@@ -7,7 +7,7 @@ import { WebMcpStatusPill } from './WebMcpStatusPill'
 import type { Component } from 'solid-js'
 import type { ArcadeMode } from '@/lib/activeTab'
 
-type CardId = ArcadeMode | 'arena'
+type CardId = ArcadeMode
 type CardDef = {
   id: CardId
   title: string
@@ -57,8 +57,8 @@ export const ARCADE_MODES: CardDef[] = [
     id: 'arena',
     title: 'Arena',
     tagline: 'Flames clash on real stats; the winner gets a shareable card.',
-    tag: 'Roadmap',
-    ready: false,
+    tag: 'Agent clashes',
+    ready: true,
     icon: Zap,
   },
   {
@@ -114,7 +114,7 @@ export function ArcadeHub(props: {
               aria-disabled={!card.ready}
               onClick={() => {
                 if (card.ready) {
-                  setActiveTab('arcade', card.id as ArcadeMode)
+                  setActiveTab('arcade', card.id)
                 }
               }}
             >

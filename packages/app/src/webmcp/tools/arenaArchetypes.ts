@@ -1,7 +1,9 @@
 import { mutateFlameSeeded } from '@/flame/randomize'
+import { calculateGroundedStats } from '@/flame/stats'
 import { deepClone } from '@/utils/clone'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameSchool, GroundedFlameStats } from '@/flame/stats'
 import type { TransformVariationType } from '@/flame/variations'
 import type { TransformVariationType3D } from '@/flame/variations3D'
 
@@ -76,6 +78,25 @@ export const TACTICAL_STANCES: Record<TacticalStance, TacticalStanceInfo> = {
       complexityMultiplier: 1.1,
     },
   },
+}
+
+/**
+ * Calculate stance-adjusted effective power level.
+ * Falls back to balanced stance if an unknown or undefined stance is provided.
+ */
+export function calculateEffectivePower(
+  basePower: number,
+  stance?: string | null,
+): number {
+  const stanceInfo =
+    (stance && TACTICAL_STANCES[stance as TacticalStance]) ||
+    TACTICAL_STANCES.balanced
+  const multiplier =
+    (stanceInfo.effects.energyMultiplier +
+      stanceInfo.effects.symmetryMultiplier +
+      stanceInfo.effects.chaosMultiplier) /
+    3
+  return Math.round((basePower || 0) * multiplier)
 }
 
 export type ArchetypeId =
@@ -239,8 +260,10 @@ export interface GeneratedFighter {
   archetype: OpponentArchetype
   name: string
   className: string
+  school: FlameSchool
   powerLevel: number
   flame: FlameDescriptor
+  groundedStats: GroundedFlameStats
   metrics: {
     complexity: number
     chaosLevel: number
@@ -296,13 +319,16 @@ export function generateArchetypeOpponent(
   }
 
   const stats = calculateFlameStats(mutated)
+  const grounded = calculateGroundedStats(mutated)
 
   return {
     archetype,
     name: archetype.name,
     className: archetype.className,
-    powerLevel: stats.powerLevel,
+    school: grounded.school,
+    powerLevel: grounded.powerLevel,
     flame: mutated,
+    groundedStats: grounded,
     metrics: stats.metrics,
   }
 }

@@ -643,7 +643,7 @@ describe('WebMCP Foundation', () => {
   })
 
   describe('animate_clash', () => {
-    it('lays down camera keyframe tracks on workspace timeline', async () => {
+    it('lays down 2D camera keyframe tracks on workspace timeline for 2D flames', async () => {
       const f1 = createTestFlame()
       const f2 = createTestFlame()
 
@@ -661,14 +661,47 @@ describe('WebMCP Foundation', () => {
       expect(cmdContext.timeline.edit!.load).toHaveBeenCalledWith(
         expect.objectContaining({
           tracks: expect.arrayContaining([
+            expect.objectContaining({ parameterPath: 'camera.zoom' }),
+            expect.objectContaining({ parameterPath: 'camera.rotation' }),
+          ]),
+        }),
+      )
+      expect(cmdContext.timeline.setDuration).toHaveBeenCalledWith(90)
+      expect(cmdContext.timeline.setAnimationEnabled).toHaveBeenCalledWith(true)
+    })
+
+    it('lays down 3D camera keyframe tracks on workspace timeline for 3D flames', async () => {
+      const f1 = {
+        ...createTestFlame(),
+        renderSettings: {
+          ...createTestFlame().renderSettings,
+          dimensions: 3 as const,
+        },
+      }
+      const f2 = {
+        ...createTestFlame(),
+        renderSettings: {
+          ...createTestFlame().renderSettings,
+          dimensions: 3 as const,
+        },
+      }
+
+      const res = (await mockContext.executeTool('animate_clash', {
+        flameA: f1,
+        flameB: f2,
+        framesPerRound: 30,
+      })) as { success: boolean; totalFrames: number; winner: string }
+
+      expect(res.success).toBe(true)
+      expect(cmdContext.timeline.edit!.load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tracks: expect.arrayContaining([
             expect.objectContaining({ parameterPath: 'camera3D.theta' }),
             expect.objectContaining({ parameterPath: 'camera3D.phi' }),
             expect.objectContaining({ parameterPath: 'camera3D.radius' }),
           ]),
         }),
       )
-      expect(cmdContext.timeline.setDuration).toHaveBeenCalledWith(90)
-      expect(cmdContext.timeline.setAnimationEnabled).toHaveBeenCalledWith(true)
     })
   })
 

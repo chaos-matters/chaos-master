@@ -3,6 +3,7 @@ import type { v2f } from 'typegpu/data'
 import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
+import type { FlameSchool, GroundedFlameStats } from '@/flame/stats'
 import type { RecordedSession, TransformColorSnapshot } from '@/recorder/schema'
 import type { SonificationSnapshot } from '@/recorder/sonificationState'
 import type { SessionRecordingStartResult } from '@/recorder/types'
@@ -37,6 +38,21 @@ export interface DirectorState {
       tags: string[]
       rationale?: string
     }>
+  }
+}
+
+export interface ArenaFighterStats {
+  name?: string
+  type?: string
+  school?: FlameSchool
+  powerLevel?: number
+  flame?: FlameDescriptor
+  groundedStats?: GroundedFlameStats
+  metrics?: {
+    complexity?: number
+    chaosLevel?: number
+    symmetryScore?: number
+    energyIntensity?: number
   }
 }
 
@@ -88,55 +104,22 @@ export interface CommandContext {
   arena?: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
-    player1Stats: Accessor<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    setPlayer1Stats: Setter<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    player2Stats: Accessor<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    setPlayer2Stats: Setter<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
+    player1Stats: Accessor<ArenaFighterStats | null>
+    setPlayer1Stats: Setter<ArenaFighterStats | null>
+    player2Stats: Accessor<ArenaFighterStats | null>
+    setPlayer2Stats: Setter<ArenaFighterStats | null>
     selectFighter?: (player: 1 | 2) => void
+    commentary?: Accessor<string | null>
+    setCommentary?: (text: string | null) => void
+    eventBanner?: Accessor<string | null>
+    setEventBanner?: (event: string | null) => void
+    stance?: Accessor<string>
+    setStance?: (stance: string) => void
+    startClash?: (options?: {
+      stance?: string
+      rounds?: number
+    }) => Promise<unknown>
+    gameState?: Accessor<'idle' | 'clashing' | 'results'>
   }
   timeline: {
     tracks: Accessor<TimelineTrack[]>

@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { batch, createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { agentDriving } from '@/arcade/pilot'
@@ -7,6 +7,7 @@ import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
+import { calculateGroundedStats } from '@/flame/stats'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { trackAppInit } from '@/lib/telemetry'
@@ -142,7 +143,7 @@ import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
-import type { CommandContext, DirectorState } from '@/commands/types'
+import type { ArenaFighterStats, CommandContext, DirectorState, } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
 export type { ExportImageInfo, ExportImageType } from '@/flame/exportImageType'
@@ -386,30 +387,37 @@ export function MainWorkspace(props: AppProps) {
   }
 
   const [showArena, setShowArena] = createSignal(false)
-  const [arenaP1Stats, setArenaP1Stats] = createSignal<{
-    name?: string
-    type?: string
-    powerLevel?: number
-    flame?: FlameDescriptor
-    metrics?: {
-      complexity?: number
-      chaosLevel?: number
-      symmetryScore?: number
-      energyIntensity?: number
-    }
-  } | null>(null)
-  const [arenaP2Stats, setArenaP2Stats] = createSignal<{
-    name?: string
-    type?: string
-    powerLevel?: number
-    flame?: FlameDescriptor
-    metrics?: {
-      complexity?: number
-      chaosLevel?: number
-      symmetryScore?: number
-      energyIntensity?: number
-    }
-  } | null>(null)
+  const [arenaP1Stats, setArenaP1Stats] =
+    createSignal<ArenaFighterStats | null>(null)
+  const [arenaP2Stats, setArenaP2Stats] =
+    createSignal<ArenaFighterStats | null>(null)
+  const [arenaCommentary, setArenaCommentary] = createSignal<string | null>(
+    null,
+  )
+  const [arenaEventBanner, setArenaEventBanner] = createSignal<string | null>(
+    null,
+  )
+  const [arenaStance, setArenaStance] = createSignal<string>('balanced')
+
+  let preArenaSidebar = true
+  let preArenaTimeline = false
+  createEffect(
+    on(
+      showArena,
+      (isOpen) => {
+        if (isOpen) {
+          preArenaSidebar = showSidebar()
+          preArenaTimeline = showTimeline()
+          setShowSidebar(false)
+          setShowTimeline(false)
+        } else {
+          setShowSidebar(preArenaSidebar)
+          setShowTimeline(preArenaTimeline)
+        }
+      },
+      { defer: true },
+    ),
+  )
 
   let isDirectorModalOpen = false
 
@@ -505,18 +513,24 @@ export function MainWorkspace(props: AppProps) {
       )
       const p1Stats = calculateFlameStats(current)
       const p2Stats = calculateFlameStats(opponent)
+      const p1Grounded = calculateGroundedStats(current)
+      const p2Grounded = calculateGroundedStats(opponent)
       setArenaP1Stats({
         name: current.metadata?.name || 'Cyan Guardian',
         type: p1Stats.type,
-        powerLevel: p1Stats.powerLevel,
+        school: p1Grounded.school,
+        powerLevel: p1Grounded.powerLevel,
         flame: current,
+        groundedStats: p1Grounded,
         metrics: p1Stats.metrics,
       })
       setArenaP2Stats({
         name: 'Crimson Nemesis',
         type: p2Stats.type,
-        powerLevel: p2Stats.powerLevel,
+        school: p2Grounded.school,
+        powerLevel: p2Grounded.powerLevel,
         flame: opponent,
+        groundedStats: p2Grounded,
         metrics: p2Stats.metrics,
       })
     }
@@ -3582,6 +3596,33 @@ export function MainWorkspace(props: AppProps) {
     }
   }
 
+  const initialStartClash = async (opts?: {
+    stance?: string
+    rounds?: number
+  }) => {
+    if (!showArena()) {
+      openFlameClashUI()
+    }
+    if (opts?.stance) {
+      setArenaStance(opts.stance)
+    }
+    return new Promise((resolve) => {
+      const start = Date.now()
+      const poll = setInterval(() => {
+        if (
+          cmdContext.arena?.startClash &&
+          cmdContext.arena.startClash !== initialStartClash
+        ) {
+          clearInterval(poll)
+          resolve(cmdContext.arena.startClash(opts))
+        } else if (Date.now() - start > 4000) {
+          clearInterval(poll)
+          resolve({ error: 'Arena clash startup timed out.' })
+        }
+      }, 50)
+    })
+  }
+
   // Command context: bridges registered commands to app signals
   const cmdContext: CommandContext = {
     seatId: 'player',
@@ -3632,6 +3673,13 @@ export function MainWorkspace(props: AppProps) {
           )
         }
       },
+      commentary: arenaCommentary,
+      setCommentary: setArenaCommentary,
+      eventBanner: arenaEventBanner,
+      setEventBanner: setArenaEventBanner,
+      stance: arenaStance,
+      setStance: setArenaStance,
+      startClash: initialStartClash,
     },
     timeline: {
       tracks: timeline.tracks,
@@ -4807,232 +4855,243 @@ export function MainWorkspace(props: AppProps) {
               executeCommand: executeCommand,
             }}
           />
-          <FloatingActions
-            disabled={animationExportRunning()}
-            initialLeft={floatingLeft()}
-            initialTop={floatingTop()}
-            onNewFlame={() => {
-              if (timeline.isPlaying()) timeline.pause()
-              // Undo restores the flame, but keyframe tracks aren't part of
-              // change history — flush unsaved work (flame + animation) to
-              // Recents so a reset can't silently destroy anything. Unlike
-              // saveRecentFlame, the upsert never declines on a full list.
-              flushDirtyToRecents()
-              const is3D =
-                (flameDescriptor.renderSettings.dimensions ?? 2) === 3
-              const flame = deepClone(is3D ? initExample3D : initExample)
-              executeFlameLoad(flame, 'New Flame', snapshotOrigin('flame.new'))
-              setLoadedAnimation({ flame, tracks: [] })
-              showToast('Fresh flame loaded — undo restores the previous one')
-            }}
-            onLoadFlame={() => {
-              if (timeline.isPlaying()) timeline.pause()
-              // Loading replaces the flame and resets dirty tracking — flush
-              // unsaved work first so it stays recoverable from Recents.
-              flushDirtyToRecents()
-              void showLoadFlameModal()
-            }}
-            onSaveForLater={async () => {
-              const tracks = timeline.tracks()
-              const success = saveRecentFlame(
-                flameDescriptor,
-                undefined,
-                tracks,
-                false,
-              )
-              if (!success) {
-                const oldest = getOldestRecentFlame()
-                const oldestName = oldest?.name || 'Flame'
-                const confirmed = await _requestModal<boolean>({
-                  content: ({ respond }) => (
-                    <Suspense>
-                      <ConfirmOverwriteRecentModal
-                        oldestName={oldestName}
-                        respond={respond}
-                      />
-                    </Suspense>
-                  ),
-                })
-                if (confirmed) {
-                  // Honour the write result. `saveRecentFlame` now reports a
-                  // failed write instead of always claiming success, so marking
-                  // the workspace clean here unconditionally would tell the user
-                  // their flame is safe when nothing landed.
-                  if (
-                    saveRecentFlame(flameDescriptor, undefined, tracks, true)
-                  ) {
-                    markSavedBaseline()
-                    showToast(
-                      tracks.length > 0
-                        ? 'Flame + animation saved (replaced oldest)'
-                        : 'Flame saved (replaced oldest)',
-                    )
-                  } else {
-                    showToast('Could not save the flame to Recents', 5000)
+          <Show when={!showArena()}>
+            <FloatingActions
+              disabled={animationExportRunning()}
+              initialLeft={floatingLeft()}
+              initialTop={floatingTop()}
+              onNewFlame={() => {
+                if (timeline.isPlaying()) timeline.pause()
+                // Undo restores the flame, but keyframe tracks aren't part of
+                // change history — flush unsaved work (flame + animation) to
+                // Recents so a reset can't silently destroy anything. Unlike
+                // saveRecentFlame, the upsert never declines on a full list.
+                flushDirtyToRecents()
+                const is3D =
+                  (flameDescriptor.renderSettings.dimensions ?? 2) === 3
+                const flame = deepClone(is3D ? initExample3D : initExample)
+                executeFlameLoad(
+                  flame,
+                  'New Flame',
+                  snapshotOrigin('flame.new'),
+                )
+                setLoadedAnimation({ flame, tracks: [] })
+                showToast('Fresh flame loaded — undo restores the previous one')
+              }}
+              onLoadFlame={() => {
+                if (timeline.isPlaying()) timeline.pause()
+                // Loading replaces the flame and resets dirty tracking — flush
+                // unsaved work first so it stays recoverable from Recents.
+                flushDirtyToRecents()
+                void showLoadFlameModal()
+              }}
+              onSaveForLater={async () => {
+                const tracks = timeline.tracks()
+                const success = saveRecentFlame(
+                  flameDescriptor,
+                  undefined,
+                  tracks,
+                  false,
+                )
+                if (!success) {
+                  const oldest = getOldestRecentFlame()
+                  const oldestName = oldest?.name || 'Flame'
+                  const confirmed = await _requestModal<boolean>({
+                    content: ({ respond }) => (
+                      <Suspense>
+                        <ConfirmOverwriteRecentModal
+                          oldestName={oldestName}
+                          respond={respond}
+                        />
+                      </Suspense>
+                    ),
+                  })
+                  if (confirmed) {
+                    // Honour the write result. `saveRecentFlame` now reports a
+                    // failed write instead of always claiming success, so marking
+                    // the workspace clean here unconditionally would tell the user
+                    // their flame is safe when nothing landed.
+                    if (
+                      saveRecentFlame(flameDescriptor, undefined, tracks, true)
+                    ) {
+                      markSavedBaseline()
+                      showToast(
+                        tracks.length > 0
+                          ? 'Flame + animation saved (replaced oldest)'
+                          : 'Flame saved (replaced oldest)',
+                      )
+                    } else {
+                      showToast('Could not save the flame to Recents', 5000)
+                    }
                   }
-                }
-              } else {
-                markSavedBaseline()
-                showToast(
-                  tracks.length > 0
-                    ? 'Flame + animation saved for later'
-                    : 'Flame saved for later',
-                )
-              }
-            }}
-            onRender={() => {
-              if (timeline.isPlaying()) timeline.pause()
-              executeCommand('export.png', cmdContext)
-            }}
-            onQuickExport={quickExport}
-            onShareLink={() => {
-              if (timeline.isPlaying()) timeline.pause()
-
-              void showShareLinkModal()
-            }}
-            onShareDiscord={shareToDiscord}
-            onLogoFavicon={showLogoFaviconGenerator}
-            onRandomizeColors={() => {
-              executeCommand(
-                'flame.setAllTransformColors',
-                cmdContext,
-                Object.fromEntries(
-                  recordEntries(
-                    randomizeAllColors(deepClone(flameDescriptor.transforms)),
-                  ).map(([tid, t]) => [tid, { x: t.color.x, y: t.color.y }]),
-                ),
-              )
-            }}
-            hideDiceButtons={hideDiceButtons}
-            setHideDiceButtons={setHideDiceButtons}
-            animationEnabled={animationEnabled}
-            setAnimationEnabled={(v) => {
-              if (IS_DEV) console.info('[anim] floating toggle →', v)
-              executeCommand('timeline.setAnimationEnabled', cmdContext, v)
-            }}
-            showTimeline={showTimeline}
-            setShowTimeline={(v) => {
-              executeCommand('view.setShowTimeline', cmdContext, v)
-            }}
-            adaptiveFilterEnabled={adaptiveFilterEnabled}
-            setAdaptiveFilterEnabled={(v) => {
-              executeCommand('view.setAdaptiveFilter', cmdContext, v)
-            }}
-            stochasticFilterEnabled={stochasticFilterEnabled}
-            setStochasticFilterEnabled={(v) => {
-              executeCommand('view.setStochasticFilter', cmdContext, v)
-            }}
-            isPlaying={() => timeline.isPlaying()}
-            togglePlay={() => {
-              if (!animationEnabled()) {
-                executeCommand('timeline.setAnimationEnabled', cmdContext, true)
-              }
-              recorderTimeline.togglePlay()
-            }}
-            qualityPreset={qualityPreset}
-            setQualityPreset={(key) => {
-              if (IS_DEV) {
-                console.info(
-                  '[App] setQualityPreset (floating)',
-                  `key=${key}`,
-                  `current=${qualityPreset()}`,
-                )
-              }
-              executeCommand('view.setQualityPreset', cmdContext, key)
-            }}
-            accumulatedPointCount={accumulatedPointCount}
-            qualityPointCountLimit={qualityPointCountLimit()}
-            collapsed={floatingActionsCollapsed}
-            setCollapsed={setFloatingActionsCollapsed}
-            dimensions={() => flameDescriptor.renderSettings.dimensions ?? 2}
-            setDimensions={(v) => {
-              const current = flameDescriptor.renderSettings.dimensions ?? 2
-              if (v === current) return
-              // The stash below is in-memory only — flush unsaved work to
-              // Recents first so switch-then-close can't lose it.
-              flushDirtyToRecents()
-              // Stash the active flame AND its animation tracks under the
-              // current dimension; restore the target dimension's own pair so
-              // 2D and 3D each keep independent animations.
-              if (current === 3) {
-                stashedFlame3D = deepClone(flameDescriptor)
-                stashedTracks3D = deepClone(timeline.tracks())
-              } else {
-                stashedFlame2D = deepClone(flameDescriptor)
-                stashedTracks2D = deepClone(timeline.tracks())
-              }
-              // Fly mode only makes sense in 3D.
-              if (v !== 3 && flyMode()) {
-                executeCommand('view.setFlyMode', cmdContext, false)
-              }
-              const restored =
-                v === 3
-                  ? (stashedFlame3D ?? example34)
-                  : (stashedFlame2D ?? initExample)
-              const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
-              // These document-boundary writes are represented by the two
-              // synthetic actions below. Suppress their coverage hooks so the
-              // recorder does not also flag the same, faithfully represented
-              // switch as an unnamed write.
-              withRecordingSuppressed(() => {
-                withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
-                  setFlameDescriptor(
-                    () => deepClone(restored),
-                    `Switch to ${v}D`,
+                } else {
+                  markSavedBaseline()
+                  showToast(
+                    tracks.length > 0
+                      ? 'Flame + animation saved for later'
+                      : 'Flame saved for later',
                   )
-                })
-                // Swap the timeline to the target dimension's tracks (empty
-                // on first entry — matches the starter flame).
-                timeline.loadTracks(restoredTracks ?? [])
-              })
-              // The switch restores from an in-memory stash, so replaying it
-              // as "switch to 3D" would land on the VIEWER's stash, not ours.
-              // Log the descriptor and tracks it actually produced instead —
-              // those replay exactly. The live path keeps one replacement-
-              // style history entry, including its palette provenance.)
-              const flameOrigin = snapshotOrigin('flame.dimension', `${v}D`)
-              recordSyntheticAction(
-                'flame.load',
-                [deepClone(restored), `Switch to ${v}D`, {}, flameOrigin],
-                snapshotOriginLabel(flameOrigin) ?? `Switch to ${v}D`,
-              )
-              const timelineOrigin = snapshotOrigin(
-                'timeline.dimension',
-                `${v}D`,
-              )
-              recordSyntheticAction(
-                'timeline.loadTimeline',
-                [
-                  {
-                    config: deepClone(timeline.config()),
-                    tracks: deepClone(restoredTracks ?? []),
-                  },
-                  timelineOrigin,
-                ],
-                snapshotOriginLabel(timelineOrigin) ?? `Load ${v}D animation`,
-              )
-              // Mode switches restore stashed/starter state — not an edit.
-              markLoadedBaseline()
-            }}
-            flyMode={flyMode}
-            setFlyMode={(v) => {
-              executeCommand('view.setFlyMode', cmdContext, v)
-              if (v) {
-                showToast(
-                  'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',
+                }
+              }}
+              onRender={() => {
+                if (timeline.isPlaying()) timeline.pause()
+                executeCommand('export.png', cmdContext)
+              }}
+              onQuickExport={quickExport}
+              onShareLink={() => {
+                if (timeline.isPlaying()) timeline.pause()
+
+                void showShareLinkModal()
+              }}
+              onShareDiscord={shareToDiscord}
+              onLogoFavicon={showLogoFaviconGenerator}
+              onRandomizeColors={() => {
+                executeCommand(
+                  'flame.setAllTransformColors',
+                  cmdContext,
+                  Object.fromEntries(
+                    recordEntries(
+                      randomizeAllColors(deepClone(flameDescriptor.transforms)),
+                    ).map(([tid, t]) => [tid, { x: t.color.x, y: t.color.y }]),
+                  ),
                 )
-              }
-            }}
-            sidebarOpen={showSidebar}
-            onToggleSidebar={() => {
-              // Same as the 'F' shortcut, so it works without a keyboard.
-              if ('startViewTransition' in document) {
-                document.startViewTransition(toggleSidebarAsAuthoredAction)
-              } else {
-                toggleSidebarAsAuthoredAction()
-              }
-            }}
-          />
+              }}
+              hideDiceButtons={hideDiceButtons}
+              setHideDiceButtons={setHideDiceButtons}
+              animationEnabled={animationEnabled}
+              setAnimationEnabled={(v) => {
+                if (IS_DEV) console.info('[anim] floating toggle →', v)
+                executeCommand('timeline.setAnimationEnabled', cmdContext, v)
+              }}
+              showTimeline={showTimeline}
+              setShowTimeline={(v) => {
+                executeCommand('view.setShowTimeline', cmdContext, v)
+              }}
+              adaptiveFilterEnabled={adaptiveFilterEnabled}
+              setAdaptiveFilterEnabled={(v) => {
+                executeCommand('view.setAdaptiveFilter', cmdContext, v)
+              }}
+              stochasticFilterEnabled={stochasticFilterEnabled}
+              setStochasticFilterEnabled={(v) => {
+                executeCommand('view.setStochasticFilter', cmdContext, v)
+              }}
+              isPlaying={() => timeline.isPlaying()}
+              togglePlay={() => {
+                if (!animationEnabled()) {
+                  executeCommand(
+                    'timeline.setAnimationEnabled',
+                    cmdContext,
+                    true,
+                  )
+                }
+                recorderTimeline.togglePlay()
+              }}
+              qualityPreset={qualityPreset}
+              setQualityPreset={(key) => {
+                if (IS_DEV) {
+                  console.info(
+                    '[App] setQualityPreset (floating)',
+                    `key=${key}`,
+                    `current=${qualityPreset()}`,
+                  )
+                }
+                executeCommand('view.setQualityPreset', cmdContext, key)
+              }}
+              accumulatedPointCount={accumulatedPointCount}
+              qualityPointCountLimit={qualityPointCountLimit()}
+              collapsed={floatingActionsCollapsed}
+              setCollapsed={setFloatingActionsCollapsed}
+              dimensions={() => flameDescriptor.renderSettings.dimensions ?? 2}
+              setDimensions={(v) => {
+                const current = flameDescriptor.renderSettings.dimensions ?? 2
+                if (v === current) return
+                // The stash below is in-memory only — flush unsaved work to
+                // Recents first so switch-then-close can't lose it.
+                flushDirtyToRecents()
+                // Stash the active flame AND its animation tracks under the
+                // current dimension; restore the target dimension's own pair so
+                // 2D and 3D each keep independent animations.
+                if (current === 3) {
+                  stashedFlame3D = deepClone(flameDescriptor)
+                  stashedTracks3D = deepClone(timeline.tracks())
+                } else {
+                  stashedFlame2D = deepClone(flameDescriptor)
+                  stashedTracks2D = deepClone(timeline.tracks())
+                }
+                // Fly mode only makes sense in 3D.
+                if (v !== 3 && flyMode()) {
+                  executeCommand('view.setFlyMode', cmdContext, false)
+                }
+                const restored =
+                  v === 3
+                    ? (stashedFlame3D ?? example34)
+                    : (stashedFlame2D ?? initExample)
+                const restoredTracks =
+                  v === 3 ? stashedTracks3D : stashedTracks2D
+                // These document-boundary writes are represented by the two
+                // synthetic actions below. Suppress their coverage hooks so the
+                // recorder does not also flag the same, faithfully represented
+                // switch as an unnamed write.
+                withRecordingSuppressed(() => {
+                  withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
+                    setFlameDescriptor(
+                      () => deepClone(restored),
+                      `Switch to ${v}D`,
+                    )
+                  })
+                  // Swap the timeline to the target dimension's tracks (empty
+                  // on first entry — matches the starter flame).
+                  timeline.loadTracks(restoredTracks ?? [])
+                })
+                // The switch restores from an in-memory stash, so replaying it
+                // as "switch to 3D" would land on the VIEWER's stash, not ours.
+                // Log the descriptor and tracks it actually produced instead —
+                // those replay exactly. The live path keeps one replacement-
+                // style history entry, including its palette provenance.)
+                const flameOrigin = snapshotOrigin('flame.dimension', `${v}D`)
+                recordSyntheticAction(
+                  'flame.load',
+                  [deepClone(restored), `Switch to ${v}D`, {}, flameOrigin],
+                  snapshotOriginLabel(flameOrigin) ?? `Switch to ${v}D`,
+                )
+                const timelineOrigin = snapshotOrigin(
+                  'timeline.dimension',
+                  `${v}D`,
+                )
+                recordSyntheticAction(
+                  'timeline.loadTimeline',
+                  [
+                    {
+                      config: deepClone(timeline.config()),
+                      tracks: deepClone(restoredTracks ?? []),
+                    },
+                    timelineOrigin,
+                  ],
+                  snapshotOriginLabel(timelineOrigin) ?? `Load ${v}D animation`,
+                )
+                // Mode switches restore stashed/starter state — not an edit.
+                markLoadedBaseline()
+              }}
+              flyMode={flyMode}
+              setFlyMode={(v) => {
+                executeCommand('view.setFlyMode', cmdContext, v)
+                if (v) {
+                  showToast(
+                    'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',
+                  )
+                }
+              }}
+              sidebarOpen={showSidebar}
+              onToggleSidebar={() => {
+                // Same as the 'F' shortcut, so it works without a keyboard.
+                if ('startViewTransition' in document) {
+                  document.startViewTransition(toggleSidebarAsAuthoredAction)
+                } else {
+                  toggleSidebarAsAuthoredAction()
+                }
+              }}
+            />
+          </Show>
           <WorkspaceModalsHost
             tourContext={tourContext}
             cmdContext={cmdContext}

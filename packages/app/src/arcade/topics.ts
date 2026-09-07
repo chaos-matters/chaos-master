@@ -1,4 +1,5 @@
 import type { DuelStartFrom, LessonTopic, TopicId } from './types'
+import type { TacticalStance } from '@/flame/stats'
 import type { Dims } from '@/flame/variationRegistry'
 
 export type { DuelStartFrom, LessonTopic, TopicId }
@@ -359,6 +360,101 @@ export function directorPromptCard(goal?: string): string {
     'Inspect my current flame and taste profile with director_get_taste_profile. Propose a generation of 4-6 diverse candidate flames using director_propose, explaining your artistic rationale for each. Then call director_get_feedback to review my Like/Dislike reactions and tags, and breed or mutate the next generation toward my preferences.'
 
   return `Act as the Evolutionary Art Director in Lumen Apeiron. Call director_get_taste_profile first to read my historical aesthetic preferences. Propose a curated generation of candidates with director_propose: ${goalText}. Then call director_get_feedback to review which candidates I liked or disliked and what tags I selected. Evolve the flame across multiple generations toward what I love.
+
+${WEBMCP_FALLBACK_NOTE}`
+}
+
+export interface ArenaStanceOption {
+  id: TacticalStance
+  label: string
+  bonus: string
+  description: string
+}
+
+export const ARENA_STANCES: readonly ArenaStanceOption[] = [
+  {
+    id: 'balanced',
+    label: 'Harmonic Stance',
+    bonus: 'Balanced',
+    description: 'Balanced power allocation with stable territory defense.',
+  },
+  {
+    id: 'resonance',
+    label: 'Resonance Surge',
+    bonus: '+25% ATK',
+    description:
+      'Overcharges energy intensity for aggressive offensive expansion.',
+  },
+  {
+    id: 'bastion',
+    label: 'Symmetry Bastion',
+    bonus: '+30% DEF',
+    description: 'Constructs crystalline barriers to resist enemy attacks.',
+  },
+  {
+    id: 'entropy',
+    label: 'Entropy Overload',
+    bonus: '+35% Crit',
+    description: 'Unleashes chaotic non-linear fluctuations for critical hits.',
+  },
+] as const
+
+export interface ArenaArchetypeOption {
+  id: string
+  name: string
+  className: string
+  school: string
+}
+
+export const ARENA_ARCHETYPES_LIST: readonly ArenaArchetypeOption[] = [
+  {
+    id: 'chaos_lord',
+    name: 'Chaos Lord',
+    className: 'Entropic Warlord',
+    school: 'Void',
+  },
+  {
+    id: 'symmetry_monolith',
+    name: 'Symmetry Monolith',
+    className: 'Crystalline Bastion',
+    school: 'Crystal',
+  },
+  {
+    id: 'spiral_leviathan',
+    name: 'Spiral Leviathan',
+    className: 'Abyssal Swirl',
+    school: 'Vortex',
+  },
+  {
+    id: 'quantum_siren',
+    name: 'Quantum Siren',
+    className: 'Harmonic Phantom',
+    school: 'Tide',
+  },
+  {
+    id: 'solar_seraph',
+    name: 'Solar Seraph',
+    className: 'Radiant Core',
+    school: 'Order',
+  },
+  {
+    id: 'void_stalker',
+    name: 'Void Stalker',
+    className: 'Dark Singularity',
+    school: 'Arcane',
+  },
+] as const
+
+export function arenaPromptCard(
+  opponentName: string = 'Chaos Lord',
+  stanceName: string = 'balanced',
+  strategyGoal?: string,
+): string {
+  const goalText =
+    strategyGoal?.trim() ||
+    `Evaluate our flame with arena_get_stats to identify our school strengths, stability, and crit potential. Formulate a battle plan against ${opponentName} in ${stanceName} stance.`
+
+  return `Coach and battle with me in the Flame Clash Arena in Lumen Apeiron. Check our stats with arena_get_stats to determine our school affinities and attributes against ${opponentName} (stance: ${stanceName}). Execute combat strategy: ${goalText}. Launch and animate the visual combat in the UI using arena_start_clash (or simulate_clash), watch the fighters clash in the arena spectator HUD, and use arena_commentate to narrate turns, track remaining HP, and celebrate victory!
 
 ${WEBMCP_FALLBACK_NOTE}`
 }

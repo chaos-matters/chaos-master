@@ -21,13 +21,7 @@ const icons = {
 
 // The hub's other card. Tagline is the hub's own, so a visitor reads
 // the same sentence here and on the card itself.
-const soon = [
-  {
-    icon: 'zap',
-    name: 'Arena',
-    tag: 'Flames clash on real stats; the winner gets a shareable card.',
-  },
-]
+const soon: Array<{ icon: keyof typeof icons; name: string; tag: string }> = []
 
 const modes = [
   {
@@ -60,6 +54,12 @@ const modes = [
     tag: 'Agent drives',
     body: 'The agent inspects your taste profile, proposes a curated generation of candidates, and explains the geometry behind each. Rate them with Like or Dislike, select quick feedback tags, and watch your fractal lineage evolve toward what you love.',
   },
+  {
+    icon: 'zap',
+    name: 'Arena',
+    tag: 'Agent clashes',
+    body: 'Flames clash in 3D territorial combat based on grounded geometric stats. Select a tactical stance, face procedural archetypes or let the AI coach and battle for you, and export a shareable champion card.',
+  },
 ]
 ---
 
@@ -88,23 +88,25 @@ const modes = [
     }
   </div>
 
-  <div class="soon">
-    <p class="soon-label">On the horizon</p>
-    <div class="soon-grid">
-      {
-        soon.map((c) => (
-          <div class="soon-card">
-            <span class="soon-icon" set:html={icons[c.icon]} />
-            <div>
-              <div class="soon-name">{c.name}</div>
-              <div class="soon-tag">{c.tag}</div>
+  {
+    soon.length > 0 && (
+      <div class="soon">
+        <p class="soon-label">On the horizon</p>
+        <div class="soon-grid">
+          {soon.map((c) => (
+            <div class="soon-card">
+              <span class="soon-icon" set:html={icons[c.icon]} />
+              <div>
+                <div class="soon-name">{c.name}</div>
+                <div class="soon-tag">{c.tag}</div>
+              </div>
+              <span class="soon-badge">Soon</span>
             </div>
-            <span class="soon-badge">Soon</span>
-          </div>
-        ))
-      }
-    </div>
-  </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   <div class="run">
     <span class="run-icon" set:html={icons.robot} />

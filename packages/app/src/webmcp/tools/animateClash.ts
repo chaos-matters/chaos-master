@@ -1,16 +1,16 @@
 import { executeCommand } from '@/commands/registry'
+import { generateClashKeyframeTracks } from '@/flame/flameClashChoreography'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import { simulateClash } from '@/webmcp/tools/simulateClash'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { TimelineTrack } from '@/utils/timeline'
 import type { SimulateClashResult } from '@/webmcp/tools/simulateClash'
 import type { WebMcpTool } from '@/webmcp/types'
 
 export const animateClash: WebMcpTool = {
   name: 'animate_clash',
   description:
-    'Keyframes an interactive 3D camera choreography and territory fight into the timeline. Sets up establishing orbit, convergence collision, and victory resolution across 3 rounds.',
+    'Keyframes an interactive 3D or 2D camera choreography and kinetic fighter territory clash into the timeline. Sets up approach, high-speed dash, impact collision flashes, recoil, and victory resolution across rounds.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -29,7 +29,7 @@ export const animateClash: WebMcpTool = {
       },
       framesPerRound: {
         type: 'integer',
-        description: 'Number of timeline frames per round. Default is 60.',
+        description: 'Number of timeline frames per round. Default is 30.',
       },
     },
   },
@@ -44,7 +44,7 @@ export const animateClash: WebMcpTool = {
       framesPerRound?: number
     }
 
-    const { framesPerRound = 60 } = raw
+    const { framesPerRound = 30 } = raw
     let sim = raw.simulation
 
     if (!sim) {
@@ -57,7 +57,11 @@ export const animateClash: WebMcpTool = {
         }
       }
       const simRes = simulateClash.execute(
-        { flameA: f1, flameB: f2, dimensions: 3 },
+        {
+          flameA: f1,
+          flameB: f2,
+          dimensions: f1.renderSettings?.dimensions ?? 3,
+        },
         {},
       ) as SimulateClashResult
       if (!simRes || !simRes.rounds) {
@@ -68,122 +72,22 @@ export const animateClash: WebMcpTool = {
 
     const round1Flame = sim.rounds[0]?.clashFlame
     if (round1Flame) {
-      // Through the registry, not a raw setter: an unnamed document write is
-      // invisible to the session recorder and cannot be replayed (audit F2).
-      executeCommand(
-        'flame.load',
-        ctx,
-        deepClone(round1Flame),
-        'Animate 3D Clash',
-      )
+      executeCommand('flame.load', ctx, deepClone(round1Flame), 'Animate Clash')
     }
 
-    const totalFrames = framesPerRound * 3
-    const separation = 2.2
+    if (!round1Flame) {
+      return { error: 'No clash flame available to animate.' }
+    }
 
-    const tracks: TimelineTrack[] = [
+    const dimensions = (round1Flame.renderSettings?.dimensions as 2 | 3) ?? 3
+    const { tracks, totalFrames } = generateClashKeyframeTracks(
+      round1Flame,
+      sim,
       {
-        parameterPath: 'camera3D.theta',
-        keyframes: [
-          { frame: 0, value: 0, easing: 'easeInOut', interp: 'spline' },
-          {
-            frame: framesPerRound,
-            value: Math.PI,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: framesPerRound * 2,
-            value: 2 * Math.PI,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: totalFrames,
-            value: sim.winner === 'A' ? 2 * Math.PI - 0.5 : 2 * Math.PI + 0.5,
-            easing: 'easeOut',
-            interp: 'spline',
-          },
-        ],
+        framesPerRound,
+        dimensions,
       },
-      {
-        parameterPath: 'camera3D.phi',
-        keyframes: [
-          { frame: 0, value: 1.2, easing: 'easeInOut', interp: 'spline' },
-          {
-            frame: framesPerRound,
-            value: 1.0,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: framesPerRound * 2,
-            value: 1.4,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: totalFrames,
-            value: 1.2,
-            easing: 'easeOut',
-            interp: 'spline',
-          },
-        ],
-      },
-      {
-        parameterPath: 'camera3D.radius',
-        keyframes: [
-          {
-            frame: 0,
-            value: separation * 3.5,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: framesPerRound,
-            value: separation * 2.8,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: framesPerRound * 2,
-            value: separation * 1.5,
-            easing: 'easeInOut',
-            interp: 'spline',
-          },
-          {
-            frame: totalFrames,
-            value: separation * 2.0,
-            easing: 'easeOut',
-            interp: 'spline',
-          },
-        ],
-      },
-      {
-        parameterPath: 'depthColorPower',
-        keyframes: [
-          { frame: 0, value: 0.2, easing: 'linear', interp: 'linear' },
-          {
-            frame: framesPerRound,
-            value: 0.35,
-            easing: 'linear',
-            interp: 'linear',
-          },
-          {
-            frame: framesPerRound * 2,
-            value: 0.5,
-            easing: 'linear',
-            interp: 'linear',
-          },
-          {
-            frame: totalFrames,
-            value: 0.7,
-            easing: 'easeOut',
-            interp: 'linear',
-          },
-        ],
-      },
-    ]
+    )
 
     // Same reason: one named `timeline.loadTimeline` carrying the tracks,
     // falling back to the raw setter only where there is no edit seam (the
@@ -200,7 +104,7 @@ export const animateClash: WebMcpTool = {
 
     return {
       success: true,
-      message: `Generated ${tracks.length} camera animation tracks across ${totalFrames} frames for 3-round clash.`,
+      message: `Generated ${tracks.length} combat animation tracks across ${totalFrames} frames for clash.`,
       totalFrames,
       winner: sim.winner,
     }
