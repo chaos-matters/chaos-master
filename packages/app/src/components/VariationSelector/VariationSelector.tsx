@@ -232,9 +232,10 @@ export function VariationPreview(props: {
   let activeObjectUrl: string | undefined
 
   createEffect(() => {
-    // When version increments (point init mode changed), discard the stale
-    // cached image so the Flam3 canvas becomes visible again and re-renders.
+    // When version increments (point init mode changed) or the flame descriptor changes,
+    // discard the stale cached image so the Flam3 canvas becomes visible again and re-renders.
     void props.version
+    void props.flame
     if (activeObjectUrl !== undefined) {
       URL.revokeObjectURL(activeObjectUrl)
       activeObjectUrl = undefined

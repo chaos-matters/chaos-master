@@ -70,4 +70,36 @@ describe('ArcadeModePanel duel setup', () => {
     launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(ctx.director?.setOpen).toHaveBeenCalledWith(true)
   })
+
+  it('renders arena mode with stances, archetypes, and launch button', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    render(() => <ArcadeModePanel mode="arena" onClose={() => {}} />)
+
+    expect(screen.getByText(/Harmonic Stance/i)).toBeDefined()
+    expect(screen.getByText(/Resonance Surge/i)).toBeDefined()
+    expect(screen.getByRole('button', { name: /Chaos Lord/i })).toBeDefined()
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('arena_get_stats')
+    expect(promptCard.textContent).toContain('arena_commentate')
+    expect(promptCard.textContent).toContain('simulate_clash')
+    expect(promptCard.textContent).toContain('Chaos Lord')
+
+    // Select Solar Seraph archetype
+    const seraphChip = screen.getByRole('button', { name: /Solar Seraph/i })
+    seraphChip.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(promptCard.textContent).toContain('Solar Seraph')
+
+    // Clicking launch button opens arena modal and assigns P2 archetype stats
+    const launchBtn = screen.getByText(/Launch Clash Arena/i)
+    launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(ctx.arena?.setOpen).toHaveBeenCalledWith(true)
+    expect(ctx.arena?.setPlayer2Stats).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Sol Invictus',
+        type: 'Solar Seraph',
+      }),
+    )
+  })
 })

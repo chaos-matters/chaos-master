@@ -1,9 +1,11 @@
+import { resolveClashCombat } from '@/flame/stats'
 import { deepClone } from '@/utils/clone'
-import { TACTICAL_STANCES } from '@/webmcp/tools/arenaArchetypes'
+import { calculateEffectivePower, TACTICAL_STANCES, } from '@/webmcp/tools/arenaArchetypes'
 import { createClashFlame } from '@/webmcp/tools/createClashFlame'
 import { scoreClashRound } from '@/webmcp/tools/scoreClashRound'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ClashCombatResult } from '@/flame/stats'
 import type { TacticalStance } from '@/webmcp/tools/arenaArchetypes'
 import type { ScoreClashRoundResult } from '@/webmcp/tools/scoreClashRound'
 import type { WebMcpTool } from '@/webmcp/types'
@@ -22,6 +24,8 @@ export interface SimulateClashResult {
   winner: 'A' | 'B' | 'draw'
   rounds: ClashRoundOutcome[]
   finalScore: { A: number; B: number }
+  combat?: ClashCombatResult
+  battleLog?: string[]
 }
 
 export const simulateClash: WebMcpTool = {
@@ -121,13 +125,7 @@ export const simulateClash: WebMcpTool = {
 
     const statsA = {
       ...baseStatsA,
-      powerLevel: Math.round(
-        baseStatsA.powerLevel *
-          ((stanceInfoA.effects.energyMultiplier +
-            stanceInfoA.effects.symmetryMultiplier +
-            stanceInfoA.effects.chaosMultiplier) /
-            3),
-      ),
+      powerLevel: calculateEffectivePower(baseStatsA.powerLevel, stanceA),
       metrics: {
         complexity:
           baseStatsA.metrics.complexity *
@@ -145,13 +143,7 @@ export const simulateClash: WebMcpTool = {
 
     const statsB = {
       ...baseStatsB,
-      powerLevel: Math.round(
-        baseStatsB.powerLevel *
-          ((stanceInfoB.effects.energyMultiplier +
-            stanceInfoB.effects.symmetryMultiplier +
-            stanceInfoB.effects.chaosMultiplier) /
-            3),
-      ),
+      powerLevel: calculateEffectivePower(baseStatsB.powerLevel, stanceB),
       metrics: {
         complexity:
           baseStatsB.metrics.complexity *
@@ -274,10 +266,24 @@ export const simulateClash: WebMcpTool = {
 
     const overallWinner = scoreA > scoreB ? 'A' : scoreB > scoreA ? 'B' : 'draw'
 
+    const combat = resolveClashCombat({
+      nameA: flameA.metadata?.name || 'Player 1',
+      nameB: flameB.metadata?.name || 'Player 2',
+      flameA,
+      flameB,
+      stanceA,
+      stanceB,
+      rounds,
+      seed,
+      territoryWinner: overallWinner,
+    })
+
     return {
       winner: overallWinner,
       rounds: roundOutcomes,
       finalScore: { A: scoreA, B: scoreB },
+      combat,
+      battleLog: combat.battleLog,
     }
   },
 }

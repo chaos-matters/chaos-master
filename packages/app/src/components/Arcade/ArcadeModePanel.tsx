@@ -2,15 +2,18 @@ import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
 import { BUNDLED_TRACKS } from '@/arcade/bundledTracks'
 import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
 import { beginDuel } from '@/arcade/duelActions'
-import { BEATS_PRESETS, beatsPromptCard, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { ARENA_ARCHETYPES_LIST, ARENA_STANCES, arenaPromptCard, BEATS_PRESETS, beatsPromptCard, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { variationTypesFor } from '@/flame/variationRegistry'
 import { Copy, Cross, Swords } from '@/icons'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
+import { generateArchetypeOpponent } from '@/webmcp/tools/arenaArchetypes'
 import ui from './ArcadeHub.module.css'
 import type { DuelStartFrom } from '@/arcade/duelActions'
 import type { TopicId } from '@/arcade/topics'
+import type { TacticalStance } from '@/flame/stats'
 import type { Dims } from '@/flame/variationRegistry'
 import type { ArcadeMode } from '@/lib/activeTab'
+import type { ArchetypeId } from '@/webmcp/tools/arenaArchetypes'
 
 /**
  * Whether the hub offers a duel with nobody in the other seat.
@@ -28,6 +31,7 @@ const TITLES: Record<ArcadeMode, string> = {
   duel: 'Duel',
   beats: 'Beats',
   director: 'Director',
+  arena: 'Arena',
 }
 
 const STEPS = [
@@ -129,13 +133,21 @@ export function ArcadeModePanel(props: {
   const [directorGoal, setDirectorGoal] = createSignal(
     DIRECTOR_PRESETS[0]!.wish,
   )
+  const [selectedStance, setSelectedStance] = createSignal<TacticalStance>(
+    ARENA_STANCES[0]!.id,
+  )
+  const [selectedArchetype, setSelectedArchetype] = createSignal(
+    ARENA_ARCHETYPES_LIST[0]!,
+  )
+  const [arenaGoal, setArenaGoal] = createSignal('')
 
   const ready = () =>
     props.mode === 'teach' ||
     props.mode === 'cinema' ||
     props.mode === 'duel' ||
     props.mode === 'beats' ||
-    props.mode === 'director'
+    props.mode === 'director' ||
+    props.mode === 'arena'
   const prompt = () =>
     props.mode === 'teach'
       ? teachPromptCard(topic())
@@ -145,7 +157,13 @@ export function ArcadeModePanel(props: {
           ? beatsPromptCard(selectedTrack().name, beatsGoal())
           : props.mode === 'director'
             ? directorPromptCard(directorGoal())
-            : cinemaPromptCard(description())
+            : props.mode === 'arena'
+              ? arenaPromptCard(
+                  selectedArchetype().name,
+                  selectedStance(),
+                  arenaGoal(),
+                )
+              : cinemaPromptCard(description())
   return (
     <aside
       class={ui.panel}
@@ -397,6 +415,86 @@ export function ArcadeModePanel(props: {
             }}
           >
             Launch Art Director Overlay
+          </button>
+        </Match>
+        <Match when={props.mode === 'arena'}>
+          <p>
+            Choose your tactical combat stance and challenger archetype, or let
+            the AI coach and clash for you using grounded geometric stats.
+          </p>
+          <div class={ui.chips} aria-label="Tactical combat stances">
+            <For each={ARENA_STANCES}>
+              {(st) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: selectedStance() === st.id,
+                  }}
+                  onClick={() => setSelectedStance(st.id)}
+                  title={st.description}
+                >
+                  {st.label} ({st.bonus})
+                </button>
+              )}
+            </For>
+          </div>
+          <div class={ui.chips} aria-label="Challenger archetypes">
+            <For each={ARENA_ARCHETYPES_LIST}>
+              {(arch) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: selectedArchetype().id === arch.id,
+                  }}
+                  onClick={() => setSelectedArchetype(arch)}
+                  title={`${arch.className} — School of ${arch.school}`}
+                >
+                  {arch.name} ({arch.school})
+                </button>
+              )}
+            </For>
+          </div>
+          <label class={ui.field}>
+            <span>Combat Strategy</span>
+            <textarea
+              rows={3}
+              value={arenaGoal()}
+              onInput={(ev) => setArenaGoal(ev.currentTarget.value)}
+              placeholder="Focus on high stability to endure enemy chaos, and counter with resonant energy spikes"
+            />
+          </label>
+          <button
+            type="button"
+            class={ui.soloDuelButton}
+            onClick={() => {
+              const ctx = getWebMcpContext()
+              if (ctx?.arena) {
+                if (ctx.arena.setStance) {
+                  ctx.arena.setStance(selectedStance())
+                }
+                const currentFlame = ctx.flameDescriptor?.()
+                if (currentFlame && ctx.arena.setPlayer2Stats) {
+                  const opp = generateArchetypeOpponent(
+                    currentFlame,
+                    selectedArchetype().id as ArchetypeId,
+                  )
+                  ctx.arena.setPlayer2Stats({
+                    name: opp.name,
+                    type: opp.className,
+                    school: opp.school,
+                    powerLevel: opp.powerLevel,
+                    flame: opp.flame,
+                    groundedStats: opp.groundedStats,
+                    metrics: opp.metrics,
+                  })
+                }
+                ctx.arena.setOpen(true)
+              }
+            }}
+          >
+            Launch Clash Arena
           </button>
         </Match>
         <Match when={!ready()}>

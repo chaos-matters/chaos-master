@@ -10,7 +10,13 @@ import { createSignal } from 'solid-js'
 export type AppTab = 'home' | 'workspace' | 'arcade'
 
 /** The Arcade panels a deep link (or a tool) can open the hub on. */
-export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats' | 'director'
+export type ArcadeMode =
+  | 'teach'
+  | 'cinema'
+  | 'duel'
+  | 'beats'
+  | 'director'
+  | 'arena'
 
 /**
  * The tab lives in the URL fragment (`#home`, `#arcade`, `#arcade=teach`)
@@ -29,6 +35,7 @@ const ARCADE_MODES: readonly ArcadeMode[] = [
   'duel',
   'beats',
   'director',
+  'arena',
 ]
 
 // The parameter is named `fragment` rather than `hash` because the security

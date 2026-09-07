@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { ALWAYS_ALLOWED, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
+import { ALWAYS_ALLOWED, ARENA_ARCHETYPES_LIST, ARENA_STANCES, arenaPromptCard, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -172,6 +172,42 @@ describe('director', () => {
     expect(card).toContain('director_get_taste_profile')
     expect(card).toContain('director_propose')
     expect(card).toContain('director_get_feedback')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('arena', () => {
+  it('offers arena stances with distinct bonuses and descriptions', () => {
+    expect(ARENA_STANCES.length).toBe(4)
+    for (const stance of ARENA_STANCES) {
+      expect(stance.label.length).toBeGreaterThan(3)
+      expect(stance.bonus.length).toBeGreaterThan(2)
+      expect(stance.description.length).toBeGreaterThan(15)
+    }
+  })
+
+  it('offers 6 procedural challenger archetypes with schools', () => {
+    expect(ARENA_ARCHETYPES_LIST.length).toBe(6)
+    for (const arch of ARENA_ARCHETYPES_LIST) {
+      expect(arch.name.length).toBeGreaterThan(3)
+      expect(arch.className.length).toBeGreaterThan(3)
+      expect(arch.school.length).toBeGreaterThan(2)
+    }
+  })
+
+  it('arena prompt card incorporates opponent, stance, and arena tools', () => {
+    const card = arenaPromptCard(
+      'Spiral Leviathan',
+      'resonance',
+      'Focus on high energy',
+    )
+    expect(card).toContain('Spiral Leviathan')
+    expect(card).toContain('resonance')
+    expect(card).toContain('Focus on high energy')
+    expect(card).toContain('arena_get_stats')
+    expect(card).toContain('arena_commentate')
+    expect(card).toContain('simulate_clash')
+    expect(card).toContain('arena_start_clash')
     expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })
 })

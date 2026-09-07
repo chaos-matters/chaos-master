@@ -29,6 +29,11 @@ export const openArena: WebMcpTool = {
         type: 'object',
         description: 'Optional FlameDescriptor for fighter 2.',
       },
+      autoStart: {
+        type: 'boolean',
+        description:
+          'When true, automatically initiates the visual animated clash in the UI.',
+      },
     },
     required: ['player1Stats', 'player2Stats'],
   },
@@ -52,6 +57,7 @@ export const openArena: WebMcpTool = {
       player2Name?: string
       player2Stats?: Record<string, unknown>
       player2Flame?: FlameDescriptor
+      autoStart?: boolean
     }
 
     const currentFlame = ctx.flameDescriptor()
@@ -105,6 +111,14 @@ export const openArena: WebMcpTool = {
       flame: p2Flame,
     })
     arena.setOpen(true)
+
+    if (raw.autoStart && arena.startClash) {
+      arena.startClash().catch(() => {})
+      return {
+        success: true,
+        message: 'Arena HUD opened and clash animation initiated.',
+      }
+    }
 
     return { success: true, message: 'Arena HUD opened.' }
   },
