@@ -51,7 +51,17 @@ export function isPlainRecord(
   return prototype === Object.prototype || prototype === null
 }
 
-export function tryValidatePalette(value: unknown): Palette | undefined {
+interface ValidatedPaletteHeader {
+  id: string
+  name: string
+  source?: 'builtin' | 'custom' | 'imported' | 'official'
+  createdAt?: number
+  entries: unknown[]
+}
+
+function validatePaletteHeader(
+  value: unknown,
+): ValidatedPaletteHeader | undefined {
   if (!isPlainRecord(value)) return undefined
   const { id, name, source, createdAt, entries } = value
   if (
@@ -79,44 +89,58 @@ export function tryValidatePalette(value: unknown): Palette | undefined {
   ) {
     return undefined
   }
+  return { id, name, source, createdAt, entries }
+}
+
+function validatePaletteEntry(
+  entry: unknown,
+  ids: Set<string>,
+): Palette['entries'][number] | undefined {
+  if (!isPlainRecord(entry)) return undefined
+  const { id: entryId, position, a, b } = entry
+  if (
+    Object.keys(entry).some(
+      (key) => key !== 'id' && key !== 'position' && key !== 'a' && key !== 'b',
+    ) ||
+    typeof entryId !== 'string' ||
+    entryId.length === 0 ||
+    entryId.length > MAX_PALETTE_TEXT_LENGTH ||
+    ids.has(entryId) ||
+    typeof position !== 'number' ||
+    !Number.isFinite(position) ||
+    position < 0 ||
+    position > 1 ||
+    typeof a !== 'number' ||
+    !Number.isFinite(a) ||
+    Math.abs(a) > MAX_PALETTE_CHANNEL_MAGNITUDE ||
+    typeof b !== 'number' ||
+    !Number.isFinite(b) ||
+    Math.abs(b) > MAX_PALETTE_CHANNEL_MAGNITUDE
+  ) {
+    return undefined
+  }
+  ids.add(entryId)
+  return { id: entryId, position, a, b }
+}
+
+export function tryValidatePalette(value: unknown): Palette | undefined {
+  const header = validatePaletteHeader(value)
+  if (!header) return undefined
 
   const ids = new Set<string>()
   const validatedEntries: Palette['entries'] = []
-  for (const entry of entries) {
-    if (!isPlainRecord(entry)) return undefined
-    const { id: entryId, position, a, b } = entry
-    if (
-      Object.keys(entry).some(
-        (key) =>
-          key !== 'id' && key !== 'position' && key !== 'a' && key !== 'b',
-      ) ||
-      typeof entryId !== 'string' ||
-      entryId.length === 0 ||
-      entryId.length > MAX_PALETTE_TEXT_LENGTH ||
-      ids.has(entryId) ||
-      typeof position !== 'number' ||
-      !Number.isFinite(position) ||
-      position < 0 ||
-      position > 1 ||
-      typeof a !== 'number' ||
-      !Number.isFinite(a) ||
-      Math.abs(a) > MAX_PALETTE_CHANNEL_MAGNITUDE ||
-      typeof b !== 'number' ||
-      !Number.isFinite(b) ||
-      Math.abs(b) > MAX_PALETTE_CHANNEL_MAGNITUDE
-    ) {
-      return undefined
-    }
-    ids.add(entryId)
-    validatedEntries.push({ id: entryId, position, a, b })
+  for (const rawEntry of header.entries) {
+    const entry = validatePaletteEntry(rawEntry, ids)
+    if (!entry) return undefined
+    validatedEntries.push(entry)
   }
 
   return {
-    id,
-    name,
-    source: source ?? 'custom',
+    id: header.id,
+    name: header.name,
+    source: header.source ?? 'custom',
     entries: validatedEntries,
-    ...(createdAt === undefined ? {} : { createdAt }),
+    ...(header.createdAt === undefined ? {} : { createdAt: header.createdAt }),
   }
 }
 
@@ -313,13 +337,12 @@ export function symmetryTransformCount(n: unknown, type: unknown): number {
   return folds - 1 + (type === 'dihedral' ? 1 : 0)
 }
 
-export function symmetryArgsError(
-  args: readonly unknown[],
+function validateSymmetryHeader(
+  n: unknown,
+  type: unknown,
+  origin: unknown,
+  hasOrigin: boolean,
 ): string | undefined {
-  if (args.length !== 3 && args.length !== 4) {
-    return 'symmetry expects three arguments and an optional control origin'
-  }
-  const [n, type, ids, origin] = args
   if (
     typeof n !== 'number' ||
     !Number.isInteger(n) ||
@@ -331,34 +354,47 @@ export function symmetryArgsError(
   if (type !== 'rotational' && type !== 'dihedral') {
     return 'symmetry type must be rotational or dihedral'
   }
-  if (args.length === 4 && !isSymmetryControlOrigin(origin)) {
+  if (hasOrigin && !isSymmetryControlOrigin(origin)) {
     return 'symmetry control origin must be add, type, or folds'
   }
+  return undefined
+}
 
-  const count = symmetryTransformCount(n, type)
-  if (!Array.isArray(ids) || ids.length !== count) {
+function validateSymmetryPair(
+  pair: unknown,
+): { transformId: string; variationId: string } | string {
+  if (!Array.isArray(pair) || pair.length !== 2) {
+    return 'each symmetry id pair must contain exactly two ids'
+  }
+  const [transformId, variationId] = pair
+  if (
+    !isSafeFlameEntityId(transformId) ||
+    !transformId.startsWith('_sym__') ||
+    transformId.length === '_sym__'.length
+  ) {
+    return 'symmetry transform ids must use the reserved _sym__ prefix'
+  }
+  if (!isSafeFlameEntityId(variationId)) {
+    return 'symmetry variation ids are unsafe'
+  }
+  return { transformId, variationId }
+}
+
+function validateSymmetryIds(
+  ids: unknown,
+  expectedCount: number,
+): string | undefined {
+  if (!Array.isArray(ids) || ids.length !== expectedCount) {
     return 'symmetry transform ids do not match the fold count'
   }
 
   const transformIds: string[] = []
   const variationIds: string[] = []
-  for (const pair of ids) {
-    if (!Array.isArray(pair) || pair.length !== 2) {
-      return 'each symmetry id pair must contain exactly two ids'
-    }
-    const [transformId, variationId] = pair
-    if (
-      !isSafeFlameEntityId(transformId) ||
-      !transformId.startsWith('_sym__') ||
-      transformId.length === '_sym__'.length
-    ) {
-      return 'symmetry transform ids must use the reserved _sym__ prefix'
-    }
-    if (!isSafeFlameEntityId(variationId)) {
-      return 'symmetry variation ids are unsafe'
-    }
-    transformIds.push(transformId)
-    variationIds.push(variationId)
+  for (const rawPair of ids) {
+    const validated = validateSymmetryPair(rawPair)
+    if (typeof validated === 'string') return validated
+    transformIds.push(validated.transformId)
+    variationIds.push(validated.variationId)
   }
 
   if (
@@ -368,4 +404,18 @@ export function symmetryArgsError(
     return 'symmetry transform and variation ids must be unique'
   }
   return undefined
+}
+
+export function symmetryArgsError(
+  args: readonly unknown[],
+): string | undefined {
+  if (args.length !== 3 && args.length !== 4) {
+    return 'symmetry expects three arguments and an optional control origin'
+  }
+  const [n, type, ids, origin] = args
+  const headerError = validateSymmetryHeader(n, type, origin, args.length === 4)
+  if (headerError) return headerError
+
+  const count = symmetryTransformCount(n, type)
+  return validateSymmetryIds(ids, count)
 }

@@ -26,6 +26,29 @@ registerCommand({
   },
 })
 
+function mergeRenderSettingsPatch(
+  current: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {
+    ...current,
+    ...patch,
+  }
+  if (patch.camera && typeof patch.camera === 'object') {
+    merged.camera = {
+      ...(current.camera as Record<string, unknown> | undefined),
+      ...(patch.camera as Record<string, unknown>),
+    }
+  }
+  if (patch.camera3D && typeof patch.camera3D === 'object') {
+    merged.camera3D = {
+      ...(current.camera3D as Record<string, unknown> | undefined),
+      ...(patch.camera3D as Record<string, unknown>),
+    }
+  }
+  return merged
+}
+
 registerCommand({
   id: 'flame.updateRenderSettings',
   label: 'Update Render Settings',
@@ -44,24 +67,10 @@ registerCommand({
       string,
       unknown
     >
-    const mergedSettings: Record<string, unknown> = {
-      ...currentSettings,
-      ...patch,
-    }
-    if (patch.camera && typeof patch.camera === 'object') {
-      mergedSettings.camera = {
-        ...(currentSettings.camera ?? {}),
-        ...(patch.camera as Record<string, unknown>),
-      }
-    }
-    if (patch.camera3D && typeof patch.camera3D === 'object') {
-      mergedSettings.camera3D = {
-        ...(currentSettings.camera3D ?? {}),
-        ...(patch.camera3D as Record<string, unknown>),
-      }
-    }
-    candidate.renderSettings =
-      mergedSettings as unknown as FlameDescriptor['renderSettings']
+    candidate.renderSettings = mergeRenderSettingsPatch(
+      currentSettings,
+      patch,
+    ) as unknown as FlameDescriptor['renderSettings']
     const validated = tryValidateFlame(candidate)
     if (!validated) {
       console.warn(
