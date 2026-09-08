@@ -1,19 +1,16 @@
 import '@/commands/builtins'
-import { batch, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { agentDriving } from '@/arcade/pilot'
-import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
+import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
-import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
-import { calculateGroundedStats } from '@/flame/stats'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { trackAppInit } from '@/lib/telemetry'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
-import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
 import { duelShowing, duelSidebarOpen } from './arcade/duel'
 import { CanvasViewport } from './components/CanvasViewport'
@@ -29,7 +26,7 @@ import { AdvancedToolsDrawer, MobileBottomSurface, TabletInspectorDeck, TouchHUD
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
-import { useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceShortcuts, } from './hooks'
+import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 import { isTouchDevice, PHONE_MAX_WIDTH, TABLET_MAX_WIDTH, } from './stores/workspaceLayoutStore'
 
@@ -48,11 +45,6 @@ const PopulationSimulator = lazy(() =>
     default: m.PopulationSimulator,
   })),
 )
-const DirectorOverlay = lazy(() =>
-  import('./components/DirectorOverlay').then((m) => ({
-    default: m.DirectorOverlay,
-  })),
-)
 const ConfirmDeleteVariationModal = lazy(() =>
   import('./components/CustomVariationEditor/ConfirmDeleteVariationModal').then(
     (m) => ({
@@ -67,7 +59,6 @@ const ConfirmOverwriteRecentModal = lazy(() =>
     }),
   ),
 )
-import { smartRandomAnimation } from './components/Timeline/presets'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { useCompactMode } from './contexts/CompactModeContext'
@@ -85,17 +76,13 @@ import { accumulatedPointCount, animationExportCancel, animationExportProgress, 
 import { tryValidateFlame } from './flame/schema/flameSchema'
 import { extractFlameUniforms, generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { extractFlameUniforms3D } from './flame/transformFunction3D'
-import { allTransformVariations, isAnyParametricVariationType, } from './flame/variations'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
 import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
-import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
-import { captureReplayInterfaceVideo } from './recorder/replayInterfaceVideo'
-import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
-import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
-import { createReplayVideoJobSpec, replayVideoFileName, } from './recorder/replayVideo'
+import { canEnableReplayAudio } from './recorder/replay'
+import { captureTransformColors, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
-import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
+import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
 import { downloadBlob } from './utils/blob'
@@ -112,40 +99,33 @@ import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { storeImportedSession, storeSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
-import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
+import { createTimelineState, defaultConfig as defaultTimelineConfig, } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
 import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useAudioReactive } from './utils/useAudioReactive'
 import { useSonification } from './utils/useSonification'
 import type { AudioMapping } from './components/AudioReactivePanel/AudioReactivePanel'
-import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { Palette } from './flame/colorMap'
-import type { PointInitMode } from './flame/pointInitMode'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
-import type { AudioWiringSnapshot } from './flame/schema/audioWiring'
-import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { FlameDescriptor } from './flame/schema/flameSchema'
 import type { TimelineSnapshot } from './flame/schema/timeline'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
-import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
+import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, } from './recorder/focusPreparation'
 import type { SessionStartExtras } from './recorder/recorder'
-import type { ReplayTarget } from './recorder/replay'
-import type { ReplayVideoExportRequest } from './recorder/replayInterfaceVideo'
-import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
 import type { RecordedSession } from './recorder/schema'
 import type { SnapshotOrigin } from './recorder/snapshotOrigin'
 import type { SonificationSnapshot } from './recorder/sonificationState'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
-import type { HistoryPreviewOwner } from './utils/createStoreHistory'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
-import type { ArenaFighterStats, CommandContext, DirectorState, } from '@/commands/types'
+import type { CommandContext } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
 export type { ExportImageInfo, ExportImageType } from '@/flame/exportImageType'
@@ -211,6 +191,39 @@ export function extractFlameVariationTypes(
  * opened from Home second must land in the state it would have landed in first.
  */
 const DEFAULT_ANIMATION_ENABLED = true
+
+function resolveInitialFlame(props: AppProps): FlameDescriptor {
+  const welcome = props.flameFromWelcome?.()
+  if (welcome) {
+    const valid = tryValidateFlame(welcome)
+    if (valid) return valid
+  }
+  const query = props.flameFromQuery?.flame
+  if (query) {
+    const valid = tryValidateFlame(query)
+    if (valid) return valid
+    console.error(
+      '[share] initial flame from query is invalid, falling back to example1',
+      query,
+    )
+  }
+  return example1
+}
+
+function logStoreInitDev(props: AppProps, flameDescriptor: FlameDescriptor) {
+  if (!IS_DEV) return
+  console.info('[share:app] store initialized', {
+    source: props.flameFromWelcome?.()
+      ? 'welcome'
+      : props.flameFromQuery?.flame
+        ? 'query'
+        : 'default',
+    transformCount: recordKeys(flameDescriptor.transforms).length,
+    firstColor: Object.values(flameDescriptor.transforms)[0]?.color,
+    queryFlamePresent: !!props.flameFromQuery?.flame,
+    queryAnimPresent: !!props.flameFromQuery?.animation,
+  })
+}
 
 export function MainWorkspace(props: AppProps) {
   const { theme, setTheme } = useTheme()
@@ -364,208 +377,7 @@ export function MainWorkspace(props: AppProps) {
   const { showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
-
-  const [directorOpen, setDirectorOpen] = createSignal(false)
-  const [directorState, setDirectorState] = createSignal<DirectorState | null>(
-    null,
-  )
-
   const _requestModal = useRequestModal()
-
-  const selectCandidate = (index: number) => {
-    const s = directorState()
-    if (s && s.candidates[index]?.flame) {
-      const candidateFlame = s.candidates[index].flame
-      setFlameDescriptor(
-        () => deepClone(candidateFlame),
-        `Art Director: Candidate ${index + 1}`,
-      )
-      setDirectorState({
-        ...s,
-        lastFeedback: {
-          ...s.lastFeedback,
-          selectedIndex: index,
-          candidates: s.candidates.map((c, i) => ({
-            index: i,
-            reaction: c.reaction ?? null,
-            tags: c.tags ?? [],
-            rationale: c.rationale,
-          })),
-        },
-      })
-      showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
-    }
-  }
-
-  const [showArena, setShowArena] = createSignal(false)
-  const [arenaP1Stats, setArenaP1Stats] =
-    createSignal<ArenaFighterStats | null>(null)
-  const [arenaP2Stats, setArenaP2Stats] =
-    createSignal<ArenaFighterStats | null>(null)
-  const [arenaCommentary, setArenaCommentary] = createSignal<string | null>(
-    null,
-  )
-  const [arenaEventBanner, setArenaEventBanner] = createSignal<string | null>(
-    null,
-  )
-  const [arenaStance, setArenaStance] = createSignal<string>('balanced')
-
-  let preArenaSidebar = true
-  let preArenaTimeline = false
-  createEffect(
-    on(
-      showArena,
-      (isOpen) => {
-        if (isOpen) {
-          preArenaSidebar = showSidebar()
-          preArenaTimeline = showTimeline()
-          setShowSidebar(false)
-          setShowTimeline(false)
-        } else {
-          setShowSidebar(preArenaSidebar)
-          setShowTimeline(preArenaTimeline)
-        }
-      },
-      { defer: true },
-    ),
-  )
-
-  let isDirectorModalOpen = false
-
-  function openArtDirectorUI() {
-    if (isDirectorModalOpen) return
-    isDirectorModalOpen = true
-    const s = directorState()
-    if (!s || s.candidates.length === 0) {
-      const current = deepClone(flameDescriptor)
-      const presets = ['Subtle', 'Moderate', 'Chaotic', 'Structural'] as const
-      const candidates = presets.map((_, i) => {
-        const mutated = mutateFlame(
-          current,
-          {
-            strength: 0.2 + i * 0.1,
-            minTransforms: 2,
-            maxTransforms: 6,
-            minVariations: 1,
-            maxVariations: 3,
-            allowedVariations: [],
-            dimensions: current.renderSettings.dimensions ?? 2,
-          },
-          {
-            mutateAffine: true,
-            affineMode: 'smart',
-            mutateVariations: 'modify',
-            mutateColors: true,
-          },
-        )
-        return {
-          fitness: evaluateFlameFitness(mutated).composite,
-          flame: mutated,
-        }
-      })
-      setDirectorState({
-        generation: 1,
-        candidates,
-      })
-    }
-    setDirectorOpen(true)
-    void _requestModal({
-      content: ({ respond }) => (
-        <Suspense>
-          <DirectorOverlay
-            director={{
-              open: directorOpen,
-              setOpen: setDirectorOpen,
-              state: directorState,
-              setState: setDirectorState,
-              selectCandidate,
-            }}
-            hardwareTier={props.hardwareTier}
-            respond={() => {
-              isDirectorModalOpen = false
-              setDirectorOpen(false)
-              respond()
-            }}
-          />
-        </Suspense>
-      ),
-    }).finally(() => {
-      isDirectorModalOpen = false
-      setDirectorOpen(false)
-    })
-  }
-
-  let isArenaModalOpen = false
-
-  function openFlameClashUI() {
-    if (isArenaModalOpen) return
-    isArenaModalOpen = true
-    const current = deepClone(flameDescriptor)
-    const p1Stats = calculateFlameStats(current)
-    const p1Grounded = calculateGroundedStats(current)
-    setArenaP1Stats({
-      name: current.metadata?.name || 'Cyan Guardian',
-      type: p1Stats.type,
-      school: p1Grounded.school,
-      powerLevel: p1Grounded.powerLevel,
-      flame: current,
-      groundedStats: p1Grounded,
-      metrics: p1Stats.metrics,
-    })
-
-    const p2 = arenaP2Stats()
-    if (!p2) {
-      const opponent = mutateFlame(
-        current,
-        {
-          strength: 0.45,
-          minTransforms: 2,
-          maxTransforms: 6,
-          minVariations: 1,
-          maxVariations: 3,
-          allowedVariations: [],
-          dimensions: current.renderSettings.dimensions ?? 2,
-        },
-        {
-          mutateAffine: true,
-          affineMode: 'smart',
-          mutateVariations: 'all',
-          mutateColors: true,
-        },
-      )
-      const p2Stats = calculateFlameStats(opponent)
-      const p2Grounded = calculateGroundedStats(opponent)
-      setArenaP2Stats({
-        name: 'Crimson Nemesis',
-        type: p2Stats.type,
-        school: p2Grounded.school,
-        powerLevel: p2Grounded.powerLevel,
-        flame: opponent,
-        groundedStats: p2Grounded,
-        metrics: p2Stats.metrics,
-      })
-    }
-    setShowArena(true)
-    isArenaModalOpen = true
-  }
-
-  createEffect(() => {
-    if (!showArena()) {
-      isArenaModalOpen = false
-    }
-  })
-
-  createEffect(() => {
-    if (directorOpen() && !isDirectorModalOpen) {
-      openArtDirectorUI()
-    }
-  })
-
-  createEffect(() => {
-    if (showArena() && !isArenaModalOpen) {
-      openFlameClashUI()
-    }
-  })
 
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
@@ -654,23 +466,7 @@ export function MainWorkspace(props: AppProps) {
     }
     openReplaySession(session)
   }
-  const initialFlame = (() => {
-    const welcome = props.flameFromWelcome?.()
-    if (welcome) {
-      const valid = tryValidateFlame(welcome)
-      if (valid) return valid
-    }
-    const query = props.flameFromQuery?.flame
-    if (query) {
-      const valid = tryValidateFlame(query)
-      if (valid) return valid
-      console.error(
-        '[share] initial flame from query is invalid, falling back to example1',
-        query,
-      )
-    }
-    return example1
-  })()
+  const initialFlame = resolveInitialFlame(props)
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(deepClone(initialFlame)),
     // The main flame history joins the app-wide undo journal so Ctrl+Z can
@@ -694,6 +490,42 @@ export function MainWorkspace(props: AppProps) {
   } = useWorkspacePalette({
     flameDescriptor,
     history,
+  })
+
+  const {
+    directorOpen,
+    setDirectorOpen,
+    directorState,
+    setDirectorState,
+    selectCandidate,
+    openArtDirectorUI,
+  } = useWorkspaceArtDirector({
+    flameDescriptor,
+    setFlameDescriptor,
+    showToast,
+    hardwareTier: () => props.hardwareTier,
+  })
+
+  const {
+    showArena,
+    setShowArena,
+    arenaP1Stats,
+    setArenaP1Stats,
+    arenaP2Stats,
+    setArenaP2Stats,
+    arenaCommentary,
+    setArenaCommentary,
+    arenaEventBanner,
+    setArenaEventBanner,
+    arenaStance,
+    setArenaStance,
+    openFlameClashUI,
+  } = useWorkspaceArena({
+    flameDescriptor,
+    showSidebar,
+    setShowSidebar,
+    showTimeline,
+    setShowTimeline,
   })
 
   /**
@@ -744,19 +576,7 @@ export function MainWorkspace(props: AppProps) {
   const setBlendWeight = (weight: number) => {
     executeCommand('flame.setBlendWeight', cmdContext, weight)
   }
-  if (IS_DEV) {
-    console.info('[share:app] store initialized', {
-      source: props.flameFromWelcome?.()
-        ? 'welcome'
-        : props.flameFromQuery?.flame
-          ? 'query'
-          : 'default',
-      transformCount: recordKeys(flameDescriptor.transforms).length,
-      firstColor: Object.values(flameDescriptor.transforms)[0]?.color,
-      queryFlamePresent: !!props.flameFromQuery?.flame,
-      queryAnimPresent: !!props.flameFromQuery?.animation,
-    })
-  }
+  logStoreInitDev(props, flameDescriptor)
   /**
    * A capability handed over by a Home "Explore" card, waiting to be applied.
    *
@@ -2587,179 +2407,16 @@ export function MainWorkspace(props: AppProps) {
     markLoadedBaseline()
   }
 
-  const handleRandomizeAnimation = (
-    presetIds: string[],
-    clearFirst: boolean,
-  ) => {
-    if (presetIds.length === 0) return
-
-    isRandomizingAnimation = true
-    try {
-      // One click = one undo step, regardless of how many keyframes the
-      // selected presets write (previously each addKeyframe pushed its own
-      // snapshot — dozens of Ctrl+Z to revert, and enough to overflow the
-      // undo cap and lose the pre-click animation entirely).
-      runTimelineSnapshotMutation(
-        recorderTimeline,
-        snapshotOrigin('timeline.random', presetIds.join(', ')),
-        () => {
-          randomizeAnimationTracks(presetIds, clearFirst)
-        },
-      )
-      executeCommand('view.setShowTimeline', cmdContext, true)
-    } finally {
-      setTimeout(() => {
-        isRandomizingAnimation = false
-      }, 200)
-    }
-  }
-
-  const randomizeAnimationTracks = (
-    presetIds: string[],
-    clearFirst: boolean,
-  ) => {
-    {
-      if (clearFirst) timeline.clearAllTracks()
-
-      const start = timeline.config().startFrame
-      const end = timeline.config().endFrame
-      const mid = Math.floor((start + end) / 2)
-
-      const addLoopingTrack = (
-        paramPath: string,
-        startVal: number,
-        minPerturb: number,
-        maxPerturb: number,
-        easing: EasingCurve = 'easeInOut',
-      ) => {
-        const perturb =
-          randomRange(minPerturb, maxPerturb) * (Math.random() > 0.5 ? 1 : -1)
-        const midVal = startVal + perturb
-        timeline.addKeyframe(paramPath, start, startVal, easing)
-        timeline.addKeyframe(paramPath, mid, midVal, easing)
-        timeline.addKeyframe(paramPath, end, startVal, easing)
-      }
-
-      const addContinuousTrack = (
-        paramPath: string,
-        startVal: number,
-        delta: number,
-      ) => {
-        timeline.addKeyframe(paramPath, start, startVal, 'linear')
-        timeline.addKeyframe(paramPath, end, startVal + delta, 'linear')
-      }
-
-      for (const preset of presetIds) {
-        if (preset === 'pan') {
-          const camX = flameDescriptor.renderSettings.camera?.position?.[0] ?? 0
-          const camY = flameDescriptor.renderSettings.camera?.position?.[1] ?? 0
-          addLoopingTrack('camera.x', camX, 0.1, 0.4)
-          addLoopingTrack('camera.y', camY, 0.1, 0.4)
-        } else if (preset === 'zoom') {
-          const zoom = flameDescriptor.renderSettings.camera?.zoom ?? 1
-          addLoopingTrack('camera.zoom', zoom, zoom * 0.15, zoom * 0.4)
-        } else if (preset === 'rot') {
-          const rot = flameDescriptor.renderSettings.camera?.rotation ?? 0
-          const dir = Math.random() > 0.5 ? 1 : -1
-          addContinuousTrack('camera.rotation', rot, dir * 2 * Math.PI)
-        } else if (preset === 'color') {
-          const phase = flameDescriptor.renderSettings.palettePhase ?? 0
-          const dir = Math.random() > 0.5 ? 1 : -1
-          addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
-        } else if (preset === 'transformColor') {
-          // Drift each transform's OkLab (a, b) color coordinate in a loop —
-          // animates the per-transform colors (the color scrub inputs), distinct
-          // from palette cycling above.
-          for (const [tid, t] of Object.entries(flameDescriptor.transforms)) {
-            addLoopingTrack(`transform.${tid}.color.x`, t.color.x, 0.1, 0.3)
-            addLoopingTrack(`transform.${tid}.color.y`, t.color.y, 0.1, 0.3)
-          }
-        } else if (preset === 'vibrancy') {
-          const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
-          const minPert = vib > 0.5 ? -0.3 : 0.1
-          const maxPert = vib > 0.5 ? -0.1 : 0.3
-          addLoopingTrack('vibrancy', vib, minPert, maxPert)
-        } else if (preset === 'orbit') {
-          const theta = flameDescriptor.renderSettings.camera3D?.theta ?? 0
-          const phi =
-            flameDescriptor.renderSettings.camera3D?.phi ?? Math.PI / 2
-          const radius = flameDescriptor.renderSettings.camera3D?.radius ?? 5
-
-          addContinuousTrack('camera3D.theta', theta, 2 * Math.PI)
-          addLoopingTrack('camera3D.phi', phi, 0.1, 0.3)
-          addLoopingTrack(
-            'camera3D.radius',
-            radius,
-            radius * 0.1,
-            radius * 0.25,
-          )
-        } else if (preset === 'finalTransform') {
-          const q1 = Math.floor(start + (end - start) * 0.25)
-          const q3 = Math.floor(start + (end - start) * 0.75)
-          const dir = Math.random() > 0.5 ? 1 : -1
-
-          // Rotate the final transform a full turn. The affine matrix is
-          // [[a, b], [d, e]] (c, f are translation), so rotation by θ is
-          // a = e = cos θ, b = -sin θ, d = sin θ (`dir` flips the spin).
-          // θ steps 0,90,180,270,360 → cos: 1,0,-1,0,1  sin: 0,1,0,-1,0
-          timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
-          timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
-          timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
-          timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
-          timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
-
-          timeline.addKeyframe('finalTransform.e', start, 1, 'linear')
-          timeline.addKeyframe('finalTransform.e', q1, 0, 'linear')
-          timeline.addKeyframe('finalTransform.e', mid, -1, 'linear')
-          timeline.addKeyframe('finalTransform.e', q3, 0, 'linear')
-          timeline.addKeyframe('finalTransform.e', end, 1, 'linear')
-
-          timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
-          timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
-          timeline.addKeyframe('finalTransform.b', mid, 0, 'linear')
-          timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
-          timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
-
-          timeline.addKeyframe('finalTransform.d', start, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', q1, dir, 'linear')
-          timeline.addKeyframe('finalTransform.d', mid, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', q3, -dir, 'linear')
-          timeline.addKeyframe('finalTransform.d', end, 0, 'linear')
-        }
-      }
-
-      // The workspace signal drives rendering/FloatingActions; the raw
-      // timeline signal is captured by the deterministic result snapshot.
-      // Keep both coherent before runWithSingleUndo takes that snapshot.
-      timeline.setAnimationEnabled(true)
-      setAnimationEnabled(true)
-    }
-  }
-
-  // Smart animation: apply a random curated preset from each category for a full
-  // multi-aspect loop (vs the selected-items random tracks above). Honors the
-  // same clear-first toggle.
-  const handleSmartAnimation = (clearFirst: boolean) => {
-    isRandomizingAnimation = true
-    try {
-      // One click = one undo step (see handleRandomizeAnimation).
-      runTimelineSnapshotMutation(
-        recorderTimeline,
-        snapshotOrigin('timeline.smart'),
-        () => {
-          if (clearFirst) timeline.clearAllTracks()
-          smartRandomAnimation(flameDescriptor, timeline)
-          timeline.setAnimationEnabled(true)
-          setAnimationEnabled(true)
-        },
-      )
-      executeCommand('view.setShowTimeline', cmdContext, true)
-    } finally {
-      setTimeout(() => {
-        isRandomizingAnimation = false
-      }, 200)
-    }
-  }
+  const { handleRandomizeAnimation, handleSmartAnimation } =
+    useWorkspaceAnimationGen({
+      timeline,
+      flameDescriptor,
+      getCmdContext: () => cmdContext,
+      setAnimationEnabled,
+      setIsRandomizingAnimation: (val) => {
+        isRandomizingAnimation = val
+      },
+    })
 
   const runTourCommand: { fn?: (id: string, ...args: unknown[]) => void } = {}
 
@@ -3054,551 +2711,12 @@ export function MainWorkspace(props: AppProps) {
     })()
   })
 
-  function getFlameValue(
-    path: string,
-  ):
-    | number
-    | string
-    | [number, number, number]
-    | [number, number, number, number]
-    | null {
-    const fd = flameDescriptor
-    switch (path) {
-      case 'exposure':
-        return fd.renderSettings.exposure
-      case 'skipIters':
-        return fd.renderSettings.skipIters
-      case 'plotsPerChain':
-        return fd.renderSettings.plotsPerChain
-      case 'vibrancy':
-        return fd.renderSettings.vibrancy
-      case 'contrast':
-        return fd.renderSettings.contrast ?? 1
-      case 'gamma':
-        return fd.renderSettings.gamma ?? 2.2
-      case 'highlightPower':
-        return fd.renderSettings.highlightPower ?? 1
-      case 'drawMode':
-        return fd.renderSettings.drawMode
-      case 'colorInitMode':
-        return fd.renderSettings.colorInitMode
-      case 'pointInitMode':
-        return fd.renderSettings.pointInitMode
-      case 'densityEstimationQuality':
-        return fd.renderSettings.densityEstimationQuality ?? 0.8
-      case 'estimatorCurve':
-        return fd.renderSettings.estimatorCurve ?? 0.5
-      case 'paletteMode':
-        return fd.renderSettings.paletteMode ?? 0
-      case 'palettePhase':
-        return fd.renderSettings.palettePhase ?? 0
-      case 'paletteSpeed':
-        return fd.renderSettings.paletteSpeed ?? 1
-      case 'backgroundColor':
-        return fd.renderSettings.backgroundColor ?? [0, 0, 0]
-      case 'edgeFadeColor':
-        return fd.renderSettings.edgeFadeColor ?? [0, 0, 0, 0]
-      case 'camera.x':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame('camera.x', timeline.currentFrame())
-          ) {
-            const xTrack = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera.x')
-            if (xTrack) {
-              const val = resolveKeyframeValue(
-                xTrack.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera?.position[0] ?? 0
-      case 'camera.y':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame('camera.y', timeline.currentFrame())
-          ) {
-            const yTrack = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera.y')
-            if (yTrack) {
-              const val = resolveKeyframeValue(
-                yTrack.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera?.position[1] ?? 0
-      case 'camera.zoom':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame('camera.zoom', timeline.currentFrame())
-          ) {
-            const zoomTrack = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera.zoom')
-            if (zoomTrack) {
-              const val = resolveKeyframeValue(
-                zoomTrack.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera?.zoom ?? 1
-      case 'camera.rotation':
-        return (
-          ((fd.renderSettings.camera as Record<string, unknown> | undefined)
-            ?.rotation as number | undefined) ?? 0
-        )
-      case 'camera3D.theta':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame(
-              'camera3D.theta',
-              timeline.currentFrame(),
-            )
-          ) {
-            const track = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera3D.theta')
-            if (track) {
-              const val = resolveKeyframeValue(
-                track.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera3D?.theta ?? 0
-      case 'camera3D.phi':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame('camera3D.phi', timeline.currentFrame())
-          ) {
-            const track = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera3D.phi')
-            if (track) {
-              const val = resolveKeyframeValue(
-                track.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera3D?.phi ?? Math.PI / 2
-      case 'camera3D.radius':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame(
-              'camera3D.radius',
-              timeline.currentFrame(),
-            )
-          ) {
-            const track = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera3D.radius')
-            if (track) {
-              const val = resolveKeyframeValue(
-                track.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera3D?.radius ?? 5
-      case 'camera3D.fov':
-        if (timeline.isDrivingView()) {
-          if (
-            timeline.hasKeyframeAtFrame('camera3D.fov', timeline.currentFrame())
-          ) {
-            const track = timeline
-              .tracks()
-              .find((t) => t.parameterPath === 'camera3D.fov')
-            if (track) {
-              const val = resolveKeyframeValue(
-                track.keyframes,
-                timeline.currentFrame(),
-              )
-              if (val !== null && typeof val === 'number') return val
-            }
-          }
-        }
-        return fd.renderSettings.camera3D?.fov ?? 60
-      case 'blendWeight':
-        return blendWeight()
-      default:
-        break
-    }
-    // Handle transform paths: transform.{tid}.{prop} or transform.{tid}.{sub}.{key}
-    const parts = path.split('.')
-    if (parts[0] === 'transform') {
-      const transforms = fd.transforms as Record<string, unknown>
-      if (parts.length === 3 && parts[2] === 'probability') {
-        return (
-          (
-            transforms[parts[1]!] as {
-              probability?: number
-              colorSpeed?: number
-              color?: Record<string, number>
-              preAffine?: Record<string, number>
-              postAffine?: Record<string, number>
-              variations?: Record<string, { weight?: number }>
-            }
-          )?.probability ?? null
-        )
-      }
-      if (parts.length === 3 && parts[2] === 'colorSpeed') {
-        return (
-          (
-            transforms[parts[1]!] as {
-              probability?: number
-              colorSpeed?: number
-              color?: Record<string, number>
-              preAffine?: Record<string, number>
-              postAffine?: Record<string, number>
-              variations?: Record<string, { weight?: number }>
-            }
-          )?.colorSpeed ?? 0.4
-        )
-      }
-      if (
-        parts.length === 4 &&
-        (parts[2] === 'preAffine' || parts[2] === 'postAffine')
-      ) {
-        const affine = (
-          transforms[parts[1]!] as {
-            probability?: number
-            colorSpeed?: number
-            color?: Record<string, number>
-            preAffine?: Record<string, number>
-            postAffine?: Record<string, number>
-            variations?: Record<string, { weight?: number }>
-          }
-        )?.[parts[2]]
-        if (affine && parts[3]! in affine) {
-          return affine[parts[3]!] as number
-        }
-      }
-      if (parts.length === 4 && parts[2] === 'color') {
-        const color = (
-          transforms[parts[1]!] as {
-            probability?: number
-            colorSpeed?: number
-            color?: Record<string, number>
-            preAffine?: Record<string, number>
-            postAffine?: Record<string, number>
-            variations?: Record<string, { weight?: number }>
-          }
-        )?.color
-        if (color && parts[3]! in color) {
-          return color[parts[3]!] ?? null
-        }
-      }
-      return null
-    }
-    // Handle transform variation parameter: {transformId}.{variationId}.{paramName}
-    if (parts.length === 3) {
-      const [transformId, variationId, paramName] = parts as [
-        string,
-        string,
-        string,
-      ]
-
-      const transform = (
-        fd.transforms as Record<
-          string,
-          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
-        >
-      )[transformId] as
-        | {
-            variations?: Record<
-              string,
-              { type: string; params?: Record<string, number> }
-            >
-          }
-        | undefined
-      const variation = transform?.variations?.[variationId]
-      if (variation) {
-        if (variation.params) {
-          const val = variation.params[paramName]
-          if (val !== undefined) return val
-        } else if (isAnyParametricVariationType(variation.type)) {
-          // Params not initialized yet — fall back to defaults
-          const vType = variation.type
-          const vDef = (allTransformVariations as Record<string, unknown>)[
-            vType
-          ] as { paramDefaults: Record<string, number> } | undefined
-          if (vDef && paramName in vDef.paramDefaults) {
-            const d = vDef.paramDefaults[paramName]
-            if (d !== undefined) return d
-          }
-        }
-      }
-    }
-    // Handle transform variation weight: {transformId}.{variationId}
-    if (
-      parts.length === 2 &&
-      parts[0] !== 'transform' &&
-      parts[0] !== 'camera'
-    ) {
-      const [transformId, variationId] = parts as [string, string]
-
-      const variation = (
-        fd.transforms as Record<
-          string,
-          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
-        >
-      )[transformId]?.variations?.[variationId] as
-        | { weight?: number }
-        | undefined
-      if (variation?.weight !== undefined) return variation.weight
-    }
-    return null
-  }
-  timeline.setValueResolver(getFlameValue)
-
-  function setFlameValue(
-    path: string,
-    value:
-      | number
-      | string
-      | [number, number, number]
-      | [number, number, number, number],
-  ) {
-    // Silent: this is the timeline's write-through (recording, playback
-    // holds, and undo/redo write-back). The timeline undo stack owns these
-    // changes — recording them in flame history double-counted every
-    // preset keyframe at the current frame and would turn timeline undo
-    // write-backs into fresh flame entries.
-    history.setSilently((draft) => {
-      switch (path) {
-        case 'blendWeight':
-          draft.renderSettings.blendWeight = value as number
-          break
-        case 'exposure':
-          draft.renderSettings.exposure = value as number
-          break
-        case 'skipIters':
-          draft.renderSettings.skipIters = value as number
-          break
-        case 'plotsPerChain':
-          draft.renderSettings.plotsPerChain = value as number
-          break
-        case 'vibrancy':
-          draft.renderSettings.vibrancy = value as number
-          break
-        case 'contrast':
-          draft.renderSettings.contrast = value as number
-          break
-        case 'gamma':
-          draft.renderSettings.gamma = value as number
-          break
-        case 'highlightPower':
-          draft.renderSettings.highlightPower = value as number
-          break
-        case 'drawMode':
-          draft.renderSettings.drawMode = value as 'light' | 'paint'
-          break
-        case 'colorInitMode':
-          draft.renderSettings.colorInitMode = value as
-            | 'colorInitZero'
-            | 'colorInitPosition'
-          break
-        case 'pointInitMode':
-          draft.renderSettings.pointInitMode = value as PointInitMode
-          break
-        case 'densityEstimationQuality':
-          draft.renderSettings.densityEstimationQuality = value as number
-          break
-        case 'estimatorCurve':
-          draft.renderSettings.estimatorCurve = value as number
-          break
-        case 'paletteMode':
-          draft.renderSettings.paletteMode = value as number
-          break
-        case 'palettePhase':
-          draft.renderSettings.palettePhase = value as number
-          break
-        case 'paletteSpeed':
-          draft.renderSettings.paletteSpeed = value as number
-          break
-        case 'backgroundColor':
-          if (Array.isArray(value)) {
-            draft.renderSettings.backgroundColor = value as [
-              number,
-              number,
-              number,
-            ]
-          }
-          break
-        case 'edgeFadeColor':
-          if (Array.isArray(value)) {
-            draft.renderSettings.edgeFadeColor = value as [
-              number,
-              number,
-              number,
-              number,
-            ]
-          }
-          break
-        case 'camera.x':
-          if (draft.renderSettings.camera) {
-            draft.renderSettings.camera.position[0] = value as number
-          }
-          break
-        case 'camera.y':
-          if (draft.renderSettings.camera) {
-            draft.renderSettings.camera.position[1] = value as number
-          }
-          break
-        case 'camera.zoom':
-          if (draft.renderSettings.camera) {
-            draft.renderSettings.camera.zoom = value as number
-          }
-          break
-        case 'camera.rotation':
-          ;(draft.renderSettings.camera as
-            | Record<string, unknown>
-            | undefined)!.rotation = value
-          break
-        case 'camera3D.theta':
-          if (draft.renderSettings.camera3D) {
-            draft.renderSettings.camera3D.theta = value as number
-          }
-          break
-        case 'camera3D.phi':
-          if (draft.renderSettings.camera3D) {
-            draft.renderSettings.camera3D.phi = value as number
-          }
-          break
-        case 'camera3D.radius':
-          if (draft.renderSettings.camera3D) {
-            draft.renderSettings.camera3D.radius = value as number
-          }
-          break
-        case 'camera3D.fov':
-          if (draft.renderSettings.camera3D) {
-            draft.renderSettings.camera3D.fov = value as number
-          }
-          break
-        default: {
-          const parts = path.split('.')
-          if (parts[0] === 'transform') {
-            const transforms = draft.transforms as Record<string, unknown>
-            if (parts.length === 3 && parts[2] === 'probability') {
-              if (transforms[parts[1]!]) {
-                ;(
-                  transforms[parts[1]!] as {
-                    probability?: number
-                    colorSpeed?: number
-                    color?: Record<string, number>
-                    preAffine?: Record<string, number>
-                    postAffine?: Record<string, number>
-                    variations?: Record<string, { weight?: number }>
-                  }
-                ).probability = value as number
-              }
-            } else if (parts.length === 3 && parts[2] === 'colorSpeed') {
-              if (transforms[parts[1]!]) {
-                ;(
-                  transforms[parts[1]!] as {
-                    probability?: number
-                    colorSpeed?: number
-                    color?: Record<string, number>
-                    preAffine?: Record<string, number>
-                    postAffine?: Record<string, number>
-                    variations?: Record<string, { weight?: number }>
-                  }
-                ).colorSpeed = value as number
-              }
-            } else if (
-              parts.length === 4 &&
-              (parts[2] === 'preAffine' || parts[2] === 'postAffine')
-            ) {
-              const affine = (
-                transforms[parts[1]!] as {
-                  probability?: number
-                  colorSpeed?: number
-                  color?: Record<string, number>
-                  preAffine?: Record<string, number>
-                  postAffine?: Record<string, number>
-                  variations?: Record<string, { weight?: number }>
-                }
-              )?.[parts[2]]
-              if (affine && parts[3]! in affine) {
-                affine[parts[3]!] = value as number
-              }
-            } else if (parts.length === 4 && parts[2] === 'color') {
-              const color = (
-                transforms[parts[1]!] as {
-                  probability?: number
-                  colorSpeed?: number
-                  color?: Record<string, number>
-                  preAffine?: Record<string, number>
-                  postAffine?: Record<string, number>
-                  variations?: Record<string, { weight?: number }>
-                }
-              )?.color
-              if (color && parts[3]! in color) {
-                color[parts[3]!] = value as number
-              }
-            }
-          } else if (parts.length === 3) {
-            const [transformId, variationId, paramName] = parts as [
-              string,
-              string,
-              string,
-            ]
-
-            const transform = (
-              draft.transforms as Record<
-                string,
-                any /* eslint-disable-line @typescript-eslint/no-explicit-any */
-              >
-            )[transformId] as
-              | {
-                  variations?: Record<
-                    string,
-                    { type: string; params?: Record<string, number> }
-                  >
-                }
-              | undefined
-            const variation = transform?.variations?.[variationId]
-            if (variation?.params) {
-              variation.params[paramName] = value as number
-            }
-          } else if (parts.length === 2 && parts[0] !== 'camera') {
-            const [transformId, variationId] = parts as [string, string]
-
-            const transform = (draft.transforms as Record<string, unknown>)[
-              transformId
-            ] as
-              | {
-                  variations?: Record<string, { weight?: number }>
-                }
-              | undefined
-            const variation = transform?.variations?.[variationId]
-            if (variation) {
-              variation.weight = value as number
-            }
-          }
-          break
-        }
-      }
-    })
-  }
-  timeline.setValueWriter(setFlameValue)
+  useWorkspaceTimelineBinding({
+    flameDescriptor,
+    history,
+    timeline,
+    blendWeight,
+  })
 
   // Effective camera values: read from timeline whenever animation is enabled
   // so the camera follows keyframes during playback, seeking, and when stopped.
@@ -4024,438 +3142,104 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
-  /**
-   * Where a replayed session writes (M4). `loadInitial` goes through the
-   * SETTER rather than `history.replace`, because replace pushes its own
-   * entry and would escape the batch — the batch is what makes a whole
-   * replayed run a single undo step the viewer can take back in one go.
-   */
-  type ReplaySideState = ReplayNonFlameSideState & {
-    /**
-     * Timeline keyframe commands intentionally write their current-frame
-     * value into the flame through `history.setSilently`. Patches cannot see
-     * those writes, so replay's undo side effect carries an exact document
-     * snapshot alongside the timeline/audio/view state.
-     */
-    flame: FlameDescriptor
-  }
-
-  const captureReplayPresentation = (): ReplayPresentationSnapshot => {
-    const affine = replayAffineModeRequest()
-    const diffView = sidebarDiffView()
-    return {
-      sidebarHidden: sidebarHidden(),
-      selectedTransformId: selectedTransformId(),
-      collapsedTransformIds: Array.from(collapsedTransforms()).sort(),
-      timelineCollapsed: timelineCollapsed(),
-      sidebarDiffView: diffView === null ? null : deepClone(diffView),
-      showBlendGallery: showBlendGallery(),
-      showAudioPanel: showAudioPanel(),
-      showSonificationPanel: showSonificationPanel(),
-      quickPickState: quickPickState(),
-      hoveredVariationType: hoveredVariationType(),
-      affineCardOpen: affineCardOpen(),
-      colorCardOpen: colorCardOpen(),
-      metadataCardOpen: metadataCardOpen(),
-      paletteCardOpen: paletteCardOpen(),
-      prePaletteColors: deepClone(prePaletteColors()),
-      renderCardOpen: renderCardOpen(),
-      floatingActionsCollapsed: floatingActionsCollapsed(),
-      affineMode: affine.mode,
-      affineTab: affine.tab,
-      colorView: replayColorViewRequest().view,
-    }
-  }
-
-  const captureReplayNonFlameSideState = (
-    presentation = captureReplayPresentation(),
-  ): ReplayNonFlameSideState => ({
-    timeline: {
-      config: deepClone(timeline.config()),
-      currentFrame: timeline.currentFrame(),
-      animationEnabled: animationEnabled(),
-      autoKeyframe: timeline.autoKeyframe(),
-      previewHeld: timeline.previewHeld(),
-      tracks: deepClone(timeline.tracks()),
-    },
-    audio: {
-      mapping: deepClone(audioMapping()),
-      enabled: audioEnabled(),
-      source: audioSource(),
-      trackName: audioTrackName(),
-    },
-    sonification: captureSonificationSnapshot(),
-    view: {
-      qualityPreset: qualityPreset(),
-      pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
-      adaptiveFilter: adaptiveFilterEnabled(),
-      stochasticFilter: stochasticFilterEnabled(),
-      flyMode: flyMode(),
-      showTimeline: showTimeline(),
-      sidebarOpen: showSidebar(),
-    },
-    presentation,
-  })
-
-  const captureReplaySideState = (
-    presentation = captureReplayPresentation(),
-  ): ReplaySideState => ({
-    flame: deepClone(flameDescriptor),
-    ...captureReplayNonFlameSideState(presentation),
-  })
-
-  const applyReplayAudioState = (audio: AudioWiringSnapshot) => {
-    // A session records wiring, never file bytes or microphone permission.
-    // Keep the workspace's actual resource identity and only re-enable the
-    // wiring when that same resource is still present. In particular, redo
-    // must not relabel B.wav as the A.wav captured by an earlier replay.
-    applyReplayAudioWiring(
-      audio,
-      {
-        hasFileBuffer: audioBuffer() !== undefined,
-        currentTrackName: audioTrackName(),
-        hasLiveAnalyzer: liveAnalyzer() !== undefined,
-      },
-      {
+  const { replayTarget, exportReplayVideo, prepareReplayFocus } =
+    useWorkspaceReplay({
+      flameDescriptor,
+      setFlameDescriptor,
+      history,
+      timeline,
+      setAnimationEnabled,
+      animationEnabled,
+      cmdContext,
+      audio: {
+        mapping: audioMapping,
         setMapping: setAudioMapping,
-        setSource: setAudioSource,
+        enabled: audioEnabled,
         setEnabled: setAudioEnabled,
+        source: audioSource,
+        setSource: setAudioSource,
+        trackName: audioTrackName,
+        hasFileBuffer: () => audioBuffer() !== undefined,
+        hasLiveAnalyzer: () => liveAnalyzer() !== undefined,
       },
-    )
-  }
-
-  const restoreReplaySideState = (state: ReplaySideState) => {
-    timeline.setTracks(() => deepClone(state.timeline.tracks))
-    timeline.setConfig(deepClone(state.timeline.config))
-    if (state.timeline.currentFrame !== undefined) {
-      timeline.setCurrentFrame(state.timeline.currentFrame)
-    }
-    if (state.timeline.animationEnabled !== undefined) {
-      setAnimationEnabled(state.timeline.animationEnabled)
-    }
-    if (state.timeline.autoKeyframe !== undefined) {
-      timeline.setAutoKeyframe(state.timeline.autoKeyframe)
-    }
-    if (state.timeline.previewHeld !== undefined) {
-      timeline.setPreviewHeld(state.timeline.previewHeld)
-    }
-    applyReplayAudioState(state.audio)
-    if (state.view.qualityPreset in qualityPresets) {
-      setQualityPreset(state.view.qualityPreset as QualityPreset)
-    }
-    if (state.view.pixelRatio !== undefined) {
-      setPixelRatio(state.view.pixelRatio)
-    }
-    setAdaptiveFilterEnabled(state.view.adaptiveFilter)
-    setStochasticFilterEnabled(state.view.stochasticFilter)
-    setFlyMode(state.view.flyMode)
-    setShowTimeline(state.view.showTimeline)
-    setShowSidebar(state.view.sidebarOpen)
-    // Last writer wins: restoring the exact snapshot after timeline/view
-    // signals prevents their derived silent writers from leaving a replayed
-    // current-frame value behind after undo.
-    history.replaceSilently(state.flame)
-
-    const presentation = normalizeReplayPresentation(
-      state.presentation,
-      state.flame,
-    )
-    setSidebarHidden(presentation.sidebarHidden)
-    setSelectedTransformId(presentation.selectedTransformId)
-    setCollapsedTransforms(new Set(presentation.collapsedTransformIds))
-    setTimelineCollapsed(presentation.timelineCollapsed)
-    setSidebarDiffView(
-      presentation.sidebarDiffView === null
-        ? null
-        : deepClone(presentation.sidebarDiffView),
-    )
-    setShowBlendGallery(presentation.showBlendGallery)
-    setShowAudioPanel(presentation.showAudioPanel)
-    setShowSonificationPanel(presentation.showSonificationPanel)
-    setQuickPickState(
-      presentation.quickPickState === null
-        ? null
-        : {
-            tid: presentation.quickPickState.tid as TransformId,
-            vid: presentation.quickPickState.vid as VariationId,
-            type: presentation.quickPickState.type,
-          },
-    )
-    setHoveredVariationType(presentation.hoveredVariationType)
-    setAffineCardOpen(presentation.affineCardOpen)
-    setColorCardOpen(presentation.colorCardOpen)
-    setMetadataCardOpen(presentation.metadataCardOpen)
-    setPaletteCardOpen(presentation.paletteCardOpen)
-    setPrePaletteColors(deepClone(presentation.prePaletteColors))
-    setRenderCardOpen(presentation.renderCardOpen)
-    setFloatingActionsCollapsed(presentation.floatingActionsCollapsed)
-    setReplayAffineModeRequest((previous) => ({
-      mode: presentation.affineMode,
-      tab: presentation.affineTab,
-      epoch: previous.epoch + 1,
-    }))
-    setReplayColorViewRequest((previous) => ({
-      view: presentation.colorView,
-      epoch: previous.epoch + 1,
-    }))
-    loadSonificationSnapshot(state.sonification, false)
-  }
-
-  let replayBatchStart: ReplaySideState | undefined
-  let replayPreviewOwner: HistoryPreviewOwner | undefined
-  let replayPresentationBeforePrepare: ReplayPresentationSnapshot | undefined
-
-  const prepareReplayFocus: ReplayFocusPreparationHandler = (preparation) => {
-    if (preparation.timeline) {
-      setShowTimeline(true)
-      if (preparation.timeline.expand) setTimelineCollapsed(false)
-    }
-    if (preparation.sidebar) {
-      revealSidebar()
-      setQuickPickState(null)
-      setHoveredVariationType(null)
-      if (preparation.audioPanel) setShowAudioPanel(true)
-      if (preparation.sonificationPanel) {
-        revealSonificationPanel()
-      }
-    }
-
-    if (preparation.clearTransformSelection) {
-      setSelectedTransformId(null)
-    } else if (preparation.transform) {
-      const transformId = preparation.transform.id
-      setSelectedTransformId(transformId)
-      setCollapsedTransforms((previous) => {
-        if (!previous.has(transformId)) return previous
-        const next = new Set(previous)
-        next.delete(transformId)
-        return next
-      })
-    }
-
-    if (preparation.editorSurface === 'affine') {
-      setAffineCardOpen(true)
-    } else if (preparation.editorSurface === 'color') {
-      setColorCardOpen(true)
-    } else if (preparation.editorSurface === 'metadata') {
-      setMetadataCardOpen(true)
-    } else if (preparation.editorSurface === 'palette') {
-      setPaletteCardOpen(true)
-    } else if (preparation.editorSurface === 'render') {
-      setRenderCardOpen(true)
-    } else if (preparation.editorSurface === 'randomizer') {
-      const expandAnimation = [
-        'ui:random-animation',
-        'ui:smart-animation',
-        'ui:animation-colors',
-        'ui:animation-presets',
-        'ui:animation-clear',
-      ].includes(preparation.spotlightFocus ?? '')
-      openRandomizerCard({
-        expandAnimation,
-        // Replay preparation may reveal controls, but must never author a
-        // sonification-disable command or take ownership from replay.
-        preserveSonificationOutput: true,
-      })
-    }
-    if (preparation.symmetryCard) {
-      setSymmetryCardOpen(true)
-    }
-    if (preparation.floatingActions) setFloatingActionsCollapsed(false)
-
-    if (preparation.colorView) {
-      setReplayColorViewRequest((previous) => ({
-        view: preparation.colorView!,
-        epoch: previous.epoch + 1,
-      }))
-    }
-
-    if (preparation.affineMode || preparation.affineTab) {
-      setReplayAffineModeRequest((previous) => ({
-        mode: preparation.affineMode ?? previous.mode,
-        tab: preparation.affineTab ?? 'grid',
-        epoch: previous.epoch + 1,
-      }))
-    }
-  }
-
-  const replayTarget: ReplayTarget = {
-    primeEffects: (session) => {
-      if (sessionMayEnableSonification(session)) {
-        sonificationLifecycle.prime()
-      }
-    },
-    prepare: () => {
-      // Keep the presentation from before gallery cleanup. A hover may have
-      // installed a temporary document preview, so the flame baseline itself
-      // is captured later, after that preview has been cleared.
-      replayPresentationBeforePrepare = captureReplayPresentation()
-      // Gallery hover previews are intentionally silent document swaps. End
-      // them before the replay transaction captures its undo baseline; if the
-      // gallery were closed later by `prepareReplayFocus`, its restore snapshot
-      // could overwrite the session's freshly loaded initial flame.
-      handlePreviewBlend(null)
-      setHoveredBlendName(null)
-      setShowBlendGallery(false)
-    },
-    loadInitial: (flame) => {
-      // The session's initial document is a hard provenance boundary. Never
-      // let Unselect restore colours stashed for the viewer's previous flame.
-      setPrePaletteColors({})
-      setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
-    },
-    // Only called when the session carries them, so replaying an older
-    // recording leaves the viewer's own animation and audio wiring alone.
-    loadTimeline: (data) => {
-      timeline.loadTracks(data.tracks)
-      timeline.setConfig(data.config)
-      if (data.currentFrame !== undefined) {
-        timeline.setCurrentFrame(data.currentFrame)
-      }
-      if (data.animationEnabled !== undefined) {
-        setAnimationEnabled(data.animationEnabled)
-      }
-      if (data.autoKeyframe !== undefined) {
-        timeline.setAutoKeyframe(data.autoKeyframe)
-      }
-      if (data.previewHeld !== undefined) {
-        timeline.setPreviewHeld(data.previewHeld)
-      }
-    },
-    loadAudio: (audio) => {
-      // `audioTrackName` describes the resource actually loaded in this
-      // workspace. A session cannot supply bytes, so never relabel B.wav as
-      // the A.wav it requires or run the wrong track under the saved mapping.
-      applyReplayAudioState(audio)
-    },
-    loadSonification: loadSonificationSnapshot,
-    loadView: (view) => {
-      if (view.qualityPreset in qualityPresets) {
-        setQualityPreset(view.qualityPreset as QualityPreset)
-      }
-      if (view.pixelRatio !== undefined) setPixelRatio(view.pixelRatio)
-      setAdaptiveFilterEnabled(view.adaptiveFilter)
-      setStochasticFilterEnabled(view.stochasticFilter)
-      setFlyMode(view.flyMode)
-      setShowTimeline(view.showTimeline)
-      setShowSidebar(view.sidebarOpen)
-      setPrePaletteColors(deepClone(view.paletteRestoreColors ?? {}))
-    },
-    execute: (id, args) => {
-      const currentPaletteColors = prePaletteColors()
-      // Derive this before executing: applyPalette replaces the colours whose
-      // exact values the later live Unselect action must restore.
-      const nextPaletteColors = paletteRestoreColorsAfterReplayCommand(
-        id,
-        args,
-        flameDescriptor,
-        currentPaletteColors,
-      )
-      const accepted = executeReplayCommand(id, cmdContext, ...args)
-      if (accepted && nextPaletteColors !== currentPaletteColors) {
-        setPrePaletteColors(nextPaletteColors)
-      }
-      return accepted
-    },
-    preflight: preflightReplayCommand,
-    beginBatch: (onTakeover) => {
-      invalidateLastFinishedSession()
-      setReplaySuspendsAudioModulation(true)
-      setReplayPreservesSonificationOutput(true)
-      replayBatchStart = captureReplaySideState(replayPresentationBeforePrepare)
-      replayPresentationBeforePrepare = undefined
-      // Transport is wall-clock state, not authored replay state. Freeze it
-      // before loading the session so frames cannot advance underneath the
-      // deterministic action sequence; undo never restarts playback.
-      if (timeline.isPlaying()) timeline.pause()
-      timeline.beginTransientHistory()
-      replayPreviewOwner = history.startOwnedPreview('Replay', onTakeover)
-    },
-    withBatchWrite: (fn) => {
-      const owner = replayPreviewOwner
-      if (owner === undefined) return fn()
-      return history.withPreviewOwner(owner, fn)
-    },
-    withDeferredEffects: withReplayDeferredEffects,
-    endBatch: () => {
-      const owner = replayPreviewOwner
-      replayPreviewOwner = undefined
-      const before = replayBatchStart
-      // A presentation-only follow-cam hide must not become an authored stop.
-      // Once the batch settles, make enabled output reachable again unless
-      // the local keep-playing preference explicitly permits hidden sound.
-      if (
-        shouldRevealSonificationAfterReplay({
-          enabled: sonificationEnabled(),
-          panelVisible: sonificationPanelVisible(),
-          keepPlayingWhenClosed: keepAudioPlayingWhenClosed(),
-        })
-      ) {
-        revealSonificationPanel()
-      }
-      setReplayPreservesSonificationOutput(false)
-      const afterSideState = before
-        ? captureReplayNonFlameSideState()
-        : undefined
-      replayBatchStart = undefined
-      replayPresentationBeforePrepare = undefined
-      timeline.endTransientHistory()
-      setReplaySuspendsAudioModulation(false)
-      if (owner === undefined) return
-      const sideStateChanged =
-        before !== undefined &&
-        afterSideState !== undefined &&
-        replaySideStateChanged(before, afterSideState)
-      withRecordingSuppressed(() => {
-        if (sideStateChanged && before && afterSideState) {
-          const after: ReplaySideState = {
-            flame: deepClone(flameDescriptor),
-            ...afterSideState,
-          }
-          history.commitOwnedPreview(owner, {
-            force: true,
-            undoEffect: () => {
-              restoreReplaySideState(before)
-            },
-            redoEffect: () => {
-              restoreReplaySideState(after)
-            },
-          })
-        } else {
-          history.commitOwnedPreview(owner)
-        }
-      })
-    },
-  }
-
-  const exportReplayVideo = async (request: ReplayVideoExportRequest) => {
-    try {
-      if (request.mode === 'artwork') {
-        enqueueAnimationJob(
-          createReplayVideoJobSpec(request.session, request.playbackSpeed),
-        )
-        showToast('Artwork replay added to Exports', 3500)
-        return
-      }
-
-      const result = await captureReplayInterfaceVideo(request)
-      downloadBlob(
-        result.blob,
-        `${replayVideoFileName(request.session, 'interface')}.${result.extension}`,
-      )
-      showToast(
-        result.extension === 'mp4'
-          ? 'Full-interface replay downloaded'
-          : 'Full-interface replay downloaded as WebM (MP4 encoding is unavailable in this browser)',
-        5000,
-      )
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Could not export replay video'
-      showToast(message, 5000)
-      throw error
-    }
-  }
+      sonification: {
+        captureSnapshot: captureSonificationSnapshot,
+        loadSnapshot: loadSonificationSnapshot,
+        lifecycle: sonificationLifecycle,
+        enabled: sonificationEnabled,
+        panelVisible: sonificationPanelVisible,
+        keepPlayingWhenClosed: keepAudioPlayingWhenClosed,
+        revealPanel: revealSonificationPanel,
+      },
+      view: {
+        qualityPreset,
+        setQualityPreset,
+        pixelRatio,
+        setPixelRatio,
+        adaptiveFilterEnabled,
+        setAdaptiveFilterEnabled,
+        stochasticFilterEnabled,
+        setStochasticFilterEnabled,
+        flyMode,
+        setFlyMode,
+        showTimeline,
+        setShowTimeline,
+        showSidebar,
+        setShowSidebar,
+        prePaletteColors,
+        setPrePaletteColors,
+      },
+      presentation: {
+        sidebarHidden,
+        setSidebarHidden,
+        selectedTransformId,
+        setSelectedTransformId,
+        collapsedTransforms,
+        setCollapsedTransforms,
+        timelineCollapsed,
+        setTimelineCollapsed,
+        sidebarDiffView,
+        setSidebarDiffView,
+        showBlendGallery,
+        setShowBlendGallery,
+        showAudioPanel,
+        setShowAudioPanel,
+        showSonificationPanel,
+        setShowSonificationPanel,
+        quickPickState,
+        setQuickPickState,
+        hoveredVariationType,
+        setHoveredVariationType,
+        affineCardOpen,
+        setAffineCardOpen,
+        colorCardOpen,
+        setColorCardOpen,
+        metadataCardOpen,
+        setMetadataCardOpen,
+        paletteCardOpen,
+        setPaletteCardOpen,
+        renderCardOpen,
+        setRenderCardOpen,
+        symmetryCardOpen,
+        setSymmetryCardOpen,
+        floatingActionsCollapsed,
+        setFloatingActionsCollapsed,
+        replayAffineModeRequest,
+        setReplayAffineModeRequest,
+        replayColorViewRequest,
+        setReplayColorViewRequest,
+      },
+      revealSidebar,
+      openRandomizerCard,
+      handlePreviewBlend,
+      setHoveredBlendName,
+      showToast,
+      withReplayDeferredEffects,
+      withRecordingSuppressed,
+      invalidateLastFinishedSession,
+      setReplaySuspendsAudioModulation,
+      setReplayPreservesSonificationOutput,
+    })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
@@ -5339,7 +4123,6 @@ export function MainWorkspace(props: AppProps) {
             arena={cmdContext.arena!}
             hardwareTier={props.hardwareTier}
             onCloseArena={() => {
-              isArenaModalOpen = false
               setShowArena(false)
             }}
           />

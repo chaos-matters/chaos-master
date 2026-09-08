@@ -5,6 +5,8 @@ import randomizerSectionSource from '../components/WorkspaceSidebar/RandomizerSe
 import renderSettingsSectionSource from '../components/WorkspaceSidebar/RenderSettingsSection.tsx?raw'
 import transformsSectionSource from '../components/WorkspaceSidebar/TransformsSection.tsx?raw'
 import sidebarSource from '../components/WorkspaceSidebar/WorkspaceSidebar.tsx?raw'
+import animationGenSource from '../hooks/useWorkspaceAnimationGen.ts?raw'
+import replaySource from '../hooks/useWorkspaceReplay.ts?raw'
 import workspaceSource from '../MainWorkspace.tsx?raw'
 
 const workspacePath = 'src/MainWorkspace.tsx'
@@ -68,6 +70,26 @@ const allAstEntries = [
       ts.ScriptKind.TSX,
     ),
   },
+  {
+    path: 'src/hooks/useWorkspaceAnimationGen.ts',
+    ast: ts.createSourceFile(
+      'src/hooks/useWorkspaceAnimationGen.ts',
+      animationGenSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    ),
+  },
+  {
+    path: 'src/hooks/useWorkspaceReplay.ts',
+    ast: ts.createSourceFile(
+      'src/hooks/useWorkspaceReplay.ts',
+      replaySource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    ),
+  },
 ]
 
 const allSources = [
@@ -77,6 +99,8 @@ const allSources = [
   randomizerSectionSource,
   transformsSectionSource,
   renderSettingsSectionSource,
+  animationGenSource,
+  replaySource,
 ].join('\n')
 
 /**
@@ -112,7 +136,9 @@ function namedDeclaration(name: string): ts.Node {
     }
     ts.forEachChild(node, visit)
   }
-  visit(workspaceAst)
+  for (const { ast } of allAstEntries) {
+    visit(ast)
+  }
   expect(
     matches,
     `expected exactly one declaration named ${name}`,
@@ -152,8 +178,9 @@ function expectNamedDeclarationToUse(
   ...fragments: string[]
 ): void {
   const declaration = namedDeclaration(name)
+  const sourceFile = declaration.getSourceFile()
   const calls = callsWithin(declaration)
-  const callText = calls.map((call) => compact(call.getText(workspaceAst)))
+  const callText = calls.map((call) => compact(call.getText(sourceFile)))
   const recorderCall = callText.find((call) =>
     fragments.every((fragment) => call.includes(fragment)),
   )
@@ -162,7 +189,7 @@ function expectNamedDeclarationToUse(
     `${name} must retain one recorder call containing ${fragments.join(', ')}`,
   ).toBeDefined()
 
-  const callees = calls.map((call) => call.expression.getText(workspaceAst))
+  const callees = calls.map((call) => call.expression.getText(sourceFile))
   expect(callees).not.toContain('setFlameDescriptor')
   expect(callees).not.toContain('history.set')
   expect(callees).not.toContain('history.setSilently')
