@@ -3,9 +3,132 @@ import { DEBUG_MODE } from '@/defaults'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
 import { EXPORT_FENCE_TIMEOUT_MS, EXPORT_IDLE_DELAY_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_LOG_INTERVAL_MS, EXPORT_MAX_ITERATIONS, EXPORT_SLOW_TICK_MS, EXPORT_TARGET_TICK_MS, EXPORT_TICK_GROW_BELOW_MS, EXPORT_TICK_SHRINK_ABOVE_MS, } from './renderDriverTypes'
-import type { ExportRenderDriver, ExportRenderDriverOptions, } from './renderDriverTypes'
+import type { ExportRenderDriver, ExportRenderDriverOptions, RenderTickResult, } from './renderDriverTypes'
 
 const { performance } = globalThis
+
+/**
+ * Await the queue fence (onSubmittedWorkDone) with an explicit timeout safeguard.
+ * Mobile WebGPU queues can transiently reject during backgrounding or memory pressure.
+ */
+export async function awaitExportQueueFence(
+  fencePromise: Promise<void> | undefined,
+): Promise<void> {
+  if (!fencePromise) return
+
+  let timerId: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      fencePromise,
+      new Promise<void>((resolve) => {
+        timerId = setTimeout(resolve, EXPORT_FENCE_TIMEOUT_MS)
+      }),
+    ])
+  } catch (err) {
+    // Mobile WebGPU queues (WebKit/Android) can transiently reject
+    // onSubmittedWorkDone() during backgrounding or memory pressure events.
+    // Do not break the driving loop; if the device was genuinely lost,
+    // options.gpuReady() will evaluate to false and cleanly stop driving.
+    if (DEBUG_MODE) {
+      console.warn(
+        `[ExportDriver ${logTime()}] queue fence rejected; continuing export loop`,
+        err,
+      )
+    }
+  } finally {
+    if (timerId !== undefined) {
+      clearTimeout(timerId)
+    }
+  }
+}
+
+/**
+ * Calculate the next export iteration count based on elapsed tick duration.
+ * Presentation ticks are skipped because filter/grading passes skew wall time.
+ */
+export function calculateNextExportIterations(
+  currentIterations: number,
+  tickMs: number,
+  iterationsRan: number,
+  presented: boolean,
+): number {
+  if (iterationsRan <= 0 || presented) {
+    return currentIterations
+  }
+
+  // Dual-rate controller (presentation ticks are skipped: their
+  // wall time includes the filter/grading passes and would skew it).
+  if (tickMs < EXPORT_TICK_GROW_BELOW_MS) {
+    // Clearly latency-bound — the fixed await floor dominates, so
+    // more iterations are effectively free. Double.
+    return Math.min(currentIterations * 2, EXPORT_MAX_ITERATIONS)
+  }
+
+  if (tickMs <= EXPORT_TICK_SHRINK_ABOVE_MS) {
+    // Inside the band — creep upward to find the point
+    // where GPU time, not latency, sets the pace.
+    return Math.min(Math.ceil(currentIterations * 1.25), EXPORT_MAX_ITERATIONS)
+  }
+
+  // The chunk itself overshot the budget — shrink proportionally.
+  return Math.max(
+    Math.ceil(currentIterations * (EXPORT_TARGET_TICK_MS / tickMs)),
+    1,
+  )
+}
+
+interface ExportTelemetry {
+  windowStartMs: number
+  windowPoints: number
+  windowTickMs: number
+  windowTicks: number
+}
+
+function createExportTelemetry(): ExportTelemetry {
+  return {
+    windowStartMs: performance.now(),
+    windowPoints: 0,
+    windowTickMs: 0,
+    windowTicks: 0,
+  }
+}
+
+function recordExportTelemetry(
+  telemetry: ExportTelemetry,
+  tick: RenderTickResult,
+  tickMs: number,
+  options: ExportRenderDriverOptions,
+  chunkIterations: number,
+): void {
+  telemetry.windowPoints +=
+    tick.iterations *
+    options.pointCountPerBatch() *
+    options.plotsPerChainBaked()
+  telemetry.windowTickMs += tickMs
+  telemetry.windowTicks += 1
+
+  if (DEBUG_MODE && tickMs > EXPORT_SLOW_TICK_MS) {
+    console.info(
+      `[ExportDriver ${logTime()}] slow tick: ${tickMs.toFixed(0)}ms for a ${tick.iterations}-iteration chunk${tick.presented ? ' (presented)' : ''}`,
+    )
+  }
+
+  const nowMs = performance.now()
+  if (nowMs - telemetry.windowStartMs >= EXPORT_LOG_INTERVAL_MS) {
+    if (DEBUG_MODE) {
+      const seconds = (nowMs - telemetry.windowStartMs) / 1000
+      const avgTickMs =
+        telemetry.windowTickMs / Math.max(telemetry.windowTicks, 1)
+      console.info(
+        `[ExportDriver ${logTime()}] ${formatPointCount(telemetry.windowPoints / seconds)} pts/s | ${telemetry.windowTicks} ticks, avg ${avgTickMs.toFixed(1)}ms | chunk=${chunkIterations} iters`,
+      )
+    }
+    telemetry.windowStartMs = nowMs
+    telemetry.windowPoints = 0
+    telemetry.windowTickMs = 0
+    telemetry.windowTicks = 0
+  }
+}
 
 /**
  * Export render driver: replaces the rAF loop while an export runs.
@@ -37,10 +160,7 @@ export function createExportRenderDriver(
 
     // Telemetry — timestamped so stalls can be correlated with tab
     // switches, window moves and occlusion.
-    let windowStartMs = performance.now()
-    let windowPoints = 0
-    let windowTickMs = 0
-    let windowTicks = 0
+    const telemetry = createExportTelemetry()
     let idleSinceMs: number | undefined
 
     if (DEBUG_MODE) {
@@ -71,9 +191,7 @@ export function createExportRenderDriver(
           idleSinceMs ??= startMs
           await new Promise<void>((resolve) => {
             notifyExportWork = resolve
-            setTimeout(() => {
-              resolve()
-            }, EXPORT_IDLE_DELAY_MS)
+            setTimeout(resolve, EXPORT_IDLE_DELAY_MS)
           })
           notifyExportWork = undefined
           continue
@@ -93,90 +211,23 @@ export function createExportRenderDriver(
           break
         }
 
-        const fencePromise = options.latestQueueFence?.()
-        if (fencePromise) {
-          let timerId: ReturnType<typeof setTimeout> | undefined
-          try {
-            await Promise.race([
-              fencePromise,
-              new Promise<void>((resolve) => {
-                timerId = setTimeout(resolve, EXPORT_FENCE_TIMEOUT_MS)
-              }),
-            ])
-          } catch (err) {
-            // Mobile WebGPU queues (WebKit/Android) can transiently reject
-            // onSubmittedWorkDone() during backgrounding or memory pressure events.
-            // Do not break the driving loop; if the device was genuinely lost,
-            // options.gpuReady() will evaluate to false and cleanly stop driving.
-            if (DEBUG_MODE) {
-              console.warn(
-                `[ExportDriver ${logTime()}] queue fence rejected; continuing export loop`,
-                err,
-              )
-            }
-          } finally {
-            if (timerId !== undefined) {
-              clearTimeout(timerId)
-            }
-          }
-        }
+        await awaitExportQueueFence(options.latestQueueFence?.())
 
         const tickMs = performance.now() - startMs
-        windowPoints +=
-          tick.iterations *
-          options.pointCountPerBatch() *
-          options.plotsPerChainBaked()
-        windowTickMs += tickMs
-        windowTicks += 1
+        recordExportTelemetry(
+          telemetry,
+          tick,
+          tickMs,
+          options,
+          exportIterationCount,
+        )
 
-        if (DEBUG_MODE && tickMs > EXPORT_SLOW_TICK_MS) {
-          console.info(
-            `[ExportDriver ${logTime()}] slow tick: ${tickMs.toFixed(0)}ms for a ${tick.iterations}-iteration chunk${tick.presented ? ' (presented)' : ''}`,
-          )
-        }
-
-        const nowMs = performance.now()
-        if (nowMs - windowStartMs >= EXPORT_LOG_INTERVAL_MS) {
-          if (DEBUG_MODE) {
-            const seconds = (nowMs - windowStartMs) / 1000
-            const avgTickMs = windowTickMs / Math.max(windowTicks, 1)
-            console.info(
-              `[ExportDriver ${logTime()}] ${formatPointCount(windowPoints / seconds)} pts/s | ${windowTicks} ticks, avg ${avgTickMs.toFixed(1)}ms | chunk=${exportIterationCount} iters`,
-            )
-          }
-          windowStartMs = nowMs
-          windowPoints = 0
-          windowTickMs = 0
-          windowTicks = 0
-        }
-
-        if (tick.iterations > 0 && !tick.presented) {
-          // Dual-rate controller (presentation ticks are skipped: their
-          // wall time includes the filter/grading passes and would skew it).
-          if (tickMs < EXPORT_TICK_GROW_BELOW_MS) {
-            // Clearly latency-bound — the fixed await floor dominates, so
-            // more iterations are effectively free. Double.
-            exportIterationCount = Math.min(
-              exportIterationCount * 2,
-              EXPORT_MAX_ITERATIONS,
-            )
-          } else if (tickMs <= EXPORT_TICK_SHRINK_ABOVE_MS) {
-            // Inside the band — creep upward to find the point
-            // where GPU time, not latency, sets the pace.
-            exportIterationCount = Math.min(
-              Math.ceil(exportIterationCount * 1.25),
-              EXPORT_MAX_ITERATIONS,
-            )
-          } else {
-            // The chunk itself overshot the budget — shrink proportionally.
-            exportIterationCount = Math.max(
-              Math.ceil(
-                exportIterationCount * (EXPORT_TARGET_TICK_MS / tickMs),
-              ),
-              1,
-            )
-          }
-        }
+        exportIterationCount = calculateNextExportIterations(
+          exportIterationCount,
+          tickMs,
+          tick.iterations,
+          tick.presented,
+        )
       }
     }
     void loop()
