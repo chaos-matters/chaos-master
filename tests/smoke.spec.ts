@@ -86,6 +86,13 @@ test.describe('CI smoke', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await dismissWelcomeIfPresent(page, 12_000)
 
+    const menuTrigger = page.getByRole('button', {
+      name: /Chaos Master.*menu/i,
+    })
+    if (await menuTrigger.isVisible()) {
+      await menuTrigger.click()
+    }
+
     const labLink = page.getByRole('link', { name: 'Open Benchmark Lab' })
     await expect(labLink).toBeVisible({ timeout: 12_000 })
     await expect(labLink).toHaveAttribute('href', '/benchmarks')

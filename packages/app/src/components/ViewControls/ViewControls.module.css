@@ -21,6 +21,16 @@
   flex-shrink: 0;
 }
 
+.isDragging {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.isDragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
 .viewControlWrapper {
   display: flex;
   align-items: center;

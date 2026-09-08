@@ -370,8 +370,13 @@ export function calculateGroundedStats(
     totalProb += p
     probs.push(p)
 
-    const aff = t.preAffine ?? { a: 1, b: 0, c: 0, d: 1 }
-    const { sigma1, det, angle } = analyze2x2Affine(aff.a, aff.b, aff.c, aff.d)
+    const aff = t.preAffine ?? { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+    const { sigma1, det, angle } = analyze2x2Affine(
+      aff.a ?? 1,
+      aff.b ?? 0,
+      aff.d ?? 0,
+      aff.e ?? 1,
+    )
     spectralNorms.push(sigma1)
     angles.push(angle)
 
@@ -432,7 +437,13 @@ export function calculateGroundedStats(
   )
 
   // Symmetry Order
-  const symmetryOrder = detectRotationalSymmetryOrder(angles, hasSymmetryVars)
+  const symTransformCount = Object.entries(flame.transforms ?? {}).filter(
+    ([k, t]) => k.startsWith('_sym__') && t.visible,
+  ).length
+  const symmetryOrder =
+    symTransformCount > 0
+      ? Math.min(8, symTransformCount + 1)
+      : detectRotationalSymmetryOrder(angles, hasSymmetryVars)
 
   // Beauty from fitness
   const fitness = evaluateFlameFitness(flame)

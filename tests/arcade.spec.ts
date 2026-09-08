@@ -62,6 +62,12 @@ test.describe('Lumen Arcade', () => {
     // The workspace is up and the hub is not.
     await expect(page.getByTestId('arcade-card')).toHaveCount(0)
 
+    const menuTrigger = page.getByRole('button', {
+      name: /Chaos Master.*menu/i,
+    })
+    if (await menuTrigger.isVisible()) {
+      await menuTrigger.click()
+    }
     await page.getByRole('link', { name: 'Open Lumen Arcade' }).click()
     await expect(page.getByTestId('arcade-card')).toHaveCount(6)
     // In place: no reload, so the mock the workspace installed is still there.
@@ -69,9 +75,7 @@ test.describe('Lumen Arcade', () => {
 
     await page.getByRole('button', { name: 'Back to editor' }).click()
     await expect(page.getByTestId('arcade-card')).toHaveCount(0)
-    await expect(
-      page.getByRole('link', { name: 'Open Lumen Arcade' }),
-    ).toBeVisible()
+    await expect(menuTrigger).toBeVisible()
   })
 
   test('Teach: start, drive, narrate, end, replay card', async ({ page }) => {

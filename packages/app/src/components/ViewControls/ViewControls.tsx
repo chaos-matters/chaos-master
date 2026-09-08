@@ -4,6 +4,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { Cross, Minus, Plus, Redo, Undo } from '@/icons'
+import { createHorizontalScrollDrag } from '@/utils/createHorizontalScrollDrag'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
 import { PullUpMenu } from '../PullUpMenu/PullUpMenu'
@@ -73,8 +74,14 @@ export function ViewControls(props: ViewControlProps) {
   // Whether the canvas currently reflects a specific animation frame (playing,
   // scrubbing, or a held parked frame) vs the base flame.
   const showingFrame = () => timeline?.isDrivingView() ?? false
+
+  let controlsRef: HTMLDivElement | undefined
+  createHorizontalScrollDrag(() => controlsRef, {
+    draggingClass: ui.isDragging,
+  })
+
   return (
-    <div class={ui.viewControls}>
+    <div ref={controlsRef} class={ui.viewControls}>
       <ButtonGroup data-tour-target="pixelRatio-buttons">
         <For each={[1, 2, 4]}>
           {(divider) => {

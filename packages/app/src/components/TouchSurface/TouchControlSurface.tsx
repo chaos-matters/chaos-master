@@ -11,6 +11,7 @@ import { variationTypesFor } from '@/flame/variationRegistry'
 import { filterVariations } from '@/flame/variations/search'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { ColourWedge, Cross, Minus, Plus, Reset, ShapeTriangle, Shuffle, SidebarPanel, Sparkle, VariationSpiral, } from '@/icons'
+import { createHorizontalScrollDrag } from '@/utils/createHorizontalScrollDrag'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
 import ui from './TouchSurface.module.css'
@@ -86,6 +87,9 @@ export function TouchControlSurface(props: TouchControlSurfaceProps) {
   const [galleryListEl, setGalleryListEl] = createSignal<HTMLDivElement>()
   const trackTileVisibility = createSharedIntersectionObserver(galleryListEl, {
     rootMargin: '200px',
+  })
+  createHorizontalScrollDrag(galleryListEl, {
+    draggingClass: ui.isDragging,
   })
 
   const previewFlames = createMemo(() =>

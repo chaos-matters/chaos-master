@@ -500,10 +500,21 @@ export function MainWorkspace(props: AppProps) {
   function openFlameClashUI() {
     if (isArenaModalOpen) return
     isArenaModalOpen = true
-    const p1 = arenaP1Stats()
+    const current = deepClone(flameDescriptor)
+    const p1Stats = calculateFlameStats(current)
+    const p1Grounded = calculateGroundedStats(current)
+    setArenaP1Stats({
+      name: current.metadata?.name || 'Cyan Guardian',
+      type: p1Stats.type,
+      school: p1Grounded.school,
+      powerLevel: p1Grounded.powerLevel,
+      flame: current,
+      groundedStats: p1Grounded,
+      metrics: p1Stats.metrics,
+    })
+
     const p2 = arenaP2Stats()
-    if (!p1 || !p2) {
-      const current = deepClone(flameDescriptor)
+    if (!p2) {
       const opponent = mutateFlame(
         current,
         {
@@ -522,19 +533,8 @@ export function MainWorkspace(props: AppProps) {
           mutateColors: true,
         },
       )
-      const p1Stats = calculateFlameStats(current)
       const p2Stats = calculateFlameStats(opponent)
-      const p1Grounded = calculateGroundedStats(current)
       const p2Grounded = calculateGroundedStats(opponent)
-      setArenaP1Stats({
-        name: current.metadata?.name || 'Cyan Guardian',
-        type: p1Stats.type,
-        school: p1Grounded.school,
-        powerLevel: p1Grounded.powerLevel,
-        flame: current,
-        groundedStats: p1Grounded,
-        metrics: p1Stats.metrics,
-      })
       setArenaP2Stats({
         name: 'Crimson Nemesis',
         type: p2Stats.type,

@@ -18,9 +18,9 @@
 }
 
 .trackerTouch {
-  right: max(0.75rem, env(safe-area-inset-right));
-  left: auto;
-  top: max(0.75rem, env(safe-area-inset-top));
+  right: auto;
+  left: max(0.75rem, env(safe-area-inset-left));
+  top: calc(max(0.75rem, env(safe-area-inset-top)) + 42px);
 }
 
 .headerBar {

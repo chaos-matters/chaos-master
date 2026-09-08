@@ -1268,7 +1268,8 @@
   left: max(0.75rem, env(safe-area-inset-left));
   align-items: flex-start;
   top: calc(
-    max(0.75rem, env(safe-area-inset-top)) + var(--toast-stack-offset, 0px)
+    max(0.75rem, env(safe-area-inset-top)) + 42px +
+      var(--toast-stack-offset, 0px)
   );
 }
 
