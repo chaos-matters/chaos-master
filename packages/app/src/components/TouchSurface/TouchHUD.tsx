@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { executeCommand } from '@/commands/registry'
 import { CameraIcon, Download, Home, Redo, Shuffle, SidebarPanel, Sparkle, Undo, } from '@/icons'
+import { createHorizontalScrollDrag } from '@/utils/createHorizontalScrollDrag'
 import ui from './TouchSurface.module.css'
 import type { Accessor } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
@@ -40,6 +41,8 @@ function MoreDotsIcon() {
 export function TouchHUD(props: TouchHUDProps) {
   const [showTitleTooltip, setShowTitleTooltip] = createSignal(false)
   const [moreMenuOpen, setMoreMenuOpen] = createSignal(false)
+  const [controlsRailEl, setControlsRailEl] = createSignal<HTMLDivElement>()
+  createHorizontalScrollDrag(controlsRailEl, { draggingClass: ui.isDragging })
 
   const dispatch = (id: string, ...args: unknown[]) => {
     executeCommand(id, props.ctx, ...args)
@@ -104,7 +107,12 @@ export function TouchHUD(props: TouchHUDProps) {
       </div>
 
       {/* 3. Controls Rail */}
-      <div class={ui.controlsRail} role="toolbar" aria-label="Controls">
+      <div
+        ref={setControlsRailEl}
+        class={ui.controlsRail}
+        role="toolbar"
+        aria-label="Controls"
+      >
         <button
           type="button"
           class={ui.hudButton}
@@ -142,88 +150,88 @@ export function TouchHUD(props: TouchHUDProps) {
         >
           <CameraIcon class={ui.hudButtonIcon} />
         </button>
+      </div>
 
-        {/* 4. More (...) Menu */}
-        <div class={ui.moreMenuWrapper}>
-          <button
-            type="button"
-            class={ui.hudButton}
-            title="More Options"
-            aria-label="More Options"
-            aria-expanded={moreMenuOpen()}
-            onClick={() => setMoreMenuOpen((o) => !o)}
+      {/* 4. More (...) Menu */}
+      <div class={ui.moreMenuWrapper}>
+        <button
+          type="button"
+          class={ui.hudButton}
+          title="More Options"
+          aria-label="More Options"
+          aria-expanded={moreMenuOpen()}
+          onClick={() => setMoreMenuOpen((o) => !o)}
+        >
+          <MoreDotsIcon />
+        </button>
+
+        <Show when={moreMenuOpen()}>
+          <div
+            class={ui.popoverBackdrop}
+            onClick={() => setMoreMenuOpen(false)}
+          />
+          <div
+            class={ui.moreMenuPopover}
+            role="menu"
+            aria-label="More Options Menu"
           >
-            <MoreDotsIcon />
-          </button>
-
-          <Show when={moreMenuOpen()}>
-            <div
-              class={ui.popoverBackdrop}
-              onClick={() => setMoreMenuOpen(false)}
-            />
-            <div
-              class={ui.moreMenuPopover}
-              role="menu"
-              aria-label="More Options Menu"
+            <button
+              type="button"
+              role="menuitem"
+              class={ui.moreMenuItem}
+              onClick={() => {
+                setMoreMenuOpen(false)
+                if (props.onMutate) props.onMutate()
+                else dispatch('flame.mutate')
+              }}
             >
+              <Sparkle class={ui.moreMenuIcon} />
+              <span>Mutate Flame</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              class={ui.moreMenuItem}
+              onClick={() => {
+                setMoreMenuOpen(false)
+                if (props.onRandomize) props.onRandomize()
+                else dispatch('flame.randomize')
+              }}
+            >
+              <Shuffle class={ui.moreMenuIcon} />
+              <span>Randomize Flame</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              class={ui.moreMenuItem}
+              onClick={() => {
+                setMoreMenuOpen(false)
+                handleOpenExportModal()
+              }}
+            >
+              <Download class={ui.moreMenuIcon} />
+              <span>Full Export (Options & Animation)…</span>
+            </button>
+
+            <Show when={props.onOpenDrawer}>
               <button
                 type="button"
                 role="menuitem"
                 class={ui.moreMenuItem}
                 onClick={() => {
                   setMoreMenuOpen(false)
-                  if (props.onMutate) props.onMutate()
-                  else dispatch('flame.mutate')
+                  props.onOpenDrawer?.()
                 }}
               >
-                <Sparkle class={ui.moreMenuIcon} />
-                <span>Mutate Flame</span>
+                <SidebarPanel class={ui.moreMenuIcon} />
+                <span>Advanced Tools</span>
               </button>
-
-              <button
-                type="button"
-                role="menuitem"
-                class={ui.moreMenuItem}
-                onClick={() => {
-                  setMoreMenuOpen(false)
-                  if (props.onRandomize) props.onRandomize()
-                  else dispatch('flame.randomize')
-                }}
-              >
-                <Shuffle class={ui.moreMenuIcon} />
-                <span>Randomize Flame</span>
-              </button>
-
-              <button
-                type="button"
-                role="menuitem"
-                class={ui.moreMenuItem}
-                onClick={() => {
-                  setMoreMenuOpen(false)
-                  handleOpenExportModal()
-                }}
-              >
-                <Download class={ui.moreMenuIcon} />
-                <span>Full Export (Options & Animation)…</span>
-              </button>
-
-              <Show when={props.onOpenDrawer}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  class={ui.moreMenuItem}
-                  onClick={() => {
-                    setMoreMenuOpen(false)
-                    props.onOpenDrawer?.()
-                  }}
-                >
-                  <SidebarPanel class={ui.moreMenuIcon} />
-                  <span>Advanced Tools</span>
-                </button>
-              </Show>
-            </div>
-          </Show>
-        </div>
+            </Show>
+          </div>
+        </Show>
       </div>
     </header>
   )

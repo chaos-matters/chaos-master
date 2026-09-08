@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applySymmetryToFlame } from '@/flame/symmetry'
 import { scoreFlame } from './scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -118,5 +119,51 @@ describe('scoreFlame tool', () => {
     expect(linearRes.metrics.symmetryScore).toBe(0)
     expect(linearRes.metrics.chaosLevel).toBe(0)
     expect(linearRes.powerLevel).toBe(670)
+  })
+
+  it('correctly scores structural rotational symmetry transforms (_sym__ prefix)', () => {
+    const base = {
+      version: '1.0',
+      metadata: { name: 'base' },
+      renderSettings: { exposure: 1.0, vibrancy: 0.5, dimensions: 2 },
+      transforms: {
+        t1: {
+          visible: true,
+          probability: 1,
+          colorSpeed: 0.4,
+          variations: { linearVar: { type: 'linearVar', weight: 1 } },
+        },
+      },
+    } as unknown as FlameDescriptor
+
+    type ScoreResult = {
+      stats: {
+        powerLevel: number
+        metrics: { symmetryScore: number; chaosLevel: number }
+      }
+    }
+
+    const resC1 = (scoreFlame.execute({ flame: base }, {}) as ScoreResult).stats
+    expect(resC1.metrics.symmetryScore).toBe(0)
+
+    const flameC2 = applySymmetryToFlame(base, 2)
+    const resC2 = (scoreFlame.execute({ flame: flameC2 }, {}) as ScoreResult)
+      .stats
+    expect(resC2.metrics.symmetryScore).toBe(2.5)
+
+    const flameC3 = applySymmetryToFlame(base, 3)
+    const resC3 = (scoreFlame.execute({ flame: flameC3 }, {}) as ScoreResult)
+      .stats
+    expect(resC3.metrics.symmetryScore).toBe(3.8)
+
+    const flameC4 = applySymmetryToFlame(base, 4)
+    const resC4 = (scoreFlame.execute({ flame: flameC4 }, {}) as ScoreResult)
+      .stats
+    expect(resC4.metrics.symmetryScore).toBe(5.0)
+
+    const flameC8 = applySymmetryToFlame(base, 8)
+    const resC8 = (scoreFlame.execute({ flame: flameC8 }, {}) as ScoreResult)
+      .stats
+    expect(resC8.metrics.symmetryScore).toBe(10.0)
   })
 })

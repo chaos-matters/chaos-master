@@ -87,16 +87,61 @@ describe('ArenaOverlay Component', () => {
     expect(screen.getByText('CLASH')).toBeDefined()
   })
 
-  it('allows tactical stance selection from top bar chips', () => {
+  it('allows tactical stance selection from fighter card', () => {
     const { stance } = mountArenaOverlay()
 
     expect(stance()).toBe('balanced')
 
-    // Click Resonance Surge stance chip
-    const resonanceChip = screen.getByTitle(/Resonance Surge/i)
-    fireEvent.click(resonanceChip)
+    // Click Resonance Surge stance button in Player 1 card
+    const resonanceBtn = screen.getByText('Resonance Surge')
+    fireEvent.click(resonanceBtn)
 
     expect(stance()).toBe('resonance')
+  })
+
+  it('allows adjusting symmetry order on Player 1 and Player 2', () => {
+    const { p1, p2 } = mountArenaOverlay()
+
+    // Find C4 buttons for P1 and P2
+    const c4Buttons = screen.getAllByRole('button', {
+      name: /Set 4-fold rotational symmetry/i,
+    })
+    expect(c4Buttons.length).toBe(2)
+
+    // Click C4 on Player 1
+    fireEvent.click(c4Buttons[0]!)
+    const p1SymKeys = Object.keys(p1()?.flame?.transforms ?? {}).filter((k) =>
+      k.startsWith('_sym__'),
+    )
+    expect(p1SymKeys.length).toBeGreaterThanOrEqual(1)
+    expect(p1()?.metrics?.symmetryScore).toBe(5.0)
+    expect(p1()?.groundedStats?.symmetryOrder).toBe(4)
+
+    // Click C4 again on Player 1 to toggle off/reset to C1
+    fireEvent.click(c4Buttons[0]!)
+    expect(p1()?.groundedStats?.symmetryOrder).toBe(1)
+    expect(p1()?.metrics?.symmetryScore).toBe(0)
+
+    // Click C4 on Player 2
+    fireEvent.click(c4Buttons[1]!)
+    const p2SymKeys = Object.keys(p2()?.flame?.transforms ?? {}).filter((k) =>
+      k.startsWith('_sym__'),
+    )
+    expect(p2SymKeys.length).toBeGreaterThanOrEqual(1)
+    expect(p2()?.metrics?.symmetryScore).toBe(5.0)
+    expect(p2()?.groundedStats?.symmetryOrder).toBe(4)
+  })
+
+  it('renders Sync Active and From Gallery action buttons', () => {
+    mountArenaOverlay()
+
+    expect(
+      screen.getByRole('button', { name: /Sync active flame/i }),
+    ).toBeDefined()
+    const galleryButtons = screen.getAllByRole('button', {
+      name: /from gallery/i,
+    })
+    expect(galleryButtons.length).toBe(2)
   })
 
   it('rerolling opponent updates opponent stats and triggers new archetype', () => {

@@ -5,7 +5,7 @@ import { SoftwareVersion } from './SoftwareVersion'
 describe('SoftwareVersion component', () => {
   afterEach(cleanup)
 
-  it('renders visible pills on desktop layout', () => {
+  it('renders collapsed version trigger and expands upward menu on click in desktop layout', () => {
     const showHelp = vi.fn()
     const showDocs = vi.fn()
     const showBenchmark = vi.fn()
@@ -22,6 +22,14 @@ describe('SoftwareVersion component', () => {
       />
     ))
 
+    const trigger = screen.getByRole('button', { name: /chaos master.*menu/i })
+    expect(trigger).toBeTruthy()
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    // Open menu
+    fireEvent.click(trigger)
+    expect(screen.getByRole('menu')).toBeTruthy()
+
     const labLink = screen.getByRole('link', { name: 'Open Benchmark Lab' })
     expect(labLink).toBeTruthy()
     expect(labLink.getAttribute('href')).toBe('/benchmarks')
@@ -29,19 +37,21 @@ describe('SoftwareVersion component', () => {
     const arcadeLink = screen.getByRole('link', { name: 'Open Lumen Arcade' })
     expect(arcadeLink).toBeTruthy()
 
-    const docsBtn = screen.getByRole('button', { name: /docs/i })
+    const docsBtn = screen.getByText('Documentation')
     expect(docsBtn).toBeTruthy()
     fireEvent.click(docsBtn)
     expect(showDocs).toHaveBeenCalled()
 
-    const aboutBtn = screen.getByRole('button', { name: /about/i })
+    // Reopen menu to click About
+    fireEvent.click(trigger)
+    const aboutBtn = screen.getByText('About Chaos Master')
     expect(aboutBtn).toBeTruthy()
     fireEvent.click(aboutBtn)
     expect(showHelp).toHaveBeenCalled()
 
-    const touchBtn = screen.getByRole('button', {
-      name: 'Switch to Touch Studio',
-    })
+    // Reopen menu to click Touch
+    fireEvent.click(trigger)
+    const touchBtn = screen.getByText('Switch to Touch Studio')
     expect(touchBtn).toBeTruthy()
     fireEvent.click(touchBtn)
     expect(setPref).toHaveBeenCalledWith('touch')

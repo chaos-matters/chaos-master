@@ -136,6 +136,7 @@ export const scoreClashRound: WebMcpTool = {
     function stepVariation(
       p: [number, number, number],
       t: TransformFunction,
+      rng?: () => number,
     ): [number, number, number] {
       const vars = t.variations || {}
       const entries = Object.values(vars)
@@ -167,6 +168,49 @@ export const scoreClashRound: WebMcpTool = {
           vx += (p[0] * c - p[1] * s) * w
           vy += (p[0] * s + p[1] * c) * w
           vz += p[2] * w
+        } else if (type.startsWith('julia')) {
+          const r = Math.hypot(p[0], p[1])
+          const theta = Math.atan2(p[1], p[0])
+          const omega = rng && rng() > 0.5 ? Math.PI : 0
+          const angle = theta / 2 + omega
+          const sqrtR = Math.sqrt(r)
+          vx += sqrtR * Math.cos(angle) * w
+          vy += sqrtR * Math.sin(angle) * w
+          vz += p[2] * w
+        } else if (type.startsWith('polar')) {
+          const r = Math.hypot(p[0], p[1])
+          const theta = Math.atan2(p[1], p[0])
+          vx += (theta / Math.PI) * w
+          vy += (r - 1.0) * w
+          vz += p[2] * w
+        } else if (type.startsWith('ngon')) {
+          const phi = Math.atan2(p[1], p[0])
+          const r = Math.hypot(p[0], p[1]) + 1e-6
+          const sides = 4
+          const corners = 4
+          const circle = 4
+          const p2 = (2.0 * Math.PI) / sides
+          const t3 = phi - p2 * Math.floor(phi / p2)
+          const t4 = t3 > p2 / 2.0 ? t3 - p2 : t3
+          const kNum =
+            corners * (1.0 / Math.max(1e-4, Math.cos(t4)) - 1.0) + circle
+          const kDen = r * r
+          const k = Math.min(10, Math.max(-10, kNum / kDen))
+          vx += p[0] * k * w
+          vy += p[1] * k * w
+          vz += p[2] * w
+        } else if (type.startsWith('kaleidoscope')) {
+          const r = Math.hypot(p[0], p[1])
+          let theta = Math.atan2(p[1], p[0])
+          const folds = 6
+          const sector = (2 * Math.PI) / folds
+          theta = ((theta % sector) + sector) % sector
+          if (theta > sector / 2) {
+            theta = sector - theta
+          }
+          vx += r * Math.cos(theta) * w
+          vy += r * Math.sin(theta) * w
+          vz += p[2] * w
         } else {
           vx += p[0] * w
           vy += p[1] * w
@@ -183,9 +227,10 @@ export const scoreClashRound: WebMcpTool = {
     function stepTransform(
       p: [number, number, number],
       t: TransformFunction,
+      rng?: () => number,
     ): [number, number, number] {
       const pre = stepAffine(p, t.preAffine)
-      const mid = stepVariation(pre, t)
+      const mid = stepVariation(pre, t, rng)
       const post = stepAffine(mid, t.postAffine)
       return post
     }
@@ -221,7 +266,7 @@ export const scoreClashRound: WebMcpTool = {
           r -= prob
         }
         if (chosen) {
-          p = stepTransform(p, chosen)
+          p = stepTransform(p, chosen, rngA)
           if (i > 20) {
             const key = toVoxelKey(p)
             voxelsA.set(key, (voxelsA.get(key) || 0) + 1)
@@ -249,12 +294,33 @@ export const scoreClashRound: WebMcpTool = {
           r -= prob
         }
         if (chosen) {
-          p = stepTransform(p, chosen)
+          p = stepTransform(p, chosen, rngB)
           if (i > 20) {
             const key = toVoxelKey(p)
             voxelsB.set(key, (voxelsB.get(key) || 0) + 1)
           }
         }
+      }
+    }
+
+    // Symmetry structural reinforcement:
+    // Detect symmetry transforms or variations to reinforce contested boundary defense
+    let symStrengthA = 0
+    let symStrengthB = 0
+    for (const [id, t] of transforms) {
+      const hasSymVar = Object.values(t.variations ?? {}).some((v) => {
+        const type = (v as { type?: string }).type ?? ''
+        return (
+          type.startsWith('julia') ||
+          type.startsWith('polar') ||
+          type.startsWith('ngon') ||
+          type.startsWith('kaleidoscope')
+        )
+      })
+      const isSym = id.includes('_sym__') || hasSymVar
+      if (isSym) {
+        if (id.startsWith('p1_')) symStrengthA++
+        if (id.startsWith('p2_')) symStrengthB++
       }
     }
 
@@ -269,10 +335,13 @@ export const scoreClashRound: WebMcpTool = {
       if (cA > 0 && cB === 0) voxA++
       else if (cB > 0 && cA === 0) voxB++
       else if (cA > 0 && cB > 0) {
-        if (cA > cB * 2) {
+        // Apply symmetry structural reinforcement
+        const weightA = cA * (1 + Math.min(0.3, symStrengthA * 0.05))
+        const weightB = cB * (1 + Math.min(0.3, symStrengthB * 0.05))
+        if (weightA > weightB * 2) {
           voxA += 0.7
           voxContested += 0.3
-        } else if (cB > cA * 2) {
+        } else if (weightB > weightA * 2) {
           voxB += 0.7
           voxContested += 0.3
         } else {

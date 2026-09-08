@@ -134,6 +134,18 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.controlsRail.isDragging {
+  cursor: grabbing;
+}
+
+.controlsRail.isDragging * {
+  cursor: grabbing !important;
+  pointer-events: none;
 }
 
 .controlsRail::-webkit-scrollbar {
@@ -997,10 +1009,24 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding: 4px 2px 10px 2px;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.variationsCarousel.isDragging {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+  cursor: grabbing;
+}
+
+.variationsCarousel.isDragging * {
+  cursor: grabbing !important;
+  pointer-events: none;
 }
 
 .variationsCarousel::-webkit-scrollbar {
