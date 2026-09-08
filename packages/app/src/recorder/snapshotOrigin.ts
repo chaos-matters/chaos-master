@@ -90,106 +90,74 @@ function withDetail(base: string, detail: string | undefined): string {
   return detail === undefined ? base : `${base}: ${detail}`
 }
 
+const SNAPSHOT_LABEL_MAPPERS: Record<
+  SnapshotOrigin['kind'],
+  (detail: string | undefined) => string
+> = {
+  'flame.randomize': () => 'Randomize Flame',
+  'flame.mutate': () => 'Mutate Flame',
+  'flame.random-gallery': () => 'Apply Random Flame',
+  'flame.history': () => 'Load Randomizer History',
+  'flame.gallery': (detail) => withDetail('Load Gallery Flame', detail),
+  'flame.file': (detail) => withDetail('Load Flame', detail),
+  'flame.home': (detail) => withDetail('Open Home Flame', detail),
+  'flame.new': () => 'New Flame',
+  'flame.breed': () => 'Apply Bred Flame',
+  'flame.evolve': () => 'Apply Evolved Flame',
+  'flame.simulator': () => 'Apply Simulator Flame',
+  'flame.ancestry': () => 'Load Ancestry Flame',
+  'flame.dimension': (detail) =>
+    detail === undefined ? 'Switch Dimensions' : `Switch to ${detail}`,
+  'timeline.random': (detail) => withDetail('Random Animate', detail),
+  'timeline.smart': () => 'Smart Animate',
+  'timeline.colors': () => 'Animate Colors',
+  'timeline.preset': (detail) => withDetail('Apply Animation Preset', detail),
+  'timeline.load': (detail) => withDetail('Load Animation', detail),
+  'timeline.clear': () => 'Clear Animation',
+  'timeline.morph': () => 'Create Morph Animation',
+  'timeline.dimension': (detail) =>
+    detail === undefined
+      ? 'Load Dimension Animation'
+      : `Load ${detail} Animation`,
+}
+
 /** Human caption for an exact snapshot action. */
 export function snapshotOriginLabel(value: unknown): string | undefined {
   const origin = tryValidateSnapshotOrigin(value)
   if (!origin) return undefined
+  const mapper = SNAPSHOT_LABEL_MAPPERS[origin.kind]
+  return mapper ? mapper(origin.detail) : undefined
+}
 
-  switch (origin.kind) {
-    case 'flame.randomize':
-      return 'Randomize Flame'
-    case 'flame.mutate':
-      return 'Mutate Flame'
-    case 'flame.random-gallery':
-      return 'Apply Random Flame'
-    case 'flame.history':
-      return 'Load Randomizer History'
-    case 'flame.gallery':
-      return withDetail('Load Gallery Flame', origin.detail)
-    case 'flame.file':
-      // The standard Load dialog also contains built-ins and Recents. Keep the
-      // caption truthful until the modal returns a more specific source.
-      return withDetail('Load Flame', origin.detail)
-    case 'flame.home':
-      return withDetail('Open Home Flame', origin.detail)
-    case 'flame.new':
-      return 'New Flame'
-    case 'flame.breed':
-      return 'Apply Bred Flame'
-    case 'flame.evolve':
-      return 'Apply Evolved Flame'
-    case 'flame.simulator':
-      return 'Apply Simulator Flame'
-    case 'flame.ancestry':
-      return 'Load Ancestry Flame'
-    case 'flame.dimension':
-      return origin.detail === undefined
-        ? 'Switch Dimensions'
-        : `Switch to ${origin.detail}`
-    case 'timeline.random':
-      return withDetail('Random Animate', origin.detail)
-    case 'timeline.smart':
-      return 'Smart Animate'
-    case 'timeline.colors':
-      return 'Animate Colors'
-    case 'timeline.preset':
-      return withDetail('Apply Animation Preset', origin.detail)
-    case 'timeline.load':
-      return withDetail('Load Animation', origin.detail)
-    case 'timeline.clear':
-      return 'Clear Animation'
-    case 'timeline.morph':
-      return 'Create Morph Animation'
-    case 'timeline.dimension':
-      return origin.detail === undefined
-        ? 'Load Dimension Animation'
-        : `Load ${origin.detail} Animation`
-  }
+const SNAPSHOT_ORIGIN_FOCUS_MAP: Record<SnapshotOrigin['kind'], string> = {
+  'flame.randomize': 'ui:randomizer-generate',
+  'flame.mutate': 'ui:randomizer-mutate',
+  'flame.random-gallery': 'ui:randomizer-card',
+  'flame.history': 'ui:randomizer-card',
+  'flame.file': 'ui:load-flame',
+  'flame.home': 'ui:load-flame',
+  'flame.gallery': 'ui:gallery-picker',
+  'flame.new': 'ui:new-flame',
+  'flame.breed': 'ui:genetics-menu',
+  'flame.evolve': 'ui:genetics-menu',
+  'flame.simulator': 'ui:genetics-menu',
+  'flame.ancestry': 'ui:genetics-menu',
+  'flame.dimension': 'ui:dimension-toggle',
+  'timeline.dimension': 'ui:dimension-toggle',
+  'timeline.random': 'ui:random-animation',
+  'timeline.smart': 'ui:smart-animation',
+  'timeline.colors': 'ui:animation-colors',
+  'timeline.preset': 'ui:animation-presets',
+  'timeline.load': 'ui:timeline-section',
+  'timeline.clear': 'ui:animation-clear',
+  'timeline.morph': 'ui:morph-picker',
 }
 
 /** Stable follow-cam hint for an exact snapshot action. */
 export function snapshotOriginFocus(value: unknown): string | undefined {
   const origin = tryValidateSnapshotOrigin(value)
   if (!origin) return undefined
-
-  switch (origin.kind) {
-    case 'flame.randomize':
-      return 'ui:randomizer-generate'
-    case 'flame.mutate':
-      return 'ui:randomizer-mutate'
-    case 'flame.random-gallery':
-    case 'flame.history':
-      return 'ui:randomizer-card'
-    case 'flame.file':
-    case 'flame.home':
-      return 'ui:load-flame'
-    case 'flame.gallery':
-      return 'ui:gallery-picker'
-    case 'flame.new':
-      return 'ui:new-flame'
-    case 'flame.breed':
-    case 'flame.evolve':
-    case 'flame.simulator':
-    case 'flame.ancestry':
-      return 'ui:genetics-menu'
-    case 'flame.dimension':
-    case 'timeline.dimension':
-      return 'ui:dimension-toggle'
-    case 'timeline.random':
-      return 'ui:random-animation'
-    case 'timeline.smart':
-      return 'ui:smart-animation'
-    case 'timeline.colors':
-      return 'ui:animation-colors'
-    case 'timeline.preset':
-      return 'ui:animation-presets'
-    case 'timeline.load':
-      return 'ui:timeline-section'
-    case 'timeline.clear':
-      return 'ui:animation-clear'
-    case 'timeline.morph':
-      return 'ui:morph-picker'
-  }
+  return SNAPSHOT_ORIGIN_FOCUS_MAP[origin.kind]
 }
 
 /**

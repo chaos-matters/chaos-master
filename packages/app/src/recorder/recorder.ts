@@ -477,6 +477,106 @@ function cancelIn(s: StreamState): void {
  * invocation (top-level, unsuppressed, while a recording is active), then
  * runs it inside a command scope so history pushes it causes are attributed
  * to it instead of being flagged as unnamed writes.
+ */
+function coalesceRecordedAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+  anchorIndex: number,
+  existing: RecordedAction,
+): void {
+  // A drag re-sets the same target dozens of times inside ONE undo step;
+  // the log keeps the last value and the timestamp the gesture began.
+  const coalescedArgs = cmd.coalesceArgs
+    ? cmd.coalesceArgs(existing.args, args)
+    : args
+  const snapshot = snapshotAction(
+    s,
+    rec,
+    {
+      ...existing,
+      args: coalescedArgs,
+      focus: focusFor(cmd, [...coalescedArgs]),
+      // The label has to move with the args. Describing commands render
+      // the value into their label ("Set gamma to 2.42"), so keeping the
+      // first one left the step list quoting a value the action no longer
+      // carried.
+      label: cmd.describe?.([...coalescedArgs]) ?? cmd.label,
+    },
+    anchorIndex,
+  )
+  if (snapshot !== undefined) {
+    rec.actionJsonCharsTotal +=
+      snapshot.jsonChars - (rec.actionJsonChars[anchorIndex] ?? 0)
+    rec.actionJsonChars[anchorIndex] = snapshot.jsonChars
+    rec.actions[anchorIndex] = snapshot.action
+    s.pendingActionIndex = anchorIndex
+  }
+}
+
+function appendRecordedAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+  anchorKey?: string,
+): void {
+  const narration = s.pendingNarration
+  s.pendingNarration = undefined
+  const snapshot = snapshotAction(s, rec, {
+    t: elapsedMs(rec),
+    id: cmd.id,
+    args,
+    label: cmd.describe?.([...args]) ?? cmd.label,
+    focus: focusFor(cmd, [...args]),
+    ...(narration === undefined ? {} : { note: narration }),
+  })
+  if (snapshot !== undefined) {
+    rec.actions.push(snapshot.action)
+    rec.actionJsonChars.push(snapshot.jsonChars)
+    rec.actionJsonCharsTotal += snapshot.jsonChars
+    s.pendingActionIndex = rec.actions.length - 1
+    if (anchorKey !== undefined) {
+      s.coalesceAnchors.set(anchorKey, s.pendingActionIndex)
+    }
+    s.setActionCount(rec.actions.length)
+  }
+}
+
+function recordActiveCommandAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+): void {
+  // Any command during a gesture accounts for the entry that gesture will
+  // push, so the commit is not reported as an anonymous write.
+  s.gestureClaimed = true
+  try {
+    const key = cmd.coalesceKey?.([...args])
+    const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
+    const anchorIndex =
+      anchorKey === undefined ? undefined : s.coalesceAnchors.get(anchorKey)
+    const existing =
+      anchorIndex === undefined ? undefined : rec.actions[anchorIndex]
+    if (existing !== undefined && anchorIndex !== undefined) {
+      coalesceRecordedAction(s, rec, cmd, args, anchorIndex, existing)
+    } else {
+      appendRecordedAction(s, rec, cmd, args, anchorKey)
+    }
+  } catch {
+    noteSessionBudgetExceeded(
+      s,
+      rec,
+      'An action could not be serialized and was not recorded',
+    )
+  }
+}
+
+/**
+ * Executes a command while logging it, handling depth, cancellation, and error
+ * reporting.
  *
  * Args are cloned via the JSON-based `deepClone`, matching the convention
  * that command args are plain data — a non-serializable arg would break
@@ -489,109 +589,26 @@ function recordCommandExecutionIn(
   run: () => void,
 ): void {
   const rec = s.active
-  if (
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.preservesFinishedSession !== true
-  ) {
+  const isTopLevel = commandDepth === 0 && suppressDepth === 0
+  if (isTopLevel && cmd.preservesFinishedSession !== true) {
     noteLiveWorkspaceMutation(s)
+    if (!rec) {
+      invalidateLastFinishedSessionIn(s)
+    }
   }
-  if (
-    !rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.preservesFinishedSession !== true
-  ) {
-    invalidateLastFinishedSessionIn(s)
-  }
-  if (
-    rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.recordable === false
-  ) {
-    s.coalesceAnchors = new Map()
-    s.gestureClaimed = false
-    noteUnnamedWrite(s, rec, `${cmd.label} is wall-clock transport`)
-  } else if (
-    rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.id === NARRATION_COMMAND_ID &&
-    !narrationAsStep()
-  ) {
-    // The sentence still runs (the live rail shows it); it just waits to
-    // caption the step it introduces instead of standing as a step itself.
-    s.gestureClaimed = true
-    const text = args[0]
-    s.pendingNarration = typeof text === 'string' ? text : undefined
-  } else if (rec && commandDepth === 0 && suppressDepth === 0) {
-    // Any command during a gesture accounts for the entry that gesture will
-    // push, so the commit is not reported as an anonymous write.
-    s.gestureClaimed = true
-    try {
-      const key = cmd.coalesceKey?.([...args])
-      const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
-      const anchorIndex =
-        anchorKey === undefined ? undefined : s.coalesceAnchors.get(anchorKey)
-      const existing =
-        anchorIndex === undefined ? undefined : rec.actions[anchorIndex]
-      if (existing !== undefined && anchorIndex !== undefined) {
-        // A drag re-sets the same target dozens of times inside ONE undo step;
-        // the log keeps the last value and the timestamp the gesture began.
-        const coalescedArgs = cmd.coalesceArgs
-          ? cmd.coalesceArgs(existing.args, args)
-          : args
-        const snapshot = snapshotAction(
-          s,
-          rec,
-          {
-            ...existing,
-            args: coalescedArgs,
-            focus: focusFor(cmd, [...coalescedArgs]),
-            // The label has to move with the args. Describing commands render
-            // the value into their label ("Set gamma to 2.42"), so keeping the
-            // first one left the step list quoting a value the action no longer
-            // carried.
-            label: cmd.describe?.([...coalescedArgs]) ?? cmd.label,
-          },
-          anchorIndex,
-        )
-        if (snapshot !== undefined) {
-          rec.actionJsonCharsTotal +=
-            snapshot.jsonChars - (rec.actionJsonChars[anchorIndex] ?? 0)
-          rec.actionJsonChars[anchorIndex] = snapshot.jsonChars
-          rec.actions[anchorIndex] = snapshot.action
-          s.pendingActionIndex = anchorIndex
-        }
-      } else {
-        const narration = s.pendingNarration
-        s.pendingNarration = undefined
-        const snapshot = snapshotAction(s, rec, {
-          t: elapsedMs(rec),
-          id: cmd.id,
-          args,
-          label: cmd.describe?.([...args]) ?? cmd.label,
-          focus: focusFor(cmd, [...args]),
-          ...(narration === undefined ? {} : { note: narration }),
-        })
-        if (snapshot !== undefined) {
-          rec.actions.push(snapshot.action)
-          rec.actionJsonChars.push(snapshot.jsonChars)
-          rec.actionJsonCharsTotal += snapshot.jsonChars
-          s.pendingActionIndex = rec.actions.length - 1
-          if (anchorKey !== undefined) {
-            s.coalesceAnchors.set(anchorKey, s.pendingActionIndex)
-          }
-          s.setActionCount(rec.actions.length)
-        }
-      }
-    } catch {
-      noteSessionBudgetExceeded(
-        s,
-        rec,
-        'An action could not be serialized and was not recorded',
-      )
+  if (rec && isTopLevel) {
+    if (cmd.recordable === false) {
+      s.coalesceAnchors = new Map()
+      s.gestureClaimed = false
+      noteUnnamedWrite(s, rec, `${cmd.label} is wall-clock transport`)
+    } else if (cmd.id === NARRATION_COMMAND_ID && !narrationAsStep()) {
+      // The sentence still runs (the live rail shows it); it just waits to
+      // caption the step it introduces instead of standing as a step itself.
+      s.gestureClaimed = true
+      const text = args[0]
+      s.pendingNarration = typeof text === 'string' ? text : undefined
+    } else {
+      recordActiveCommandAction(s, rec, cmd, args)
     }
   }
   commandDepth++

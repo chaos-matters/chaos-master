@@ -253,17 +253,16 @@ export function parseSession(json: string): RecordedSession | undefined {
   }
 }
 
-/** Same checks against an already-decoded value — the form a session takes
- *  when it arrives from a PNG chunk rather than a file. */
-export function validateSession(data: unknown): RecordedSession | undefined {
+function isSessionJsonLengthValid(data: unknown): boolean {
   try {
     const encoded = JSON.stringify(data)
-    if (encoded === undefined || encoded.length > MAX_SESSION_JSON_CHARS) {
-      return undefined
-    }
+    return encoded !== undefined && encoded.length <= MAX_SESSION_JSON_CHARS
   } catch {
-    return undefined
+    return false
   }
+}
+
+function validateInitialPaletteColors(data: unknown): boolean {
   try {
     if (data !== null && typeof data === 'object') {
       const initialView = (data as { initialView?: unknown }).initialView
@@ -275,11 +274,52 @@ export function validateSession(data: unknown): RecordedSession | undefined {
           paletteRestoreColors !== undefined &&
           tryValidateTransformColorSnapshot(paletteRestoreColors) === undefined
         ) {
-          return undefined
+          return false
         }
       }
     }
+    return true
   } catch {
+    return false
+  }
+}
+
+function validateActionTimestampsAndSonification(
+  actions: readonly RecordedAction[],
+  initialSonificationModel?: string,
+): boolean {
+  let previousTime = -1
+  let sonificationModel = initialSonificationModel
+  let sonificationModelTransitions = 0
+  for (const action of actions) {
+    if (action.t < previousTime) return false
+    previousTime = action.t
+    if (
+      action.id !== 'sonification.setConfig' &&
+      action.id !== 'sonification.setEnabled'
+    ) {
+      continue
+    }
+    const snapshot = tryValidateSonificationSnapshot(action.args[0])
+    if (!snapshot) continue
+    if (
+      sonificationModel === undefined ||
+      snapshot.config.model !== sonificationModel
+    ) {
+      sonificationModelTransitions++
+      if (sonificationModelTransitions > MAX_SONIFICATION_MODEL_TRANSITIONS) {
+        return false
+      }
+    }
+    sonificationModel = snapshot.config.model
+  }
+  return true
+}
+
+/** Same checks against an already-decoded value — the form a session takes
+ *  when it arrives from a PNG chunk rather than a file. */
+export function validateSession(data: unknown): RecordedSession | undefined {
+  if (!isSessionJsonLengthValid(data) || !validateInitialPaletteColors(data)) {
     return undefined
   }
   const shell = v.safeParse(RecordedSessionShellSchema, data)
@@ -303,30 +343,13 @@ export function validateSession(data: unknown): RecordedSession | undefined {
   ) {
     return undefined
   }
-  let previousTime = -1
-  let sonificationModel = shell.output.initialSonification?.config.model
-  let sonificationModelTransitions = 0
-  for (const action of shell.output.actions) {
-    if (action.t < previousTime) return undefined
-    previousTime = action.t
-    if (
-      action.id !== 'sonification.setConfig' &&
-      action.id !== 'sonification.setEnabled'
-    ) {
-      continue
-    }
-    const snapshot = tryValidateSonificationSnapshot(action.args[0])
-    if (!snapshot) continue
-    if (
-      sonificationModel === undefined ||
-      snapshot.config.model !== sonificationModel
-    ) {
-      sonificationModelTransitions++
-      if (sonificationModelTransitions > MAX_SONIFICATION_MODEL_TRANSITIONS) {
-        return undefined
-      }
-    }
-    sonificationModel = snapshot.config.model
+  if (
+    !validateActionTimestampsAndSonification(
+      shell.output.actions,
+      shell.output.initialSonification?.config.model,
+    )
+  ) {
+    return undefined
   }
   const initial = tryValidateFlame(shell.output.initial)
   if (initial === undefined) return undefined

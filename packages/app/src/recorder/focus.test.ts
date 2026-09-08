@@ -209,6 +209,46 @@ describe('focusHintFor', () => {
     )
   })
 
+  it('handles updateRenderSettings with patch variants and randomizer', () => {
+    expect(
+      focusHintFor('flame.updateRenderSettings', [
+        { exposure: 1.5 },
+        'randomizer',
+      ]),
+    ).toBe('ui:randomizer-card')
+    expect(
+      focusHintFor('flame.updateRenderSettings', [{ exposure: 1.5 }]),
+    ).toBe('param:exposure')
+    expect(
+      focusHintFor('flame.updateRenderSettings', [{ autoExposure3D: true }]),
+    ).toBe('param:autoExposure3D')
+    expect(
+      focusHintFor('flame.updateRenderSettings', [{ contrast: 1.2 }]),
+    ).toBe('param:contrast')
+  })
+
+  it('handles deleteVariation and setFinalAffine properly', () => {
+    expect(focusHintFor('flame.deleteVariation', ['t1', 'v1'])).toBe(
+      'focus:tx:t1',
+    )
+    expect(focusHintFor('flame.deleteVariation', [])).toBe('ui:transform-list')
+    expect(focusHintFor('flame.setFinalAffine', ['rotate'])).toBe(
+      'param:finalTransform.rotate',
+    )
+    expect(focusHintFor('flame.setFinalAffine', [])).toBe('focus:affine:final')
+  })
+
+  it('handles metadata and export command hints', () => {
+    expect(focusHintFor('flame.setMetadata', ['author', 'Alice'])).toBe(
+      'param:metadata.author',
+    )
+    expect(focusHintFor('flame.setMetadata', [])).toBe('ui:metadata-card')
+    expect(focusHintFor('history.undo', [])).toBe('ui:undoRedo-controls')
+    expect(focusHintFor('history.redo', [])).toBe('ui:undoRedo-controls')
+    expect(focusHintFor('export.png', [])).toBe('ui:export-png')
+    expect(focusHintFor('export.animation', [])).toBe('ui:timeline-section')
+  })
+
   it('has nothing to say about an unknown command', () => {
     expect(focusHintFor('some.futureCommand', ['x'])).toBeUndefined()
   })
