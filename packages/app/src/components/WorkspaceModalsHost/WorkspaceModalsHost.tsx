@@ -9,6 +9,7 @@ import type { TourContext } from '@/components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
 import type { Seat3DCamera } from '@/seats/seat'
+import type { TouchLayoutPreference } from '@/stores/workspaceLayoutStore'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
 const DuelStage = lazy(() =>
@@ -42,6 +43,10 @@ export interface WorkspaceModalsHostProps {
   arena: NonNullable<CommandContext['arena']>
   hardwareTier?: HardwareTier | null
   onCloseArena: () => void
+  touchLayoutPreference?: () => TouchLayoutPreference
+  setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
+  isTouchLayout?: () => boolean
+  onPickGallery?: () => void
 }
 
 export function WorkspaceModalsHost(props: WorkspaceModalsHostProps) {
@@ -52,6 +57,10 @@ export function WorkspaceModalsHost(props: WorkspaceModalsHostProps) {
         showBenchmark={props.showBenchmark}
         showDocs={props.showDocs}
         showHelp={props.showHelp}
+        touchLayoutPreference={props.touchLayoutPreference}
+        setTouchLayoutPreference={props.setTouchLayoutPreference}
+        isTouchLayout={props.isTouchLayout}
+        onPickGallery={props.onPickGallery}
       />
       <Show when={props.devCrashTest()}>
         {(() => {

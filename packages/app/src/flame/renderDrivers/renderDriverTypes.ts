@@ -8,6 +8,7 @@ export const EXPORT_PRESENT_INTERVAL_MS = 250
 export const EXPORT_LOG_INTERVAL_MS = 2000
 export const EXPORT_SLOW_TICK_MS = 300
 export const EXPORT_COUNT_SIGNAL_INTERVAL_MS = 100
+export const EXPORT_FENCE_TIMEOUT_MS = 2000
 
 export type RenderTickResult = {
   iterations: number

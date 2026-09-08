@@ -80,26 +80,11 @@
   max-height: calc(80vh - 6rem);
 }
 
-@media (max-width: 700px) {
-  .dialogBody {
-    grid-template-columns: 1fr;
-  }
-
-  .previewPane {
-    aspect-ratio: auto;
-    height: 200px;
-    max-height: 200px;
-  }
-
-  .animationPreviewPane {
-    min-height: 120px;
-    max-height: 200px;
-  }
-}
-
 .previewPane {
   position: relative;
   aspect-ratio: 1;
+  min-height: 220px;
+  min-width: 0;
   max-height: 420px;
   border-radius: 0.5rem;
   overflow: hidden;
@@ -118,6 +103,24 @@
   flex-direction: column;
   gap: 10px;
   padding: 8px;
+}
+
+@media (max-width: 860px) {
+  .dialogBody {
+    grid-template-columns: 1fr;
+  }
+
+  .previewPane {
+    aspect-ratio: auto;
+    height: 240px;
+    max-height: 280px;
+    min-height: 200px;
+  }
+
+  .animationPreviewPane {
+    min-height: 120px;
+    max-height: 200px;
+  }
 }
 
 .previewToolbar {

@@ -12,6 +12,18 @@
   isolation: isolate;
 }
 
+.phoneLayout {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'viewport';
+}
+
+.tabletLayout {
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'viewport inspector';
+}
+
 .canvas-container {
   grid-area: viewport;
   grid-row-end: viewport-controls;
@@ -679,13 +691,18 @@
   }
 
   [data-theme='dark'] & {
-    border-color: var(--neutral-700);
-    color: var(--neutral-400);
+    border-color: var(--neutral-600);
+    color: #f1f5f9;
+
+    & > svg {
+      color: #f1f5f9;
+      stroke: currentColor;
+    }
 
     &:hover {
-      color: var(--neutral-200);
-      background: rgba(255, 255, 255, 0.05);
-      border-color: var(--neutral-600);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--neutral-500);
     }
   }
 }
@@ -1246,6 +1263,15 @@
   transition: top 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.toast-region-touch {
+  right: auto;
+  left: max(0.75rem, env(safe-area-inset-left));
+  align-items: flex-start;
+  top: calc(
+    max(0.75rem, env(safe-area-inset-top)) + var(--toast-stack-offset, 0px)
+  );
+}
+
 .toast {
   display: flex;
   align-items: center;
@@ -1270,6 +1296,10 @@
     color: oklch(26% 0.05 240);
     box-shadow: 0 4px 16px oklch(50% 0.04 240 / 0.18);
   }
+}
+
+.toast-touch {
+  animation-name: toast-in-left;
 }
 
 /* Toast with buttons: interactive. Hiding is the store's job (sticky toasts
@@ -1320,11 +1350,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast {
+  .toast,
+  .toast-touch {
     animation: none;
   }
 
-  .toast-region {
+  .toast-region,
+  .toast-region-touch {
     transition: none;
   }
 }
@@ -1568,6 +1600,17 @@
   }
 }
 
+@keyframes toast-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* -- Render settings group labels -- */
 .settings-group {
   grid-column: 1 / -1;
@@ -1737,11 +1780,16 @@
   }
 
   [data-theme='dark'] & {
-    color: var(--neutral-400);
+    color: #f1f5f9;
+
+    & svg {
+      color: #f1f5f9;
+      stroke: currentColor;
+    }
 
     &:hover {
       background: var(--neutral-800);
-      color: var(--neutral-200);
+      color: #ffffff;
     }
   }
 }

@@ -23,21 +23,29 @@ export function useWorkspaceCamera(params: UseWorkspaceCameraParams) {
   const { flameDescriptor, setRenderSetting, timeline, setSilently } = params
 
   const setFlameZoom: Setter<number> = (value) => {
-    const current = flameDescriptor.renderSettings.camera.zoom
-    const next = clamp(
-      typeof value === 'function' ? value(current) : value,
-      MIN_CAMERA_ZOOM_VALUE,
-      MAX_CAMERA_ZOOM_VALUE,
-    )
+    const cur = flameDescriptor.renderSettings.camera.zoom
+    const current = Number.isFinite(cur) && cur > 0 ? cur : 1
+    const raw =
+      typeof value === 'function'
+        ? (value as (p: number) => number)(current)
+        : value
+    const safeRaw = Number.isFinite(raw) && raw > 0 ? raw : current
+    const next = clamp(safeRaw, MIN_CAMERA_ZOOM_VALUE, MAX_CAMERA_ZOOM_VALUE)
     setRenderSetting('camera.zoom', next)
-    return flameDescriptor.renderSettings.camera.zoom
+    return next
   }
 
   const setFlamePosition: Setter<v2f> = (value) => {
-    const current = vec2f(...flameDescriptor.renderSettings.camera.position)
-    const next = typeof value === 'function' ? value(current) : value
-    setRenderSetting('camera.position', [next.x, next.y])
-    return flameDescriptor.renderSettings.camera.position
+    const rawPos = flameDescriptor.renderSettings.camera.position
+    const curX = Number.isFinite(rawPos[0]) ? rawPos[0] : 0
+    const curY = Number.isFinite(rawPos[1]) ? rawPos[1] : 0
+    const current = vec2f(curX, curY)
+    const next =
+      typeof value === 'function' ? (value as (p: v2f) => v2f)(current) : value
+    const safeX = Number.isFinite(next.x) ? next.x : curX
+    const safeY = Number.isFinite(next.y) ? next.y : curY
+    setRenderSetting('camera.position', [safeX, safeY])
+    return vec2f(safeX, safeY)
   }
 
   function makeCamera3DSetter(

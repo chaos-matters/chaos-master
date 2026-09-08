@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { isTouchLayout } from '@/stores/workspaceLayoutStore'
 import { dismissJob, exportJobs, markJobDownloaded, requestJobForceExport, } from '@/utils/exportJobs'
 import { formatEta } from '@/utils/formatEta'
 import { formatPointCount } from '@/utils/formatPointCount'
@@ -7,16 +8,17 @@ import ui from './ExportJobTracker.module.css'
 import type { ExportJob } from '@/utils/exportJobs'
 
 /**
- * Top-right popup tracking background export jobs (see utils/exportJobs.ts +
+ * Popup tracking background export jobs (see utils/exportJobs.ts +
  * ExportJobHost). Shows live progress + Stop/Cancel while rendering, and a
- * thumbnail + Download once a job finishes.
+ * thumbnail + Download once a job finishes. Positioned top-right on desktop,
+ * and top-left on touch/tablet layouts.
  */
 export function ExportJobTracker() {
   const [collapsed, setCollapsed] = createSignal(false)
   const jobs = exportJobs
   let trackerRef: HTMLDivElement | undefined
 
-  // The toast column occupies the same top-right corner. Publish this
+  // The toast column occupies the same top corner. Publish this
   // popup's height so the toasts stack below it instead of covering the
   // collapse control and the first job's Download button. Measured rather
   // than hard-coded because the height depends on job count and collapse
@@ -46,7 +48,11 @@ export function ExportJobTracker() {
 
   return (
     <Show when={jobs().length > 0}>
-      <div class={ui.tracker} ref={trackerRef}>
+      <div
+        class={ui.tracker}
+        classList={{ [ui.trackerTouch as string]: isTouchLayout() }}
+        ref={trackerRef}
+      >
         <button
           type="button"
           class={ui.headerBar}

@@ -2,7 +2,7 @@ import { createEffect, onCleanup } from 'solid-js'
 import { DEBUG_MODE } from '@/defaults'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
-import { EXPORT_IDLE_DELAY_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_LOG_INTERVAL_MS, EXPORT_MAX_ITERATIONS, EXPORT_SLOW_TICK_MS, EXPORT_TARGET_TICK_MS, EXPORT_TICK_GROW_BELOW_MS, EXPORT_TICK_SHRINK_ABOVE_MS, } from './renderDriverTypes'
+import { EXPORT_FENCE_TIMEOUT_MS, EXPORT_IDLE_DELAY_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_LOG_INTERVAL_MS, EXPORT_MAX_ITERATIONS, EXPORT_SLOW_TICK_MS, EXPORT_TARGET_TICK_MS, EXPORT_TICK_GROW_BELOW_MS, EXPORT_TICK_SHRINK_ABOVE_MS, } from './renderDriverTypes'
 import type { ExportRenderDriver, ExportRenderDriverOptions, } from './renderDriverTypes'
 
 const { performance } = globalThis
@@ -89,14 +89,36 @@ export function createExportRenderDriver(
           idleSinceMs = undefined
         }
 
-        try {
-          const fence = options.latestQueueFence?.()
-          if (fence) {
-            await fence
-          }
-        } catch {
-          // Device lost — stop driving; the app-level handler takes over.
+        if (!options.gpuReady()) {
           break
+        }
+
+        const fencePromise = options.latestQueueFence?.()
+        if (fencePromise) {
+          let timerId: ReturnType<typeof setTimeout> | undefined
+          try {
+            await Promise.race([
+              fencePromise,
+              new Promise<void>((resolve) => {
+                timerId = setTimeout(resolve, EXPORT_FENCE_TIMEOUT_MS)
+              }),
+            ])
+          } catch (err) {
+            // Mobile WebGPU queues (WebKit/Android) can transiently reject
+            // onSubmittedWorkDone() during backgrounding or memory pressure events.
+            // Do not break the driving loop; if the device was genuinely lost,
+            // options.gpuReady() will evaluate to false and cleanly stop driving.
+            if (DEBUG_MODE) {
+              console.warn(
+                `[ExportDriver ${logTime()}] queue fence rejected; continuing export loop`,
+                err,
+              )
+            }
+          } finally {
+            if (timerId !== undefined) {
+              clearTimeout(timerId)
+            }
+          }
         }
 
         const tickMs = performance.now() - startMs
