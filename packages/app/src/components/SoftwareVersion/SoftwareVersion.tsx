@@ -158,8 +158,8 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       >
         <Info class={ui.menuIcon} />
         <div class={ui.menuMeta}>
-          <span class={ui.menuLabel}>About Chaos Master</span>
-          <span class={ui.menuSub}>v{VERSION}</span>
+          <span class={ui.menuLabel}>Settings and More</span>
+          <span class={ui.menuSub}>Preferences, about & v{VERSION}</span>
         </div>
       </button>
     </>

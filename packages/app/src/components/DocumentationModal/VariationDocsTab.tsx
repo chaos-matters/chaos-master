@@ -5,8 +5,8 @@ import { categoryOf, defaultLinearType, variationTypesFor, } from '@/flame/varia
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { hasDoc } from '@/flame/variations/docs'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
+import { Info } from '@/icons'
 import { Root } from '@/lib/Root'
-import { hardwareTiers } from '@/utils/hardwareTier'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
 import ui from './DocumentationModal.module.css'
@@ -35,19 +35,16 @@ function fuzzyScore(needle: string, haystack: string): number {
   return ni === n.length ? Math.max(1, score) : -1
 }
 
-// The gallery renders the entire catalogue as live previews. On a high/ultra
-// GPU each cell would otherwise run to ~0.99 quality (VariationPreview derives
-// its target from the hardware tier) — far more than a thumbnail needs. Cap the
-// tier so previews stay cheap and recognisable; a lower real tier is kept.
-const PREVIEW_TIER_CAP: HardwareTier = 'mid'
-// Backing-store size per cell (cells are ~84–120px). 16:11 matches .galleryCanvas.
-const PREVIEW_RESOLUTION = { width: 160, height: 110 }
-
-function capPreviewTier(tier: HardwareTier | null): HardwareTier {
-  if (!tier) return PREVIEW_TIER_CAP
-  const cap = hardwareTiers.indexOf(PREVIEW_TIER_CAP)
-  const current = hardwareTiers.indexOf(tier)
-  return current > cap ? PREVIEW_TIER_CAP : tier
+// Resolution per cell scaled by hardware tier so high/ultra tiers render
+// smooth, continuous-density previews instead of sparse dots. 16:11 matches .galleryCanvas.
+const PREVIEW_RESOLUTION_BY_TIER: Record<
+  HardwareTier,
+  { width: number; height: number }
+> = {
+  low: { width: 192, height: 132 },
+  mid: { width: 256, height: 176 },
+  high: { width: 320, height: 220 },
+  ultra: { width: 384, height: 264 },
 }
 
 export function VariationDocsTab(props: {
@@ -128,21 +125,42 @@ export function VariationDocsTab(props: {
     variationPreviewFlames('pointInitGaussianDisk', dims()),
   )
 
-  const previewTier = createMemo(() => capPreviewTier(props.hardwareTier()))
+  const previewTier = createMemo<HardwareTier>(
+    () => props.hardwareTier() ?? 'high',
+  )
+  const previewResolution = createMemo(
+    () => PREVIEW_RESOLUTION_BY_TIER[previewTier()],
+  )
 
   return (
     <div class={ui.docsLayout}>
       <div class={ui.galleryPane}>
         <div class={ui.searchRow}>
-          <input
-            class={ui.searchInput}
-            type="search"
-            placeholder="Search variations…"
-            value={query()}
-            onInput={(e) => setQuery(e.currentTarget.value)}
-            autocomplete="off"
-            spellcheck={false}
-          />
+          <div class={ui.searchWrap}>
+            <svg
+              class={ui.searchIcon}
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              class={ui.searchInput}
+              type="search"
+              placeholder="Search variations…"
+              value={query()}
+              onInput={(e) => setQuery(e.currentTarget.value)}
+              autocomplete="off"
+              spellcheck={false}
+            />
+          </div>
           <div class={ui.dimsToggle}>
             <button
               class={ui.dimBtn}
@@ -198,14 +216,32 @@ export function VariationDocsTab(props: {
             <Show
               when={filtered().length > 0}
               fallback={
-                <div class={ui.muted}>No variations match “{query()}”.</div>
+                <div class={ui.emptyNoticeCard}>
+                  <div class={ui.emptyNoticeIcon}>
+                    <Info width="16" height="16" />
+                  </div>
+                  <div class={ui.emptyNoticeContent}>
+                    <div class={ui.emptyNoticeTitle}>
+                      No Matching Variations
+                    </div>
+                    <div class={ui.emptyNoticeText}>
+                      No variations match &ldquo;{query()}&rdquo;.
+                    </div>
+                  </div>
+                </div>
               }
             >
               <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
                 <For each={grouped()}>
                   {(group) => (
                     <>
-                      <div class={ui.sectionHeader}>{group.label}</div>
+                      <div class={ui.sectionHeader}>
+                        <span class={ui.sectionLabel}>{group.label}</span>
+                        <span class={ui.sectionCount}>
+                          {group.types.length}
+                        </span>
+                        <span class={ui.sectionLine} />
+                      </div>
                       <div class={ui.galleryGrid}>
                         <For each={group.types}>
                           {(type) => {
@@ -230,14 +266,17 @@ export function VariationDocsTab(props: {
                                           name={type}
                                           flame={f}
                                           hardwareTier={previewTier()}
-                                          resolution={PREVIEW_RESOLUTION}
+                                          resolution={previewResolution()}
                                         />
                                       </div>
                                     </DelayedShow>
                                   )}
                                 </Show>
                                 <Show when={hasDoc(type)}>
-                                  <span class={ui.docDot} title="Documented" />
+                                  <span
+                                    class={ui.docDot}
+                                    title="Documented formula"
+                                  />
                                 </Show>
                                 <span class={ui.galleryItemName}>
                                   {getNormalizedVariationName(type)}

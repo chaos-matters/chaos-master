@@ -44,7 +44,7 @@ describe('SoftwareVersion component', () => {
 
     // Reopen menu to click About
     fireEvent.click(trigger)
-    const aboutBtn = screen.getByText('About Chaos Master')
+    const aboutBtn = screen.getByText('Settings and More')
     expect(aboutBtn).toBeTruthy()
     fireEvent.click(aboutBtn)
     expect(showHelp).toHaveBeenCalled()
@@ -86,7 +86,7 @@ describe('SoftwareVersion component', () => {
     expect(screen.getByText('Benchmark Lab')).toBeTruthy()
     expect(screen.getByText('Quick GPU Benchmark')).toBeTruthy()
     expect(screen.getByText('Documentation')).toBeTruthy()
-    expect(screen.getByText('About Chaos Master')).toBeTruthy()
+    expect(screen.getByText('Settings and More')).toBeTruthy()
 
     // Test switch to desktop layout
     screen.getByText('Switch to Desktop Layout').click()
@@ -123,7 +123,7 @@ describe('SoftwareVersion component', () => {
 
     // Help
     fireEvent.click(trigger)
-    screen.getByText('About Chaos Master').click()
+    screen.getByText('Settings and More').click()
     expect(showHelp).toHaveBeenCalled()
   })
 

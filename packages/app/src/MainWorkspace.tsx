@@ -1581,6 +1581,20 @@ export function MainWorkspace(props: AppProps) {
     hardwareTier: () => props.hardwareTier ?? null,
   })
 
+  const showHelp = createLazyShowHelp(
+    quickPickerMode,
+    setQuickPickerMode,
+    sidebarLayoutMode,
+    setSidebarLayoutMode,
+    isCompact,
+    setCompact,
+    theme,
+    setTheme,
+    IS_DEV ? () => setDevCrashTest(true) : undefined,
+    () => props.hardwareTier ?? null,
+    props.onHardwareTierChange,
+  )
+
   onMount(() => {
     // A recording is module-global and outlives this component, so one that
     // is already running belongs to a PREVIOUS workspace instance — this
@@ -5297,19 +5311,9 @@ export function MainWorkspace(props: AppProps) {
             showDocs={() => {
               void showDocumentation()
             }}
-            showHelp={createLazyShowHelp(
-              quickPickerMode,
-              setQuickPickerMode,
-              sidebarLayoutMode,
-              setSidebarLayoutMode,
-              isCompact,
-              setCompact,
-              theme,
-              setTheme,
-              IS_DEV ? () => setDevCrashTest(true) : undefined,
-              () => props.hardwareTier ?? null,
-              props.onHardwareTierChange,
-            )}
+            showHelp={() => {
+              void showHelp()
+            }}
             devCrashTest={devCrashTest}
             touchLayoutPreference={touchLayoutPreference}
             setTouchLayoutPreference={setTouchLayoutPreference}
