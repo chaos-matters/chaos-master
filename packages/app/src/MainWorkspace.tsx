@@ -25,11 +25,13 @@ import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { useRequestModal } from './components/Modal/ModalContext'
 import { qualityPresets } from './components/Quality/QualityPresets'
 import { recorderExportPending, recorderTaskPending, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
+import { AdvancedToolsDrawer, MobileBottomSurface, TabletInspectorDeck, TouchHUD, } from './components/TouchSurface'
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceShortcuts, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
+import { isTouchDevice, PHONE_MAX_WIDTH, TABLET_MAX_WIDTH, } from './stores/workspaceLayoutStore'
 
 const AncestryTreeModal = lazy(() =>
   import('./components/AncestryTreeModal/AncestryTreeModal').then((m) => ({
@@ -231,8 +233,15 @@ export function MainWorkspace(props: AppProps) {
   const exportStore = createWorkspaceExportStore(props.hardwareTier)
 
   const {
+    touchLayoutPreference,
+    setTouchLayoutPreference,
     isMobile,
     setIsMobile,
+    isPhone,
+    setIsPhone,
+    isTablet,
+    setIsTablet,
+    isTouchLayout,
     sidebarHidden,
     setSidebarHidden,
     showSidebar,
@@ -266,6 +275,8 @@ export function MainWorkspace(props: AppProps) {
     floatingLeft,
     floatingTop,
   } = layoutStore
+
+  const [touchDrawerOpen, setTouchDrawerOpen] = createSignal(false)
 
   const {
     selectedTransformId,
@@ -566,23 +577,42 @@ export function MainWorkspace(props: AppProps) {
   let randomizerCardRef: HTMLDivElement | undefined
   createEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
+    const mqPhone = window.matchMedia(
+      `(max-width: ${PHONE_MAX_WIDTH - 0.02}px)`,
+    )
+    const mqTablet = window.matchMedia(
+      `(min-width: ${PHONE_MAX_WIDTH}px) and (max-width: ${TABLET_MAX_WIDTH}px)`,
+    )
+
     setIsMobile(mq.matches)
-    if (mq.matches) setCompact(true)
+    setIsPhone(mqPhone.matches)
+    setIsTablet(mqTablet.matches)
+    if (mq.matches || mqPhone.matches) setCompact(true)
+
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches)
       if (e.matches) setCompact(true)
-      // A responsive layout change is authored only while recording. During
-      // replay it is presentation, so let the replay-preservation policy keep
-      // generated audio stable instead of injecting a live Disable action.
       if (e.matches) {
         if (isSessionRecording()) hideMobileSidebarAsAuthoredAction()
         else setSidebarHidden(true)
       }
     }
-    mq.addEventListener('change', handler)
-    return () => {
-      mq.removeEventListener('change', handler)
+    const phoneHandler = (e: MediaQueryListEvent) => {
+      setIsPhone(e.matches)
+      if (e.matches) setCompact(true)
     }
+    const tabletHandler = (e: MediaQueryListEvent) => {
+      setIsTablet(e.matches)
+    }
+
+    mq.addEventListener('change', handler)
+    mqPhone.addEventListener('change', phoneHandler)
+    mqTablet.addEventListener('change', tabletHandler)
+    onCleanup(() => {
+      mq.removeEventListener('change', handler)
+      mqPhone.removeEventListener('change', phoneHandler)
+      mqTablet.removeEventListener('change', tabletHandler)
+    })
   })
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
@@ -1570,6 +1600,31 @@ export function MainWorkspace(props: AppProps) {
     )
     if (props.autoOpenBenchmark) {
       void showBenchmark({ autoStart: props.autoStartBenchmark })
+    }
+    if (
+      isTouchDevice() &&
+      touchLayoutPreference() === 'auto' &&
+      !isPhone() &&
+      !isTablet()
+    ) {
+      showToast(
+        'Touch device detected: switch to Touch Studio layout?',
+        'sticky',
+        [
+          {
+            label: 'Switch to Touch',
+            onClick: () => {
+              setTouchLayoutPreference('touch')
+            },
+          },
+          {
+            label: 'Keep Desktop',
+            onClick: () => {
+              setTouchLayoutPreference('desktop')
+            },
+          },
+        ],
+      )
     }
     if (IS_DEV) {
       console.info('[share:app] onMount', {
@@ -4407,11 +4462,15 @@ export function MainWorkspace(props: AppProps) {
   return (
     <ChangeHistoryContextProvider value={history}>
       <TimelineContextProvider value={recorderTimeline}>
-        <Dropzone class={ui.layout} onDrop={onDrop}>
+        <Dropzone
+          class={`${ui.layout} ${isPhone() ? ui.phoneLayout : ''} ${isTablet() ? ui.tabletLayout : ''}`}
+          onDrop={onDrop}
+        >
           <>
             <CanvasViewport
               isMobile={isMobile}
               showSidebar={showSidebar}
+              hideMobileSidebarToggle={isPhone() || isTablet()}
               onCanvasClick={() => {
                 // Tap canvas to close sidebar on mobile
                 if (isMobile()) hideMobileSidebarAsAuthoredAction()
@@ -4455,90 +4514,224 @@ export function MainWorkspace(props: AppProps) {
               hoveredCustomVarDef={hoveredCustomVarDef}
               hoveredBlendName={hoveredBlendName}
             >
-              <WorkspaceBottomBar
-                isMobile={isMobile}
-                flameDescriptor={flameDescriptor}
-                effectiveFlame={effectiveFlame}
-                captureRecorderStartExtras={captureRecorderStartExtras}
-                replayTarget={replayTarget}
-                prepareReplayFocus={prepareReplayFocus}
-                replaySession={replaySession}
-                openReplaySession={openReplaySession}
-                externalSessionLibraryRevision={externalSessionLibraryRevision}
-                exportReplayVideo={exportReplayVideo}
-                recorderReplayPresentation={recorderReplayPresentation}
-                setRecorderReplayPresentation={setRecorderReplayPresentation}
-                effectiveZoom={effectiveZoom}
-                setFlameZoom={setFlameZoom}
-                effectivePosition={effectivePosition}
-                setFlamePosition={setFlamePosition}
-                effectiveTheta={effectiveTheta}
-                setFlameTheta={setFlameTheta}
-                effectivePhi={effectivePhi}
-                setFlamePhi={setFlamePhi}
-                effectiveRadius={effectiveRadius}
-                setFlameRadius={setFlameRadius}
-                effectiveFov={effectiveFov}
-                setFlameFov={setFlameFov}
-                flyMode={flyMode}
-                flySpeed={flySpeed}
-                pixelRatio={pixelRatio}
-                setPixelRatio={(ratio) => {
-                  const next =
-                    typeof ratio === 'function' ? ratio(pixelRatio()) : ratio
-                  executeCommand('view.setPixelRatio', cmdContext, next)
-                  return next
-                }}
-                onUndo={() => {
-                  executeCommand('history.undo', cmdContext)
-                }}
-                onRedo={() => {
-                  executeCommand('history.redo', cmdContext)
-                }}
-                canUndo={undoRouter.canUndo}
-                canRedo={undoRouter.canRedo}
-                blendFlame={blendFlame}
-                resolvedBlendWeight={resolvedBlendWeight}
-                onPickBlendFlame={pickBlendFlame}
-                onMorphFlame={pickMorphFlame}
-                onBreedFlame={pickBreedFlame}
-                onEvolveFlame={pickEvolveFlame}
-                onSimulatorFlame={pickSimulatorFlame}
-                onDiffFlame={pickDiffFlame}
-                onAncestryFlame={pickAncestryFlame}
-                onGalleryFlame={pickGalleryFlame}
-                onArtDirector={openArtDirectorUI}
-                onFlameClash={openFlameClashUI}
-                onClearBlendFlame={() => {
-                  setBlendFlame(undefined)
-                }}
-                onBlendWeightChange={setBlendWeight}
-                onAudioReactive={() => {
-                  setShowBlendGallery(false)
-                  closeSonificationPanelAsAuthoredAction()
-                  setShowAudioPanel(true)
-                }}
-                onSonification={() => {
-                  setShowBlendGallery(false)
-                  setShowAudioPanel(false)
-                  setShowSonificationPanel(true)
-                }}
-                showTimeline={showTimeline}
-                timeline={timeline}
-                timelineCollapsed={timelineCollapsed}
-                setTimelineCollapsed={setTimelineCollapsed}
-                readableIds={readableIds}
-                openAnimationGenerator={openAnimationGenerator}
-                onSetAutoKeyframe={(enabled) => {
-                  executeCommand(
-                    'timeline.setAutoKeyframe',
-                    cmdContext,
-                    enabled,
-                  )
-                }}
-              />
+              <Show when={!isPhone() && !isTablet()}>
+                <WorkspaceBottomBar
+                  isMobile={isMobile}
+                  flameDescriptor={flameDescriptor}
+                  effectiveFlame={effectiveFlame}
+                  captureRecorderStartExtras={captureRecorderStartExtras}
+                  replayTarget={replayTarget}
+                  prepareReplayFocus={prepareReplayFocus}
+                  replaySession={replaySession}
+                  openReplaySession={openReplaySession}
+                  externalSessionLibraryRevision={
+                    externalSessionLibraryRevision
+                  }
+                  exportReplayVideo={exportReplayVideo}
+                  recorderReplayPresentation={recorderReplayPresentation}
+                  setRecorderReplayPresentation={setRecorderReplayPresentation}
+                  effectiveZoom={effectiveZoom}
+                  setFlameZoom={setFlameZoom}
+                  effectivePosition={effectivePosition}
+                  setFlamePosition={setFlamePosition}
+                  effectiveTheta={effectiveTheta}
+                  setFlameTheta={setFlameTheta}
+                  effectivePhi={effectivePhi}
+                  setFlamePhi={setFlamePhi}
+                  effectiveRadius={effectiveRadius}
+                  setFlameRadius={setFlameRadius}
+                  effectiveFov={effectiveFov}
+                  setFlameFov={setFlameFov}
+                  flyMode={flyMode}
+                  flySpeed={flySpeed}
+                  pixelRatio={pixelRatio}
+                  setPixelRatio={(ratio) => {
+                    const next =
+                      typeof ratio === 'function' ? ratio(pixelRatio()) : ratio
+                    executeCommand('view.setPixelRatio', cmdContext, next)
+                    return next
+                  }}
+                  onUndo={() => {
+                    executeCommand('history.undo', cmdContext)
+                  }}
+                  onRedo={() => {
+                    executeCommand('history.redo', cmdContext)
+                  }}
+                  canUndo={undoRouter.canUndo}
+                  canRedo={undoRouter.canRedo}
+                  blendFlame={blendFlame}
+                  resolvedBlendWeight={resolvedBlendWeight}
+                  onPickBlendFlame={pickBlendFlame}
+                  onMorphFlame={pickMorphFlame}
+                  onBreedFlame={pickBreedFlame}
+                  onEvolveFlame={pickEvolveFlame}
+                  onSimulatorFlame={pickSimulatorFlame}
+                  onDiffFlame={pickDiffFlame}
+                  onAncestryFlame={pickAncestryFlame}
+                  onGalleryFlame={pickGalleryFlame}
+                  onArtDirector={openArtDirectorUI}
+                  onFlameClash={openFlameClashUI}
+                  onClearBlendFlame={() => {
+                    setBlendFlame(undefined)
+                  }}
+                  onBlendWeightChange={setBlendWeight}
+                  onAudioReactive={() => {
+                    setShowBlendGallery(false)
+                    closeSonificationPanelAsAuthoredAction()
+                    setShowAudioPanel(true)
+                  }}
+                  onSonification={() => {
+                    setShowBlendGallery(false)
+                    setShowAudioPanel(false)
+                    setShowSonificationPanel(true)
+                  }}
+                  showTimeline={showTimeline}
+                  timeline={timeline}
+                  timelineCollapsed={timelineCollapsed}
+                  setTimelineCollapsed={setTimelineCollapsed}
+                  readableIds={readableIds}
+                  openAnimationGenerator={openAnimationGenerator}
+                  onSetAutoKeyframe={(enabled) => {
+                    executeCommand(
+                      'timeline.setAutoKeyframe',
+                      cmdContext,
+                      enabled,
+                    )
+                  }}
+                />
+              </Show>
             </CanvasViewport>
           </>
+          {/* Mobile Phone Touch Interface */}
+          <Show when={isPhone()}>
+            <TouchHUD
+              ctx={cmdContext}
+              flame={effectiveFlame}
+              canUndo={undoRouter.canUndo}
+              canRedo={undoRouter.canRedo}
+              onRandomize={() => {
+                executeCommand('flame.randomize', cmdContext)
+              }}
+              onMutate={() => {
+                executeCommand('flame.mutate', cmdContext)
+              }}
+              onUndo={() => {
+                executeCommand('history.undo', cmdContext)
+              }}
+              onRedo={() => {
+                executeCommand('history.redo', cmdContext)
+              }}
+              onFlashExport={quickExport}
+              onOpenExportModal={() => {
+                executeCommand('export.png', cmdContext)
+              }}
+              onSnapshot={quickExport}
+              onOpenDrawer={() => setTouchDrawerOpen(true)}
+              onPickGallery={pickGalleryFlame}
+            />
+            <MobileBottomSurface
+              ctx={cmdContext}
+              flame={effectiveFlame}
+              canUndo={undoRouter.canUndo}
+              canRedo={undoRouter.canRedo}
+              onRandomize={() => {
+                executeCommand('flame.randomize', cmdContext)
+              }}
+              onMutate={() => {
+                executeCommand('flame.mutate', cmdContext)
+              }}
+              onUndo={() => {
+                executeCommand('history.undo', cmdContext)
+              }}
+              onRedo={() => {
+                executeCommand('history.redo', cmdContext)
+              }}
+              onSnapshot={quickExport}
+              onOpenDrawer={() => setTouchDrawerOpen(true)}
+              onPickGallery={pickGalleryFlame}
+            />
+          </Show>
+
+          {/* Tablet Split Touch Interface */}
+          <Show when={isTablet()}>
+            <TabletInspectorDeck
+              ctx={cmdContext}
+              flame={effectiveFlame}
+              canUndo={undoRouter.canUndo}
+              canRedo={undoRouter.canRedo}
+              onRandomize={() => {
+                executeCommand('flame.randomize', cmdContext)
+              }}
+              onMutate={() => {
+                executeCommand('flame.mutate', cmdContext)
+              }}
+              onUndo={() => {
+                executeCommand('history.undo', cmdContext)
+              }}
+              onRedo={() => {
+                executeCommand('history.redo', cmdContext)
+              }}
+              onSnapshot={quickExport}
+              onOpenDrawer={() => setTouchDrawerOpen(true)}
+              onPickGallery={pickGalleryFlame}
+            />
+          </Show>
+
+          {/* Touch Advanced Tools Drawer */}
+          <AdvancedToolsDrawer
+            open={touchDrawerOpen()}
+            onClose={() => setTouchDrawerOpen(false)}
+            onPickGallery={pickGalleryFlame}
+            onSwitchToDesktop={() => {
+              setTouchLayoutPreference('desktop')
+              showToast(
+                'Switched to Desktop Layout. Switch back anytime from the menu.',
+                4000,
+              )
+            }}
+            onArtDirector={openArtDirectorUI}
+            onFlameClash={openFlameClashUI}
+            onBreed={() => {
+              if (isTouchLayout()) {
+                setTouchLayoutPreference('desktop')
+                showToast(
+                  'Switched to Desktop Layout for Breeding & Genetics',
+                  3500,
+                )
+              }
+              pickBreedFlame()
+            }}
+            onAudio={() => {
+              if (isTouchLayout()) {
+                setTouchLayoutPreference('desktop')
+                showToast('Switched to Desktop Layout for Audio Reactive', 3500)
+              }
+              setShowBlendGallery(false)
+              closeSonificationPanelAsAuthoredAction()
+              setShowAudioPanel(true)
+            }}
+            onSonification={() => {
+              if (isTouchLayout()) {
+                setTouchLayoutPreference('desktop')
+                showToast('Switched to Desktop Layout for Sonification', 3500)
+              }
+              setShowBlendGallery(false)
+              setShowAudioPanel(false)
+              setShowSonificationPanel(true)
+            }}
+            onTimelineToggle={() => {
+              if (isTouchLayout()) {
+                setTouchLayoutPreference('desktop')
+                showToast('Switched to Desktop Layout for Timeline', 3500)
+              }
+              const current = showTimeline()
+              executeCommand('view.setShowTimeline', cmdContext, !current)
+            }}
+            onExportPng={() => {
+              executeCommand('export.png', cmdContext)
+            }}
+          />
+
           {/* Development only. The gate was dropped in 53e1486 and the panel
               has been rendering over the top-left of the canvas in production
               ever since, on every visit, with no way for a visitor to close
@@ -4550,312 +4743,314 @@ export function MainWorkspace(props: AppProps) {
             />
           </Show>
 
-          <WorkspaceSidebar
-            showSidebar={showSidebar}
-            isPlaying={timeline.isPlaying}
-            sidebarHidden={sidebarHidden}
-            setSidebarHidden={setSidebarHidden}
-            duelShowing={duelShowing}
-            duelSidebarOpen={duelSidebarOpen}
-            sidebarWidth={sidebarWidth}
-            sideBarResizable={SIDEBAR_RESIZABLE}
-            startSidebarDrag={startSidebarDrag}
-            animationExportRunning={animationExportRunning}
-            onTogglePlay={() => {
-              recorderTimeline.togglePlay()
-            }}
-            onForceAnimationExportNow={() => setForceAnimationExportNow(true)}
-            animationExportCancel={animationExportCancel}
-            isMobile={isMobile}
-            hideMobileSidebarAsAuthoredAction={
-              hideMobileSidebarAsAuthoredAction
-            }
-            setSidebarEl={setSidebarEl}
-            sidebarDiffView={sidebarDiffView}
-            closeSidebarDiff={closeSidebarDiff}
-            showBlendGallery={showBlendGallery}
-            setShowBlendGallery={setShowBlendGallery}
-            showAudioPanel={showAudioPanel}
-            setShowAudioPanel={setShowAudioPanel}
-            showSonificationPanel={showSonificationPanel}
-            closeSonificationPanelAsAuthoredAction={
-              closeSonificationPanelAsAuthoredAction
-            }
-            sonificationEnabled={sonificationEnabled}
-            sonificationConfig={sonificationConfig}
-            keepAudioPlayingWhenClosed={keepAudioPlayingWhenClosed}
-            setKeepPlayingWhenClosedAsAuthoredAction={
-              setKeepPlayingWhenClosedAsAuthoredAction
-            }
-            breakRecordingCoalescing={breakRecordingCoalescing}
-            audioBuffer={audioBuffer}
-            setAudioBuffer={setAudioBuffer}
-            setAudioTrackName={setAudioTrackName}
-            setFileAnalyzer={setFileAnalyzer}
-            analysisProgress={analysisProgress}
-            setAnalysisProgress={setAnalysisProgress}
-            setAudioEnabled={setAudioEnabled}
-            setPlaybackPaused={setPlaybackPaused}
-            setPlaybackTime={setPlaybackTime}
-            setSeekTarget={setSeekTarget}
-            audioMapping={audioMapping}
-            audioEnabled={audioEnabled}
-            audioSource={audioSource}
-            liveAnalyzer={liveAnalyzer}
-            setLiveAnalyzer={setLiveAnalyzer}
-            playbackPaused={playbackPaused}
-            playbackTime={playbackTime}
-            fileAnalyzer={fileAnalyzer}
-            transformInfos={transformInfos}
-            blendIntent={blendIntent}
-            setupMorph={setupMorph}
-            breedPreviewChild={breedPreviewChild}
-            endBreedPreview={endBreedPreview}
-            _requestModal={_requestModal}
-            showToast={showToast}
-            executeFlameLoad={executeFlameLoad}
-            pickBreedFlame={pickBreedFlame}
-            pickEvolveFlame={pickEvolveFlame}
-            openDiffAsModal={openDiffAsModal}
-            openDiffView={openDiffView}
-            setBlendFlame={setBlendFlame}
-            blendFlame={blendFlame}
-            handlePreviewBlend={handlePreviewBlend}
-            setHoveredBlendName={setHoveredBlendName}
-            history={history}
-            hardwareTier={props.hardwareTier}
-            quickPickState={quickPickState}
-            setQuickPickState={setQuickPickState}
-            setHoveredVariationType={setHoveredVariationType}
-            quickPickerMode={quickPickerMode}
-            setQuickPickerMode={setQuickPickerMode}
-            showVariationSelector={showVariationSelector}
-            setFlameTheta={setFlameTheta}
-            setFlamePhi={setFlamePhi}
-            setFlameRadius={setFlameRadius}
-            setFlameTarget3D={setFlameTarget3D}
-            setFlameFov={setFlameFov}
-            affineSectionProps={{
-              open: affineCardOpen,
-              onToggleOpen: () => setAffineCardOpen((open) => !open),
-              transforms: flameDescriptor.transforms,
-              setTransforms: (setFn) => {
-                setFlameDescriptor((draft) => {
-                  setFn(draft.transforms)
-                })
-              },
-              setTransformAffine: (tid, which, affine, origin) => {
-                executeCommand(
-                  'flame.setTransformAffine',
-                  cmdContext,
-                  tid,
-                  which,
-                  affine,
-                  origin,
-                )
-              },
-              setAffineCoefficient: (tid, which, key, value) => {
-                executeCommand(
-                  'flame.setAffine',
-                  cmdContext,
-                  tid,
-                  which,
-                  key,
-                  value,
-                )
-              },
-              finalTransform:
-                flameDescriptor.finalTransform ??
-                ((flameDescriptor.renderSettings.dimensions ?? 2) === 3
-                  ? {
-                      a: 1,
-                      b: 0,
-                      c: 0,
-                      d: 0,
-                      e: 0,
-                      f: 1,
-                      g: 0,
-                      h: 0,
-                      i: 0,
-                      j: 0,
-                      k: 1,
-                      l: 0,
-                    }
-                  : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }),
-              setFinalTransform: (affine, origin) => {
-                executeCommand(
-                  'flame.setFinalTransform',
-                  cmdContext,
-                  affine,
-                  origin,
-                )
-              },
-              setFinalAffineCoefficient: (key, value) => {
-                executeCommand('flame.setFinalAffine', cmdContext, key, value)
-              },
-              is3D: (flameDescriptor.renderSettings.dimensions ?? 2) === 3,
-              selectedTransformId: selectedTransformId,
-              setSelectedTransformId: setSelectedTransformId,
-              replayModeRequest: replayAffineModeRequest,
-              onEditorStateChange: (state) => {
-                setReplayAffineModeRequest((previous) =>
-                  previous.mode === state.mode && previous.tab === state.tab
-                    ? previous
-                    : { ...state, epoch: previous.epoch + 1 },
-                )
-              },
-            }}
-            colorAndPaletteSectionProps={{
-              colorCardOpen: colorCardOpen,
-              onToggleColorCardOpen: () => setColorCardOpen((open) => !open),
-              paletteCardOpen: paletteCardOpen,
-              onTogglePaletteCardOpen: () =>
-                setPaletteCardOpen((open) => !open),
-              transforms: flameDescriptor.transforms,
-              setTransforms: (setFn) => {
-                setFlameDescriptor((draft) => {
-                  setFn(draft.transforms)
-                })
-              },
-              setTransformColor: (tid, x, y, origin) => {
-                executeCommand(
-                  'flame.setTransformColor',
-                  cmdContext,
-                  tid,
-                  x,
-                  y,
-                  origin,
-                )
-              },
-              selectedTransformId: selectedTransformId,
-              setSelectedTransformId: setSelectedTransformId,
-              replayColorViewRequest: replayColorViewRequest,
-              onColorViewChange: (view) => {
-                setReplayColorViewRequest((previous) =>
-                  previous.view === view
-                    ? previous
-                    : { view, epoch: previous.epoch + 1 },
-                )
-              },
-              selectedPaletteId: selectedPaletteId,
-              handlePaletteSelect: handlePaletteSelect,
-              handlePaletteUnselect: handlePaletteUnselect,
-            }}
-            customVariationsSectionProps={{
-              is3D: flameDescriptor.renderSettings.dimensions === 3,
-              customVariationsList: customVariationsList,
-              hoveredCustomVarDef: hoveredCustomVarDef,
-              setHoveredCustomVarDef: setHoveredCustomVarDef,
-              onOpenCustomVariationEditor: (def) => {
-                void showCustomVariationEditor(def).then((addedDef) => {
-                  if (addedDef) {
-                    executeCommand(
-                      'flame.addTransform',
-                      cmdContext,
-                      addedDef.id,
-                    )
-                  }
-                  setCustomVarsVersion((v) => v + 1)
-                })
-              },
-              onAddTransform: (defId) => {
-                executeCommand('flame.addTransform', cmdContext, defId)
-              },
-              onShareVariationLink: (def) => {
-                void showShareVariationLinkModal(def)
-              },
-              onDuplicateCustomVariation: (id) => {
-                duplicateCustomVariation(id)
-                setCustomVarsVersion((v) => v + 1)
-              },
-              onDeleteCustomVariation: (def) => {
-                void handleDeleteCustomVariation(def)
-              },
-            }}
-            randomizerSectionProps={{
-              randomizerCardRef: (el) => {
-                randomizerCardRef = el
-              },
-              flame: flameDescriptor,
-              open: randomizerOpen,
-              onToggleOpen: () => setRandomizerOpen((v) => !v),
-              expandAnimationEpoch: randomizerAnimEpoch,
-              historyEntries: randomizerHistory,
-              selectedTimestamp: selectedHistoryTimestamp,
-              handleGenerateFlame: handleGenerateFlame,
-              handleMutateFlame: handleMutateFlame,
-              handleLoadHistory: handleLoadHistory,
-              onClearHistory: handleClearHistory,
-              onRandomizeAnimation: handleRandomizeAnimation,
-              onSmartAnimation: handleSmartAnimation,
-              handleUpdateRenderSettings: handleUpdateRenderSettings,
-              onApplyCandidate: (candidateFlame, origin) => {
-                if (blendFlame())
-                  showToast(
-                    'Blend is still active — the loaded flame will look mixed',
-                    4000,
+          <Show when={!isPhone() && !isTablet()}>
+            <WorkspaceSidebar
+              showSidebar={showSidebar}
+              isPlaying={timeline.isPlaying}
+              sidebarHidden={sidebarHidden}
+              setSidebarHidden={setSidebarHidden}
+              duelShowing={duelShowing}
+              duelSidebarOpen={duelSidebarOpen}
+              sidebarWidth={sidebarWidth}
+              sideBarResizable={SIDEBAR_RESIZABLE}
+              startSidebarDrag={startSidebarDrag}
+              animationExportRunning={animationExportRunning}
+              onTogglePlay={() => {
+                recorderTimeline.togglePlay()
+              }}
+              onForceAnimationExportNow={() => setForceAnimationExportNow(true)}
+              animationExportCancel={animationExportCancel}
+              isMobile={isMobile}
+              hideMobileSidebarAsAuthoredAction={
+                hideMobileSidebarAsAuthoredAction
+              }
+              setSidebarEl={setSidebarEl}
+              sidebarDiffView={sidebarDiffView}
+              closeSidebarDiff={closeSidebarDiff}
+              showBlendGallery={showBlendGallery}
+              setShowBlendGallery={setShowBlendGallery}
+              showAudioPanel={showAudioPanel}
+              setShowAudioPanel={setShowAudioPanel}
+              showSonificationPanel={showSonificationPanel}
+              closeSonificationPanelAsAuthoredAction={
+                closeSonificationPanelAsAuthoredAction
+              }
+              sonificationEnabled={sonificationEnabled}
+              sonificationConfig={sonificationConfig}
+              keepAudioPlayingWhenClosed={keepAudioPlayingWhenClosed}
+              setKeepPlayingWhenClosedAsAuthoredAction={
+                setKeepPlayingWhenClosedAsAuthoredAction
+              }
+              breakRecordingCoalescing={breakRecordingCoalescing}
+              audioBuffer={audioBuffer}
+              setAudioBuffer={setAudioBuffer}
+              setAudioTrackName={setAudioTrackName}
+              setFileAnalyzer={setFileAnalyzer}
+              analysisProgress={analysisProgress}
+              setAnalysisProgress={setAnalysisProgress}
+              setAudioEnabled={setAudioEnabled}
+              setPlaybackPaused={setPlaybackPaused}
+              setPlaybackTime={setPlaybackTime}
+              setSeekTarget={setSeekTarget}
+              audioMapping={audioMapping}
+              audioEnabled={audioEnabled}
+              audioSource={audioSource}
+              liveAnalyzer={liveAnalyzer}
+              setLiveAnalyzer={setLiveAnalyzer}
+              playbackPaused={playbackPaused}
+              playbackTime={playbackTime}
+              fileAnalyzer={fileAnalyzer}
+              transformInfos={transformInfos}
+              blendIntent={blendIntent}
+              setupMorph={setupMorph}
+              breedPreviewChild={breedPreviewChild}
+              endBreedPreview={endBreedPreview}
+              _requestModal={_requestModal}
+              showToast={showToast}
+              executeFlameLoad={executeFlameLoad}
+              pickBreedFlame={pickBreedFlame}
+              pickEvolveFlame={pickEvolveFlame}
+              openDiffAsModal={openDiffAsModal}
+              openDiffView={openDiffView}
+              setBlendFlame={setBlendFlame}
+              blendFlame={blendFlame}
+              handlePreviewBlend={handlePreviewBlend}
+              setHoveredBlendName={setHoveredBlendName}
+              history={history}
+              hardwareTier={props.hardwareTier}
+              quickPickState={quickPickState}
+              setQuickPickState={setQuickPickState}
+              setHoveredVariationType={setHoveredVariationType}
+              quickPickerMode={quickPickerMode}
+              setQuickPickerMode={setQuickPickerMode}
+              showVariationSelector={showVariationSelector}
+              setFlameTheta={setFlameTheta}
+              setFlamePhi={setFlamePhi}
+              setFlameRadius={setFlameRadius}
+              setFlameTarget3D={setFlameTarget3D}
+              setFlameFov={setFlameFov}
+              affineSectionProps={{
+                open: affineCardOpen,
+                onToggleOpen: () => setAffineCardOpen((open) => !open),
+                transforms: flameDescriptor.transforms,
+                setTransforms: (setFn) => {
+                  setFlameDescriptor((draft) => {
+                    setFn(draft.transforms)
+                  })
+                },
+                setTransformAffine: (tid, which, affine, origin) => {
+                  executeCommand(
+                    'flame.setTransformAffine',
+                    cmdContext,
+                    tid,
+                    which,
+                    affine,
+                    origin,
                   )
-                executeFlameLoad(candidateFlame, 'Apply Random Flame', origin)
-              },
-              hardwareTier: props.hardwareTier,
-              isBusy: isRandomizing,
-            }}
-            transformsSectionProps={{
-              flameDescriptor: flameDescriptor,
-              theme: theme,
-              readableIds: readableIds,
-              collapsedTransforms: collapsedTransforms,
-              toggleTransformCollapsed: toggleTransformCollapsed,
-              anyTransformOpen: anyTransformOpen,
-              toggleCollapseAllTransforms: toggleCollapseAllTransforms,
-              selectedTransformId: selectedTransformId,
-              toggleSelectedTransform: toggleSelectedTransform,
-              hideDiceButtons: hideDiceButtons,
-              cmdContext: cmdContext,
-              executeCommand: executeCommand,
-              totalProbability: totalProbability,
-              setTargetedParameter: setTargetedParameter,
-              animationEnabled: animationEnabled,
-              customStatus: customStatus,
-              isMobile: isMobile,
-              sidebarHidden: sidebarHidden,
-              setSidebarHidden: setSidebarHidden,
-              setQuickPickState: setQuickPickState,
-              showVariationSelector: showVariationSelector,
-              setFlameTheta: setFlameTheta,
-              setFlamePhi: setFlamePhi,
-              setFlameRadius: setFlameRadius,
-              setFlameTarget3D: setFlameTarget3D,
-              setFlameFov: setFlameFov,
-              symmetryCardOpen: symmetryCardOpen,
-              setSymmetryCardOpen: setSymmetryCardOpen,
-              currentSymType: currentSymType,
-              currentSymFolds: currentSymFolds,
-              applySymmetry: applySymmetry,
-              symTransformIds: symTransformIds,
-              symTransforms: symTransforms,
-              showMigrationModal: (flame) => {
-                void showMigrationModal(
-                  structuredClone(JSON.parse(JSON.stringify(flame))),
-                )
-              },
-            }}
-            renderSettingsSectionProps={{
-              flameDescriptor: flameDescriptor,
-              renderCardOpen: renderCardOpen,
-              setRenderCardOpen: setRenderCardOpen,
-              metadataCardOpen: metadataCardOpen,
-              setMetadataCardOpen: setMetadataCardOpen,
-              setTargetedParameter: setTargetedParameter,
-              setRenderSetting: setRenderSetting,
-              setRenderSettings: setRenderSettings,
-              stochasticFilterEnabled: stochasticFilterEnabled,
-              selectedPaletteId: selectedPaletteId,
-              cmdContext: cmdContext,
-              executeCommand: executeCommand,
-            }}
-          />
-          <Show when={!showArena()}>
+                },
+                setAffineCoefficient: (tid, which, key, value) => {
+                  executeCommand(
+                    'flame.setAffine',
+                    cmdContext,
+                    tid,
+                    which,
+                    key,
+                    value,
+                  )
+                },
+                finalTransform:
+                  flameDescriptor.finalTransform ??
+                  ((flameDescriptor.renderSettings.dimensions ?? 2) === 3
+                    ? {
+                        a: 1,
+                        b: 0,
+                        c: 0,
+                        d: 0,
+                        e: 0,
+                        f: 1,
+                        g: 0,
+                        h: 0,
+                        i: 0,
+                        j: 0,
+                        k: 1,
+                        l: 0,
+                      }
+                    : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }),
+                setFinalTransform: (affine, origin) => {
+                  executeCommand(
+                    'flame.setFinalTransform',
+                    cmdContext,
+                    affine,
+                    origin,
+                  )
+                },
+                setFinalAffineCoefficient: (key, value) => {
+                  executeCommand('flame.setFinalAffine', cmdContext, key, value)
+                },
+                is3D: (flameDescriptor.renderSettings.dimensions ?? 2) === 3,
+                selectedTransformId: selectedTransformId,
+                setSelectedTransformId: setSelectedTransformId,
+                replayModeRequest: replayAffineModeRequest,
+                onEditorStateChange: (state) => {
+                  setReplayAffineModeRequest((previous) =>
+                    previous.mode === state.mode && previous.tab === state.tab
+                      ? previous
+                      : { ...state, epoch: previous.epoch + 1 },
+                  )
+                },
+              }}
+              colorAndPaletteSectionProps={{
+                colorCardOpen: colorCardOpen,
+                onToggleColorCardOpen: () => setColorCardOpen((open) => !open),
+                paletteCardOpen: paletteCardOpen,
+                onTogglePaletteCardOpen: () =>
+                  setPaletteCardOpen((open) => !open),
+                transforms: flameDescriptor.transforms,
+                setTransforms: (setFn) => {
+                  setFlameDescriptor((draft) => {
+                    setFn(draft.transforms)
+                  })
+                },
+                setTransformColor: (tid, x, y, origin) => {
+                  executeCommand(
+                    'flame.setTransformColor',
+                    cmdContext,
+                    tid,
+                    x,
+                    y,
+                    origin,
+                  )
+                },
+                selectedTransformId: selectedTransformId,
+                setSelectedTransformId: setSelectedTransformId,
+                replayColorViewRequest: replayColorViewRequest,
+                onColorViewChange: (view) => {
+                  setReplayColorViewRequest((previous) =>
+                    previous.view === view
+                      ? previous
+                      : { view, epoch: previous.epoch + 1 },
+                  )
+                },
+                selectedPaletteId: selectedPaletteId,
+                handlePaletteSelect: handlePaletteSelect,
+                handlePaletteUnselect: handlePaletteUnselect,
+              }}
+              customVariationsSectionProps={{
+                is3D: flameDescriptor.renderSettings.dimensions === 3,
+                customVariationsList: customVariationsList,
+                hoveredCustomVarDef: hoveredCustomVarDef,
+                setHoveredCustomVarDef: setHoveredCustomVarDef,
+                onOpenCustomVariationEditor: (def) => {
+                  void showCustomVariationEditor(def).then((addedDef) => {
+                    if (addedDef) {
+                      executeCommand(
+                        'flame.addTransform',
+                        cmdContext,
+                        addedDef.id,
+                      )
+                    }
+                    setCustomVarsVersion((v) => v + 1)
+                  })
+                },
+                onAddTransform: (defId) => {
+                  executeCommand('flame.addTransform', cmdContext, defId)
+                },
+                onShareVariationLink: (def) => {
+                  void showShareVariationLinkModal(def)
+                },
+                onDuplicateCustomVariation: (id) => {
+                  duplicateCustomVariation(id)
+                  setCustomVarsVersion((v) => v + 1)
+                },
+                onDeleteCustomVariation: (def) => {
+                  void handleDeleteCustomVariation(def)
+                },
+              }}
+              randomizerSectionProps={{
+                randomizerCardRef: (el) => {
+                  randomizerCardRef = el
+                },
+                flame: flameDescriptor,
+                open: randomizerOpen,
+                onToggleOpen: () => setRandomizerOpen((v) => !v),
+                expandAnimationEpoch: randomizerAnimEpoch,
+                historyEntries: randomizerHistory,
+                selectedTimestamp: selectedHistoryTimestamp,
+                handleGenerateFlame: handleGenerateFlame,
+                handleMutateFlame: handleMutateFlame,
+                handleLoadHistory: handleLoadHistory,
+                onClearHistory: handleClearHistory,
+                onRandomizeAnimation: handleRandomizeAnimation,
+                onSmartAnimation: handleSmartAnimation,
+                handleUpdateRenderSettings: handleUpdateRenderSettings,
+                onApplyCandidate: (candidateFlame, origin) => {
+                  if (blendFlame())
+                    showToast(
+                      'Blend is still active — the loaded flame will look mixed',
+                      4000,
+                    )
+                  executeFlameLoad(candidateFlame, 'Apply Random Flame', origin)
+                },
+                hardwareTier: props.hardwareTier,
+                isBusy: isRandomizing,
+              }}
+              transformsSectionProps={{
+                flameDescriptor: flameDescriptor,
+                theme: theme,
+                readableIds: readableIds,
+                collapsedTransforms: collapsedTransforms,
+                toggleTransformCollapsed: toggleTransformCollapsed,
+                anyTransformOpen: anyTransformOpen,
+                toggleCollapseAllTransforms: toggleCollapseAllTransforms,
+                selectedTransformId: selectedTransformId,
+                toggleSelectedTransform: toggleSelectedTransform,
+                hideDiceButtons: hideDiceButtons,
+                cmdContext: cmdContext,
+                executeCommand: executeCommand,
+                totalProbability: totalProbability,
+                setTargetedParameter: setTargetedParameter,
+                animationEnabled: animationEnabled,
+                customStatus: customStatus,
+                isMobile: isMobile,
+                sidebarHidden: sidebarHidden,
+                setSidebarHidden: setSidebarHidden,
+                setQuickPickState: setQuickPickState,
+                showVariationSelector: showVariationSelector,
+                setFlameTheta: setFlameTheta,
+                setFlamePhi: setFlamePhi,
+                setFlameRadius: setFlameRadius,
+                setFlameTarget3D: setFlameTarget3D,
+                setFlameFov: setFlameFov,
+                symmetryCardOpen: symmetryCardOpen,
+                setSymmetryCardOpen: setSymmetryCardOpen,
+                currentSymType: currentSymType,
+                currentSymFolds: currentSymFolds,
+                applySymmetry: applySymmetry,
+                symTransformIds: symTransformIds,
+                symTransforms: symTransforms,
+                showMigrationModal: (flame) => {
+                  void showMigrationModal(
+                    structuredClone(JSON.parse(JSON.stringify(flame))),
+                  )
+                },
+              }}
+              renderSettingsSectionProps={{
+                flameDescriptor: flameDescriptor,
+                renderCardOpen: renderCardOpen,
+                setRenderCardOpen: setRenderCardOpen,
+                metadataCardOpen: metadataCardOpen,
+                setMetadataCardOpen: setMetadataCardOpen,
+                setTargetedParameter: setTargetedParameter,
+                setRenderSetting: setRenderSetting,
+                setRenderSettings: setRenderSettings,
+                stochasticFilterEnabled: stochasticFilterEnabled,
+                selectedPaletteId: selectedPaletteId,
+                cmdContext: cmdContext,
+                executeCommand: executeCommand,
+              }}
+            />
+          </Show>
+          <Show when={!showArena() && !isPhone() && !isTablet()}>
             <FloatingActions
               disabled={animationExportRunning()}
               initialLeft={floatingLeft()}
@@ -5116,6 +5311,10 @@ export function MainWorkspace(props: AppProps) {
               props.onHardwareTierChange,
             )}
             devCrashTest={devCrashTest}
+            touchLayoutPreference={touchLayoutPreference}
+            setTouchLayoutPreference={setTouchLayoutPreference}
+            isTouchLayout={isTouchLayout}
+            onPickGallery={pickGalleryFlame}
             duelShowing={duelShowing}
             playerFlame={effectiveFlame}
             playerZoom={[effectiveZoom, setFlameZoom]}

@@ -72,8 +72,12 @@ function OffscreenRender(props: { job: ImageJob }) {
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
 
   const cam = job.flame.renderSettings.camera
-  const zoom = createSignal(cam.zoom)
-  const position = createSignal(vec2f(cam.position[0], cam.position[1]))
+  const safeZoom =
+    Number.isFinite(cam?.zoom) && (cam?.zoom ?? 0) > 0 ? cam.zoom : 1
+  const safeX = Number.isFinite(cam?.position?.[0]) ? cam.position[0] : 0
+  const safeY = Number.isFinite(cam?.position?.[1]) ? cam.position[1] : 0
+  const zoom = createSignal(safeZoom)
+  const position = createSignal(vec2f(safeX, safeY))
 
   const c3d = job.flame.renderSettings.camera3D ?? {
     theta: 0,
@@ -83,12 +87,24 @@ function OffscreenRender(props: { job: ImageJob }) {
     fov: 60,
     roll: 0,
   }
-  const theta = createSignal(c3d.theta)
-  const phi = createSignal(c3d.phi)
-  const radius = createSignal(c3d.radius)
-  const target = createSignal<Vec3>(new Float32Array(c3d.target))
-  const fov = createSignal(c3d.fov)
-  const roll = createSignal(c3d.roll ?? 0)
+  const safeTheta = Number.isFinite(c3d.theta) ? c3d.theta : 0
+  const safePhi = Number.isFinite(c3d.phi) ? c3d.phi : Math.PI / 2
+  const safeRadius =
+    Number.isFinite(c3d.radius) && c3d.radius > 0 ? c3d.radius : 5
+  const safeTarget = new Float32Array([
+    Number.isFinite(c3d.target?.[0]) ? c3d.target[0] : 0,
+    Number.isFinite(c3d.target?.[1]) ? c3d.target[1] : 0,
+    Number.isFinite(c3d.target?.[2]) ? c3d.target[2] : 0,
+  ])
+  const safeFov = Number.isFinite(c3d.fov) && c3d.fov > 0 ? c3d.fov : 60
+  const safeRoll =
+    typeof c3d.roll === 'number' && Number.isFinite(c3d.roll) ? c3d.roll : 0
+  const theta = createSignal(safeTheta)
+  const phi = createSignal(safePhi)
+  const radius = createSignal(safeRadius)
+  const target = createSignal<Vec3>(safeTarget)
+  const fov = createSignal(safeFov)
+  const roll = createSignal(safeRoll)
 
   let limitAccessor: () => number = () => 0
   let accumulated = 0
@@ -133,6 +149,10 @@ function OffscreenRender(props: { job: ImageJob }) {
       width: job.dimensions.width,
       height: job.dimensions.height,
     })
+    const downloadLink = window.document.createElement('a')
+    downloadLink.href = url
+    downloadLink.download = `${job.name?.trim() || 'flame'}.png`
+    downloadLink.click()
   }
 
   const handleExport: ExportImageType = (canvas, info) => {
@@ -149,9 +169,16 @@ function OffscreenRender(props: { job: ImageJob }) {
     if (!props.job.forceExport && info?.finalImageReady !== true) return
     captured = true
     setJobFinalizing(job.id)
-    void finalize(canvas).catch((err: unknown) => {
-      setJobError(job.id, err instanceof Error ? err.message : String(err))
-    })
+    void (async () => {
+      try {
+        if (info?.fence) {
+          await info.fence
+        }
+        await finalize(canvas)
+      } catch (err: unknown) {
+        setJobError(job.id, err instanceof Error ? err.message : String(err))
+      }
+    })()
   }
 
   return (

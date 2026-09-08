@@ -37,6 +37,7 @@ export interface CanvasViewportProps {
   showSidebar: Accessor<boolean>
   onCanvasClick: () => void
   onToggleMobileSidebar: () => void
+  hideMobileSidebarToggle?: boolean
 
   // Flame / rendering
   flameDescriptor: FlameDescriptor
@@ -99,7 +100,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
       classList={{ [ui.fullscreen as string]: !props.showSidebar() }}
       onClick={props.onCanvasClick}
     >
-      <Show when={props.isMobile()}>
+      <Show when={props.isMobile() && !props.hideMobileSidebarToggle}>
         <button
           class={ui.sidebarToggle}
           data-replay-region="dim"

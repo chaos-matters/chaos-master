@@ -86,10 +86,14 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
     const size = canvasSize()
     const { width, height } = size
     const { position, zoom } = props
-    const { x, y } = position
+    const rawX = position?.x
+    const rawY = position?.y
+    const x = Number.isFinite(rawX) ? rawX : 0
+    const y = Number.isFinite(rawY) ? rawY : 0
+    const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
     const aspect = height > 0 ? width / height : 1
     const viewMatrix4 = mat4x4f()
-    const fovy = 1 / zoom
+    const fovy = 1 / safeZoom
     // near/far are -1/1 (not 0/0): the projection is 2D, so the z entries are
     // unused (only the xyw of columns 0/1/3 are read below), but 0/0 makes
     // ortho write NaN/Inf into those entries, which TypeGPU 0.11 rejects
@@ -147,7 +151,8 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
           worldToClip,
           clipToWorld,
         },
-        zoom: () => props.zoom,
+        zoom: () =>
+          Number.isFinite(props.zoom) && props.zoom > 0 ? props.zoom : 1,
         position: () => props.position,
         setPosition: (pos: v2f | ((prev: v2f) => v2f)) => {
           if (typeof pos === 'function') {

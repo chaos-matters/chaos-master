@@ -3,15 +3,53 @@ import { persistentSignal } from '@/utils/persistentSignal'
 import type { Accessor, Setter } from 'solid-js'
 
 export const WIDE_LAYOUT_MIN_WIDTH = 769
+export const PHONE_MAX_WIDTH = 680
+export const TABLET_MAX_WIDTH = 1024
 
 export function isWideLayout(): boolean {
   if (typeof window === 'undefined') return true
   return window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
 }
 
+export function isPhoneLayout(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.innerWidth < PHONE_MAX_WIDTH
+}
+
+export function isTabletLayout(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    window.innerWidth >= PHONE_MAX_WIDTH &&
+    window.innerWidth <= TABLET_MAX_WIDTH
+  )
+}
+
+export type TouchLayoutPreference = 'auto' | 'touch' | 'desktop'
+
+export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  const nav = window.navigator as
+    | (Navigator & { msMaxTouchPoints?: number })
+    | undefined
+  return (
+    'ontouchstart' in window ||
+    (typeof nav !== 'undefined' &&
+      ((nav.maxTouchPoints ?? 0) > 0 || (nav.msMaxTouchPoints ?? 0) > 0)) ||
+    (typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches)
+  )
+}
+
 export interface WorkspaceLayoutStore {
+  touchLayoutPreference: Accessor<TouchLayoutPreference>
+  setTouchLayoutPreference: (pref: TouchLayoutPreference) => void
   isMobile: Accessor<boolean>
   setIsMobile: Setter<boolean>
+  isPhone: Accessor<boolean>
+  setIsPhone: Setter<boolean>
+  isTablet: Accessor<boolean>
+  setIsTablet: Setter<boolean>
+  isTouchLayout: Accessor<boolean>
 
   sidebarHidden: Accessor<boolean>
   setSidebarHidden: Setter<boolean>
@@ -49,6 +87,49 @@ export interface WorkspaceLayoutStore {
 
   floatingLeft: Accessor<number>
   floatingTop: Accessor<number>
+}
+
+const [touchLayoutPreference, setTouchLayoutPreference] =
+  persistentSignal<TouchLayoutPreference>('chaos-touch-layout-pref', 'auto')
+
+const [rawIsPhone, setRawIsPhone] = createSignal(
+  typeof window !== 'undefined' ? window.innerWidth < PHONE_MAX_WIDTH : false,
+)
+const [rawIsTablet, setRawIsTablet] = createSignal(
+  typeof window !== 'undefined'
+    ? window.innerWidth >= PHONE_MAX_WIDTH &&
+        window.innerWidth <= TABLET_MAX_WIDTH
+    : false,
+)
+
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  const mqPhone = window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH - 0.02}px)`)
+  const mqTablet = window.matchMedia(
+    `(min-width: ${PHONE_MAX_WIDTH}px) and (max-width: ${TABLET_MAX_WIDTH}px)`,
+  )
+  mqPhone.addEventListener?.('change', (e) => setRawIsPhone(e.matches))
+  mqTablet.addEventListener?.('change', (e) => setRawIsTablet(e.matches))
+}
+
+export const isPhone = createMemo(() => {
+  if (touchLayoutPreference() === 'desktop') return false
+  if (touchLayoutPreference() === 'touch') return rawIsPhone()
+  return rawIsPhone()
+})
+
+export const isTablet = createMemo(() => {
+  if (touchLayoutPreference() === 'desktop') return false
+  if (touchLayoutPreference() === 'touch') return !rawIsPhone()
+  return rawIsTablet()
+})
+
+export const isTouchLayout = createMemo(() => isPhone() || isTablet())
+
+export {
+  touchLayoutPreference,
+  setTouchLayoutPreference,
+  setRawIsPhone as setIsPhone,
+  setRawIsTablet as setIsTablet,
 }
 
 export function createWorkspaceLayoutStore(
@@ -95,8 +176,15 @@ export function createWorkspaceLayoutStore(
   const floatingTop = createMemo(() => 8)
 
   return {
+    touchLayoutPreference,
+    setTouchLayoutPreference,
     isMobile,
     setIsMobile,
+    isPhone,
+    setIsPhone: setRawIsPhone,
+    isTablet,
+    setIsTablet: setRawIsTablet,
+    isTouchLayout,
     sidebarHidden,
     setSidebarHidden,
     showSidebar,

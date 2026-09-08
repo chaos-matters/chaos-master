@@ -116,11 +116,12 @@ function RenderDialog(props: RenderDialogProps) {
     () => 0,
   )
 
-  const cameraPos = () =>
-    vec2f(
-      props.previewDescriptor.renderSettings.camera.position[0],
-      props.previewDescriptor.renderSettings.camera.position[1],
-    )
+  const cameraPos = () => {
+    const cam = props.previewDescriptor.renderSettings.camera
+    const x = Number.isFinite(cam?.position?.[0]) ? cam.position[0] : 0
+    const y = Number.isFinite(cam?.position?.[1]) ? cam.position[1] : 0
+    return vec2f(x, y)
+  }
 
   const is3D = () =>
     (props.previewDescriptor.renderSettings.dimensions ?? 2) === 3
@@ -201,18 +202,15 @@ function RenderDialog(props: RenderDialogProps) {
   }
 
   const setFlameZoom: Setter<number> = (value) => {
-    if (typeof value === 'function') {
-      const currentZoom = props.previewDescriptor.renderSettings.camera.zoom
-      const newZoom = clamp(
-        value(currentZoom),
-        MIN_CAMERA_ZOOM_VALUE,
-        MAX_CAMERA_ZOOM_VALUE,
-      )
-      props.setPreviewDescriptor('renderSettings', 'camera', 'zoom', newZoom)
-      return newZoom
-    }
+    const currentZoom =
+      Number.isFinite(props.previewDescriptor.renderSettings.camera.zoom) &&
+      props.previewDescriptor.renderSettings.camera.zoom > 0
+        ? props.previewDescriptor.renderSettings.camera.zoom
+        : 1
+    const raw = typeof value === 'function' ? value(currentZoom) : value
+    const safeRaw = Number.isFinite(raw) && raw > 0 ? raw : currentZoom
     const clampedZoom = clamp(
-      value,
+      safeRaw,
       MIN_CAMERA_ZOOM_VALUE,
       MAX_CAMERA_ZOOM_VALUE,
     )
@@ -221,21 +219,18 @@ function RenderDialog(props: RenderDialogProps) {
   }
 
   const setFlamePosition: Setter<v2f> = (value) => {
-    if (typeof value === 'function') {
-      const [px, py] = props.previewDescriptor.renderSettings.camera.position
-      const currentPos = vec2f(px, py)
-      const newPos = value(currentPos)
-      props.setPreviewDescriptor('renderSettings', 'camera', 'position', [
-        newPos.x,
-        newPos.y,
-      ])
-      return newPos
-    }
+    const rawPos = props.previewDescriptor.renderSettings.camera.position
+    const curX = Number.isFinite(rawPos[0]) ? rawPos[0] : 0
+    const curY = Number.isFinite(rawPos[1]) ? rawPos[1] : 0
+    const currentPos = vec2f(curX, curY)
+    const next = typeof value === 'function' ? value(currentPos) : value
+    const safeX = Number.isFinite(next.x) ? next.x : curX
+    const safeY = Number.isFinite(next.y) ? next.y : curY
     props.setPreviewDescriptor('renderSettings', 'camera', 'position', [
-      value.x,
-      value.y,
+      safeX,
+      safeY,
     ])
-    return value
+    return vec2f(safeX, safeY)
   }
 
   return (
@@ -1138,6 +1133,18 @@ export function createExportPngDialog(
     )
 
     const initialFlame = deepClone(flameDescriptor)
+    if (!initialFlame.renderSettings.camera) {
+      initialFlame.renderSettings.camera = {
+        zoom: 1,
+        position: [0, 0],
+        rotation: 0,
+      }
+    } else {
+      const cam = initialFlame.renderSettings.camera
+      if (!Number.isFinite(cam.zoom) || cam.zoom <= 0) cam.zoom = 1
+      if (!Number.isFinite(cam.position[0])) cam.position[0] = 0
+      if (!Number.isFinite(cam.position[1])) cam.position[1] = 0
+    }
     if (!initialFlame.metadata) {
       initialFlame.metadata = { name: '', description: '', author: 'unknown' }
     } else {
@@ -1164,6 +1171,18 @@ export function createExportPngDialog(
       const frame = t.currentFrame()
       const fresh = deepClone(flameDescriptor)
       applyTimelineToFlameAtFrame(t, fresh, frame)
+      if (!fresh.renderSettings.camera) {
+        fresh.renderSettings.camera = {
+          zoom: 1,
+          position: [0, 0],
+          rotation: 0,
+        }
+      } else {
+        const cam = fresh.renderSettings.camera
+        if (!Number.isFinite(cam.zoom) || cam.zoom <= 0) cam.zoom = 1
+        if (!Number.isFinite(cam.position[0])) cam.position[0] = 0
+        if (!Number.isFinite(cam.position[1])) cam.position[1] = 0
+      }
       // Keep the dialog's metadata edits — only the flame state re-snapshots.
       if (previewDescriptor.metadata) {
         fresh.metadata = { ...previewDescriptor.metadata }
