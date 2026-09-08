@@ -171,61 +171,117 @@ export function focusForCommand(
  * unpointed-at. Commands that need something the args do not reveal can
  * declare `focus` themselves; that wins (see recordCommandExecution).
  */
-export function focusHintFor(
+const STATIC_COMMAND_HINTS: Readonly<Record<string, string>> = Object.freeze({
+  // ---- render settings ------------------------------------------------
+  'flame.setGamma': 'param:gamma',
+  'flame.setExposure': 'param:exposure',
+  'flame.setContrast': 'param:contrast',
+  'flame.setVibrancy': 'param:vibrancy',
+  'flame.setSkipIters': 'param:skipIters',
+  'flame.setDrawMode': 'param:drawMode',
+  'flame.setBackgroundColor': 'ui:backgroundColor-picker',
+  'flame.setBlendWeight': 'ui:blendWeight-slider',
+  'flame.setBlendFlame': 'ui:blend-picker',
+
+  // ---- structure ------------------------------------------------------
+  'flame.addTransform': 'ui:transform-list',
+  'flame.clearTransforms': 'ui:transform-list',
+  'flame.removeTransform': 'ui:transform-list',
+  'flame.deleteTransform': 'ui:transform-list',
+  'flame.applyPalette': 'ui:palette-selector',
+  'flame.removePalette': 'ui:palette-selector',
+  'flame.setAllTransformColors': 'ui:randomize-colors',
+  'flame.randomize': 'ui:randomizer-generate',
+  'flame.mutate': 'ui:randomizer-mutate',
+  'flame.setupMorph': 'ui:morph-picker',
+
+  // ---- view, camera ---------------------------------------------------
+  'camera.zoomTo': 'param:camera.zoom',
+  'camera.zoomBy': 'param:camera.zoom',
+  'camera.center': 'param:camera.zoom',
+  'camera.frame': 'param:camera.zoom',
+  'camera.panTo': 'param:camera.position',
+  'camera.panBy': 'param:camera.position',
+
+  // ---- timeline -------------------------------------------------------
+  'timeline.play': 'ui:play-button',
+  'timeline.setCurrentFrame': 'ui:seek-ruler',
+  'timeline.goToFrame': 'ui:seek-ruler',
+  'timeline.addKeyframe': 'ui:dope-sheet',
+  'timeline.addKeyframes': 'ui:dope-sheet',
+  'timeline.removeKeyframe': 'ui:dope-sheet',
+  'timeline.setKeyframeValue': 'ui:dope-sheet',
+  'timeline.setKeyframeInterp': 'ui:dope-sheet',
+  'timeline.moveKeyframe': 'ui:dope-sheet',
+  'timeline.relocateKeyframe': 'ui:dope-sheet',
+  'timeline.removeTrack': 'ui:dope-sheet',
+  'timeline.clearTracks': 'ui:animation-clear',
+  'timeline.setFps': 'ui:timeline-fps',
+  'timeline.setAutoFps': 'ui:timeline-auto-fps',
+  'timeline.setTimeScale': 'ui:timeline-speed',
+  'timeline.setLoop': 'ui:timeline-loop',
+  'timeline.setDuration': 'ui:timeline-duration',
+  'timeline.setLoopMode': 'ui:timeline-loop-mode',
+  'timeline.setAutoKeyframe': 'ui:auto-keyframe',
+  'timeline.setAnimationEnabled': 'ui:animation-toggle',
+
+  // ---- audio, sonification --------------------------------------------
+  'audio.setMapping': 'ui:audio-panel',
+  'audio.setEnabled': 'ui:audio-panel',
+  'audio.setSource': 'ui:audio-panel',
+  'audio.applySnapshot': 'ui:audio-panel',
+  'sonification.setEnabled': 'param:sonification.enabled',
+
+  // ---- app chrome -----------------------------------------------------
+  'view.setQualityPreset': 'ui:quality-presets',
+  'view.setAdaptiveFilter': 'ui:adaptive-filter',
+  'view.setDimensions': 'ui:dimension-toggle',
+  'view.setStochasticFilter': 'ui:stochastic-filter',
+  'view.setFlyMode': 'ui:fly-mode',
+  'view.setPixelRatio': 'ui:pixelRatio-buttons',
+  'view.setShowTimeline': 'ui:show-timeline',
+  'sidebar.open': 'ui:sidebar',
+  'sidebar.close': 'ui:sidebar',
+  'history.undo': 'ui:undoRedo-controls',
+  'history.redo': 'ui:undoRedo-controls',
+  'export.png': 'ui:export-png',
+  'export.animation': 'ui:timeline-section',
+})
+
+function resolveRenderSettingHint(
   commandId: string,
   args: readonly unknown[],
+  asString?: string,
 ): string | undefined {
-  const first = args[0]
-  const asString = typeof first === 'string' ? first : undefined
-
-  switch (commandId) {
-    // ---- render settings: the path is the hint -------------------------
-    case 'flame.setRenderSetting':
-      return asString === undefined ? undefined : `param:${asString}`
-    case 'flame.updateRenderSettings': {
-      if (args[1] === 'randomizer') return 'ui:randomizer-card'
-      const patch = first
-      if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
-        return undefined
-      }
-      if (Object.hasOwn(patch, 'exposure')) return 'param:exposure'
-      if (Object.hasOwn(patch, 'autoExposure3D')) {
-        return 'param:autoExposure3D'
-      }
-      const [firstPath] = Object.keys(patch)
-      return firstPath === undefined ? undefined : `param:${firstPath}`
+  if (commandId === 'flame.setRenderSetting') {
+    return asString === undefined ? undefined : `param:${asString}`
+  }
+  if (commandId === 'flame.updateRenderSettings') {
+    if (args[1] === 'randomizer') return 'ui:randomizer-card'
+    const patch = args[0]
+    if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+      return undefined
     }
-    case 'flame.setGamma':
-      return 'param:gamma'
-    case 'flame.setExposure':
-      return 'param:exposure'
-    case 'flame.setContrast':
-      return 'param:contrast'
-    case 'flame.setVibrancy':
-      return 'param:vibrancy'
+    if (Object.hasOwn(patch, 'exposure')) return 'param:exposure'
+    if (Object.hasOwn(patch, 'autoExposure3D')) {
+      return 'param:autoExposure3D'
+    }
+    const [firstPath] = Object.keys(patch)
+    return firstPath === undefined ? undefined : `param:${firstPath}`
+  }
+  return undefined
+}
+
+function resolveTransformPropertyHint(
+  commandId: string,
+  args: readonly unknown[],
+  asString?: string,
+): string | undefined {
+  switch (commandId) {
     case 'flame.setColorSpeed':
       return asString === undefined
         ? 'ui:transform-list'
         : `param:transform.${asString}.colorSpeed`
-    case 'flame.setSkipIters':
-      return 'param:skipIters'
-    case 'flame.setDrawMode':
-      return 'param:drawMode'
-    case 'flame.setBackgroundColor':
-      return 'ui:backgroundColor-picker'
-    case 'flame.setBlendWeight':
-      return 'ui:blendWeight-slider'
-    case 'flame.setBlendFlame':
-      return 'ui:blend-picker'
-
-    // ---- structure: point at the row that changed -----------------------
-    case 'flame.addTransform':
-    case 'flame.clearTransforms':
-      return 'ui:transform-list'
-    case 'flame.removeTransform':
-    case 'flame.deleteTransform':
-      // The row is gone before follow-cam measures the action.
-      return 'ui:transform-list'
     case 'flame.setTransformVisible':
       return asString === undefined
         ? 'ui:transform-list'
@@ -234,7 +290,7 @@ export function focusHintFor(
       return asString === undefined
         ? 'ui:transform-list'
         : `param:transform.${asString}.probability`
-    case 'flame.setTransformColor':
+    case 'flame.setTransformColor': {
       if (asString === undefined) return 'ui:transform-list'
       if (args[3] === 'card-randomize') {
         return `focus:${transformColorRandomizeFocusId(asString)}`
@@ -249,7 +305,19 @@ export function focusHintFor(
         return `focus:${colorResetFocusId(asString)}`
       }
       return `focus:${colorFocusId(asString)}`
-    case 'flame.setTransformAffine':
+    }
+    default:
+      return undefined
+  }
+}
+
+function resolveTransformAffineHint(
+  commandId: string,
+  args: readonly unknown[],
+  asString?: string,
+): string | undefined {
+  switch (commandId) {
+    case 'flame.setTransformAffine': {
       if (asString === undefined) return 'ui:affine-editor'
       if (args[3] === 'randomize') {
         return `focus:${affineRandomizeFocusId(asString)}`
@@ -258,6 +326,7 @@ export function focusHintFor(
         return `focus:${affineResetFocusId(asString)}`
       }
       return `focus:${affineFocusId(asString)}`
+    }
     case 'flame.setAffine': {
       if (
         asString === undefined ||
@@ -269,16 +338,31 @@ export function focusHintFor(
       const affine = args[1] === 'post' ? 'postAffine' : 'preAffine'
       return `param:transform.${asString}.${affine}.${args[2]}`
     }
-    case 'flame.setFinalTransform':
+    case 'flame.setFinalTransform': {
+      const first = args[0]
       return first === null || first === undefined
         ? 'ui:affine-editor'
         : args[1] === 'randomize'
           ? `focus:${FINAL_AFFINE_RANDOMIZE_FOCUS_ID}`
           : `focus:${FINAL_AFFINE_FOCUS_ID}`
-    case 'flame.setFinalAffine':
+    }
+    case 'flame.setFinalAffine': {
+      const first = args[0]
       return typeof first === 'string'
         ? `param:finalTransform.${first}`
         : `focus:${FINAL_AFFINE_FOCUS_ID}`
+    }
+    default:
+      return undefined
+  }
+}
+
+function resolveVariationTypeHint(
+  commandId: string,
+  args: readonly unknown[],
+  asString?: string,
+): string | undefined {
+  switch (commandId) {
     case 'flame.setVariation':
     case 'flame.applyVariationSelection': {
       const variationId = args[1]
@@ -301,9 +385,18 @@ export function focusHintFor(
         ? `focus:${variationTypeFocusId(asString, variationId)}`
         : 'ui:variation-type'
     }
+    default:
+      return undefined
+  }
+}
+
+function resolveVariationPropertyHint(
+  commandId: string,
+  args: readonly unknown[],
+  asString?: string,
+): string | undefined {
+  switch (commandId) {
     case 'flame.deleteVariation':
-      // The deleted row is gone by the time follow-cam measures it. Keep the
-      // correct transform in view instead of pointing at another variation.
       return asString === undefined
         ? 'ui:transform-list'
         : `focus:${transformFocusId(asString)}`
@@ -317,122 +410,74 @@ export function focusHintFor(
       return asString !== undefined && typeof args[1] === 'string'
         ? `param:${asString}.${args[1]}`
         : 'ui:variation-weight'
-    case 'flame.setVariationParams':
+    case 'flame.setVariationParams': {
+      const first = args[0]
       return typeof args[2] === 'string' && typeof first === 'string'
         ? `param:${first}.${String(args[1])}.${args[2]}`
         : 'ui:variation-type'
+    }
     case 'flame.applySymmetry':
       return args[3] === 'type'
         ? 'ui:symmetry-type'
         : args[3] === 'folds'
           ? 'ui:symmetry-folds'
           : 'ui:add-symmetry'
-    case 'flame.applyPalette':
-    case 'flame.removePalette':
-      return 'ui:palette-selector'
-    case 'flame.setAllTransformColors':
-      return 'ui:randomize-colors'
-    case 'flame.randomize':
-      return 'ui:randomizer-generate'
-    case 'flame.mutate':
-      return 'ui:randomizer-mutate'
-    case 'flame.setupMorph':
-      return 'ui:morph-picker'
+    default:
+      return undefined
+  }
+}
+
+function resolveAppControlHint(
+  commandId: string,
+  args: readonly unknown[],
+): string | undefined {
+  switch (commandId) {
     case 'flame.load':
       return snapshotOriginFocus(snapshotOriginForCommand(commandId, args))
-    case 'flame.setMetadata':
+    case 'flame.setMetadata': {
+      const first = args[0]
       return typeof first === 'string'
         ? `param:metadata.${first}`
         : 'ui:metadata-card'
-
-    // ---- view, timeline, audio -----------------------------------------
-    // Not `ui:canvas`. The canvas is the one region follow-cam never dims, so
-    // pointing a camera step at it spotlights something already lit and the
-    // viewer sees no highlight at all. Point at the control that moved — the
-    // same anchors the UI path (`flame.setRenderSetting camera.*`) resolves to.
-    case 'camera.zoomTo':
-    case 'camera.zoomBy':
-    case 'camera.center':
-    case 'camera.frame':
-      return 'param:camera.zoom'
-    case 'camera.panTo':
-    case 'camera.panBy':
-      return 'param:camera.position'
-    case 'timeline.play':
-      return 'ui:play-button'
-    case 'timeline.setCurrentFrame':
-    case 'timeline.goToFrame':
-      return 'ui:seek-ruler'
-    case 'timeline.addKeyframe':
-    case 'timeline.addKeyframes':
-    case 'timeline.removeKeyframe':
-    case 'timeline.setKeyframeValue':
-    case 'timeline.setKeyframeInterp':
-    case 'timeline.moveKeyframe':
-    case 'timeline.relocateKeyframe':
-    case 'timeline.removeTrack':
-      return 'ui:dope-sheet'
-    case 'timeline.clearTracks':
-      return 'ui:animation-clear'
-    case 'timeline.setFps':
-      return 'ui:timeline-fps'
-    case 'timeline.setAutoFps':
-      return 'ui:timeline-auto-fps'
-    case 'timeline.setTimeScale':
-      return 'ui:timeline-speed'
-    case 'timeline.setLoop':
-      return 'ui:timeline-loop'
-    case 'timeline.setDuration':
-      return 'ui:timeline-duration'
-    case 'timeline.setLoopMode':
-      return 'ui:timeline-loop-mode'
+    }
     case 'timeline.loadTimeline':
       return (
         snapshotOriginFocus(snapshotOriginForCommand(commandId, args)) ??
         'ui:timeline-section'
       )
-    case 'timeline.setAutoKeyframe':
-      return 'ui:auto-keyframe'
-    case 'timeline.setAnimationEnabled':
-      return 'ui:animation-toggle'
-    case 'audio.setMapping':
-    case 'audio.setEnabled':
-    case 'audio.setSource':
-    case 'audio.applySnapshot':
-      return 'ui:audio-panel'
     case 'sonification.setConfig':
       return typeof args[1] === 'string'
         ? `param:sonification.${args[1]}`
         : 'ui:sonification-panel'
-    case 'sonification.setEnabled':
-      return 'param:sonification.enabled'
-
-    // ---- app chrome ------------------------------------------------------
-    case 'view.setQualityPreset':
-      return 'ui:quality-presets'
-    case 'view.setAdaptiveFilter':
-      return 'ui:adaptive-filter'
-    case 'view.setDimensions':
-      return 'ui:dimension-toggle'
-    case 'view.setStochasticFilter':
-      return 'ui:stochastic-filter'
-    case 'view.setFlyMode':
-      return 'ui:fly-mode'
-    case 'view.setPixelRatio':
-      return 'ui:pixelRatio-buttons'
-    case 'view.setShowTimeline':
-      return 'ui:show-timeline'
-    case 'sidebar.open':
-    case 'sidebar.close':
-      return 'ui:sidebar'
-    case 'history.undo':
-    case 'history.redo':
-      return 'ui:undoRedo-controls'
-    case 'export.png':
-      return 'ui:export-png'
-    case 'export.animation':
-      return 'ui:timeline-section'
     default:
       return undefined
   }
+}
+
+/**
+ * The hint for a command invocation, derived centrally rather than declared on
+ * each of the ~60 commands.
+ *
+ * Central because the mapping is mostly mechanical (a parameter path IS the
+ * hint) and because a table can be read in one sitting to see what is still
+ * unpointed-at. Commands that need something the args do not reveal can
+ * declare `focus` themselves; that wins (see recordCommandExecution).
+ */
+export function focusHintFor(
+  commandId: string,
+  args: readonly unknown[],
+): string | undefined {
+  const staticHint = STATIC_COMMAND_HINTS[commandId]
+  if (staticHint !== undefined) {
+    return staticHint
+  }
+  const asString = typeof args[0] === 'string' ? args[0] : undefined
+  return (
+    resolveRenderSettingHint(commandId, args, asString) ??
+    resolveTransformPropertyHint(commandId, args, asString) ??
+    resolveTransformAffineHint(commandId, args, asString) ??
+    resolveVariationTypeHint(commandId, args, asString) ??
+    resolveVariationPropertyHint(commandId, args, asString) ??
+    resolveAppControlHint(commandId, args)
+  )
 }
