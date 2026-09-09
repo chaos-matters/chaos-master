@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { catmullRom } from './easing'
-import { createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
+import { applyTracksToFlame, createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
+import type { TimelineTrack } from './timeline'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 describe('Timeline Utilities', () => {
   let timeline: ReturnType<typeof createTimelineState>
@@ -778,6 +780,309 @@ describe('Timeline Utilities', () => {
       timeline.setKeyframeInterp('exposure', 10, 'spline')
       timeline.moveKeyframe('exposure', 10, 25)
       expect(timeline.getKeyframeAtFrame('exposure', 25)?.interp).toBe('spline')
+    })
+  })
+
+  describe('applyTracksToFlame', () => {
+    function createMockFlame(dimensions: 2 | 3 = 2): FlameDescriptor {
+      return {
+        version: '1.0.0',
+        metadata: { name: 'Test Flame' },
+        renderSettings: {
+          dimensions,
+          exposure: 1.0,
+          vibrancy: 1.0,
+          contrast: 1.0,
+          gamma: 2.2,
+          skipIters: 1,
+          highlightPower: 1.0,
+          depthColorPower: 1.0,
+          lightPower: 1.0,
+          palettePhase: 0.0,
+          paletteSpeed: 1.0,
+          densityEstimationQuality: 1.0,
+          estimatorCurve: 1.0,
+          drawMode: 'light',
+          colorInitMode: 'colorInitZero',
+          pointInitMode: 'pointInitOrigin',
+          camera: {
+            position: [0, 0],
+            zoom: 1.0,
+            rotation: 0.0,
+          },
+          ...(dimensions === 3
+            ? {
+                camera3D: {
+                  theta: 0,
+                  phi: 1.0,
+                  radius: 5.0,
+                  fov: 60,
+                  target: [0, 0, 0],
+                  roll: 0,
+                },
+              }
+            : {}),
+        },
+        transforms: {
+          t1: {
+            probability: 1.0,
+            colorSpeed: 1.0,
+            color: { x: 0.5, y: 0.5 },
+            preAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+            postAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+            variations: {
+              linearT: { type: 'linearT', weight: 1.0 },
+              spherical: {
+                type: 'spherical',
+                weight: 0.5,
+                params: { strength: 1.0 },
+              },
+            },
+          },
+        },
+      } as unknown as FlameDescriptor
+    }
+
+    it('applies 2D camera tracks correctly', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        { parameterPath: 'camera.x', keyframes: [{ frame: 0, value: 1.5 }] },
+        { parameterPath: 'camera.y', keyframes: [{ frame: 0, value: -2.5 }] },
+        { parameterPath: 'camera.zoom', keyframes: [{ frame: 0, value: 3.0 }] },
+        {
+          parameterPath: 'camera.rotation',
+          keyframes: [{ frame: 0, value: 0.75 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.camera?.position[0]).toBe(1.5)
+      expect(flame.renderSettings.camera?.position[1]).toBe(-2.5)
+      expect(flame.renderSettings.camera?.zoom).toBe(3.0)
+      expect(flame.renderSettings.camera?.rotation).toBe(0.75)
+    })
+
+    it('applies 3D camera tracks correctly', () => {
+      const flame = createMockFlame(3)
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'camera3D.theta',
+          keyframes: [{ frame: 0, value: 0.45 }],
+        },
+        {
+          parameterPath: 'camera3D.phi',
+          keyframes: [{ frame: 0, value: 1.85 }],
+        },
+        {
+          parameterPath: 'camera3D.radius',
+          keyframes: [{ frame: 0, value: 8.5 }],
+        },
+        {
+          parameterPath: 'camera3D.fov',
+          keyframes: [{ frame: 0, value: 75.0 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.camera3D?.theta).toBe(0.45)
+      expect(flame.renderSettings.camera3D?.phi).toBe(1.85)
+      expect(flame.renderSettings.camera3D?.radius).toBe(8.5)
+      expect(flame.renderSettings.camera3D?.fov).toBe(75.0)
+    })
+
+    it('applies render settings tracks correctly including color arrays', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        { parameterPath: 'exposure', keyframes: [{ frame: 0, value: 2.5 }] },
+        { parameterPath: 'skipIters', keyframes: [{ frame: 0, value: 3 }] },
+        { parameterPath: 'vibrancy', keyframes: [{ frame: 0, value: 0.8 }] },
+        { parameterPath: 'contrast', keyframes: [{ frame: 0, value: 1.4 }] },
+        { parameterPath: 'gamma', keyframes: [{ frame: 0, value: 1.8 }] },
+        {
+          parameterPath: 'highlightPower',
+          keyframes: [{ frame: 0, value: 0.9 }],
+        },
+        {
+          parameterPath: 'depthColorPower',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        { parameterPath: 'lightPower', keyframes: [{ frame: 0, value: 0.7 }] },
+        {
+          parameterPath: 'palettePhase',
+          keyframes: [{ frame: 0, value: 0.33 }],
+        },
+        {
+          parameterPath: 'paletteSpeed',
+          keyframes: [{ frame: 0, value: 2.0 }],
+        },
+        {
+          parameterPath: 'densityEstimationQuality',
+          keyframes: [{ frame: 0, value: 4.0 }],
+        },
+        {
+          parameterPath: 'estimatorCurve',
+          keyframes: [{ frame: 0, value: 0.6 }],
+        },
+        {
+          parameterPath: 'drawMode',
+          keyframes: [{ frame: 0, value: 'paint' }],
+        },
+        {
+          parameterPath: 'colorInitMode',
+          keyframes: [{ frame: 0, value: 'colorInitPosition' }],
+        },
+        {
+          parameterPath: 'pointInitMode',
+          keyframes: [{ frame: 0, value: 'pointInitRandom' }],
+        },
+        {
+          parameterPath: 'backgroundColor',
+          keyframes: [{ frame: 0, value: [0.1, 0.2, 0.3] }],
+        },
+        {
+          parameterPath: 'edgeFadeColor',
+          keyframes: [{ frame: 0, value: [0.4, 0.5, 0.6, 0.7] }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.exposure).toBe(2.5)
+      expect(flame.renderSettings.skipIters).toBe(3)
+      expect(flame.renderSettings.vibrancy).toBe(0.8)
+      expect(flame.renderSettings.contrast).toBe(1.4)
+      expect(flame.renderSettings.gamma).toBe(1.8)
+      expect(flame.renderSettings.highlightPower).toBe(0.9)
+      expect(flame.renderSettings.depthColorPower).toBe(1.1)
+      expect(flame.renderSettings.lightPower).toBe(0.7)
+      expect(flame.renderSettings.palettePhase).toBe(0.33)
+      expect(flame.renderSettings.paletteSpeed).toBe(2.0)
+      expect(flame.renderSettings.densityEstimationQuality).toBe(4.0)
+      expect(flame.renderSettings.estimatorCurve).toBe(0.6)
+      expect(flame.renderSettings.drawMode).toBe('paint')
+      expect(flame.renderSettings.colorInitMode).toBe('colorInitPosition')
+      expect(flame.renderSettings.pointInitMode).toBe('pointInitRandom')
+      expect(flame.renderSettings.backgroundColor).toEqual([0.1, 0.2, 0.3])
+      expect(flame.renderSettings.edgeFadeColor).toEqual([0.4, 0.5, 0.6, 0.7])
+    })
+
+    it('applies transform and variation tracks correctly', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'transform.t1.preAffine.a',
+          keyframes: [{ frame: 0, value: 0.9 }],
+        },
+        {
+          parameterPath: 'transform.t1.postAffine.d',
+          keyframes: [{ frame: 0, value: 1.2 }],
+        },
+        {
+          parameterPath: 'transform.t1.color.x',
+          keyframes: [{ frame: 0, value: 0.75 }],
+        },
+        {
+          parameterPath: 'transform.t1.probability',
+          keyframes: [{ frame: 0, value: 0.6 }],
+        },
+        {
+          parameterPath: 'transform.t1.colorSpeed',
+          keyframes: [{ frame: 0, value: 0.4 }],
+        },
+        {
+          parameterPath: 't1.linearT',
+          keyframes: [{ frame: 0, value: 0.85 }],
+        },
+        {
+          parameterPath: 't1.spherical.strength',
+          keyframes: [{ frame: 0, value: 2.5 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t1 = (flame.transforms as Record<string, any>)['t1']
+      expect(t1.preAffine.a).toBe(0.9)
+      expect(t1.postAffine.d).toBe(1.2)
+      expect(t1.color.x).toBe(0.75)
+      expect(t1.probability).toBe(0.6)
+      expect(t1.colorSpeed).toBe(0.4)
+      expect(t1.variations.linearT.weight).toBe(0.85)
+      expect(t1.variations.spherical.params.strength).toBe(2.5)
+    })
+
+    it('seeds and applies 2D finalTransform tracks', () => {
+      const flame = createMockFlame(2)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (flame as any).finalTransform
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'finalTransform.a',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        {
+          parameterPath: 'finalTransform.b',
+          keyframes: [{ frame: 0, value: 0.2 }],
+        },
+        {
+          parameterPath: 'finalTransform.c',
+          keyframes: [{ frame: 0, value: -0.2 }],
+        },
+        {
+          parameterPath: 'finalTransform.d',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        {
+          parameterPath: 'finalTransform.e',
+          keyframes: [{ frame: 0, value: 0.5 }],
+        },
+        {
+          parameterPath: 'finalTransform.f',
+          keyframes: [{ frame: 0, value: -0.5 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.finalTransform).toBeDefined()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ft = flame.finalTransform as any
+      expect(ft.a).toBe(1.1)
+      expect(ft.b).toBe(0.2)
+      expect(ft.c).toBe(-0.2)
+      expect(ft.d).toBe(1.1)
+      expect(ft.e).toBe(0.5)
+      expect(ft.f).toBe(-0.5)
+    })
+
+    it('seeds and applies 3D finalTransform tracks with 12-param identity', () => {
+      const flame = createMockFlame(3)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (flame as any).finalTransform
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'finalTransform.a',
+          keyframes: [{ frame: 0, value: 0.95 }],
+        },
+        {
+          parameterPath: 'finalTransform.f',
+          keyframes: [{ frame: 0, value: 1.05 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.finalTransform).toBeDefined()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ft = flame.finalTransform as any
+      expect(ft.a).toBe(0.95)
+      expect(ft.f).toBe(1.05)
+      // Verify 3D affine properties are retained from identity seeding
+      expect(ft.k).toBe(1)
+      expect(ft.l).toBe(0)
     })
   })
 })
