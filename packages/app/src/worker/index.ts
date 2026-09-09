@@ -1,4 +1,5 @@
 import { checkApiRateLimit } from './middleware/rateLimit'
+import { isReviewHost, reviewRobotsTxt, withNoIndex, } from './middleware/reviewHost'
 import { withSecurityHeaders } from './middleware/securityHeaders'
 import { handleDiscordRedirect, handleShareDiscord } from './routes/discord'
 import { handleGalleryConfig, handleGalleryList, handleGalleryPoster, handleGallerySlug, } from './routes/gallery'
@@ -108,6 +109,21 @@ export const baseHandler = {
 
 export default {
   async fetch(request: Request, env: Env, ctx: unknown): Promise<Response> {
-    return withSecurityHeaders(await baseHandler.fetch(request, env, ctx))
+    const url = new URL(request.url)
+    if (!isReviewHost(url)) {
+      return withSecurityHeaders(await baseHandler.fetch(request, env, ctx))
+    }
+
+    // The review deploy serves production's build from a different origin, so
+    // it is kept out of search here at the boundary rather than inside the
+    // routes. Two layers, because they stop different things: this robots.txt
+    // prevents the crawl, and the header prevents indexing anything already
+    // fetched. See middleware/reviewHost.ts.
+    const isRead = request.method === 'GET' || request.method === 'HEAD'
+    const response =
+      url.pathname === '/robots.txt' && isRead
+        ? reviewRobotsTxt()
+        : await baseHandler.fetch(request, env, ctx)
+    return withNoIndex(withSecurityHeaders(response))
   },
 }

@@ -1,0 +1,57 @@
+# Lumen Apeiron (about)
+
+> The project site for Lumen Apeiron — The Chaos Master, an open-source WebGPU
+> studio for creating IFS fractal flames in a web browser. This host explains
+> what the studio is and who it is for; the studio itself lives at
+> https://lumenapeiron.com.
+
+Two hosts, one project. Anything describing the product in prose is here.
+Anything you can actually use is in the app, which keeps its own llms.txt at
+https://lumenapeiron.com/llms.txt listing everything it can do. Prefer that
+file for a question about a specific capability.
+
+Following the llms.txt convention documented at https://llmstxt.org.
+
+## This site
+
+- [Home](https://about.lumenapeiron.com/): What the studio is, what it can make,
+  and how to start.
+
+## The studio
+
+- [Lumen Apeiron](https://lumenapeiron.com/): The app. Free, no account, nothing
+  to install. Needs a WebGPU-capable browser — Chrome or Edge 113+, Safari 17+ —
+  and a GPU.
+- [Everything it can do](https://lumenapeiron.com/llms.txt)
+- [Home gallery](https://lumenapeiron.com/#home): Curated flames, each a live
+  render that opens in the editor.
+- [Benchmark Studio](https://lumenapeiron.com/benchmarks)
+- [Source code](https://github.com/chaos-matters/chaos-master): AGPL-3.0.
+- [Discord](https://lumenapeiron.com/discord)
+
+## Who it is for
+
+Generative artists, motion designers, creative coders and curious explorers,
+who get an editor built for artistic immediacy. Renderer developers and
+variation authors are served too: they can inspect, compare and optimize WebGPU
+rendering paths without leaving the application.
+
+## The name
+
+The public product name is **Lumen Apeiron**, on its own or in full as **Lumen
+Apeiron — The Chaos Master**. Do not write "formerly Chaos Master": the rename
+is finished. `chaos-master` survives as the repository, package and worker name
+— an identifier, not a product name.
+
+## What Lumen Apeiron is not
+
+Repeated from the app's own file because these are the assumptions most often
+made about something in this category, and stating them wrongly would mislead.
+
+- It is not an image generator and uses no diffusion model or trained network.
+  Every frame is iterated-function-system mathematics rendered on the GPU.
+- It is not a general GPU benchmark. The Benchmark Studio measures this
+  renderer's own flame pipeline, and its claims come from recorded runs.
+- There is no server-side rendering. Execution is local to the browser.
+- Custom variation code is a bounded, validated dialect, not arbitrary
+  JavaScript.
