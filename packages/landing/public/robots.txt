@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://about.lumenapeiron.com/sitemap.xml
