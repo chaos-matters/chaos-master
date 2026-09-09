@@ -852,54 +852,64 @@ export function AudioWiringModal(props: {
 
   // ── Keyboard ──
 
+  function isEditableTarget(target: EventTarget | null): boolean {
+    const tag = (target as HTMLElement | null)?.tagName
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+  }
+
+  function clearDragState(): void {
+    setDragFrom(null)
+    setDragFromTarget(null)
+    setDragPos(null)
+    setDragStartPos(null)
+    setHoveredDropKey(null)
+  }
+
+  function handleEscapeKey(): void {
+    if (importPanel()) {
+      setImportPanel(null)
+    } else if (pendingPaste()) {
+      setPendingPaste(null)
+    } else if (dragFrom() || dragFromTarget()) {
+      clearDragState()
+    } else if (connectingFrom()) {
+      setConnectingFrom(null)
+    } else if (selectedWire()) {
+      setSelectedWire(null)
+    } else {
+      props.onClose()
+    }
+  }
+
+  function handleHistoryShortcuts(e: KeyboardEvent): boolean {
+    const isZ = (e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)
+    const isY = e.key === 'y' && (e.ctrlKey || e.metaKey)
+    if (!isZ && !isY) return false
+
+    e.preventDefault()
+    if (isY || e.shiftKey) {
+      redo()
+    } else {
+      undo()
+    }
+    return true
+  }
+
+  function handleDeleteShortcuts(e: KeyboardEvent): boolean {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return false
+    deleteSelectedEntry()
+    return true
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.stopPropagation()
-      if (importPanel()) {
-        setImportPanel(null)
-      } else if (pendingPaste()) {
-        setPendingPaste(null)
-      } else if (dragFrom()) {
-        setDragFrom(null)
-        setDragPos(null)
-        setDragStartPos(null)
-        setHoveredDropKey(null)
-      } else if (dragFromTarget()) {
-        setDragFromTarget(null)
-        setDragPos(null)
-        setDragStartPos(null)
-        setHoveredDropKey(null)
-      } else if (connectingFrom()) {
-        setConnectingFrom(null)
-      } else if (selectedWire()) {
-        setSelectedWire(null)
-      } else {
-        props.onClose()
-      }
-    }
-    if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      e.preventDefault()
-      if (e.shiftKey) {
-        redo()
-      } else {
-        undo()
-      }
+      handleEscapeKey()
       return
     }
-    if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      e.preventDefault()
-      redo()
-      return
-    }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      deleteSelectedEntry()
-    }
+    if (isEditableTarget(e.target)) return
+    if (handleHistoryShortcuts(e)) return
+    handleDeleteShortcuts(e)
   }
 
   // ── Collapsible groups ──

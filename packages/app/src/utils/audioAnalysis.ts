@@ -683,6 +683,202 @@ function clampRenderSetting(param: RenderSettingKey, value: number): number {
   return param === 'skipIters' ? Math.round(clamped) : clamped
 }
 
+interface AudioMutationContext {
+  rs?: Record<string, unknown>
+  camera?: Record<string, unknown>
+  txArr?: Record<string, unknown>[]
+}
+
+/**
+ * Calculates attack/release envelope smoothing for a normalized feature.
+ */
+function computeSmoothedEnvelope(
+  clamped: number,
+  targetKey: string,
+  mapping: AudioMappingEntry,
+  smoothingState: MappingSmoothingState | undefined,
+  dt: number,
+): number {
+  const attackMs = mapping.attackMs ?? 0
+  const releaseMs = mapping.releaseMs ?? 0
+  if (attackMs <= 0 && releaseMs <= 0) {
+    return clamped
+  }
+
+  const prev = smoothingState?.get(targetKey)?.smoothed ?? clamped
+  const rising = clamped > prev
+  const tc =
+    (rising
+      ? (mapping.attackMs ?? mapping.releaseMs ?? 0)
+      : (mapping.releaseMs ?? mapping.attackMs ?? 0)) / 1000
+  if (tc <= 0) {
+    return clamped
+  }
+
+  const coeff = dt / (tc + dt)
+  return prev + coeff * (clamped - prev)
+}
+
+/**
+ * Checks if target value has changed beyond DIRTY_THRESHOLD and records state.
+ */
+function checkTargetDirty(
+  smoothed: number,
+  targetKey: string,
+  smoothingState: MappingSmoothingState | undefined,
+): boolean {
+  const prevApplied = smoothingState?.get(targetKey)?.lastApplied
+  if (
+    prevApplied !== undefined &&
+    Math.abs(smoothed - prevApplied) < DIRTY_THRESHOLD
+  ) {
+    if (smoothingState) {
+      smoothingState.set(targetKey, { smoothed, lastApplied: prevApplied })
+    }
+    return false
+  }
+
+  if (smoothingState) {
+    smoothingState.set(targetKey, { smoothed, lastApplied: smoothed })
+  }
+  return true
+}
+
+function applyRenderSettingTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'renderSetting' }>,
+  val: number,
+): void {
+  ctx.rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
+  const safe = clampRenderSetting(tgt.param, val)
+  if (tgt.param === 'zoom') {
+    ctx.camera ??= (ctx.rs.camera as Record<string, unknown>) ?? {}
+    ;(ctx.camera as Record<string, number>).zoom = safe
+  } else {
+    ;(ctx.rs as Record<string, number>)[tgt.param] = safe
+  }
+}
+
+function getOrCreateTransformArray(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+): Record<string, unknown>[] {
+  ctx.txArr ??= Object.values(
+    (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
+  )
+  return ctx.txArr
+}
+
+function applyTransformAffineTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'transformAffine' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+  const mat = (tx[tgt.matrix] as Record<string, number> | undefined) ?? {}
+  mat[tgt.param] = val
+  tx[tgt.matrix] = mat
+}
+
+function applyTransformPropertyTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'transformProperty' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+
+  if (tgt.property === 'colorX' || tgt.property === 'colorY') {
+    const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
+    if (tgt.property === 'colorX') color.x = val
+    else color.y = val
+    tx.color = color
+  } else if (tgt.property === 'probability') {
+    /*
+     * Never let a transform's weight reach zero.
+     *
+     * The chaos game picks transforms by probability; at zero a branch
+     * stops receiving points and vanishes, and if every weight is driven
+     * low together the whole picture thins out to noise — the "flame
+     * collapsed and looks like nothing" people report mid-track. A
+     * negative weight is worse: it makes the cumulative distribution
+     * non-monotonic, so selection is meaningless.
+     *
+     * The schema itself only says `v.number()`, so nothing downstream
+     * would have caught either.
+     */
+    ;(tx as Record<string, number>).probability = Math.max(
+      0.001,
+      Number.isFinite(val) ? val : 0.001,
+    )
+  } else {
+    ;(tx as Record<string, number>)[tgt.property] = Number.isFinite(val)
+      ? val
+      : 0
+  }
+}
+
+function applyVariationWeightTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'variationWeight' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+  const vars = (tx.variations as Record<string, Record<string, unknown>>) ?? {}
+  const v =
+    vars[tgt.variationType] ??
+    Object.values(vars).find(
+      (candidate) => candidate.type === tgt.variationType,
+    )
+  if (v) {
+    ;(v as Record<string, number>).weight = val
+  }
+}
+
+function applyFinalAffineTarget(
+  flame: Record<string, unknown>,
+  tgt: Extract<FlameTarget, { kind: 'finalAffine' }>,
+  val: number,
+): void {
+  const fin = (flame.finalTransform as Record<string, number> | undefined) ?? {}
+  fin[tgt.param] = val
+  flame.finalTransform = fin
+}
+
+function dispatchAudioTargetMapping(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: FlameTarget,
+  val: number,
+): void {
+  switch (tgt.kind) {
+    case 'renderSetting':
+      applyRenderSettingTarget(flame, ctx, tgt, val)
+      break
+    case 'transformAffine':
+      applyTransformAffineTarget(flame, ctx, tgt, val)
+      break
+    case 'transformProperty':
+      applyTransformPropertyTarget(flame, ctx, tgt, val)
+      break
+    case 'variationWeight':
+      applyVariationWeightTarget(flame, ctx, tgt, val)
+      break
+    case 'finalAffine':
+      applyFinalAffineTarget(flame, tgt, val)
+      break
+  }
+}
+
 export function applyAudioMappingsToFlame(
   flame: Record<string, unknown>,
   frameData: FrameData & { isBeat: boolean },
@@ -693,10 +889,7 @@ export function applyAudioMappingsToFlame(
   if (mappings.length === 0) return
   const dt = deltaTime ?? 1 / 30
 
-  // Lazily resolved sub-objects
-  let rs: Record<string, unknown> | undefined
-  let camera: Record<string, unknown> | undefined
-  let txArr: Record<string, unknown>[] | undefined
+  const ctx: AudioMutationContext = {}
   let anyChanged = false
 
   for (const mapping of mappings) {
@@ -704,128 +897,26 @@ export function applyAudioMappingsToFlame(
     const clamped = Math.max(0, Math.min(1, raw))
     const targetKey = flameTargetKey(mapping.target)
 
-    // Apply attack/release envelope smoothing
-    let smoothed = clamped
-    const attackMs = mapping.attackMs
-    const releaseMs = mapping.releaseMs
-    if ((attackMs ?? 0) > 0 || (releaseMs ?? 0) > 0) {
-      const state = smoothingState?.get(targetKey)
-      const prev = state?.smoothed ?? clamped
-      const rising = clamped > prev
-      const tc =
-        (rising ? (attackMs ?? releaseMs ?? 0) : (releaseMs ?? attackMs ?? 0)) /
-        1000
-      if (tc > 0) {
-        const coeff = dt / (tc + dt)
-        smoothed = prev + coeff * (clamped - prev)
-      }
-    }
+    const smoothed = computeSmoothedEnvelope(
+      clamped,
+      targetKey,
+      mapping,
+      smoothingState,
+      dt,
+    )
 
-    // Dirty-check: skip if value hasn't changed meaningfully
-    const prevApplied = smoothingState?.get(targetKey)?.lastApplied
-    if (
-      prevApplied !== undefined &&
-      Math.abs(smoothed - prevApplied) < DIRTY_THRESHOLD
-    ) {
-      if (smoothingState) {
-        smoothingState.set(targetKey, { smoothed, lastApplied: prevApplied })
-      }
+    if (!checkTargetDirty(smoothed, targetKey, smoothingState)) {
       continue
     }
 
     anyChanged = true
     const val = mappingToVal(smoothed, mapping)
-
-    if (smoothingState) {
-      smoothingState.set(targetKey, { smoothed, lastApplied: smoothed })
-    }
-
-    // --- Resolve target and write ---
-    const tgt = mapping.target
-
-    if (tgt.kind === 'renderSetting') {
-      // Render settings
-      rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
-      const safe = clampRenderSetting(tgt.param, val)
-      if (tgt.param === 'zoom') {
-        camera ??= (rs.camera as Record<string, unknown>) ?? {}
-        ;(camera as Record<string, number>).zoom = safe
-      } else {
-        ;(rs as Record<string, number>)[tgt.param] = safe
-      }
-    } else if (tgt.kind === 'transformAffine') {
-      // Transform affine matrix param
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      const mat = (tx[tgt.matrix] as Record<string, number> | undefined) ?? {}
-      mat[tgt.param] = val
-      tx[tgt.matrix] = mat
-    } else if (tgt.kind === 'transformProperty') {
-      // Transform scalar property
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      if (tgt.property === 'colorX') {
-        const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
-        color.x = val
-        tx.color = color
-      } else if (tgt.property === 'colorY') {
-        const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
-        color.y = val
-        tx.color = color
-      } else if (tgt.property === 'probability') {
-        /*
-         * Never let a transform's weight reach zero.
-         *
-         * The chaos game picks transforms by probability; at zero a branch
-         * stops receiving points and vanishes, and if every weight is driven
-         * low together the whole picture thins out to noise — the "flame
-         * collapsed and looks like nothing" people report mid-track. A
-         * negative weight is worse: it makes the cumulative distribution
-         * non-monotonic, so selection is meaningless.
-         *
-         * The schema itself only says `v.number()`, so nothing downstream
-         * would have caught either.
-         */
-        ;(tx as Record<string, number>).probability = Math.max(
-          0.001,
-          Number.isFinite(val) ? val : 0.001,
-        )
-      } else {
-        ;(tx as Record<string, number>)[tgt.property] = Number.isFinite(val)
-          ? val
-          : 0
-      }
-    } else if (tgt.kind === 'variationWeight') {
-      // Variation weight
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      const vars =
-        (tx.variations as Record<string, Record<string, unknown>>) ?? {}
-      const v = vars[tgt.variationType]
-      if (v) {
-        ;(v as Record<string, number>).weight = val
-      }
-    } else if (tgt.kind === 'finalAffine') {
-      // Final transform affine param
-      const fin =
-        (flame.finalTransform as Record<string, number> | undefined) ?? {}
-      fin[tgt.param] = val
-      flame.finalTransform = fin
-    }
+    dispatchAudioTargetMapping(flame, ctx, mapping.target, val)
   }
 
   if (!anyChanged) return
-  if (rs) {
-    if (camera) rs.camera = camera
-    flame.renderSettings = rs
+  if (ctx.rs) {
+    if (ctx.camera) ctx.rs.camera = ctx.camera
+    flame.renderSettings = ctx.rs
   }
 }
