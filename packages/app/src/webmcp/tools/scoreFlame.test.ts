@@ -166,4 +166,26 @@ describe('scoreFlame tool', () => {
       .stats
     expect(resC8.metrics.symmetryScore).toBe(10.0)
   })
+
+  it('classifies flame archetypes accurately', async () => {
+    const { classifyFlameType } = await import('./scoreFlame')
+    expect(classifyFlameType(5, 8, 2, 5)).toBe('Chaotic Vortex')
+    expect(classifyFlameType(5, 3, 7, 5)).toBe('Structured Mandala')
+    expect(classifyFlameType(5, 5, 5, 9)).toBe('Energy Burst')
+    expect(classifyFlameType(9, 5, 5, 5)).toBe('Neural Web')
+    expect(classifyFlameType(4, 4, 4, 4)).toBe('Hybrid')
+  })
+
+  it('calculates energy intensity respecting maximum bounds', async () => {
+    const { calculateEnergyIntensity } = await import('./scoreFlame')
+    const capped = calculateEnergyIntensity(
+      {
+        exposure: 5,
+        vibrancy: 5,
+      } as unknown as FlameDescriptor['renderSettings'],
+      1,
+      10,
+    )
+    expect(capped).toBe(10)
+  })
 })

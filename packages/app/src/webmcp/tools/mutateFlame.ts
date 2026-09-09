@@ -4,6 +4,72 @@ import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, MutationPresetName, } from '@/flame/randomize'
 import type { WebMcpTool } from '@/webmcp/types'
 
+function validateMutationParams(
+  raw?: Record<string, unknown>,
+): { error: string } | null {
+  if (
+    raw?.preset !== undefined &&
+    (typeof raw.preset !== 'string' || !(raw.preset in MUTATION_PRESETS))
+  ) {
+    return {
+      error:
+        'Invalid preset. Must be one of: "Subtle", "Moderate", "Chaotic", "Structural".',
+    }
+  }
+
+  const mv = raw?.mutateVariations
+  if (mv !== undefined && mv !== 'modify' && mv !== 'all' && mv !== 'none') {
+    return {
+      error:
+        'Invalid mutateVariations. Must be one of: "modify", "all", "none".',
+    }
+  }
+
+  return null
+}
+
+function resolveMutationOptions(
+  raw?: Record<string, unknown>,
+): MutateFlameOptions {
+  const presetName: MutationPresetName =
+    typeof raw?.preset === 'string' && raw.preset in MUTATION_PRESETS
+      ? (raw.preset as MutationPresetName)
+      : 'Moderate'
+
+  const presetRates = MUTATION_PRESETS[presetName]
+
+  return {
+    mutateAffine:
+      typeof raw?.mutateAffine === 'boolean' ? raw.mutateAffine : true,
+    affineMode: 'smart',
+    mutateVariations:
+      (raw?.mutateVariations as MutateFlameOptions['mutateVariations']) ??
+      'modify',
+    mutateColors:
+      typeof raw?.mutateColors === 'boolean' ? raw.mutateColors : true,
+    ...presetRates,
+  }
+}
+
+function resolveSeed(rawSeed?: unknown): number {
+  if (typeof rawSeed === 'number' && Number.isFinite(rawSeed)) {
+    return rawSeed >>> 0
+  }
+  return Math.floor(Math.random() * 0x1_0000_0000)
+}
+
+function createMutationConfig(dimensions: number): GenerateRandomFlameConfig {
+  return {
+    strength: 0.5,
+    minTransforms: 2,
+    maxTransforms: 4,
+    minVariations: 1,
+    maxVariations: 2,
+    allowedVariations: [],
+    dimensions: dimensions === 3 ? 3 : 2,
+  }
+}
+
 export const mutateFlame: WebMcpTool = {
   name: 'mutate_flame',
   description:
@@ -49,67 +115,15 @@ export const mutateFlame: WebMcpTool = {
         ? (input as Record<string, unknown>)
         : undefined
 
-    if (
-      rawInput?.preset !== undefined &&
-      (typeof rawInput.preset !== 'string' ||
-        !(rawInput.preset in MUTATION_PRESETS))
-    ) {
-      return {
-        error:
-          'Invalid preset. Must be one of: "Subtle", "Moderate", "Chaotic", "Structural".',
-      }
+    const validationError = validateMutationParams(rawInput)
+    if (validationError) {
+      return validationError
     }
 
-    const mutateVariations = rawInput?.mutateVariations
-    if (
-      mutateVariations !== undefined &&
-      mutateVariations !== 'modify' &&
-      mutateVariations !== 'all' &&
-      mutateVariations !== 'none'
-    ) {
-      return {
-        error:
-          'Invalid mutateVariations. Must be one of: "modify", "all", "none".',
-      }
-    }
-
-    const presetName: MutationPresetName =
-      typeof rawInput?.preset === 'string' &&
-      rawInput.preset in MUTATION_PRESETS
-        ? (rawInput.preset as MutationPresetName)
-        : 'Moderate'
-
-    const presetRates = MUTATION_PRESETS[presetName]
-
-    const options: MutateFlameOptions = {
-      mutateAffine:
-        typeof rawInput?.mutateAffine === 'boolean'
-          ? rawInput.mutateAffine
-          : true,
-      affineMode: 'smart',
-      mutateVariations: mutateVariations ?? 'modify',
-      mutateColors:
-        typeof rawInput?.mutateColors === 'boolean'
-          ? rawInput.mutateColors
-          : true,
-      ...presetRates,
-    }
-
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as 2 | 3
-    const config: GenerateRandomFlameConfig = {
-      strength: 0.5,
-      minTransforms: 2,
-      maxTransforms: 4,
-      minVariations: 1,
-      maxVariations: 2,
-      allowedVariations: [],
-      dimensions: dims,
-    }
-
-    const seed =
-      typeof rawInput?.seed === 'number' && Number.isFinite(rawInput.seed)
-        ? rawInput.seed >>> 0
-        : Math.floor(Math.random() * 0x1_0000_0000)
+    const options = resolveMutationOptions(rawInput)
+    const seed = resolveSeed(rawInput?.seed)
+    const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
+    const config = createMutationConfig(dims)
 
     try {
       executeCommand('flame.mutate', ctx, seed, config, options)
