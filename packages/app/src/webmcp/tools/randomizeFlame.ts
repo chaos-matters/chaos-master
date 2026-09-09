@@ -3,6 +3,85 @@ import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { GenerateRandomFlameConfig } from '@/flame/randomize'
 import type { WebMcpTool } from '@/webmcp/types'
 
+interface RandomizeRangeParams {
+  minTransforms: number
+  maxTransforms: number
+  minVariations: number
+  maxVariations: number
+  strength: number
+}
+
+function resolveRandomizeRanges(
+  raw?: Record<string, unknown>,
+): RandomizeRangeParams {
+  return {
+    minTransforms:
+      typeof raw?.minTransforms === 'number'
+        ? Math.round(raw.minTransforms)
+        : 2,
+    maxTransforms:
+      typeof raw?.maxTransforms === 'number'
+        ? Math.round(raw.maxTransforms)
+        : 4,
+    minVariations:
+      typeof raw?.minVariations === 'number'
+        ? Math.round(raw.minVariations)
+        : 1,
+    maxVariations:
+      typeof raw?.maxVariations === 'number'
+        ? Math.round(raw.maxVariations)
+        : 2,
+    strength: typeof raw?.strength === 'number' ? raw.strength : 0.5,
+  }
+}
+
+function validateRandomizeRanges(
+  params: RandomizeRangeParams,
+): { error: string } | null {
+  const {
+    minTransforms,
+    maxTransforms,
+    minVariations,
+    maxVariations,
+    strength,
+  } = params
+
+  if (
+    minTransforms < 1 ||
+    maxTransforms > 10 ||
+    minTransforms > maxTransforms
+  ) {
+    return {
+      error:
+        'Invalid transform count range: minTransforms must be >= 1, maxTransforms <= 10, and minTransforms <= maxTransforms.',
+    }
+  }
+
+  if (
+    minVariations < 1 ||
+    maxVariations > 10 ||
+    minVariations > maxVariations
+  ) {
+    return {
+      error:
+        'Invalid variation count range: minVariations must be >= 1, maxVariations <= 10, and minVariations <= maxVariations.',
+    }
+  }
+
+  if (strength < 0 || strength > 1) {
+    return { error: 'Invalid strength: must be a number between 0 and 1.' }
+  }
+
+  return null
+}
+
+function resolveSeed(rawSeed?: unknown): number {
+  if (typeof rawSeed === 'number' && Number.isFinite(rawSeed)) {
+    return rawSeed >>> 0
+  }
+  return Math.floor(Math.random() * 0x1_0000_0000)
+}
+
 export const randomizeFlame: WebMcpTool = {
   name: 'randomize_flame',
   description:
@@ -61,66 +140,24 @@ export const randomizeFlame: WebMcpTool = {
         ? (input as Record<string, unknown>)
         : undefined
 
-    const minTransforms =
-      typeof rawInput?.minTransforms === 'number'
-        ? Math.round(rawInput.minTransforms)
-        : 2
-    const maxTransforms =
-      typeof rawInput?.maxTransforms === 'number'
-        ? Math.round(rawInput.maxTransforms)
-        : 4
-    const minVariations =
-      typeof rawInput?.minVariations === 'number'
-        ? Math.round(rawInput.minVariations)
-        : 1
-    const maxVariations =
-      typeof rawInput?.maxVariations === 'number'
-        ? Math.round(rawInput.maxVariations)
-        : 2
-    const strength =
-      typeof rawInput?.strength === 'number' ? rawInput.strength : 0.5
-
-    if (
-      minTransforms < 1 ||
-      maxTransforms > 10 ||
-      minTransforms > maxTransforms
-    ) {
-      return {
-        error:
-          'Invalid transform count range: minTransforms must be >= 1, maxTransforms <= 10, and minTransforms <= maxTransforms.',
-      }
+    const ranges = resolveRandomizeRanges(rawInput)
+    const validationError = validateRandomizeRanges(ranges)
+    if (validationError) {
+      return validationError
     }
 
-    if (
-      minVariations < 1 ||
-      maxVariations > 10 ||
-      minVariations > maxVariations
-    ) {
-      return {
-        error:
-          'Invalid variation count range: minVariations must be >= 1, maxVariations <= 10, and minVariations <= maxVariations.',
-      }
-    }
-
-    if (strength < 0 || strength > 1) {
-      return { error: 'Invalid strength: must be a number between 0 and 1.' }
-    }
-
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as 2 | 3
+    const dims = ctx.flameDescriptor().renderSettings.dimensions === 3 ? 3 : 2
     const config: GenerateRandomFlameConfig = {
-      strength,
-      minTransforms,
-      maxTransforms,
-      minVariations,
-      maxVariations,
+      strength: ranges.strength,
+      minTransforms: ranges.minTransforms,
+      maxTransforms: ranges.maxTransforms,
+      minVariations: ranges.minVariations,
+      maxVariations: ranges.maxVariations,
       allowedVariations: [],
       dimensions: dims,
     }
 
-    const seed =
-      typeof rawInput?.seed === 'number' && Number.isFinite(rawInput.seed)
-        ? rawInput.seed >>> 0
-        : Math.floor(Math.random() * 0x1_0000_0000)
+    const seed = resolveSeed(rawInput?.seed)
 
     try {
       executeCommand('flame.randomize', ctx, seed, config)

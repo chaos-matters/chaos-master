@@ -4,6 +4,74 @@ import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
+function resolveStatsObject(
+  rawStats?: Record<string, unknown>,
+): Record<string, unknown> {
+  const raw = rawStats ?? {}
+  return (raw.stats ?? raw) as Record<string, unknown>
+}
+
+function resolvePlayer1Flame(
+  rawFlame?: FlameDescriptor,
+  rawStats?: Record<string, unknown>,
+  statsObj?: Record<string, unknown>,
+  currentFlame?: FlameDescriptor,
+): FlameDescriptor | undefined {
+  if (rawFlame) return rawFlame
+  if (rawStats?.flame) return rawStats.flame as FlameDescriptor
+  if (statsObj?.flame) return statsObj.flame as FlameDescriptor
+  return currentFlame ? deepClone(currentFlame) : undefined
+}
+
+function createMutatedOpponent(currentFlame: FlameDescriptor): FlameDescriptor {
+  return mutateFlame(
+    deepClone(currentFlame),
+    {
+      strength: 0.45,
+      minTransforms: 2,
+      maxTransforms: 6,
+      minVariations: 1,
+      maxVariations: 3,
+      allowedVariations: [],
+      dimensions: currentFlame.renderSettings?.dimensions ?? 2,
+    },
+    {
+      mutateAffine: true,
+      affineMode: 'smart',
+      mutateVariations: 'all',
+      mutateColors: true,
+    },
+  )
+}
+
+function resolvePlayer2Flame(
+  rawFlame?: FlameDescriptor,
+  rawStats?: Record<string, unknown>,
+  statsObj?: Record<string, unknown>,
+  currentFlame?: FlameDescriptor,
+): FlameDescriptor | undefined {
+  if (rawFlame) return rawFlame
+  if (rawStats?.flame) return rawStats.flame as FlameDescriptor
+  if (statsObj?.flame) return statsObj.flame as FlameDescriptor
+  if (currentFlame) return createMutatedOpponent(currentFlame)
+  return undefined
+}
+
+function resolveCombatantPayload(
+  defaultName: string,
+  providedName?: string,
+  statsObj?: Record<string, unknown>,
+  flame?: FlameDescriptor,
+) {
+  const name =
+    providedName || (statsObj?.name as string | undefined) || defaultName
+  return {
+    name,
+    ...statsObj,
+    flame,
+  }
+}
+
 export const openArena: WebMcpTool = {
   name: 'open_arena',
   description:
@@ -61,55 +129,28 @@ export const openArena: WebMcpTool = {
     }
 
     const currentFlame = ctx.flameDescriptor()
-    const p1Raw = raw.player1Stats ?? {}
-    const p2Raw = raw.player2Stats ?? {}
+    const p1StatsObj = resolveStatsObject(raw.player1Stats)
+    const p2StatsObj = resolveStatsObject(raw.player2Stats)
 
-    // Extract nested stats if passed directly as score_flame result envelope/object
-    const p1StatsObj = (p1Raw.stats ?? p1Raw) as Record<string, unknown>
-    const p2StatsObj = (p2Raw.stats ?? p2Raw) as Record<string, unknown>
+    const p1Flame = resolvePlayer1Flame(
+      raw.player1Flame,
+      raw.player1Stats,
+      p1StatsObj,
+      currentFlame,
+    )
+    const p2Flame = resolvePlayer2Flame(
+      raw.player2Flame,
+      raw.player2Stats,
+      p2StatsObj,
+      currentFlame,
+    )
 
-    const p1Flame =
-      raw.player1Flame ??
-      (p1Raw.flame as FlameDescriptor | undefined) ??
-      (p1StatsObj.flame as FlameDescriptor | undefined) ??
-      (currentFlame ? deepClone(currentFlame) : undefined)
-
-    let p2Flame =
-      raw.player2Flame ??
-      (p2Raw.flame as FlameDescriptor | undefined) ??
-      (p2StatsObj.flame as FlameDescriptor | undefined)
-
-    if (!p2Flame && currentFlame) {
-      p2Flame = mutateFlame(
-        deepClone(currentFlame),
-        {
-          strength: 0.45,
-          minTransforms: 2,
-          maxTransforms: 6,
-          minVariations: 1,
-          maxVariations: 3,
-          allowedVariations: [],
-          dimensions: currentFlame.renderSettings?.dimensions ?? 2,
-        },
-        {
-          mutateAffine: true,
-          affineMode: 'smart',
-          mutateVariations: 'all',
-          mutateColors: true,
-        },
-      )
-    }
-
-    arena.setPlayer1Stats({
-      name: raw.player1Name || (p1StatsObj.name as string) || 'Player 1',
-      ...p1StatsObj,
-      flame: p1Flame,
-    })
-    arena.setPlayer2Stats({
-      name: raw.player2Name || (p2StatsObj.name as string) || 'Player 2',
-      ...p2StatsObj,
-      flame: p2Flame,
-    })
+    arena.setPlayer1Stats(
+      resolveCombatantPayload('Player 1', raw.player1Name, p1StatsObj, p1Flame),
+    )
+    arena.setPlayer2Stats(
+      resolveCombatantPayload('Player 2', raw.player2Name, p2StatsObj, p2Flame),
+    )
     arena.setOpen(true)
 
     if (raw.autoStart && arena.startClash) {

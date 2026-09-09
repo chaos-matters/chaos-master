@@ -127,4 +127,73 @@ describe('simulateClash tool', () => {
     const res = simulateClash.execute({}, {}) as { error: string }
     expect(res.error).toBeDefined()
   })
+
+  it('determines overall winner correctly', async () => {
+    const { determineOverallWinner } = await import('./simulateClash')
+    expect(determineOverallWinner(2, 1)).toBe('A')
+    expect(determineOverallWinner(1, 2)).toBe('B')
+    expect(determineOverallWinner(1, 1)).toBe('draw')
+  })
+
+  it('detects narrative events across diverse clash scenarios', async () => {
+    const { detectNarrativeEvent, calculateStanceAdjustedStats } =
+      await import('./simulateClash')
+    const statsA = calculateStanceAdjustedStats(flameA, 'balanced')
+    const statsB = calculateStanceAdjustedStats(flameB, 'balanced')
+
+    // Contested > 0.35 -> Entangled
+    const entangled = detectNarrativeEvent(
+      'draw',
+      {
+        verdict: 'draw',
+        ownershipA: 0.3,
+        ownershipB: 0.3,
+        contested: 0.4,
+        totalDensity: 100,
+      },
+      statsA,
+      statsB,
+      1,
+    )
+    expect(entangled).toBe('Entangled')
+
+    // Low ownership -> Collapse
+    const collapse = detectNarrativeEvent(
+      'A',
+      {
+        verdict: 'A',
+        ownershipA: 0.86,
+        ownershipB: 0.14,
+        contested: 0.0,
+        totalDensity: 100,
+      },
+      statsA,
+      statsB,
+      1,
+    )
+    expect(collapse).toBe('Collapse')
+  })
+
+  it('rebalances probabilities after a round win', async () => {
+    const { applyRoundProbabilityRebalance, calculateStanceAdjustedStats } =
+      await import('./simulateClash')
+    const statsA = calculateStanceAdjustedStats(flameA, 'balanced')
+    const statsB = calculateStanceAdjustedStats(flameB, 'balanced')
+
+    const staged = {
+      version: '1',
+      transforms: {
+        p1_0_0: { probability: 1 },
+        p2_0_0: { probability: 1 },
+      },
+    } as unknown as FlameDescriptor
+
+    applyRoundProbabilityRebalance(staged, 'A', statsA, statsB)
+    const stagedTransforms = staged.transforms as Record<
+      string,
+      { probability: number }
+    >
+    expect(stagedTransforms.p1_0_0?.probability).toBeGreaterThan(1.0)
+    expect(stagedTransforms.p2_0_0?.probability).toBeLessThan(1.0)
+  })
 })
