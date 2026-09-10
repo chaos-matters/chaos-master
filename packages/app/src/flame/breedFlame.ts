@@ -1,10 +1,12 @@
 import { deepClone } from '@/utils/clone'
 import { recordEntries } from '@/utils/record'
+import { crossBreedMatchedTypePairs, crossVariationParams, fillRemainingFromUnmatched, getDominantVariationType, groupTransformsByDominantType, } from './crossoverUtils'
 import { random01, randomPerturbation, randomRange } from './randomize'
 import { validateFlame } from './schema/flameSchema'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { transformVariations } from './variations'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from './variations3D'
+import type { LooseTransform, LooseVariation } from './crossoverUtils'
 import type { FlameDescriptor } from './schema/flameSchema'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -54,22 +56,6 @@ export const DEFAULT_BREED_CONFIG: BreedConfig = {
 
 // ── Internal helpers ───────────────────────────────────────────────────────
 
-type LooseTransform = {
-  probability: number
-  colorSpeed?: number
-  visible?: boolean
-  preAffine: Record<string, number>
-  postAffine: Record<string, number>
-  color: { x: number; y: number }
-  variations: Record<string, LooseVariation>
-}
-
-type LooseVariation = {
-  type: string
-  weight: number
-  params?: Record<string, number>
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyTransform = any
 
@@ -99,33 +85,6 @@ function perturbAffine(affine: Record<string, number>, sigma: number) {
   for (const key of Object.keys(affine)) {
     affine[key] = randomPerturbation(affine[key] ?? 0, sigma)
   }
-}
-
-/**
- * Cross-breed variation parameters between two variations of the same type.
- * Each param is randomly inherited from either parent A or parent B.
- */
-function crossVariationParams(
-  vA: LooseVariation,
-  vB: LooseVariation,
-): Record<string, number> | undefined {
-  if (!vA.params && !vB.params) return undefined
-  const keys = new Set([
-    ...Object.keys(vA.params ?? {}),
-    ...Object.keys(vB.params ?? {}),
-  ])
-  if (keys.size === 0) return undefined
-
-  const result: Record<string, number> = {}
-  for (const key of keys) {
-    // Randomly inherit from A or B (with fallback to the other)
-    if (random01() < 0.5) {
-      result[key] = vA.params?.[key] ?? vB.params?.[key] ?? 0
-    } else {
-      result[key] = vB.params?.[key] ?? vA.params?.[key] ?? 0
-    }
-  }
-  return result
 }
 
 /**
@@ -303,168 +262,41 @@ function smartCrossover(
   if (transformsB.length === 0)
     return shuffleCrossover(transformsA, transformsB, count)
 
-  // 1. Determine dominant variation type for each transform
-  function dominantType(t: LooseTransform): string | null {
-    let best: string | null = null
-    let bestWeight = -1
-    for (const [, v] of Object.entries(t.variations)) {
-      if ((v.weight ?? 0) > bestWeight) {
-        bestWeight = v.weight ?? 0
-        best = v.type
-      }
-    }
-    return best
-  }
+  const { byType: byTypeA, unmatched: unmatchedA } =
+    groupTransformsByDominantType(transformsA)
+  const { byType: byTypeB, unmatched: unmatchedB } =
+    groupTransformsByDominantType(transformsB)
 
-  // 2. Group transforms by dominant type
-  const byTypeA = new Map<string, LooseTransform[]>()
-  const byTypeB = new Map<string, LooseTransform[]>()
-  const unmatchedA: LooseTransform[] = []
-  const unmatchedB: LooseTransform[] = []
-
-  for (const t of transformsA) {
-    const dt = dominantType(t)
-    if (dt) {
-      const arr = byTypeA.get(dt) ?? []
-      arr.push(t)
-      byTypeA.set(dt, arr)
-    } else {
-      unmatchedA.push(t)
-    }
-  }
-
-  for (const t of transformsB) {
-    const dt = dominantType(t)
-    if (dt) {
-      const arr = byTypeB.get(dt) ?? []
-      arr.push(t)
-      byTypeB.set(dt, arr)
-    } else {
-      unmatchedB.push(t)
-    }
-  }
-
-  // 3. Cross-breed matched pairs
   const crossBred: LooseTransform[] = []
 
   for (const [type, listA] of byTypeA) {
     const listB = byTypeB.get(type)
     if (!listB || listB.length === 0) {
-      // Type only in A — add as unmatched
-      for (const t of listA) unmatchedA.push(t)
+      unmatchedA.push(...listA)
       continue
     }
 
-    // Sort by probability (higher first) and pair up
-    const sortedA = [...listA].sort((a, b) => b.probability - a.probability)
-    const sortedB = [...listB].sort((a, b) => b.probability - a.probability)
-    const pairs = Math.min(sortedA.length, sortedB.length)
-
-    for (let i = 0; i < pairs; i++) {
-      const ta = deepClone(sortedA[i]!)
-      const tb = sortedB[i]!
-
-      // Cross-breed affine: random per-coefficient inheritance
-      for (const key of Object.keys(ta.preAffine)) {
-        if (random01() < 0.5) {
-          const other = tb.preAffine[key]
-          if (other !== undefined) ta.preAffine[key] = other
-        }
-      }
-      for (const key of Object.keys(ta.postAffine)) {
-        if (random01() < 0.5) {
-          const other = tb.postAffine[key]
-          if (other !== undefined) ta.postAffine[key] = other
-        }
-      }
-
-      // Cross-breed color: mix with slight perturbation
-      ta.color = {
-        x: randomPerturbation(
-          ta.color.x * 0.5 + tb.color.x * 0.5,
-          0.05,
-          [-0.4, 0.4],
-        ),
-        y: randomPerturbation(
-          ta.color.y * 0.5 + tb.color.y * 0.5,
-          0.05,
-          [-0.4, 0.4],
-        ),
-      }
-
-      // Cross-breed probability
-      ta.probability = ta.probability * 0.5 + tb.probability * 0.5
-
-      // Cross-breed variations: match same-type vars
-      const newVars: Record<string, LooseVariation> = {}
-      const varsB = Object.entries(tb.variations)
-      const usedBTypes = new Set<string>()
-
-      for (const [, va] of Object.entries(ta.variations)) {
-        // Find matching type in B
-        const matchIdx = varsB.findIndex(
-          ([, vb]) => vb.type === va.type && !usedBTypes.has(vb.type),
-        )
-        if (matchIdx >= 0) {
-          const [, vb] = varsB[matchIdx]!
-          usedBTypes.add(vb.type)
-          const weight = (va.weight ?? 0) * 0.5 + (vb.weight ?? 0) * 0.5
-          const params = crossVariationParams(va, vb)
-          newVars[generateVariationId()] = {
-            type: va.type,
-            weight,
-            ...(params ? { params } : {}),
-          }
-        } else {
-          newVars[generateVariationId()] = { ...va }
-        }
-      }
-
-      // Add B-only variation types
-      for (const [, vb] of varsB) {
-        if (!usedBTypes.has(vb.type)) {
-          newVars[generateVariationId()] = { ...vb }
-        }
-      }
-
-      ta.variations = newVars
-      crossBred.push(ta)
-    }
-
-    // Excess transforms from A or B become unmatched
-    for (let i = pairs; i < sortedA.length; i++) unmatchedA.push(sortedA[i]!)
-    for (let i = pairs; i < sortedB.length; i++) unmatchedB.push(sortedB[i]!)
+    const {
+      crossBred: pairs,
+      excessA,
+      excessB,
+    } = crossBreedMatchedTypePairs(listA, listB)
+    crossBred.push(...pairs)
+    unmatchedA.push(...excessA)
+    unmatchedB.push(...excessB)
   }
 
-  // Types only in B
   for (const [type, listB] of byTypeB) {
     if (!byTypeA.has(type)) {
-      for (const t of listB) unmatchedB.push(t)
+      unmatchedB.push(...listB)
     }
   }
 
-  // 4. Build result: cross-bred pairs first, then unmatched
-  const result: LooseTransform[] = [...crossBred]
-
-  const remaining = [...unmatchedA, ...unmatchedB]
-  // Shuffle unmatched for variety
-  for (let i = remaining.length - 1; i > 0; i--) {
-    const j = Math.floor(randomRange(0, i + 1))
-    ;[remaining[i], remaining[j]] = [remaining[j]!, remaining[i]!]
-  }
-
-  for (const t of remaining) {
-    if (result.length >= count) break
-    const cloned = deepClone(t)
-    const newVars: Record<string, LooseVariation> = {}
-    for (const [, v] of Object.entries(cloned.variations)) {
-      newVars[generateVariationId()] = v
-    }
-    cloned.variations = newVars
-    result.push(cloned)
-  }
-
-  return result.slice(0, count)
+  return fillRemainingFromUnmatched(
+    crossBred,
+    [...unmatchedA, ...unmatchedB],
+    count,
+  )
 }
 
 // ── Smart breed match analysis ────────────────────────────────────────────────
@@ -488,33 +320,15 @@ export function analyzeSmartBreedMatch(
   parentA: FlameDescriptor,
   parentB: FlameDescriptor,
 ): SmartBreedMatchInfo {
-  // 1. Determine dominant variation type for each transform
-  function dominantTypeOf(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    t: any,
-  ): string | null {
-    let best: string | null = null
-    let bestWeight = -1
-    for (const [, v] of Object.entries(
-      (t.variations ?? {}) as Record<string, LooseVariation>,
-    )) {
-      if ((v.weight ?? 0) > bestWeight) {
-        bestWeight = v.weight ?? 0
-        best = v.type
-      }
-    }
-    return best
-  }
-
   const typesA = new Set<string>()
   const typesB = new Set<string>()
 
   for (const [, t] of transformEntries(parentA)) {
-    const dt = dominantTypeOf(t)
+    const dt = getDominantVariationType(t)
     if (dt) typesA.add(dt)
   }
   for (const [, t] of transformEntries(parentB)) {
-    const dt = dominantTypeOf(t)
+    const dt = getDominantVariationType(t)
     if (dt) typesB.add(dt)
   }
 
@@ -535,14 +349,10 @@ export function analyzeSmartBreedMatch(
     }
   }
 
-  // Count cross-bred pairs: sum of min(count_in_A_by_type, count_in_B_by_type)
-  function typeCount(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    entries: [string, any][],
-  ): Map<string, number> {
+  function typeCount(entries: [string, AnyTransform][]): Map<string, number> {
     const map = new Map<string, number>()
     for (const [, t] of entries) {
-      const dt = dominantTypeOf(t)
+      const dt = getDominantVariationType(t)
       if (dt) map.set(dt, (map.get(dt) ?? 0) + 1)
     }
     return map
@@ -578,6 +388,95 @@ export function analyzeSmartBreedMatch(
  * Only works with two flames of the same dimension (both 2D or both 3D).
  * Returns an array of validated `FlameDescriptor` children.
  */
+function handleSingleParentBreed(
+  parent: FlameDescriptor,
+  count: number,
+  mutationStrength: number,
+): FlameDescriptor[] {
+  return Array.from({ length: count }, () => {
+    const child = deepClone(parent)
+    mutateFlameLight(child, mutationStrength)
+    return validateFlame(child)
+  })
+}
+
+function extractLooseTransforms(flame: FlameDescriptor): LooseTransform[] {
+  return transformEntries(flame).map(([, t]) => ({
+    probability: t.probability ?? 0,
+    colorSpeed: t.colorSpeed,
+    visible: t.visible,
+    preAffine: t.preAffine ? { ...t.preAffine } : {},
+    postAffine: t.postAffine ? { ...t.postAffine } : {},
+    color: t.color ? { ...t.color } : { x: 0, y: 0 },
+    variations: Object.fromEntries(
+      variationEntries(t).map(([vid, v]) => [vid, { ...v }]),
+    ),
+  }))
+}
+
+function dispatchCrossover(
+  mode: CrossoverMode,
+  transformsA: LooseTransform[],
+  transformsB: LooseTransform[],
+  targetCount: number,
+): LooseTransform[] {
+  switch (mode) {
+    case 'weighted':
+      return weightedCrossover(transformsA, transformsB, targetCount)
+    case 'shuffle':
+      return shuffleCrossover(transformsA, transformsB, targetCount)
+    case 'alternate':
+      return alternateCrossover(transformsA, transformsB, targetCount)
+    case 'smart':
+      return smartCrossover(transformsA, transformsB, targetCount)
+    case 'uniform':
+    default:
+      return uniformCrossover(transformsA, transformsB, targetCount)
+  }
+}
+
+function normalizeSelectedProbabilities(selected: LooseTransform[]): void {
+  const totalProb = selected.reduce((sum, t) => sum + t.probability, 0)
+  if (totalProb > 0) {
+    for (const t of selected) {
+      t.probability = t.probability / totalProb
+    }
+  }
+}
+
+function assembleChildFlame(
+  selected: LooseTransform[],
+  index: number,
+  parentA: FlameDescriptor,
+  parentB: FlameDescriptor,
+): FlameDescriptor {
+  const childTransforms: Record<string, unknown> = {}
+  for (const t of selected) {
+    const tid = generateTransformId(`breed_${index}`)
+    childTransforms[tid] = {
+      probability: t.probability,
+      colorSpeed: t.colorSpeed ?? 0.4,
+      visible: t.visible ?? true,
+      preAffine: t.preAffine,
+      postAffine: t.postAffine,
+      color: t.color,
+      variations: t.variations,
+    }
+  }
+
+  const parentMeta = parentA.metadata ?? parentB.metadata
+  return validateFlame({
+    version: parentA.version ?? '1.0',
+    metadata: {
+      name: `Breed #${index + 1}`,
+      description: parentMeta?.description ?? '',
+      author: parentMeta?.author ?? 'unknown',
+    },
+    renderSettings: deepClone(parentA.renderSettings),
+    transforms: childTransforms,
+  })
+}
+
 export function breedFlames(
   parentA: FlameDescriptor,
   parentB: FlameDescriptor,
@@ -601,45 +500,14 @@ export function breedFlames(
 
   if (entriesA.length === 0 && entriesB.length === 0) return []
   if (entriesA.length === 0) {
-    // Only parent B has transforms — mutate B
-    return Array.from({ length: cfg.count }, () => {
-      const child = deepClone(parentB)
-      mutateFlameLight(child, cfg.mutationStrength)
-      return validateFlame(child)
-    })
+    return handleSingleParentBreed(parentB, cfg.count, cfg.mutationStrength)
   }
   if (entriesB.length === 0) {
-    // Only parent A has transforms — mutate A
-    return Array.from({ length: cfg.count }, () => {
-      const child = deepClone(parentA)
-      mutateFlameLight(child, cfg.mutationStrength)
-      return validateFlame(child)
-    })
+    return handleSingleParentBreed(parentA, cfg.count, cfg.mutationStrength)
   }
 
-  const transformsA: LooseTransform[] = entriesA.map(([, t]) => ({
-    probability: t.probability ?? 0,
-    colorSpeed: t.colorSpeed,
-    visible: t.visible,
-    preAffine: t.preAffine ? { ...t.preAffine } : {},
-    postAffine: t.postAffine ? { ...t.postAffine } : {},
-    color: t.color ? { ...t.color } : { x: 0, y: 0 },
-    variations: Object.fromEntries(
-      variationEntries(t).map(([vid, v]) => [vid, { ...v }]),
-    ),
-  }))
-
-  const transformsB: LooseTransform[] = entriesB.map(([, t]) => ({
-    probability: t.probability ?? 0,
-    colorSpeed: t.colorSpeed,
-    visible: t.visible,
-    preAffine: t.preAffine ? { ...t.preAffine } : {},
-    postAffine: t.postAffine ? { ...t.postAffine } : {},
-    color: t.color ? { ...t.color } : { x: 0, y: 0 },
-    variations: Object.fromEntries(
-      variationEntries(t).map(([vid, v]) => [vid, { ...v }]),
-    ),
-  }))
+  const transformsA = extractLooseTransforms(parentA)
+  const transformsB = extractLooseTransforms(parentB)
 
   // Determine target transform count: average of both parents, clamped
   const targetCount = Math.max(
@@ -653,76 +521,28 @@ export function breedFlames(
   const children: FlameDescriptor[] = []
 
   for (let c = 0; c < cfg.count; c++) {
-    // 1. Select transforms via crossover
-    let selected: LooseTransform[]
-    switch (cfg.crossoverMode) {
-      case 'weighted':
-        selected = weightedCrossover(transformsA, transformsB, targetCount)
-        break
-      case 'shuffle':
-        selected = shuffleCrossover(transformsA, transformsB, targetCount)
-        break
-      case 'alternate':
-        selected = alternateCrossover(transformsA, transformsB, targetCount)
-        break
-      case 'smart':
-        selected = smartCrossover(transformsA, transformsB, targetCount)
-        break
-      case 'uniform':
-      default:
-        selected = uniformCrossover(transformsA, transformsB, targetCount)
-        break
-    }
+    const selected = dispatchCrossover(
+      cfg.crossoverMode,
+      transformsA,
+      transformsB,
+      targetCount,
+    )
 
     if (selected.length === 0) continue
 
-    // 2. Cross-breed variation params between parents where types match
+    // Cross-breed variation params between parents where types match
     crossVariations(selected, transformsA, transformsB)
 
-    // 3. Cross-breed colors
+    // Cross-breed colors
     crossColors(selected, transformsA, transformsB)
 
-    // 4. Apply light mutation
+    // Apply light mutation
     if (cfg.mutationStrength > 0) {
       mutateSelected(selected, cfg.mutationStrength, dims)
     }
 
-    // 5. Normalize probabilities
-    const totalProb = selected.reduce((sum, t) => sum + t.probability, 0)
-    if (totalProb > 0) {
-      for (const t of selected) {
-        t.probability = t.probability / totalProb
-      }
-    }
-
-    // 6. Build child descriptor
-    const childTransforms: Record<string, unknown> = {}
-    for (const t of selected) {
-      const tid = generateTransformId(`breed_${c}`)
-      childTransforms[tid] = {
-        probability: t.probability,
-        colorSpeed: t.colorSpeed ?? 0.4,
-        visible: t.visible ?? true,
-        preAffine: t.preAffine,
-        postAffine: t.postAffine,
-        color: t.color,
-        variations: t.variations,
-      }
-    }
-
-    const parentMeta = parentA.metadata ?? parentB.metadata
-    const child = validateFlame({
-      version: parentA.version ?? '1.0',
-      metadata: {
-        name: `Breed #${c + 1}`,
-        description: parentMeta?.description ?? '',
-        author: parentMeta?.author ?? 'unknown',
-      },
-      renderSettings: deepClone(parentA.renderSettings),
-      transforms: childTransforms,
-    })
-
-    children.push(child)
+    normalizeSelectedProbabilities(selected)
+    children.push(assembleChildFlame(selected, c, parentA, parentB))
   }
 
   return children
