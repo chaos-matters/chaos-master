@@ -1,6 +1,6 @@
 {
   "name": "@chaos-master/landing",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Marketing landing page for Lumen Apeiron",
   "type": "module",
   "private": true,
@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@chaos-master/core": "workspace:*",
-    "@astrojs/solid-js": "^5.1.0",
+    "@astrojs/solid-js": "^7.0.2",
     "@typegpu/color": "0.12.0",
     "@typegpu/noise": "0.12.0",
     "@typegpu/sdf": "0.12.0",
-    "astro": "^5.18.2",
+    "astro": "^7.2.8",
     "solid-js": "1.9.11",
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.4.0",
