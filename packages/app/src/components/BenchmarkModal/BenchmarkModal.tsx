@@ -322,45 +322,43 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     })
   }
 
-  function renderBenchmarkCard(): HTMLCanvasElement {
-    const W = 600
-    const H = 320
-    const canvas = document.createElement('canvas')
-    canvas.width = W
-    canvas.height = H
-    const ctx = canvas.getContext('2d')!
-
+  function drawCardBackground(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    versionText: string,
+  ): void {
     // Background
-    const bgGrad = ctx.createLinearGradient(0, 0, W, H)
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height)
     bgGrad.addColorStop(0, '#0f0f1a')
     bgGrad.addColorStop(1, '#1a1025')
     ctx.fillStyle = bgGrad
-    roundRect(ctx, 0, 0, W, H, 16)
+    roundRect(ctx, 0, 0, width, height, 16)
     ctx.fill()
 
     // Subtle grid
     ctx.strokeStyle = 'rgba(255,255,255,0.02)'
     ctx.lineWidth = 0.5
-    for (let x = 0; x < W; x += 30) {
+    for (let x = 0; x < width; x += 30) {
       ctx.beginPath()
       ctx.moveTo(x, 0)
-      ctx.lineTo(x, H)
+      ctx.lineTo(x, height)
       ctx.stroke()
     }
-    for (let y = 0; y < H; y += 30) {
+    for (let y = 0; y < height; y += 30) {
       ctx.beginPath()
       ctx.moveTo(0, y)
-      ctx.lineTo(W, y)
+      ctx.lineTo(width, y)
       ctx.stroke()
     }
 
     // Top accent line
-    const accentGrad = ctx.createLinearGradient(0, 0, W, 0)
+    const accentGrad = ctx.createLinearGradient(0, 0, width, 0)
     accentGrad.addColorStop(0, '#ff6b35')
     accentGrad.addColorStop(0.5, '#f7c948')
     accentGrad.addColorStop(1, '#ff6b35')
     ctx.fillStyle = accentGrad
-    roundRect(ctx, 20, 16, W - 40, 3, 2)
+    roundRect(ctx, 20, 16, width - 40, 3, 2)
     ctx.fill()
 
     // Title
@@ -369,18 +367,19 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     ctx.fillText('Lumen Apeiron Benchmark', 28, 54)
 
     // Version pill
-    const versionText = `v${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`
     ctx.font = '11px Inter, system-ui, sans-serif'
     const vw = ctx.measureText(versionText).width
     ctx.fillStyle = 'rgba(255,255,255,0.08)'
-    roundRect(ctx, W - vw - 44, 36, vw + 16, 20, 10)
+    roundRect(ctx, width - vw - 44, 36, vw + 16, 20, 10)
     ctx.fill()
     ctx.fillStyle = 'rgba(255,255,255,0.5)'
-    ctx.fillText(versionText, W - vw - 36, 50)
+    ctx.fillText(versionText, width - vw - 36, 50)
+  }
 
-    const info = gpuDeviceInfo()
-
-    // Device info
+  function drawCardDeviceInfo(
+    ctx: CanvasRenderingContext2D,
+    info: Awaited<ReturnType<typeof getGPUDeviceInformation>> | undefined,
+  ): void {
     let y = 90
     ctx.fillStyle = 'rgba(255,255,255,0.4)'
     ctx.font = '10px Inter, system-ui, sans-serif'
@@ -398,7 +397,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     if (info?.heaps) {
       devices.push({
         label: 'VRAM',
-        value: info.heaps.map((s) => formatBytes(s)).join(' + '),
+        value: info.heaps.map((s: number) => formatBytes(s)).join(' + '),
         color: 'green',
       })
     }
@@ -418,20 +417,26 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     }
     if (sysParts.length > 0) {
       drawPill(ctx, 28, y, sysParts.join('  ·  '), 'green')
-      y += 28
     }
+  }
 
-    // Results (right column)
-    const rx = 360
-    // Start the workload pill so its text baseline (y + 15) lands on the same
-    // row as the left column's "DEVICE" header baseline (y = 90), keeping the two
-    // columns visually aligned.
+  function formatPointsCompact(tp: number): string {
+    if (tp >= 1e9) return `${(tp / 1e9).toFixed(2)}B`
+    if (tp >= 1e6) return `${(tp / 1e6).toFixed(1)}M`
+    return `${(tp / 1e3).toFixed(0)}K`
+  }
+
+  function drawCardResults(
+    ctx: CanvasRenderingContext2D,
+    rx: number,
+    workload: { label: string; meta: string },
+    mps: number,
+    bps: number,
+    tp: number,
+    badge: { label: string; cssClass: string },
+  ): void {
     let ry = 75
-
-    // Which benchmark workload was run.
-    const workload = selectedFlame()
     drawPill(ctx, rx, ry, `${workload.label}  ·  ${workload.meta}`, 'blue')
-    // Extra gap below the pill so "MILLIONS / SECOND" reads as its own group.
     ry += 44
 
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
@@ -439,7 +444,6 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     ctx.fillText('MILLIONS / SECOND', rx, ry)
     ry += 44
 
-    const mps = finalMps()
     const mpsGrad = ctx.createLinearGradient(rx, ry - 32, rx + 100, ry + 8)
     mpsGrad.addColorStop(0, '#ff8a5e')
     mpsGrad.addColorStop(0.5, '#ff6b35')
@@ -451,27 +455,22 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)'
     ctx.font = '12px Inter, system-ui, sans-serif'
-    ctx.fillText(`${finalBps().toFixed(3)} B/s`, rx, ry)
+    ctx.fillText(`${bps.toFixed(3)} B/s`, rx, ry)
     ry += 22
 
     ctx.fillStyle = 'rgba(255,255,255,0.2)'
     ctx.font = '10px Inter, system-ui, sans-serif'
-    const tp = totalPoints()
-    const ptsCompact =
-      tp >= 1e9
-        ? `${(tp / 1e9).toFixed(2)}B`
-        : tp >= 1e6
-          ? `${(tp / 1e6).toFixed(1)}M`
-          : `${(tp / 1e3).toFixed(0)}K`
-    ctx.fillText(`${ptsCompact} pts`, rx, ry)
+    ctx.fillText(`${formatPointsCompact(tp)} pts`, rx, ry)
     ry += 22
 
-    // Achievement badge
-    const badge = achievementBadge()
     drawAchievementBadge(ctx, rx, ry, badge.label, badge.cssClass)
-    ry += 36
+  }
 
-    // Footer
+  function drawCardFooterAndBorder(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ): void {
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     const platform = globalThis.navigator.platform || 'Unknown'
     ctx.fillStyle = 'rgba(255,255,255,0.25)'
@@ -479,17 +478,39 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     ctx.fillText(
       `${platform}  ·  ${new Date().toISOString().split('T')[0]}`,
       28,
-      H - 24,
+      height - 24,
     )
 
     ctx.fillStyle = 'rgba(255,255,255,0.15)'
-    ctx.fillText('lumenapeiron.com', W - 110, H - 24)
+    ctx.fillText('lumenapeiron.com', width - 110, height - 24)
 
-    // Border
     ctx.strokeStyle = 'rgba(255,255,255,0.06)'
     ctx.lineWidth = 1
-    roundRect(ctx, 0.5, 0.5, W - 1, H - 1, 16)
+    roundRect(ctx, 0.5, 0.5, width - 1, height - 1, 16)
     ctx.stroke()
+  }
+
+  function renderBenchmarkCard(): HTMLCanvasElement {
+    const W = 600
+    const H = 320
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')!
+
+    const versionText = `v${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`
+    drawCardBackground(ctx, W, H, versionText)
+    drawCardDeviceInfo(ctx, gpuDeviceInfo())
+    drawCardResults(
+      ctx,
+      360,
+      selectedFlame(),
+      finalMps(),
+      finalBps(),
+      totalPoints(),
+      achievementBadge(),
+    )
+    drawCardFooterAndBorder(ctx, W, H)
 
     return canvas
   }
