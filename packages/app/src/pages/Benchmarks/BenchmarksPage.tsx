@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
-import { BENCHMARK_COMPARISON_VERDICT_LABELS, BENCHMARK_MANIFEST_SCHEMA_VERSION, BENCHMARK_RESULT_SCHEMA_VERSION, BENCHMARK_SAMPLE_SCHEMA_VERSION, benchmarkFlameDigest, benchmarkSourceDigest, clearBenchmarkResultHistory, createBalancedComparisonSchedule, createBenchmarkCsvExport, createBenchmarkJsonExport, createRngBenchmarkImplementation, createSeededSurpriseFlame, createSingleCandidateSchedule, deleteBenchmarkResult, deriveBenchmarkCandidateSummaries, deriveBenchmarkComparison, listAncestryBenchmarkFlames, listBuiltinBenchmarkFlames, listRecentBenchmarkFlames, loadBenchmarkResultHistory, parseBenchmarkFlameUpload, RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION, RNG_IMPLEMENTATION_IDS, RNG_IMPLEMENTATION_LIST, RNG_SEED_POLICY_IDS, saveBenchmarkResult, toBenchmarkFlameV1, validateBenchmarkManifest, validateBenchmarkResult, } from '@/benchmarks'
+import { BENCHMARK_COMPARISON_VERDICT_LABELS, BENCHMARK_MANIFEST_SCHEMA_VERSION, benchmarkFlameDigest, benchmarkSourceDigest, clearBenchmarkResultHistory, createBenchmarkCsvExport, createBenchmarkJsonExport, createRngBenchmarkImplementation, createSeededSurpriseFlame, deleteBenchmarkResult, listAncestryBenchmarkFlames, listBuiltinBenchmarkFlames, listRecentBenchmarkFlames, loadBenchmarkResultHistory, parseBenchmarkFlameUpload, RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION, RNG_IMPLEMENTATION_IDS, RNG_IMPLEMENTATION_LIST, RNG_SEED_POLICY_IDS, saveBenchmarkResult, toBenchmarkFlameV1, validateBenchmarkManifest, } from '@/benchmarks'
 import { createShowBenchmark } from '@/components/BenchmarkModal/BenchmarkModal'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { WgslEditor } from '@/components/WgslEditor'
@@ -7,7 +7,7 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { useToast } from '@/contexts/ToastContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { getAncestryNodes, initAncestry } from '@/flame/ancestry'
-import { compileCustomVariationCode, previewCustomVariation, } from '@/flame/variations/custom'
+import { compileCustomVariationCode } from '@/flame/variations/custom'
 import { getVariationDoc } from '@/flame/variations/docs'
 import { gpuStatus } from '@/lib/gpuStatus'
 import { useRootContext } from '@/lib/RootContext'
@@ -16,13 +16,15 @@ import { useElementIsScrolling } from '@/utils/isScrolling'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { GIT_SHA, VERSION } from '@/version'
 import { BENCHMARK_DIAL, BENCHMARK_DIAL_EMBER_ARC, BENCHMARK_DIAL_EMBER_NODES, drawBenchmarkDialGeometry, } from './benchmarkDialGeometry'
+import { buildBenchmarkResult } from './benchmarkResultBuilder'
 import { BenchmarkRunnerHost } from './BenchmarkRunnerHost'
+import { buildBenchmarkCompilationRecords, compileTransientCustomVariation, createBenchmarkSampleRecord, createBenchmarkScheduleForRuntimes, validateBenchmarkRunPreconditions, } from './benchmarkRunnerUtils'
 import ui from './BenchmarksPage.module.css'
 import { ChaosDial } from './ChaosDial'
 import { FractalDivider } from './FractalDivider'
 import type { BenchmarkHostResult } from './BenchmarkRunnerHost'
 import type { BenchmarkAlgorithm } from './ChaosDial'
-import type { BenchmarkCandidateV1, BenchmarkCompilationV1, BenchmarkCorrectnessStatus, BenchmarkFlameSourceDescriptor, BenchmarkImplementationV1, BenchmarkManifestV1, BenchmarkResultHistoryEntry, BenchmarkResultV1, BenchmarkSampleV1, BenchmarkScheduleEntryV1, BenchmarkTextExport, RngImplementationId, } from '@/benchmarks'
+import type { BenchmarkCandidateV1, BenchmarkCorrectnessStatus, BenchmarkFlameSourceDescriptor, BenchmarkImplementationV1, BenchmarkManifestV1, BenchmarkResultHistoryEntry, BenchmarkResultV1, BenchmarkSampleV1, BenchmarkScheduleEntryV1, BenchmarkTextExport, RngImplementationId, } from '@/benchmarks'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, VariationId } from '@/flame/schema/flameSchema'
 import type { RendererRandomImplementationId } from '@/shaders/random'
@@ -451,17 +453,6 @@ function withControlledVariation(
   return flame
 }
 
-function signatureLooksRendered(
-  signatures: readonly (readonly number[])[],
-): boolean {
-  if (signatures.length === 0) return false
-  return signatures.some((signature) => {
-    const lit = signature.filter((value) => value > 1).length
-    const max = Math.max(...signature)
-    return lit >= 2 && max > 4
-  })
-}
-
 function FlameTile(props: {
   source: BenchmarkFlameSourceDescriptor
   selected: boolean
@@ -532,6 +523,528 @@ function FlameTile(props: {
         </span>
       </span>
     </button>
+  )
+}
+
+function BenchmarkHeader(props: {
+  readonly running: boolean
+  readonly classicOpen: boolean
+  readonly gpuStatusText: string
+  readonly isGpuReady: boolean
+  readonly onOpenClassic: () => void
+}) {
+  return (
+    <header class={ui.header}>
+      <div class={ui.brand}>
+        <div class={ui.brandMark}>
+          <FlameGlyph />
+        </div>
+        <div class={ui.brandText}>
+          <strong>Lumen Apeiron</strong>
+          <span>Benchmark laboratory</span>
+        </div>
+      </div>
+      <div class={ui.headerActions}>
+        <div
+          class={ui.gpuStatus}
+          title={props.isGpuReady ? 'Local GPU ready' : props.gpuStatusText}
+        >
+          <span
+            class={ui.statusDot}
+            classList={{ [ui.statusReady!]: props.isGpuReady }}
+          />
+          {props.isGpuReady ? 'Local GPU ready' : props.gpuStatusText}
+        </div>
+        <button
+          type="button"
+          aria-label="Run classic score"
+          class={ui.button}
+          disabled={props.running || props.classicOpen}
+          onClick={props.onOpenClassic}
+        >
+          <span class={ui.desktopActionLabel}>Run classic score</span>
+          <span class={ui.mobileActionLabel}>Classic</span>
+        </button>
+        <a class={ui.buttonQuiet} href="/" aria-label="Back to editor">
+          <span class={ui.desktopActionLabel}>Back to editor</span>
+          <span class={ui.mobileActionLabel}>Editor</span>
+        </a>
+      </div>
+    </header>
+  )
+}
+
+function BenchmarkHero(props: { readonly gpuLabel: string }) {
+  const buildLabel = GIT_SHA
+    ? `${VERSION} · ${GIT_SHA.slice(0, 8)}`
+    : `${VERSION} · development`
+  return (
+    <section class={ui.hero}>
+      <div>
+        <div class={ui.heroKicker}>Creative compute, measured honestly</div>
+        <h1 class={ui.heroTitle}>
+          Trace the speed of <em>chaos.</em>
+        </h1>
+        <p class={ui.heroBody}>
+          A reproducible WebGPU workbench for renderer profiles, frozen flame
+          corpora, and safe custom-variation A/B tests. The lab measures
+          queue-completed points and keeps the raw schedule, samples, device
+          fingerprint, and confidence interval.
+        </p>
+      </div>
+      <dl class={ui.heroFacts}>
+        <div class={ui.heroFact}>
+          <span>Runner</span>
+          <strong>lab-v1 · queue fenced</strong>
+        </div>
+        <div class={ui.heroFact}>
+          <span>Adapter</span>
+          <strong title={props.gpuLabel}>{props.gpuLabel}</strong>
+        </div>
+        <div class={ui.heroFact}>
+          <span>Build</span>
+          <strong>{buildLabel}</strong>
+        </div>
+      </dl>
+    </section>
+  )
+}
+
+function CompletedRunCard(props: { readonly run: CompletedLabRun }) {
+  const run = props.run
+  const candidateSummary = () => run.result.candidates.at(-1)?.throughput
+  const baselineSummary = () => run.result.candidates[0]?.throughput
+  const primary = candidateSummary
+  const samples = () =>
+    run.result.samples.filter(
+      (sample) => sample.phase === 'measured' && sample.status === 'valid',
+    )
+  const maxThroughput = () =>
+    Math.max(1, ...samples().map((sample) => sample.throughput ?? 0))
+
+  return (
+    <article class={ui.resultCard}>
+      <div class={ui.attractorCore}>
+        <svg
+          class={ui.coreSvg}
+          viewBox={`0 0 ${BENCHMARK_DIAL.size} ${BENCHMARK_DIAL.size}`}
+          aria-hidden="true"
+        >
+          <circle
+            class={ui.dialOuterRing}
+            cx={BENCHMARK_DIAL.center}
+            cy={BENCHMARK_DIAL.center}
+            r={BENCHMARK_DIAL.outerRadius}
+          />
+          <For each={BENCHMARK_DIAL.orbits}>
+            {(orbit) => (
+              <ellipse
+                class={`${ui.dialOrbit} ${
+                  orbit.tone === 'ember' ? ui.dialOrbitEmber : ui.dialOrbitCyan
+                }`}
+                cx={BENCHMARK_DIAL.center}
+                cy={BENCHMARK_DIAL.center}
+                rx={orbit.rx}
+                ry={orbit.ry}
+                transform={`rotate(${orbit.rotation} ${BENCHMARK_DIAL.center} ${BENCHMARK_DIAL.center})`}
+                style={{ opacity: orbit.opacity }}
+              />
+            )}
+          </For>
+          <path class={ui.dialEmberArc} d={BENCHMARK_DIAL_EMBER_ARC} />
+          <For each={BENCHMARK_DIAL_EMBER_NODES}>
+            {(node) => (
+              <circle
+                class={ui.dialEmberNode}
+                cx={node.x}
+                cy={node.y}
+                r={node.radius}
+                style={{ opacity: node.opacity }}
+              />
+            )}
+          </For>
+          <circle
+            class={ui.dialInnerRing}
+            cx={BENCHMARK_DIAL.center}
+            cy={BENCHMARK_DIAL.center}
+            r={BENCHMARK_DIAL.innerRadius}
+          />
+        </svg>
+        <div class={ui.coreValue}>
+          <strong>
+            {run.result.comparison
+              ? `${
+                  run.result.comparison.percentChange >= 0 ? '+' : ''
+                }${run.result.comparison.percentChange.toFixed(2)}%`
+              : formatRate(primary()?.median, true)}
+          </strong>
+          <span>
+            {run.result.comparison ? 'paired change' : 'median throughput'}
+          </span>
+          <Show when={run.result.comparison}>
+            {(comparison) => (
+              <small>
+                {comparison().pairedSampleCount} pairs ·{' '}
+                {formatSignedPercent(
+                  (comparison().confidenceInterval.low - 1) * 100,
+                )}{' '}
+                to{' '}
+                {formatSignedPercent(
+                  (comparison().confidenceInterval.high - 1) * 100,
+                )}{' '}
+                CI
+              </small>
+            )}
+          </Show>
+        </div>
+        <span class={ui.coreBadge}>{run.result.validation.status}</span>
+      </div>
+      <div class={ui.resultBody}>
+        <div class={ui.resultTopline}>
+          <div>
+            <h3>{run.manifest.workload.flame.label}</h3>
+            <p>
+              {run.manifest.candidates
+                .map((candidate) => candidate.label)
+                .join(' ↔ ')}
+              <Show
+                when={
+                  run.result.comparison &&
+                  run.manifest.candidates[1]?.id.startsWith('variation:custom:')
+                }
+              >
+                {' · '}
+                {correctnessLabel(run.result.comparison!.correctness)}
+              </Show>
+            </p>
+          </div>
+          <span class={ui.verdict}>
+            {run.result.comparison
+              ? BENCHMARK_COMPARISON_VERDICT_LABELS[
+                  run.result.comparison.verdict
+                ]
+              : 'Single profile'}
+          </span>
+        </div>
+        <div class={ui.metricGrid}>
+          <div class={ui.metric}>
+            <span>
+              {run.result.comparison ? 'A · baseline median' : 'Median'}
+            </span>
+            <strong>{formatRate(baselineSummary()?.median)}</strong>
+            <small>
+              {baselineSummary()?.confidenceInterval
+                ? `${formatRate(
+                    baselineSummary()!.confidenceInterval.low,
+                    true,
+                  )}–${formatRate(
+                    baselineSummary()!.confidenceInterval.high,
+                    true,
+                  )} · 95% CI`
+                : 'No interval'}
+            </small>
+          </div>
+          <div class={ui.metric}>
+            <span>
+              {run.result.comparison ? 'B · candidate median' : 'Paired change'}
+            </span>
+            <strong>
+              {run.result.comparison
+                ? formatRate(candidateSummary()?.median)
+                : '—'}
+            </strong>
+            <small>
+              {run.result.comparison
+                ? candidateSummary()?.confidenceInterval
+                  ? `${formatRate(
+                      candidateSummary()!.confidenceInterval.low,
+                      true,
+                    )}–${formatRate(
+                      candidateSummary()!.confidenceInterval.high,
+                      true,
+                    )} · 95% CI`
+                  : 'No interval'
+                : 'No reference lane'}
+            </small>
+          </div>
+          <div class={ui.metric}>
+            <span>Stability</span>
+            <strong>
+              {primary()?.cv === undefined
+                ? '—'
+                : `${(primary()!.cv! * 100).toFixed(1)}%`}
+            </strong>
+            <small>coefficient of variation</small>
+          </div>
+        </div>
+        <div
+          class={ui.sampleBars}
+          aria-label="Measured sample throughput distribution"
+        >
+          <For each={samples()}>
+            {(sample) => (
+              <span
+                class={ui.sampleBar}
+                classList={{
+                  [ui.sampleBarCandidate!]:
+                    run.manifest.mode === 'comparison' &&
+                    sample.candidateId === run.manifest.candidates[1].id,
+                }}
+                style={{
+                  height: `${Math.max(
+                    8,
+                    ((sample.throughput ?? 0) / maxThroughput()) * 100,
+                  )}%`,
+                }}
+                title={`${sample.candidateId}: ${formatRate(
+                  sample.throughput ?? undefined,
+                )}`}
+              />
+            )}
+          </For>
+        </div>
+        <details class={ui.sampleDetails}>
+          <summary>Raw measured samples</summary>
+          <div class={ui.sampleTable}>
+            <table>
+              <thead>
+                <tr class={ui.sampleTableHead}>
+                  <th scope="col">Lane</th>
+                  <th scope="col">Pair</th>
+                  <th scope="col">Time</th>
+                  <th scope="col">Completed work</th>
+                  <th scope="col">Throughput</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={samples()}>
+                  {(sample) => (
+                    <tr class={ui.sampleTableRow}>
+                      <td>
+                        {run.manifest.candidates.find(
+                          ({ id }) => id === sample.candidateId,
+                        )?.label ?? sample.candidateId}
+                      </td>
+                      <td>{sample.pairIndex + 1}</td>
+                      <td>{sample.elapsedMs?.toFixed(1)} ms</td>
+                      <td>{formatCount(sample.completedWork ?? 0)}</td>
+                      <td>{formatRate(sample.throughput ?? undefined)}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </details>
+        <div class={ui.resultActions}>
+          <button
+            type="button"
+            class={ui.smallAction}
+            onClick={() => {
+              downloadTextFile(
+                createBenchmarkJsonExport(run.manifest, run.result),
+              )
+            }}
+          >
+            JSON
+          </button>
+          <button
+            type="button"
+            class={ui.smallAction}
+            onClick={() => {
+              downloadTextFile(
+                createBenchmarkCsvExport(run.manifest, run.result),
+              )
+            }}
+          >
+            CSV
+          </button>
+          <button
+            type="button"
+            class={ui.smallAction}
+            onClick={() => {
+              drawShareCard(run)
+            }}
+          >
+            Share card PNG
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function BenchmarkHistoryList(props: {
+  readonly history: readonly BenchmarkResultHistoryEntry[]
+}) {
+  return (
+    <Show when={props.history.length > 0}>
+      <div class={ui.history}>
+        <div class={ui.historyHeader}>
+          <strong>Local result history</strong>
+          <span>Newest eight · IndexedDB</span>
+        </div>
+        <For each={props.history}>
+          {(entry) => (
+            <div class={ui.historyRow}>
+              <strong>{entry.manifest.workload.flame.label}</strong>
+              <span>
+                {new Date(entry.savedAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </span>
+              <span>
+                {entry.result.candidates.at(-1)?.throughput
+                  ? formatRate(
+                      entry.result.candidates.at(-1)!.throughput!.median,
+                      true,
+                    )
+                  : '—'}
+              </span>
+              <span>
+                {entry.result.comparison
+                  ? `${
+                      entry.result.comparison.percentChange >= 0 ? '+' : ''
+                    }${entry.result.comparison.percentChange.toFixed(2)}%`
+                  : 'single profile'}
+              </span>
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+}
+
+interface BenchmarkRunSectionProps {
+  readonly runError?: string
+  readonly runProfileLabel: string
+  readonly selectedSourcesCount: number
+  readonly scheduleLengthPerFlame: number
+  readonly protocolLabel: string
+  readonly resolution: number
+  readonly plotsPerChain: number
+  readonly rngStateBytes: number
+  readonly running: boolean
+  readonly canRun: boolean
+  readonly estimatedDurationSeconds: number
+  readonly runProgress?: RunProgress
+  readonly progressPercent: number
+  readonly onRun: () => void
+  readonly onCancel: () => void
+}
+
+function BenchmarkRunSection(props: BenchmarkRunSectionProps) {
+  const workloadCount = () => props.selectedSourcesCount
+  const workloadSuffix = () => (workloadCount() === 1 ? '' : 's')
+  const estimateText = () =>
+    props.running
+      ? `${props.runProgress?.flameLabel ?? 'Preparing'} · ${
+          props.runProgress?.candidateLabel ?? ''
+        }`
+      : `Estimated minimum ${props.estimatedDurationSeconds} s`
+
+  return (
+    <section id="benchmark-run" class={ui.section}>
+      <div class={ui.sectionHeader}>
+        <span class={ui.sectionNumber}>04</span>
+        <div>
+          <h2 class={ui.sectionTitle}>Run the frozen plan</h2>
+          <p class={ui.sectionDescription}>
+            Gallery previews stop before the first warm-up. Keep this tab
+            visible and avoid other GPU-heavy work until completion.
+          </p>
+        </div>
+        <p class={ui.sectionAside}>
+          Runs are sequential by design: one canvas, one workload, one
+          candidate, and one queue-completed sample at a time.
+        </p>
+      </div>
+
+      <Show when={props.runError}>
+        {(error) => (
+          <div class={ui.errorBanner}>
+            <PulseIcon />
+            {error()}
+          </div>
+        )}
+      </Show>
+
+      <div class={ui.runSurface}>
+        <div class={ui.runSummary}>
+          <div class={ui.runHeading}>
+            <span class={ui.runGlyph}>
+              <PulseIcon />
+            </span>
+            <div>
+              <h3>{props.runProfileLabel}</h3>
+              <p>
+                {workloadCount()} workload{workloadSuffix()} ·{' '}
+                {props.scheduleLengthPerFlame} samples each
+              </p>
+            </div>
+          </div>
+          <div class={ui.runFacts}>
+            <span class={ui.runFact}>
+              <strong>{props.protocolLabel}</strong> protocol
+            </span>
+            <span class={ui.runFact}>
+              <strong>{props.resolution}²</strong> accumulator
+            </span>
+            <span class={ui.runFact}>
+              <strong>{props.plotsPerChain}</strong> plots/chain
+            </span>
+            <span class={ui.runFact}>
+              <strong>{props.rngStateBytes} B</strong> RNG state
+            </span>
+          </div>
+        </div>
+        <div class={ui.runAction}>
+          <button
+            type="button"
+            class={ui.runButton}
+            classList={{ [ui.runButtonCancel!]: props.running }}
+            disabled={!props.canRun}
+            onClick={() => {
+              if (props.running) props.onCancel()
+              else props.onRun()
+            }}
+          >
+            {props.running ? 'Cancel cleanly' : 'Run benchmark plan'}
+          </button>
+          <span class={ui.runEstimate}>{estimateText()}</span>
+        </div>
+        <Show when={props.running}>
+          <div class={ui.progressArea}>
+            <div class={ui.progressHeader}>
+              <span>
+                {props.runProgress?.completedSamples ?? 0} /{' '}
+                {props.runProgress?.totalSamples ?? 0} samples
+              </span>
+              <span>
+                {formatRate(props.runProgress?.pointsPerSecond, true)}
+              </span>
+            </div>
+            <div
+              class={ui.progressTrack}
+              role="progressbar"
+              aria-label="Benchmark progress"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={props.progressPercent}
+            >
+              <div
+                class={ui.progressFill}
+                style={{
+                  transform: `scaleX(${props.progressPercent / 100})`,
+                }}
+              />
+            </div>
+          </div>
+        </Show>
+      </div>
+    </section>
   )
 }
 
@@ -1274,112 +1787,144 @@ export function BenchmarksPage() {
     }
   }
 
-  function buildResult(
-    resultId: string,
-    manifest: BenchmarkManifestV1,
-    samples: readonly BenchmarkSampleV1[],
-    compilation: readonly BenchmarkCompilationV1[],
-    signatures: ReadonlyMap<string, readonly (readonly number[])[]>,
-    startedAt: string,
-  ): BenchmarkResultV1 {
-    const candidates = deriveBenchmarkCandidateSummaries(manifest, samples)
-    let comparison: BenchmarkResultV1['comparison']
-    if (manifest.mode === 'comparison') {
-      const [baseline, candidate] = manifest.candidates
-      const baselineSignatures = signatures.get(baseline.id) ?? []
-      const candidateSignatures = signatures.get(candidate.id) ?? []
-      const signaturesAvailable =
-        baselineSignatures.length > 0 && candidateSignatures.length > 0
-      const correctness = !signaturesAvailable
-        ? 'not-checked'
-        : signatureLooksRendered(baselineSignatures) &&
-            signatureLooksRendered(candidateSignatures)
-          ? 'passed'
-          : 'failed'
-      comparison = deriveBenchmarkComparison(manifest, samples, {
-        correctness,
+  async function runSingleFlameBenchmark(params: {
+    readonly source: BenchmarkFlameSourceDescriptor
+    readonly generation: number
+    readonly transientId?: string
+    readonly compilationElapsedMs: number | null
+    readonly totalSamples: number
+    readonly getCompletedSamples: () => number
+    readonly incrementCompletedSamples: () => number
+    readonly onSampleCompleted: (progress: RunProgress) => void
+  }): Promise<CompletedLabRun> {
+    if (params.generation !== runGeneration) {
+      throw new BenchmarkRunCancelled('user')
+    }
+    const runStartedAt = new Date().toISOString()
+    const flame = withRunSettings(params.source, settings())
+    const runtimes = createCandidates(flame, params.transientId)
+    const schedule = createBenchmarkScheduleForRuntimes(runtimes, protocol())
+    const manifest = createManifest(params.source, flame, runtimes, schedule)
+    const resultId = globalThis.crypto.randomUUID()
+    const manifestValidation = validateBenchmarkManifest(manifest)
+    if (manifestValidation.status === 'invalid') {
+      throw new Error(
+        `Generated an invalid manifest: ${manifestValidation.issues
+          .map((issue) => issue.message)
+          .join('; ')}`,
+      )
+    }
+
+    const samples: BenchmarkSampleV1[] = []
+    const signatures = new Map<string, (readonly number[])[]>()
+    for (const entry of schedule) {
+      if (params.generation !== runGeneration) {
+        throw new BenchmarkRunCancelled('user')
+      }
+      const runtime = runtimes.find(
+        ({ candidate }) => candidate.id === entry.candidateId,
+      )!
+      const sampleStartedAt = new Date().toISOString()
+      const completedSamples = params.getCompletedSamples()
+      const result = await executeActiveSample(runtime, protocol(), {
+        completedSamples,
+        totalSamples: params.totalSamples,
+        flameLabel: params.source.label,
+        candidateLabel: runtime.candidate.label,
+      })
+      if (result.signature) {
+        const values = signatures.get(runtime.candidate.id) ?? []
+        values.push(result.signature)
+        signatures.set(runtime.candidate.id, values)
+      }
+      samples.push(
+        createBenchmarkSampleRecord({
+          entry,
+          runId: resultId,
+          manifestId: manifest.id,
+          sampleStartedAt,
+          elapsedMs: result.elapsedMs,
+          points: result.points,
+          pointsPerSecond: result.pointsPerSecond,
+          hasSignature: result.signature !== undefined,
+        }),
+      )
+      const nextCompleted = params.incrementCompletedSamples()
+      params.onSampleCompleted({
+        completedSamples: nextCompleted,
+        totalSamples: params.totalSamples,
+        flameLabel: params.source.label,
+        candidateLabel: runtime.candidate.label,
+        pointsPerSecond: result.pointsPerSecond,
       })
     }
 
-    const info = adapter?.info
-    const preliminary: BenchmarkResultV1 = {
-      schemaVersion: BENCHMARK_RESULT_SCHEMA_VERSION,
-      id: resultId,
-      manifestId: manifest.id,
-      status: 'completed',
-      startedAt,
-      completedAt: new Date().toISOString(),
-      device: {
-        adapter: info?.description || info?.vendor || 'WebGPU adapter',
-        ...(info?.architecture ? { architecture: info.architecture } : {}),
-        ...(info?.vendor ? { vendor: info.vendor } : {}),
-        browser: globalThis.navigator.userAgent,
-        features: device ? [...device.features].sort() : [],
-        metadata: {
-          maxBufferSize: device?.limits.maxBufferSize ?? 0,
-          hardwareConcurrency: globalThis.navigator.hardwareConcurrency,
-        },
-      },
-      compilation,
+    const compilation = buildBenchmarkCompilationRecords(
+      runtimes.map(({ candidate }) => candidate.id),
+      customLabEnabled(),
+      params.compilationElapsedMs,
+    )
+    const result = buildBenchmarkResult({
+      resultId,
+      manifest,
       samples,
-      candidates,
-      ...(comparison ? { comparison } : {}),
-      validation: { status: 'valid', issues: [] },
-      metadata: {
-        runner: 'lab-v1',
-        correctnessMethod:
-          manifest.mode === 'comparison'
-            ? 'nonblank-render-smoke/v1'
-            : 'not-checked',
-        correctnessScope: customLabEnabled()
-          ? 'safe-compile-and-nonblank-render-smoke'
-          : manifest.mode === 'comparison'
-            ? 'nonblank-render-smoke'
-            : 'not-checked',
-      },
+      compilation,
+      signatures,
+      startedAt: runStartedAt,
+      adapter,
+      device,
+      customLabEnabled: customLabEnabled(),
+    })
+    if (result.validation.status === 'invalid') {
+      throw new Error(
+        `Result validation failed: ${result.validation.issues
+          .map((issue) => issue.message)
+          .join('; ')}`,
+      )
     }
-    const validation = validateBenchmarkResult(preliminary, manifest)
-    return {
-      ...preliminary,
-      status: validation.status === 'invalid' ? 'invalid' : 'completed',
-      validation,
+    if (params.generation !== runGeneration) {
+      throw new BenchmarkRunCancelled('user')
     }
+    await saveBenchmarkResult(manifest, result)
+    if (params.generation !== runGeneration) {
+      await deleteBenchmarkResult(result.id)
+      throw new BenchmarkRunCancelled('user')
+    }
+    return { manifest, result }
   }
 
   async function runBenchmarks(): Promise<void> {
-    if (running()) return
+    const preconditions = validateBenchmarkRunPreconditions({
+      running: running(),
+      gpuStatus: gpuStatus(),
+      hasDevice: Boolean(device),
+      selectedSourcesCount: selectedSources().length,
+      customLabEnabled: customLabEnabled(),
+      customCompatible: customCompatible(),
+    })
+    if (!preconditions.valid) {
+      if (!preconditions.shouldSilentReturn && preconditions.error) {
+        setRunError(preconditions.error)
+      }
+      return
+    }
     setRunError(undefined)
-    if (gpuStatus() !== 'ready' || !device) {
-      setRunError('A ready WebGPU adapter is required to run local benchmarks.')
-      return
-    }
-    if (selectedSources().length === 0) {
-      setRunError('Select at least one frozen flame workload.')
-      return
-    }
-    if (customLabEnabled() && !customCompatible()) {
-      setRunError('The custom variation lab currently accepts 2D flames only.')
-      return
-    }
 
-    let transient:
-      | { valid: true; id: string; unregister: () => void }
-      | undefined
+    let transient: { id: string; unregister: () => void } | undefined
     let compilationElapsedMs: number | null = null
     if (customLabEnabled()) {
       if (!validateCandidate()) return
-      const compileStartedAt = globalThis.performance.now()
-      const preview = previewCustomVariation(candidateCode())
-      compilationElapsedMs = globalThis.performance.now() - compileStartedAt
-      if (!preview.valid) {
+      const compiled = compileTransientCustomVariation(candidateCode())
+      compilationElapsedMs = compiled.elapsedMs
+      if (!compiled.valid) {
         setCompileState({
           status: 'invalid',
-          elapsedMs: compilationElapsedMs,
-          message: preview.errors.map((error) => error.message).join(' · '),
+          elapsedMs: compiled.elapsedMs,
+          message: compiled.message,
         })
         return
       }
-      transient = preview
+      transient = compiled.transient
     }
 
     const generation = ++runGeneration
@@ -1397,124 +1942,16 @@ export function BenchmarksPage() {
 
     try {
       for (const source of selectedSources()) {
-        if (generation !== runGeneration)
-          throw new BenchmarkRunCancelled('user')
-        const runStartedAt = new Date().toISOString()
-        const flame = withRunSettings(source, settings())
-        const runtimes = createCandidates(flame, transient?.id)
-        const schedule =
-          runtimes.length === 2
-            ? createBalancedComparisonSchedule({
-                baselineCandidateId: runtimes[0]!.candidate.id,
-                candidateId: runtimes[1]!.candidate.id,
-                warmupPairs: protocol().warmupPairs,
-                measuredPairs: protocol().measuredPairs,
-              })
-            : createSingleCandidateSchedule({
-                candidateId: runtimes[0]!.candidate.id,
-                warmupSamples: protocol().warmupPairs,
-                measuredSamples: protocol().measuredPairs,
-              })
-        const manifest = createManifest(source, flame, runtimes, schedule)
-        const resultId = globalThis.crypto.randomUUID()
-        const manifestValidation = validateBenchmarkManifest(manifest)
-        if (manifestValidation.status === 'invalid') {
-          throw new Error(
-            `Generated an invalid manifest: ${manifestValidation.issues
-              .map((issue) => issue.message)
-              .join('; ')}`,
-          )
-        }
-
-        const samples: BenchmarkSampleV1[] = []
-        const signatures = new Map<string, (readonly number[])[]>()
-        for (const entry of schedule) {
-          if (generation !== runGeneration) {
-            throw new BenchmarkRunCancelled('user')
-          }
-          const runtime = runtimes.find(
-            ({ candidate }) => candidate.id === entry.candidateId,
-          )!
-          const sampleStartedAt = new Date().toISOString()
-          const result = await executeActiveSample(runtime, protocol(), {
-            completedSamples,
-            totalSamples,
-            flameLabel: source.label,
-            candidateLabel: runtime.candidate.label,
-          })
-          if (result.signature) {
-            const values = signatures.get(runtime.candidate.id) ?? []
-            values.push(result.signature)
-            signatures.set(runtime.candidate.id, values)
-          }
-          samples.push({
-            schemaVersion: BENCHMARK_SAMPLE_SCHEMA_VERSION,
-            id: globalThis.crypto.randomUUID(),
-            runId: resultId,
-            manifestId: manifest.id,
-            sequence: entry.sequence,
-            phase: entry.phase,
-            pairIndex: entry.pairIndex,
-            orderInPair: entry.orderInPair,
-            candidateId: entry.candidateId,
-            status: 'valid',
-            startedAt: sampleStartedAt,
-            timingMode: 'queue-fenced-wall-clock',
-            elapsedMs: result.elapsedMs,
-            completedWork: result.points,
-            throughput: result.pointsPerSecond,
-            invalidReasons: [],
-            metadata: {
-              blockOrder: entry.blockOrder,
-              signatureCaptured: result.signature !== undefined,
-            },
-          })
-          completedSamples += 1
-          setRunProgress({
-            completedSamples,
-            totalSamples,
-            flameLabel: source.label,
-            candidateLabel: runtime.candidate.label,
-            pointsPerSecond: result.pointsPerSecond,
-          })
-        }
-
-        const compilation: BenchmarkCompilationV1[] = runtimes.map(
-          ({ candidate }, index) => ({
-            candidateId: candidate.id,
-            status: 'ready',
-            elapsedMs:
-              customLabEnabled() && index === 1 ? compilationElapsedMs : null,
-            message:
-              customLabEnabled() && index === 1
-                ? 'Safe custom variation transpile/registration only; GPU pipeline warm-up is excluded by the first completed submission.'
-                : 'GPU pipeline cold work is excluded by the first completed submission.',
-          }),
-        )
-        const result = buildResult(
-          resultId,
-          manifest,
-          samples,
-          compilation,
-          signatures,
-          runStartedAt,
-        )
-        if (result.validation.status === 'invalid') {
-          throw new Error(
-            `Result validation failed: ${result.validation.issues
-              .map((issue) => issue.message)
-              .join('; ')}`,
-          )
-        }
-        if (generation !== runGeneration) {
-          throw new BenchmarkRunCancelled('user')
-        }
-        await saveBenchmarkResult(manifest, result)
-        if (generation !== runGeneration) {
-          await deleteBenchmarkResult(result.id)
-          throw new BenchmarkRunCancelled('user')
-        }
-        const completedRun = { manifest, result }
+        const completedRun = await runSingleFlameBenchmark({
+          source,
+          generation,
+          transientId: transient?.id,
+          compilationElapsedMs,
+          totalSamples,
+          getCompletedSamples: () => completedSamples,
+          incrementCompletedSamples: () => ++completedSamples,
+          onSampleCompleted: setRunProgress,
+        })
         newRuns.push(completedRun)
         setCompletedRuns([...newRuns])
       }
@@ -1560,43 +1997,13 @@ export function BenchmarksPage() {
       <a href="#benchmark-setup" class={ui.skipLink}>
         Skip to benchmark setup
       </a>
-      <header class={ui.header}>
-        <div class={ui.brand}>
-          <div class={ui.brandMark}>
-            <FlameGlyph />
-          </div>
-          <div class={ui.brandText}>
-            <strong>Lumen Apeiron</strong>
-            <span>Benchmark laboratory</span>
-          </div>
-        </div>
-        <div class={ui.headerActions}>
-          <div
-            class={ui.gpuStatus}
-            title={gpuStatus() === 'ready' ? 'Local GPU ready' : gpuStatus()}
-          >
-            <span
-              class={ui.statusDot}
-              classList={{ [ui.statusReady!]: gpuStatus() === 'ready' }}
-            />
-            {gpuStatus() === 'ready' ? 'Local GPU ready' : gpuStatus()}
-          </div>
-          <button
-            type="button"
-            aria-label="Run classic score"
-            class={ui.button}
-            disabled={running() || classicOpen()}
-            onClick={() => void openClassicBenchmark()}
-          >
-            <span class={ui.desktopActionLabel}>Run classic score</span>
-            <span class={ui.mobileActionLabel}>Classic</span>
-          </button>
-          <a class={ui.buttonQuiet} href="/" aria-label="Back to editor">
-            <span class={ui.desktopActionLabel}>Back to editor</span>
-            <span class={ui.mobileActionLabel}>Editor</span>
-          </a>
-        </div>
-      </header>
+      <BenchmarkHeader
+        running={running()}
+        classicOpen={classicOpen()}
+        gpuStatusText={gpuStatus()}
+        isGpuReady={gpuStatus() === 'ready'}
+        onOpenClassic={() => void openClassicBenchmark()}
+      />
 
       <div class={ui.shell}>
         <aside class={ui.sectionRail} aria-label="Benchmark sections">
@@ -1630,38 +2037,7 @@ export function BenchmarksPage() {
         </aside>
 
         <main class={ui.main}>
-          <section class={ui.hero}>
-            <div>
-              <div class={ui.heroKicker}>
-                Creative compute, measured honestly
-              </div>
-              <h1 class={ui.heroTitle}>
-                Trace the speed of <em>chaos.</em>
-              </h1>
-              <p class={ui.heroBody}>
-                A reproducible WebGPU workbench for renderer profiles, frozen
-                flame corpora, and safe custom-variation A/B tests. The lab
-                measures queue-completed points and keeps the raw schedule,
-                samples, device fingerprint, and confidence interval.
-              </p>
-            </div>
-            <dl class={ui.heroFacts}>
-              <div class={ui.heroFact}>
-                <span>Runner</span>
-                <strong>lab-v1 · queue fenced</strong>
-              </div>
-              <div class={ui.heroFact}>
-                <span>Adapter</span>
-                <strong title={gpuLabel()}>{gpuLabel()}</strong>
-              </div>
-              <div class={ui.heroFact}>
-                <span>Build</span>
-                <strong>
-                  {VERSION} · {GIT_SHA ? GIT_SHA.slice(0, 8) : 'development'}
-                </strong>
-              </div>
-            </dl>
-          </section>
+          <BenchmarkHero gpuLabel={gpuLabel()} />
 
           <FractalDivider id="hero" class={ui.divider} />
 
@@ -2315,117 +2691,28 @@ export function BenchmarksPage() {
 
           <FractalDivider id="run" class={ui.divider} />
 
-          <section id="benchmark-run" class={ui.section}>
-            <div class={ui.sectionHeader}>
-              <span class={ui.sectionNumber}>04</span>
-              <div>
-                <h2 class={ui.sectionTitle}>Run the frozen plan</h2>
-                <p class={ui.sectionDescription}>
-                  Gallery previews stop before the first warm-up. Keep this tab
-                  visible and avoid other GPU-heavy work until completion.
-                </p>
-              </div>
-              <p class={ui.sectionAside}>
-                Runs are sequential by design: one canvas, one workload, one
-                candidate, and one queue-completed sample at a time.
-              </p>
-            </div>
-
-            <Show when={runError()}>
-              {(error) => (
-                <div class={ui.errorBanner}>
-                  <PulseIcon />
-                  {error()}
-                </div>
-              )}
-            </Show>
-
-            <div class={ui.runSurface}>
-              <div class={ui.runSummary}>
-                <div class={ui.runHeading}>
-                  <span class={ui.runGlyph}>
-                    <PulseIcon />
-                  </span>
-                  <div>
-                    <h3>{runProfileLabel()}</h3>
-                    <p>
-                      {selectedSources().length} workload
-                      {selectedSources().length === 1 ? '' : 's'} ·{' '}
-                      {scheduleLengthPerFlame()} samples each
-                    </p>
-                  </div>
-                </div>
-                <div class={ui.runFacts}>
-                  <span class={ui.runFact}>
-                    <strong>{PROTOCOLS[protocolId()].label}</strong> protocol
-                  </span>
-                  <span class={ui.runFact}>
-                    <strong>{settings().resolution}²</strong> accumulator
-                  </span>
-                  <span class={ui.runFact}>
-                    <strong>{settings().plotsPerChain}</strong> plots/chain
-                  </span>
-                  <span class={ui.runFact}>
-                    <strong>{selectedRng().stateBytes} B</strong> RNG state
-                  </span>
-                </div>
-              </div>
-              <div class={ui.runAction}>
-                <button
-                  type="button"
-                  class={ui.runButton}
-                  classList={{ [ui.runButtonCancel!]: running() }}
-                  disabled={
-                    !running() &&
-                    (gpuStatus() !== 'ready' ||
-                      selectedSources().length === 0 ||
-                      (customLabEnabled() && !customCompatible()))
-                  }
-                  onClick={() => {
-                    if (running()) cancelRun()
-                    else void runBenchmarks()
-                  }}
-                >
-                  {running() ? 'Cancel cleanly' : 'Run benchmark plan'}
-                </button>
-                <span class={ui.runEstimate}>
-                  {running()
-                    ? `${runProgress()?.flameLabel ?? 'Preparing'} · ${
-                        runProgress()?.candidateLabel ?? ''
-                      }`
-                    : `Estimated minimum ${estimatedDurationSeconds()} s`}
-                </span>
-              </div>
-              <Show when={running()}>
-                <div class={ui.progressArea}>
-                  <div class={ui.progressHeader}>
-                    <span>
-                      {runProgress()?.completedSamples ?? 0} /{' '}
-                      {runProgress()?.totalSamples ?? 0} samples
-                    </span>
-                    <span>
-                      {formatRate(runProgress()?.pointsPerSecond, true)}
-                    </span>
-                  </div>
-                  <div
-                    class={ui.progressTrack}
-                    role="progressbar"
-                    aria-label="Benchmark progress"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                    aria-valuenow={progressPercent()}
-                  >
-                    <div
-                      class={ui.progressFill}
-                      style={{
-                        transform: `scaleX(${progressPercent() / 100})`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </Show>
-            </div>
-          </section>
+          <BenchmarkRunSection
+            runError={runError()}
+            runProfileLabel={runProfileLabel()}
+            selectedSourcesCount={selectedSources().length}
+            scheduleLengthPerFlame={scheduleLengthPerFlame()}
+            protocolLabel={PROTOCOLS[protocolId()].label}
+            resolution={settings().resolution}
+            plotsPerChain={settings().plotsPerChain}
+            rngStateBytes={selectedRng().stateBytes}
+            running={running()}
+            canRun={
+              running() ||
+              (gpuStatus() === 'ready' &&
+                selectedSources().length > 0 &&
+                (!customLabEnabled() || customCompatible()))
+            }
+            estimatedDurationSeconds={estimatedDurationSeconds()}
+            runProgress={runProgress()}
+            progressPercent={progressPercent()}
+            onRun={() => void runBenchmarks()}
+            onCancel={cancelRun}
+          />
 
           <FractalDivider id="results" class={ui.divider} />
 
@@ -2460,367 +2747,12 @@ export function BenchmarksPage() {
             >
               <div class={ui.resultStack}>
                 <For each={completedRuns()}>
-                  {(run) => {
-                    const candidateSummary = () =>
-                      run.result.candidates.at(-1)?.throughput
-                    const baselineSummary = () =>
-                      run.result.candidates[0]?.throughput
-                    const primary = candidateSummary
-                    const samples = () =>
-                      run.result.samples.filter(
-                        (sample) =>
-                          sample.phase === 'measured' &&
-                          sample.status === 'valid',
-                      )
-                    const maxThroughput = () =>
-                      Math.max(
-                        1,
-                        ...samples().map((sample) => sample.throughput ?? 0),
-                      )
-                    return (
-                      <article class={ui.resultCard}>
-                        <div class={ui.attractorCore}>
-                          <svg
-                            class={ui.coreSvg}
-                            viewBox={`0 0 ${BENCHMARK_DIAL.size} ${BENCHMARK_DIAL.size}`}
-                            aria-hidden="true"
-                          >
-                            <circle
-                              class={ui.dialOuterRing}
-                              cx={BENCHMARK_DIAL.center}
-                              cy={BENCHMARK_DIAL.center}
-                              r={BENCHMARK_DIAL.outerRadius}
-                            />
-                            <For each={BENCHMARK_DIAL.orbits}>
-                              {(orbit) => (
-                                <ellipse
-                                  class={`${ui.dialOrbit} ${
-                                    orbit.tone === 'ember'
-                                      ? ui.dialOrbitEmber
-                                      : ui.dialOrbitCyan
-                                  }`}
-                                  cx={BENCHMARK_DIAL.center}
-                                  cy={BENCHMARK_DIAL.center}
-                                  rx={orbit.rx}
-                                  ry={orbit.ry}
-                                  transform={`rotate(${orbit.rotation} ${BENCHMARK_DIAL.center} ${BENCHMARK_DIAL.center})`}
-                                  style={{ opacity: orbit.opacity }}
-                                />
-                              )}
-                            </For>
-                            <path
-                              class={ui.dialEmberArc}
-                              d={BENCHMARK_DIAL_EMBER_ARC}
-                            />
-                            <For each={BENCHMARK_DIAL_EMBER_NODES}>
-                              {(node) => (
-                                <circle
-                                  class={ui.dialEmberNode}
-                                  cx={node.x}
-                                  cy={node.y}
-                                  r={node.radius}
-                                  style={{ opacity: node.opacity }}
-                                />
-                              )}
-                            </For>
-                            <circle
-                              class={ui.dialInnerRing}
-                              cx={BENCHMARK_DIAL.center}
-                              cy={BENCHMARK_DIAL.center}
-                              r={BENCHMARK_DIAL.innerRadius}
-                            />
-                          </svg>
-                          <div class={ui.coreValue}>
-                            <strong>
-                              {run.result.comparison
-                                ? `${
-                                    run.result.comparison.percentChange >= 0
-                                      ? '+'
-                                      : ''
-                                  }${run.result.comparison.percentChange.toFixed(
-                                    2,
-                                  )}%`
-                                : formatRate(primary()?.median, true)}
-                            </strong>
-                            <span>
-                              {run.result.comparison
-                                ? 'paired change'
-                                : 'median throughput'}
-                            </span>
-                            <Show when={run.result.comparison}>
-                              {(comparison) => (
-                                <small>
-                                  {comparison().pairedSampleCount} pairs ·{' '}
-                                  {formatSignedPercent(
-                                    (comparison().confidenceInterval.low - 1) *
-                                      100,
-                                  )}{' '}
-                                  to{' '}
-                                  {formatSignedPercent(
-                                    (comparison().confidenceInterval.high - 1) *
-                                      100,
-                                  )}{' '}
-                                  CI
-                                </small>
-                              )}
-                            </Show>
-                          </div>
-                          <span class={ui.coreBadge}>
-                            {run.result.validation.status}
-                          </span>
-                        </div>
-                        <div class={ui.resultBody}>
-                          <div class={ui.resultTopline}>
-                            <div>
-                              <h3>{run.manifest.workload.flame.label}</h3>
-                              <p>
-                                {run.manifest.candidates
-                                  .map((candidate) => candidate.label)
-                                  .join(' ↔ ')}
-                                <Show
-                                  when={
-                                    run.result.comparison &&
-                                    run.manifest.candidates[1]?.id.startsWith(
-                                      'variation:custom:',
-                                    )
-                                  }
-                                >
-                                  {' · '}
-                                  {correctnessLabel(
-                                    run.result.comparison!.correctness,
-                                  )}
-                                </Show>
-                              </p>
-                            </div>
-                            <span class={ui.verdict}>
-                              {run.result.comparison
-                                ? BENCHMARK_COMPARISON_VERDICT_LABELS[
-                                    run.result.comparison.verdict
-                                  ]
-                                : 'Single profile'}
-                            </span>
-                          </div>
-                          <div class={ui.metricGrid}>
-                            <div class={ui.metric}>
-                              <span>
-                                {run.result.comparison
-                                  ? 'A · baseline median'
-                                  : 'Median'}
-                              </span>
-                              <strong>
-                                {formatRate(baselineSummary()?.median)}
-                              </strong>
-                              <small>
-                                {baselineSummary()?.confidenceInterval
-                                  ? `${formatRate(
-                                      baselineSummary()!.confidenceInterval.low,
-                                      true,
-                                    )}–${formatRate(
-                                      baselineSummary()!.confidenceInterval
-                                        .high,
-                                      true,
-                                    )} · 95% CI`
-                                  : 'No interval'}
-                              </small>
-                            </div>
-                            <div class={ui.metric}>
-                              <span>
-                                {run.result.comparison
-                                  ? 'B · candidate median'
-                                  : 'Paired change'}
-                              </span>
-                              <strong>
-                                {run.result.comparison
-                                  ? formatRate(candidateSummary()?.median)
-                                  : '—'}
-                              </strong>
-                              <small>
-                                {run.result.comparison
-                                  ? candidateSummary()?.confidenceInterval
-                                    ? `${formatRate(
-                                        candidateSummary()!.confidenceInterval
-                                          .low,
-                                        true,
-                                      )}–${formatRate(
-                                        candidateSummary()!.confidenceInterval
-                                          .high,
-                                        true,
-                                      )} · 95% CI`
-                                    : 'No interval'
-                                  : 'No reference lane'}
-                              </small>
-                            </div>
-                            <div class={ui.metric}>
-                              <span>Stability</span>
-                              <strong>
-                                {primary()?.cv === undefined
-                                  ? '—'
-                                  : `${(primary()!.cv! * 100).toFixed(1)}%`}
-                              </strong>
-                              <small>coefficient of variation</small>
-                            </div>
-                          </div>
-                          <div
-                            class={ui.sampleBars}
-                            aria-label="Measured sample throughput distribution"
-                          >
-                            <For each={samples()}>
-                              {(sample) => (
-                                <span
-                                  class={ui.sampleBar}
-                                  classList={{
-                                    [ui.sampleBarCandidate!]:
-                                      run.manifest.mode === 'comparison' &&
-                                      sample.candidateId ===
-                                        run.manifest.candidates[1].id,
-                                  }}
-                                  style={{
-                                    height: `${Math.max(
-                                      8,
-                                      ((sample.throughput ?? 0) /
-                                        maxThroughput()) *
-                                        100,
-                                    )}%`,
-                                  }}
-                                  title={`${sample.candidateId}: ${formatRate(
-                                    sample.throughput ?? undefined,
-                                  )}`}
-                                />
-                              )}
-                            </For>
-                          </div>
-                          <details class={ui.sampleDetails}>
-                            <summary>Raw measured samples</summary>
-                            <div class={ui.sampleTable}>
-                              <table>
-                                <thead>
-                                  <tr class={ui.sampleTableHead}>
-                                    <th scope="col">Lane</th>
-                                    <th scope="col">Pair</th>
-                                    <th scope="col">Time</th>
-                                    <th scope="col">Completed work</th>
-                                    <th scope="col">Throughput</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <For each={samples()}>
-                                    {(sample) => (
-                                      <tr class={ui.sampleTableRow}>
-                                        <td>
-                                          {run.manifest.candidates.find(
-                                            ({ id }) =>
-                                              id === sample.candidateId,
-                                          )?.label ?? sample.candidateId}
-                                        </td>
-                                        <td>{sample.pairIndex + 1}</td>
-                                        <td>
-                                          {sample.elapsedMs?.toFixed(1)} ms
-                                        </td>
-                                        <td>
-                                          {formatCount(
-                                            sample.completedWork ?? 0,
-                                          )}
-                                        </td>
-                                        <td>
-                                          {formatRate(
-                                            sample.throughput ?? undefined,
-                                          )}
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </For>
-                                </tbody>
-                              </table>
-                            </div>
-                          </details>
-                          <div class={ui.resultActions}>
-                            <button
-                              type="button"
-                              class={ui.smallAction}
-                              onClick={() => {
-                                downloadTextFile(
-                                  createBenchmarkJsonExport(
-                                    run.manifest,
-                                    run.result,
-                                  ),
-                                )
-                              }}
-                            >
-                              JSON
-                            </button>
-                            <button
-                              type="button"
-                              class={ui.smallAction}
-                              onClick={() => {
-                                downloadTextFile(
-                                  createBenchmarkCsvExport(
-                                    run.manifest,
-                                    run.result,
-                                  ),
-                                )
-                              }}
-                            >
-                              CSV
-                            </button>
-                            <button
-                              type="button"
-                              class={ui.smallAction}
-                              onClick={() => {
-                                drawShareCard(run)
-                              }}
-                            >
-                              Share card PNG
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    )
-                  }}
+                  {(run) => <CompletedRunCard run={run} />}
                 </For>
               </div>
             </Show>
 
-            <Show when={history().length > 0}>
-              <div class={ui.history}>
-                <div class={ui.historyHeader}>
-                  <strong>Local result history</strong>
-                  <span>Newest eight · IndexedDB</span>
-                </div>
-                <For each={history()}>
-                  {(entry) => (
-                    <div class={ui.historyRow}>
-                      <strong>{entry.manifest.workload.flame.label}</strong>
-                      <span>
-                        {new Date(entry.savedAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                      <span>
-                        {entry.result.candidates.at(-1)?.throughput
-                          ? formatRate(
-                              entry.result.candidates.at(-1)!.throughput!
-                                .median,
-                              true,
-                            )
-                          : '—'}
-                      </span>
-                      <span>
-                        {entry.result.comparison
-                          ? `${
-                              entry.result.comparison.percentChange >= 0
-                                ? '+'
-                                : ''
-                            }${entry.result.comparison.percentChange.toFixed(
-                              2,
-                            )}%`
-                          : 'single profile'}
-                      </span>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </Show>
+            <BenchmarkHistoryList history={history()} />
           </section>
 
           <footer class={ui.footer}>
