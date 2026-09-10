@@ -13,18 +13,9 @@ import { agentDriving, appendPilotLog, endPilot, notePilotSaveResult, startPilot
 import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from './topics'
 import type { DuelVerdict } from './duelJudge'
 import type { PilotEndReason } from './pilot'
-/**
- * Who is in the other seat.
- *
- * `none` opens the split screen with nobody driving it. Everything else is
- * the same duel — the same clock, the same dial, the same chips, the same
- * ending — so the interface can be looked at, and changed, without a chat
- * connected and a model round trip between every edit. It is a development
- * affordance, not a game mode: there is no opponent, so there is nothing to
- * win, and the hub only offers it where `SOLO_DUEL_AVAILABLE` says so.
- */
 import type { DuelOpponent, DuelStartFrom } from './types'
 import type { CommandContext } from '@/commands/types'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 export type { DuelOpponent, DuelStartFrom }
 
@@ -134,6 +125,65 @@ export type DuelOutcome = {
   savedTakes: number
 }
 
+async function saveDuelRecordedTakes(
+  recorder: CommandContext['recorder'],
+  sessions: ReturnType<typeof stopDuel>,
+  title: string,
+): Promise<number> {
+  let saved = 0
+  let attempted = 0
+  const takes = [
+    [`Duel: ${title} — your flame`, sessions.player],
+    [`Duel: ${title} — the agent's flame`, sessions.rival],
+  ] as const
+
+  for (const [name, session] of takes) {
+    if (!session) continue
+    attempted++
+    try {
+      await recorder?.save(session, name)
+      saved++
+    } catch (error) {
+      console.warn('[arcade] could not save a duel take', error)
+      appendPilotLog('error', `Could not save "${name}" to the library`)
+    }
+  }
+  if (attempted > 0) notePilotSaveResult(saved === attempted)
+  return saved
+}
+
+function presentDuelResult(params: {
+  readonly verdict: DuelVerdict
+  readonly reason: PilotEndReason
+  readonly playerFlame: FlameDescriptor
+  readonly rivalNameFallback?: string
+  readonly winnerFlame: FlameDescriptor
+  readonly durationMs: number
+  readonly savedTakes: number
+}): void {
+  const {
+    verdict,
+    reason,
+    playerFlame,
+    rivalNameFallback,
+    winnerFlame,
+    durationMs,
+    savedTakes,
+  } = params
+
+  showDuelResult({
+    verdict,
+    reason,
+    playerName: playerFlame.metadata?.name?.trim() || 'You',
+    rivalName: rivalNameFallback?.trim() || 'The agent',
+    winnerFlame,
+    archetype: calculateFlameStats(winnerFlame).type,
+    durationMs,
+    id: newDuelId(),
+    savedTakes,
+  })
+}
+
 /**
  * The one way a duel ends — the End button, the clock, Escape twice, and the
  * end tool all come through here.
@@ -173,36 +223,14 @@ export async function finishDuel(
     sessionName: sessions.player ? playerName : undefined,
     session: sessions.player,
   })
-  let saved = 0
-  let attempted = 0
-  for (const [name, session] of [
-    [playerName, sessions.player],
-    [`Duel: ${title} — the agent's flame`, sessions.rival],
-  ] as const) {
-    if (!session) continue
-    attempted++
-    try {
-      await ctx.recorder?.save(session, name)
-      saved++
-    } catch (error) {
-      console.warn('[arcade] could not save a duel take', error)
-      appendPilotLog('error', `Could not save "${name}" to the library`)
-    }
-  }
-  if (attempted > 0) notePilotSaveResult(saved === attempted)
-  // The card is the report. A toast as well would say the same thing twice,
-  // in the corner, over a screen that is now entirely about the result.
-  showDuelResult({
+  const saved = await saveDuelRecordedTakes(ctx.recorder, sessions, title)
+  presentDuelResult({
     verdict,
     reason,
-    // The card names the winner and only falls back to who they are. The
-    // take names above are a filename convention and stay as they are.
-    playerName: playerFlame.metadata?.name?.trim() || 'You',
-    rivalName: state.ready?.title?.trim() || 'The agent',
+    playerFlame,
+    rivalNameFallback: state.ready?.title,
     winnerFlame,
-    archetype: calculateFlameStats(winnerFlame).type,
     durationMs: state.durationMs,
-    id: newDuelId(),
     savedTakes: saved,
   })
   return {
