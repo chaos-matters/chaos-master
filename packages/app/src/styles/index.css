@@ -2,6 +2,7 @@
 @import './preflight.css';
 @import './designSystem/layout.css';
 @import './designSystem/colors.css';
+@import './designSystem/lumen.css';
 @import './designSystem/dark-mode.css';
 
 /* The duel's trophy title. Self-hosted rather than a second Google import:
