@@ -1,36 +1,44 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from './clone'
+import { DEFAULT_SHUTTER_ANGLE, exportTickIterations, motionBlurSettings, subFrameLimit, subFrameOffsets, } from './motionBlur'
 import { applyTimelineToFlameAtFrame, defaultConfig } from './timeline'
 import type { TimelineTrack } from './timeline'
 
-describe('motionBlur temporal calculations', () => {
-  it('calculates expected sub-frame offsets for 180 degree shutter', () => {
-    const shutterAngle = 180
-    const shutterDuration = shutterAngle / 360 // 0.5 frame duration
-    const motionBlurSamples = 4
-    const frame = 10
-
-    const subOffsets = Array.from({ length: motionBlurSamples }, (_, idx) => {
-      return (idx / motionBlurSamples) * shutterDuration
-    })
-
-    expect(subOffsets).toEqual([0, 0.125, 0.25, 0.375])
-
-    const subFrames = subOffsets.map((offset) => frame + offset)
-    expect(subFrames).toEqual([10, 10.125, 10.25, 10.375])
+describe('motion blur sub-frame rule', () => {
+  // These used to re-derive the arithmetic inline and import nothing, so they
+  // could not catch either export path drifting from the other. Both paths
+  // now call the helpers tested here.
+  it('spreads samples across a 180 degree shutter, starting at the frame', () => {
+    expect(subFrameOffsets(4, 180)).toEqual([0, 0.125, 0.25, 0.375])
   })
 
-  it('computes monotonic and complete cumulative point limits', () => {
-    const totalLimit = 10000
-    const motionBlurSamples = 4
+  it('scales the spread with the shutter angle', () => {
+    expect(subFrameOffsets(2, 360)).toEqual([0, 0.5])
+  })
 
-    const subLimits = Array.from({ length: motionBlurSamples }, (_, idx) => {
-      return Math.round(((idx + 1) / motionBlurSamples) * totalLimit)
+  it('returns a single zero offset when blur is off or the count is invalid', () => {
+    expect(subFrameOffsets(1, 180)).toEqual([0])
+    expect(subFrameOffsets(0, 180)).toEqual([0])
+    expect(subFrameOffsets(Number.NaN, 180)).toEqual([0])
+  })
+
+  it('splits the point budget into monotonic, complete cumulative limits', () => {
+    const limits = [0, 1, 2, 3].map((i) => subFrameLimit(i, 4, 10000))
+    expect(limits).toEqual([2500, 5000, 7500, 10000])
+  })
+
+  it('gives the whole budget to the only sample when blur is off', () => {
+    expect(subFrameLimit(0, 1, 1000)).toBe(1000)
+  })
+
+  it('hands both export paths the same settings, shutter angle included', () => {
+    expect(motionBlurSettings(16)).toEqual({
+      motionBlurSamples: 16,
+      shutterAngle: DEFAULT_SHUTTER_ANGLE,
     })
-
-    expect(subLimits).toEqual([2500, 5000, 7500, 10000])
-    expect(subLimits[subLimits.length - 1]).toBe(totalLimit)
+    expect(motionBlurSettings(0).motionBlurSamples).toBe(1)
+    expect(DEFAULT_SHUTTER_ANGLE).toBe(180)
   })
 
   it('interpolates flame descriptor at fractional sub-frame numbers', () => {
@@ -59,5 +67,21 @@ describe('motionBlur temporal calculations', () => {
     applyTimelineToFlameAtFrame(timelineStub, flame, 2.25)
     // 0.2 + 0.225 * 1.0 = 0.425
     expect(flame.renderSettings.exposure).toBeCloseTo(0.425, 4)
+  })
+})
+
+describe('exportTickIterations', () => {
+  it('stops a tick at the sub-frame share instead of the whole budget', () => {
+    // 1M points per iteration, 2.5M left in this sub-frame, driver planned 30.
+    expect(exportTickIterations(30, 2_500_000, 1_000_000)).toBe(3)
+  })
+
+  it('never plans more than the driver asked for', () => {
+    expect(exportTickIterations(4, 50_000_000, 1_000_000)).toBe(4)
+  })
+
+  it('always runs at least one iteration, even at or past the share', () => {
+    expect(exportTickIterations(30, 0, 1_000_000)).toBe(1)
+    expect(exportTickIterations(30, -5, 1_000_000)).toBe(1)
   })
 })
