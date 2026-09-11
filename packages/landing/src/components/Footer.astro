@@ -56,6 +56,8 @@ const links = [
   <div class="wrap foot-in">
     <div class="foot-meta">
       <span class="copy">© {year} Chaos Matters · AGPL-3.0</span>
+      <a class="legal-link" href="/privacy/">Privacy</a>
+      <a class="legal-link" href="/support/">Help</a>
       {
         commitUrl ? (
           <a
@@ -108,6 +110,15 @@ const links = [
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+  }
+  /* Privacy / Help: the App Store and Play listings link here, so they stay
+     reachable from every page, but quieter than the primary nav. */
+  .legal-link {
+    color: var(--neutral-500);
+    transition: color 0.15s ease;
+  }
+  .legal-link:hover {
+    color: var(--neutral-100);
   }
   /* Version + short-sha pill — mirrors the app's about/version pill so the
      deployed landing build is identifiable at a glance. */
