@@ -18,6 +18,7 @@ import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTI
 import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, snapshotExportSession, } from '@/utils/exportPreferences'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
+import { motionBlurSettings } from '@/utils/motionBlur'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { saveRecentFlame } from '@/utils/recentFlames'
 import { applyTimelineToFlameAtFrame, defaultConfig as defaultTimelineConfig, } from '@/utils/timeline'
@@ -1264,7 +1265,7 @@ export function createExportPngDialog(
           session: sessionSnapshot,
           audioBuffer: getAudioBuffer?.(),
           audioMapping: getAudioMapping?.(),
-          motionBlurSamples: motionBlurSamples(),
+          ...motionBlurSettings(motionBlurSamples()),
         })
         return
       }
@@ -1287,7 +1288,7 @@ export function createExportPngDialog(
         session: sessionSnapshot,
         audioBuffer: audioBuf,
         audioMapping: getAudioMapping?.(),
-        motionBlurSamples: motionBlurSamples(),
+        ...motionBlurSettings(motionBlurSamples()),
       }
       // The canvas will be obtained from the Flam3 component in App.tsx
       // For now, we pass config and the factory calls startAnimationExport

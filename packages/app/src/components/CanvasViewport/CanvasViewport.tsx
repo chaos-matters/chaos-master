@@ -8,7 +8,7 @@ import { ExportJobTracker } from '@/components/ExportJobs/ExportJobTracker'
 import { ProgressBar } from '@/components/ProgressBar/ProgressBar'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { animationExportRunning, cameraDuringExportEnabled, exportQuality, setCurrentQuality, setQualityPointCountLimit, } from '@/flame/renderStats'
+import { animationExportRunning, cameraDuringExportEnabled, exportAccumulationFraction, exportQuality, setCurrentQuality, setQualityPointCountLimit, } from '@/flame/renderStats'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { Menu } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -188,6 +188,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
                     }
                     pointCountPerBatch={DEFAULT_POINT_COUNT}
                     isExportRenderer
+                    accumulationFraction={exportAccumulationFraction()}
                     adaptiveFilterEnabled={props.adaptiveFilterEnabled()}
                     stochasticFilterEnabled={props.stochasticFilterEnabled()}
                     animationEnabled={props.animationEnabled()}
@@ -237,6 +238,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
                   }
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   isExportRenderer
+                  accumulationFraction={exportAccumulationFraction()}
                   adaptiveFilterEnabled={props.adaptiveFilterEnabled()}
                   animationEnabled={props.animationEnabled()}
                   flameDescriptor={props.effectiveFlame()}

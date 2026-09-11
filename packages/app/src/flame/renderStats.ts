@@ -94,6 +94,10 @@ export const [animationExportProgress, setAnimationExportProgress] =
 
 export const [animationExportRunning, setAnimationExportRunning] =
   createSignal(false)
+/** Main-canvas motion blur: the workspace renderer's accumulationFraction for
+ *  the sub-frame being rendered. Undefined outside a blurred export. */
+export const [exportAccumulationFraction, setExportAccumulationFraction] =
+  createSignal<number | undefined>(undefined)
 
 export const [animationExportCancel, setAnimationExportCancel] = createSignal<
   (() => void) | undefined
