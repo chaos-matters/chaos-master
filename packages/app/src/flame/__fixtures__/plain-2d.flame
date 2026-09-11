@@ -1,0 +1,4 @@
+<flame name="Plain 2D" version="Apophysis 7X" size="800 600" center="0 0" scale="200" oversample="1" filter="0.5" quality="100" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="0.5" color="0" linear="1" coefs="1 0 0 1 0 0"/>
+  <xform weight="0.5" color="1" spherical="0.8" coefs="0.5 0 0 0.5 0.25 -0.25"/>
+</flame>

@@ -1,0 +1,4 @@
+<flame name="Legacy Names" size="800 600" center="0 0" scale="200" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="0.5" color="0" horseshoe="0.7" polar="0.3" coefs="1 0 0 1 0 0"/>
+  <xform weight="0.5" color="1" handkerchief="0.5" heart="0.5" coefs="0.6 0.2 -0.2 0.6 0 0"/>
+</flame>

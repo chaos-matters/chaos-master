@@ -6,7 +6,7 @@
  * Var-suffixed names (e.g. 'horseshoeVar'). This map enables loading old flames that
  * still reference the short names.
  */
-const VARIATION_TYPE_MIGRATIONS: Record<string, string> = {
+export const VARIATION_TYPE_MIGRATIONS: Record<string, string> = {
   // Short names → Var-suffixed canonical names
   linear: 'linearVar',
   sinusoidal: 'sinusoidalVar',

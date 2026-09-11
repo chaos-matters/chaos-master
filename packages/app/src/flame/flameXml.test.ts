@@ -321,6 +321,25 @@ describe('flam3 variation coverage', () => {
 
 // ── isFlameXmlContent ──────────────────────────────────────────────────────
 
+describe('exportFlameXml skipIters', () => {
+  it('round-trips every skipIters value exactly', () => {
+    // Import maps quality -> skipIters as round(50 - quality / 3); export has to
+    // be its exact inverse, or a re-imported flame renders with a different
+    // warm-up (every golden fixture came back at 30, not 17).
+    const base = parseFlameXml(SIMPLE_FLAME_XML)
+    const lost: string[] = []
+    for (let skipIters = 0; skipIters <= 30; skipIters++) {
+      const flame = {
+        ...base,
+        renderSettings: { ...base.renderSettings, skipIters },
+      }
+      const back = parseFlameXml(exportFlameXml(flame)).renderSettings.skipIters
+      if (back !== skipIters) lost.push(`${skipIters} -> ${back}`)
+    }
+    expect(lost).toEqual([])
+  })
+})
+
 describe('isFlameXmlContent', () => {
   it('detects valid flame XML', () => {
     expect(isFlameXmlContent(SIMPLE_FLAME_XML)).toBe(true)
