@@ -2,6 +2,7 @@ import '@/commands/builtins'
 import { batch, createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
+import { fetchBundledTrackBuffer } from '@/arcade/bundledTracks'
 import { agentDriving } from '@/arcade/pilot'
 import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
@@ -85,6 +86,7 @@ import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
+import { createAudioAnalyzer, decodeAudioBytes } from './utils/audioAnalysis'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
@@ -125,6 +127,7 @@ import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
+import type { BundledTrack } from '@/arcade/bundledTracks'
 import type { CommandContext } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
@@ -2407,17 +2410,6 @@ export function MainWorkspace(props: AppProps) {
     markLoadedBaseline()
   }
 
-  const { handleRandomizeAnimation, handleSmartAnimation } =
-    useWorkspaceAnimationGen({
-      timeline,
-      flameDescriptor,
-      getCmdContext: () => cmdContext,
-      setAnimationEnabled,
-      setIsRandomizingAnimation: (val) => {
-        isRandomizingAnimation = val
-      },
-    })
-
   const runTourCommand: { fn?: (id: string, ...args: unknown[]) => void } = {}
 
   /** Active animateValue loops -- each entry snaps to its end value when called. */
@@ -2811,6 +2803,53 @@ export function MainWorkspace(props: AppProps) {
   }
 
   // Command context: bridges registered commands to app signals
+  /**
+   * Adopt a decoded track as the file audio source, or clear it with
+   * undefined. The audio panel and Beats mode both come through here, so a
+   * track loaded either way gets the same analyzer, playback reset and
+   * recorded audio.applySnapshot.
+   */
+  const adoptAudioBuffer = (
+    buf: AudioBuffer | undefined,
+    fileName: string | undefined,
+  ) => {
+    history.takeOverOwnedPreview()
+    setAudioBuffer(buf)
+    setAudioTrackName(fileName)
+    setFileAnalyzer(undefined)
+    setAnalysisProgress(null)
+    if (!buf) {
+      setAudioEnabled(false)
+    } else {
+      setAnalysisProgress(0)
+      setTimeout(async () => {
+        let lastPercent = -1
+        const analyzer = await createAudioAnalyzer(
+          buf,
+          30,
+          (current, total) => {
+            if (total <= 0) return
+            const percent = Math.floor((current / total) * 100)
+            if (percent === lastPercent) return
+            lastPercent = percent
+            setAnalysisProgress(percent / 100)
+          },
+        )
+        setFileAnalyzer(analyzer)
+        setAnalysisProgress(null)
+      }, 30)
+    }
+    setPlaybackPaused(false)
+    setPlaybackTime(0)
+    setSeekTarget(null)
+    executeCommand('audio.applySnapshot', cmdContext)
+  }
+
+  const loadBundledTrack = async (track: BundledTrack) => {
+    const bytes = await fetchBundledTrackBuffer(track)
+    adoptAudioBuffer(await decodeAudioBytes(bytes), track.name)
+  }
+
   const cmdContext: CommandContext = {
     seatId: 'player',
     beforeCommand: () => {
@@ -2968,6 +3007,7 @@ export function MainWorkspace(props: AppProps) {
       setMapping: setAudioMapping,
       setEnabled: setAudioEnabled,
       setSource: setAudioSource,
+      loadBundledTrack,
       canEnable: (required) =>
         canEnableReplayAudio(required, {
           hasFileBuffer: audioBuffer() !== undefined,
@@ -3090,6 +3130,20 @@ export function MainWorkspace(props: AppProps) {
       history.takeOverOwnedPreview()
     },
   )
+  // After recorderTimeline, not before: the pre-extraction code recorded both
+  // presets through it, and handing the hook the raw timeline instead silently
+  // dropped Randomize and Smart Animation from session recordings.
+  const { handleRandomizeAnimation, handleSmartAnimation } =
+    useWorkspaceAnimationGen({
+      timeline,
+      recorderTimeline,
+      flameDescriptor,
+      getCmdContext: () => cmdContext,
+      setAnimationEnabled,
+      setIsRandomizingAnimation: (val) => {
+        isRandomizingAnimation = val
+      },
+    })
   useWorkspaceShortcuts({
     getCmdContext: () => cmdContext,
     sidebarDiffView,
@@ -3581,14 +3635,9 @@ export function MainWorkspace(props: AppProps) {
               }
               breakRecordingCoalescing={breakRecordingCoalescing}
               audioBuffer={audioBuffer}
-              setAudioBuffer={setAudioBuffer}
-              setAudioTrackName={setAudioTrackName}
-              setFileAnalyzer={setFileAnalyzer}
+              onAudioChange={adoptAudioBuffer}
               analysisProgress={analysisProgress}
-              setAnalysisProgress={setAnalysisProgress}
-              setAudioEnabled={setAudioEnabled}
               setPlaybackPaused={setPlaybackPaused}
-              setPlaybackTime={setPlaybackTime}
               setSeekTarget={setSeekTarget}
               audioMapping={audioMapping}
               audioEnabled={audioEnabled}

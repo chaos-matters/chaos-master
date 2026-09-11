@@ -342,6 +342,7 @@ describe('WebMCP Foundation', () => {
 
       expect(result.success).toBe(true)
       expect(cmdContext.director!.setState).toHaveBeenCalledWith({
+        sessionId: expect.any(String),
         generation: 1,
         candidates,
       })

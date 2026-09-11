@@ -1,5 +1,5 @@
-// dev.lumenapeiron.com is the review deploy. It serves the same build as
-// production from a different origin, so search engines must be kept off it at
+// dev.lumenapeiron.com and the PR preview are review deploys. They serve the
+// same build as production from a different origin, so search engines must be kept off it at
 // the HTTP boundary — a robots meta tag in the SPA is no use here, because the
 // app is JavaScript a crawler may never execute.
 //
@@ -13,8 +13,23 @@
 
 export const REVIEW_HOST = 'dev.lumenapeiron.com'
 
+/**
+ * Every origin that serves a non-production build: the dev deploy, anything
+ * under it (about.dev.lumenapeiron.com), and every *.workers.dev address. The
+ * PR preview has no route, so `wrangler deploy --env preview` serves it from
+ * workers.dev, and deploy.yml posts that URL on every public pull request.
+ *
+ * This matches review origins rather than allowlisting production, because
+ * production may still be bound to legacy domains outside wrangler.jsonc until
+ * their redirect lands, and marking those noindex is a separate SEO decision.
+ */
 export function isReviewHost(url: URL): boolean {
-  return url.hostname === REVIEW_HOST
+  const host = url.hostname
+  return (
+    host === REVIEW_HOST ||
+    host.endsWith(`.${REVIEW_HOST}`) ||
+    host.endsWith('.workers.dev')
+  )
 }
 
 const REVIEW_ROBOTS = [

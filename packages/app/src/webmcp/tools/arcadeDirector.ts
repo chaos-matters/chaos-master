@@ -1,4 +1,4 @@
-import { deriveTasteProfile, extractFlameTasteFeatures, } from '@/arcade/tasteStore'
+import { createDirectorSessionId, deriveTasteProfile, extractFlameTasteFeatures, } from '@/arcade/tasteStore'
 import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
 import { mutateFlame } from '@/flame/randomize'
 import { deepClone } from '@/utils/clone'
@@ -122,12 +122,20 @@ export const directorPropose: WebMcpTool = {
     const currentFlame = ctx.flameDescriptor?.()
     const normalized = normalizeCandidates(candidates || [], currentFlame)
 
+    // A later generation of the running session keeps its session id, so its
+    // ratings accumulate; anything else starts a new session.
+    const previous = ctx.director.state()
+    const nextGeneration = generation || 1
+    const continues =
+      previous?.sessionId !== undefined && nextGeneration > previous.generation
     const state: {
+      sessionId: string
       generation: number
       candidates: DirectorCandidate[]
       steeringPrompt?: string
     } = {
-      generation: generation || 1,
+      sessionId: continues ? previous.sessionId! : createDirectorSessionId(),
+      generation: nextGeneration,
       candidates: normalized,
     }
     if (steeringPrompt !== undefined) {

@@ -28,6 +28,13 @@ export interface FlameTasteFeatures {
 
 export interface RatedCandidate {
   id: string
+  /**
+   * The Director session the rating belongs to. Every session restarts at
+   * generation 1, so without it a new session overwrote the last one's
+   * ratings. Absent on records saved before sessions were keyed; those keep
+   * their original id and are treated as one legacy session.
+   */
+  sessionId?: string | undefined
   generation: number
   candidateIndex: number
   reaction: CandidateReaction
@@ -154,6 +161,14 @@ function saveRatings(ratings: RatedCandidate[]): void {
   }
 }
 
+/** A fresh id for one Director session's ratings. */
+export function createDirectorSessionId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  )
+}
+
 /**
  * Records or updates user feedback for a candidate flame.
  */
@@ -161,7 +176,10 @@ export function recordCandidateFeedback(
   feedback: Omit<RatedCandidate, 'id' | 'timestamp'>,
 ): RatedCandidate {
   const ratings = getStoredRatings()
-  const id = `cand-${feedback.generation}-${feedback.candidateIndex}`
+  const id =
+    feedback.sessionId === undefined
+      ? `cand-${feedback.generation}-${feedback.candidateIndex}`
+      : `cand-${feedback.sessionId}-${feedback.generation}-${feedback.candidateIndex}`
 
   const existingIndex = ratings.findIndex((r) => r.id === id)
   const candidateRecord: RatedCandidate = {

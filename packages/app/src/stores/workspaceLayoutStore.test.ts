@@ -1,5 +1,5 @@
 import { createRoot } from 'solid-js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createWorkspaceLayoutStore, isTouchLayout, isWideLayout, WIDE_LAYOUT_MIN_WIDTH, } from './workspaceLayoutStore'
 
 describe('workspaceLayoutStore', () => {
@@ -81,5 +81,19 @@ describe('workspaceLayoutStore', () => {
       store.setTouchLayoutPreference('auto')
       dispose()
     })
+  })
+
+  it('creates its module-level memos inside a root, so Solid does not warn', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      vi.resetModules()
+      await import('./workspaceLayoutStore')
+      const offending = warn.mock.calls
+        .map((c) => c.map(String).join(' '))
+        .filter((m) => /never be disposed|createRoot/i.test(m))
+      expect(offending).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

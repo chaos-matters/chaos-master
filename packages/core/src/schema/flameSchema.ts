@@ -243,6 +243,16 @@ export type BaseVariationDescriptor = v.InferOutput<
 export const VariationDescriptor = BaseVariationDescriptor
 export type VariationDescriptor = BaseVariationDescriptor
 
+/**
+ * `v.number()` rejects NaN but ACCEPTS Infinity and -Infinity, because both are
+ * `typeof 'number'`. An infinite camera value produced by a degenerate touch
+ * gesture therefore validates cleanly and is persisted into autosave, share
+ * links and session recordings, where it renders as a collapsed camera and is
+ * very hard to trace back. Bounded fields like ZoomValueSchema are already safe
+ * -- a maxValue check rejects Infinity -- so this is for the unbounded ones.
+ */
+export const finiteNumber = v.pipe(v.number(), v.finite())
+
 const ZoomValueSchema = v.pipe(
   v.number(),
   v.minValue(MIN_CAMERA_ZOOM_VALUE),
@@ -251,23 +261,23 @@ const ZoomValueSchema = v.pipe(
 const CameraObjSchema = v.object({
   zoom: v.optional(ZoomValueSchema, cameraDefault.zoom),
   position: v.optional(
-    v.tuple([v.number(), v.number()]),
+    v.tuple([finiteNumber, finiteNumber]),
     cameraDefault.position,
   ),
-  rotation: v.optional(v.number(), cameraDefault.rotation),
+  rotation: v.optional(finiteNumber, cameraDefault.rotation),
 })
 
 export type Camera3DObj = v.InferOutput<typeof Camera3DObjSchema>
 export const Camera3DObjSchema = v.object({
-  theta: v.optional(v.number(), camera3DDefault.theta),
-  phi: v.optional(v.number(), camera3DDefault.phi),
-  radius: v.optional(v.number(), camera3DDefault.radius),
+  theta: v.optional(finiteNumber, camera3DDefault.theta),
+  phi: v.optional(finiteNumber, camera3DDefault.phi),
+  radius: v.optional(finiteNumber, camera3DDefault.radius),
   target: v.optional(
-    v.tuple([v.number(), v.number(), v.number()]),
+    v.tuple([finiteNumber, finiteNumber, finiteNumber]),
     camera3DDefault.target,
   ),
-  fov: v.optional(v.number(), camera3DDefault.fov),
-  roll: v.optional(v.number(), camera3DDefault.roll),
+  fov: v.optional(finiteNumber, camera3DDefault.fov),
+  roll: v.optional(finiteNumber, camera3DDefault.roll),
 })
 
 const ColorValueSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1))

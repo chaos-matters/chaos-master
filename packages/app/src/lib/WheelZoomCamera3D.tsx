@@ -346,6 +346,13 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   }
 
   const startPinch = createPinchHandler((initEvent) => {
+    // createPinchHandler already rejects degenerate gestures, but prevDistance
+    // is state this consumer holds, so guard it here too -- the 2D camera has
+    // done so since 0d239a45 and this one did not, which is how a two-finger
+    // tap wrote NaN into camera3D.radius.
+    if (!Number.isFinite(initEvent.distance) || initEvent.distance <= 0) {
+      return
+    }
     let prevDistance = initEvent.distance
     cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
@@ -353,7 +360,17 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     }
     return {
       onPinchMove(event) {
+        if (
+          !Number.isFinite(event.distance) ||
+          event.distance <= 0 ||
+          prevDistance <= 0
+        ) {
+          return
+        }
         const ratio = event.distance / prevDistance
+        if (!Number.isFinite(ratio) || ratio <= 0) {
+          return
+        }
         props.radius[1]((r) =>
           Math.max(MIN_ORBIT_RADIUS, Math.min(MAX_ORBIT_RADIUS, r / ratio)),
         )

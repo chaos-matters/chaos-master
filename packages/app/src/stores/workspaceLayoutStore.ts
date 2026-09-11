@@ -1,4 +1,4 @@
-import { createMemo, createSignal } from 'solid-js'
+import { createMemo, createRoot, createSignal } from 'solid-js'
 import { persistentSignal } from '@/utils/persistentSignal'
 import type { Accessor, Setter } from 'solid-js'
 
@@ -111,21 +111,31 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   mqTablet.addEventListener?.('change', (e) => setRawIsTablet(e.matches))
 }
 
-export const isPhone = createMemo(() => {
-  if (touchLayoutPreference() === 'desktop') return false
-  if (touchLayoutPreference() === 'touch') return rawIsPhone()
-  return rawIsPhone()
+/**
+ * Device classification outlives every component, so these memos are
+ * deliberately global. `createRoot` makes that explicit and gives them an owner;
+ * at module scope they were created outside any root and Solid warned, on every
+ * page load, that they would never be disposed. The root is never disposed on
+ * purpose, so its dispose function is discarded.
+ */
+const { isPhone, isTablet, isTouchLayout } = createRoot(() => {
+  const isPhone = createMemo(() => {
+    if (touchLayoutPreference() === 'desktop') return false
+    return rawIsPhone()
+  })
+  const isTablet = createMemo(() => {
+    if (touchLayoutPreference() === 'desktop') return false
+    if (touchLayoutPreference() === 'touch') return !rawIsPhone()
+    return rawIsTablet()
+  })
+  const isTouchLayout = createMemo(() => isPhone() || isTablet())
+  return { isPhone, isTablet, isTouchLayout }
 })
-
-export const isTablet = createMemo(() => {
-  if (touchLayoutPreference() === 'desktop') return false
-  if (touchLayoutPreference() === 'touch') return !rawIsPhone()
-  return rawIsTablet()
-})
-
-export const isTouchLayout = createMemo(() => isPhone() || isTablet())
 
 export {
+  isPhone,
+  isTablet,
+  isTouchLayout,
   touchLayoutPreference,
   setTouchLayoutPreference,
   setRawIsPhone as setIsPhone,

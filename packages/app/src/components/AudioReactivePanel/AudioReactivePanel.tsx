@@ -1,14 +1,21 @@
-import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, lazy, onCleanup, Show, Suspense, } from 'solid-js'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
 import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, PRESET_DESCRIPTIONS, PRESET_LABELS, randomizeMappings, RENDER_PRESET_IDS, RENDER_PRESETS, } from '@/utils/audioWiringPresets'
-import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
 import ui from './AudioReactivePanel.module.css'
 import { computeBeatFrames, drawWaveform } from './audioWaveform'
 import { createMappingGestureBoundary } from './mappingGesture'
 import type { Accessor } from 'solid-js'
 import type { AffineKey, AudioAnalyzer, AudioFeature, FlameTarget, LiveAudioAnalyzer, RenderSettingKey, TransformInfo, TransformPropertyKey, } from '@/utils/audioAnalysis'
 import type { WiringPresetId } from '@/utils/audioWiringPresets'
+
+// The wiring modal and its node graph are ~90 KB of source that only matter
+// once the user opens it, so they load on demand instead of with the panel.
+const AudioWiringModal = lazy(() =>
+  import('../AudioWiringModal/AudioWiringModal').then((m) => ({
+    default: m.AudioWiringModal,
+  })),
+)
 
 // Re-export for consumers (MainWorkspace etc.)
 export type { AudioFeature, FlameTarget, TransformInfo }
@@ -1235,21 +1242,23 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
 
       {/* Wiring modal overlay */}
       <Show when={showWiringModal()}>
-        <AudioWiringModal
-          mappings={props.audioMapping().mappings}
-          transforms={props.transforms}
-          presets={wiringPresets()}
-          featureLevels={liveFeatureLevels()}
-          liveAnalyzer={props.liveAnalyzer()}
-          onMappingsChange={(mappings) => {
-            props.onMappingChange({
-              preset: 'custom',
-              mappings,
-            })
-          }}
-          onMappingGestureBoundary={props.onMappingGestureBoundary}
-          onClose={() => setShowWiringModal(false)}
-        />
+        <Suspense>
+          <AudioWiringModal
+            mappings={props.audioMapping().mappings}
+            transforms={props.transforms}
+            presets={wiringPresets()}
+            featureLevels={liveFeatureLevels()}
+            liveAnalyzer={props.liveAnalyzer()}
+            onMappingsChange={(mappings) => {
+              props.onMappingChange({
+                preset: 'custom',
+                mappings,
+              })
+            }}
+            onMappingGestureBoundary={props.onMappingGestureBoundary}
+            onClose={() => setShowWiringModal(false)}
+          />
+        </Suspense>
       </Show>
     </div>
   )

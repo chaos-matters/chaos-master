@@ -1,3 +1,4 @@
+import { BUNDLED_TRACKS, findBundledTrack } from '@/arcade/bundledTracks'
 import { describeAllowedCommands } from '@/arcade/commandHints'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
@@ -8,6 +9,7 @@ import { executeCommand } from '@/commands/registry'
 import { AudioMapping, AudioPreset } from '@/flame/schema/audioWiring'
 import * as v from '@/valibot'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
+import type { CommandContext } from '@/commands/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -84,6 +86,48 @@ const AUDIO_PRESET_DESCRIPTIONS = [
   },
 ] as const
 
+/**
+ * Make sure a decoded track is loaded before a Beats session starts. Without
+ * one, audio.applySnapshot's canEnable check fails and the mapping step turns
+ * reactivity straight back off, so the session saves with nothing reactive.
+ * A track that is already usable -- bundled, or the user's own file -- is kept.
+ */
+async function ensureBeatsTrack(
+  audio: NonNullable<CommandContext['audio']>,
+  requested: string | undefined,
+): Promise<{ trackName: string } | { error: string }> {
+  const current = audio.snapshot()
+  const usable = (trackName: string) =>
+    audio.canEnable({ ...current, source: 'file', enabled: true, trackName })
+
+  const track =
+    requested === undefined ? undefined : findBundledTrack(requested)
+  const wanted = track?.name ?? requested
+  if (wanted === undefined) {
+    if (current.trackName !== undefined && usable(current.trackName)) {
+      return { trackName: current.trackName }
+    }
+  } else if (usable(wanted)) {
+    return { trackName: wanted }
+  }
+
+  if (requested !== undefined && track === undefined) {
+    const names = BUNDLED_TRACKS.map((t) => t.name).join(', ')
+    return { error: `Unknown track "${requested}". Bundled tracks: ${names}.` }
+  }
+  const target = track ?? BUNDLED_TRACKS[0]!
+  if (!audio.loadBundledTrack) {
+    return { error: 'This workspace cannot load audio tracks.' }
+  }
+  try {
+    await audio.loadBundledTrack(target)
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    return { error: `Could not load "${target.name}": ${reason}` }
+  }
+  return { trackName: target.name }
+}
+
 export const arcadeStartBeats: WebMcpTool = {
   name: 'arcade_start_beats',
   description:
@@ -97,7 +141,7 @@ export const arcadeStartBeats: WebMcpTool = {
       },
     },
   },
-  execute: (args: unknown) => {
+  execute: async (args: unknown) => {
     const ctx = getWebMcpContext()
     if (!ctx) return NOT_READY
     if (!ctx.recorder || !ctx.arcade || !ctx.audio) {
@@ -115,6 +159,15 @@ export const arcadeStartBeats: WebMcpTool = {
         error: 'A recording is already running. Ask the user to stop it first.',
       }
     }
+
+    const parsedArgs =
+      typeof args === 'object' && args !== null
+        ? (args as { trackName?: string })
+        : {}
+    // Before recording starts, so a track that cannot load leaves nothing
+    // half-started behind.
+    const loaded = await ensureBeatsTrack(ctx.audio, parsedArgs.trackName)
+    if ('error' in loaded) return { error: loaded.error }
 
     const started = ctx.recorder.start()
     if (!started.ok) {
@@ -136,14 +189,13 @@ export const arcadeStartBeats: WebMcpTool = {
 
     clearNarration()
     ctx.arcade.closeHub()
+    // Beats drives the flame from the track just ensured. A microphone chosen
+    // earlier in the session would otherwise keep driving it, and the mapping
+    // step would report no track loaded when one is.
+    ctx.audio.setSource('file')
     ctx.audio.setEnabled(true)
 
-    const parsedArgs =
-      typeof args === 'object' && args !== null
-        ? (args as { trackName?: string })
-        : {}
-    const activeTrack =
-      parsedArgs.trackName ?? ctx.audio.snapshot().trackName ?? 'Ember Drift'
+    const activeTrack = loaded.trackName
 
     return {
       ok: true,
@@ -352,8 +404,19 @@ export const arcadeSetAudioMapping: WebMcpTool = {
       executeCommand('lesson.note', ctx, noteText)
     }
 
+    // applySnapshot only switches reactivity on when a matching decoded track
+    // is loaded. Say so, rather than reporting a reactive session that is not.
+    const reactive = ctx.audio.canEnable(newSnapshot)
+
     return {
       ok: true,
+      reactive,
+      ...(reactive
+        ? {}
+        : {
+            warning:
+              'The mapping is saved, but no audio track is loaded, so reactivity is off. Start Beats again to load a track.',
+          }),
       appliedCount: parsed.output.mappings.length,
       preset: parsed.output.preset,
       remainingSteps: pilotStepsRemaining(),

@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agentDriving, drivingState, resetPilot } from '@/arcade/pilot'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
@@ -145,5 +145,124 @@ describe('arcade beats tools', () => {
     expect(endResult.ok).toBe(true)
     expect(endResult.title).toBe('Cosmic Bass Pulse')
     expect(agentDriving()).toBe(false)
+  })
+
+  describe('track loading', () => {
+    const setup = (loadedTrack: string | undefined) => {
+      const ctx = createMockCommandContext()
+      const audio = ctx.audio!
+      audio.snapshot = vi.fn(() => ({
+        mapping: { preset: 'custom' as const, mappings: [] },
+        enabled: false,
+        source: 'file' as const,
+        trackName: loadedTrack,
+      }))
+      audio.canEnable = vi.fn(
+        (required) =>
+          loadedTrack !== undefined && required.trackName === loadedTrack,
+      )
+      setWebMcpContext(ctx)
+      return { ctx, load: vi.mocked(audio.loadBundledTrack!) }
+    }
+
+    it('loads the requested bundled track before recording starts', async () => {
+      const { ctx, load } = setup('Ember Drift')
+
+      const result = await run(arcadeStartBeats, { trackName: 'Cyber Pulse' })
+
+      expect(result.ok).toBe(true)
+      expect(load).toHaveBeenCalledOnce()
+      expect(load.mock.calls[0]?.[0]).toMatchObject({ id: 'cyber-pulse' })
+      const start = vi.mocked(ctx.recorder!.start)
+      expect(load.mock.invocationCallOrder[0]!).toBeLessThan(
+        start.mock.invocationCallOrder[0]!,
+      )
+    })
+
+    it('switches to the loaded track when the microphone was the source', async () => {
+      const { ctx } = setup('Ember Drift')
+      const audio = ctx.audio!
+      audio.snapshot = vi.fn(() => ({
+        mapping: { preset: 'custom' as const, mappings: [] },
+        enabled: false,
+        source: 'mic' as const,
+        trackName: 'Ember Drift',
+      }))
+
+      const result = await run(arcadeStartBeats, {})
+
+      expect(result.ok).toBe(true)
+      const setSource = vi.mocked(audio.setSource)
+      expect(setSource).toHaveBeenCalledWith('file')
+      expect(setSource.mock.invocationCallOrder[0]!).toBeLessThan(
+        vi.mocked(audio.setEnabled).mock.invocationCallOrder[0]!,
+      )
+    })
+
+    it('accepts a track id as well as its display name', async () => {
+      const { load } = setup(undefined)
+      await run(arcadeStartBeats, { trackName: 'cyber-pulse' })
+      expect(load.mock.calls[0]?.[0]).toMatchObject({ name: 'Cyber Pulse' })
+    })
+
+    it('loads the default track when nothing usable is loaded', async () => {
+      const { load } = setup(undefined)
+      const result = await run(arcadeStartBeats, {})
+      expect(result.activeTrack).toBe('Ember Drift')
+      expect(load.mock.calls[0]?.[0]).toMatchObject({ id: 'ember-drift' })
+    })
+
+    it('keeps a track that is already loaded instead of reloading it', async () => {
+      const { load } = setup('Ember Drift')
+      await run(arcadeStartBeats, { trackName: 'Ember Drift' })
+      await run(arcadeEndBeats, {})
+      resetPilot()
+      await run(arcadeStartBeats, {})
+      expect(load).not.toHaveBeenCalled()
+    })
+
+    it('refuses an unknown track and starts nothing', async () => {
+      const { ctx, load } = setup(undefined)
+      const result = await run(arcadeStartBeats, { trackName: 'Nope' })
+      expect(String(result.error)).toContain('Ember Drift')
+      expect(load).not.toHaveBeenCalled()
+      expect(ctx.recorder?.start).not.toHaveBeenCalled()
+      expect(agentDriving()).toBe(false)
+    })
+
+    it('starts nothing and reports it when the track fails to load', async () => {
+      const { ctx, load } = setup(undefined)
+      load.mockRejectedValueOnce(new Error('HTTP 404'))
+      const result = await run(arcadeStartBeats, { trackName: 'Cyber Pulse' })
+      expect(String(result.error)).toContain('HTTP 404')
+      expect(ctx.recorder?.start).not.toHaveBeenCalled()
+      expect(agentDriving()).toBe(false)
+    })
+
+    it('says whether the mapping actually left reactivity on', async () => {
+      const mapping = {
+        mappings: [
+          {
+            audioFeature: 'bass',
+            target: { kind: 'renderSetting', param: 'exposure' },
+            sensitivity: 1,
+            range: [0, 1],
+          },
+        ],
+      }
+      setup('Ember Drift')
+      await run(arcadeStartBeats, {})
+      const on = await run(arcadeSetAudioMapping, mapping)
+      expect(on.reactive).toBe(true)
+
+      resetPilot()
+      clearWebMcpContext()
+      const { ctx } = setup(undefined)
+      ctx.audio!.loadBundledTrack = vi.fn(() => Promise.resolve())
+      await run(arcadeStartBeats, {})
+      const off = await run(arcadeSetAudioMapping, mapping)
+      expect(off.reactive).toBe(false)
+      expect(String(off.warning)).toMatch(/no audio track|reactivity is off/i)
+    })
   })
 })
