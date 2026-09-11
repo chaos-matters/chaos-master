@@ -1427,7 +1427,19 @@
 
 /* Tablet portrait / mobile: overlay sidebar */
 @media (max-width: 768px) {
-  .layout {
+  /*
+   * Device bands, as classified by workspaceLayoutStore:
+   *   phone   width < PHONE_MAX_WIDTH (680)          -> .phoneLayout
+   *   tablet  680 <= width <= TABLET_MAX_WIDTH (1024) -> .tabletLayout
+   *   desktop everything else, or preference 'desktop'
+   * This block is width-only and predates that classification, and it sits
+   * after .tabletLayout with equal specificity, so without the :not() it won
+   * across 680-768px: iPad Mini 6 portrait at 744, older iPads at 768 and many
+   * Android tablets lost the 'inspector' grid area while isTablet() was true.
+   * .phoneLayout is deliberately still overridden here -- that is the layout
+   * the phone chrome was built and tested against.
+   */
+  .layout:not(.tabletLayout) {
     grid-template-columns: 1fr;
     grid-template-areas:
       'viewport'

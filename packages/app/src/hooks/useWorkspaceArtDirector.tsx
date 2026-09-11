@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Suspense } from 'solid-js'
+import { createDirectorSessionId } from '@/arcade/tasteStore'
 import { DirectorOverlay } from '@/components/DirectorOverlay'
 import { useRequestModal } from '@/components/Modal/ModalContext'
 import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
@@ -88,6 +89,7 @@ export function useWorkspaceArtDirector(params: UseWorkspaceArtDirectorParams) {
         }
       })
       setDirectorState({
+        sessionId: createDirectorSessionId(),
         generation: 1,
         candidates,
       })

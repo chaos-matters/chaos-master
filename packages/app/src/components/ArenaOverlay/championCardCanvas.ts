@@ -64,9 +64,30 @@ export function drawRoundedRect(
   }
 }
 
+/**
+ * How long the export waits for the victor's artwork before drawing the card
+ * without it. canvas.toBlob on a WebGPU canvas can simply never call back --
+ * a lost device, a backgrounded tab -- and the export button then stayed on
+ * "Exporting" for good, because nothing else ever settled the wait.
+ */
+export const VICTOR_IMAGE_TIMEOUT_MS = 4000
+
 export function getVictorImage(
   isWinner1: boolean,
+  timeoutMs = VICTOR_IMAGE_TIMEOUT_MS,
 ): Promise<HTMLImageElement | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const gaveUp = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(null)
+    }, timeoutMs)
+  })
+  return Promise.race([findVictorImage(isWinner1), gaveUp]).finally(() => {
+    clearTimeout(timer)
+  })
+}
+
+function findVictorImage(isWinner1: boolean): Promise<HTMLImageElement | null> {
   const cardSelector = isWinner1 ? `.${ui.p1Card}` : `.${ui.p2Card}`
   const targetCard = document.querySelector<HTMLElement>(cardSelector)
   const winnerContainer = document.querySelector<HTMLElement>(

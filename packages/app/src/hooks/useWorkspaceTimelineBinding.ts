@@ -84,15 +84,35 @@ const CAMERA_GETTERS: Record<
   'camera3D.fov': (rs) => rs.camera3D?.fov ?? 60,
 }
 
+/**
+ * The keyframe short-circuit belongs to camera paths only. Before this hook was
+ * extracted from MainWorkspace it was written out longhand in exactly these
+ * seven cases, and `camera.rotation` deliberately had none. Applying it to every
+ * path makes a slider on a keyframed transform snap back, because
+ * addKeyframeImpl writes the resolved value straight back into the flame.
+ */
+const KEYFRAME_SHORT_CIRCUIT_PATHS: ReadonlySet<string> = new Set([
+  'camera.x',
+  'camera.y',
+  'camera.zoom',
+  'camera3D.theta',
+  'camera3D.phi',
+  'camera3D.radius',
+  'camera3D.fov',
+])
+
 function getFlameCameraSetting(
   rs: FlameDescriptor['renderSettings'],
   path: string,
   timeline: TimelineAccess,
 ): FlameValue | undefined {
-  const kf = getTimelineCameraKeyframeValue(timeline, path)
-  if (kf !== null) return kf
   const getter = CAMERA_GETTERS[path]
-  return getter ? getter(rs) : undefined
+  if (!getter) return undefined
+  if (KEYFRAME_SHORT_CIRCUIT_PATHS.has(path)) {
+    const kf = getTimelineCameraKeyframeValue(timeline, path)
+    if (kf !== null) return kf
+  }
+  return getter(rs)
 }
 
 function getFlameTransformSetting(

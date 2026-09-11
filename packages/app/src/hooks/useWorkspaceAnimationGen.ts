@@ -6,10 +6,18 @@ import { runTimelineSnapshotMutation } from '@/recorder/timelineActions'
 import type { Setter } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecorderAwareTimeline } from '@/recorder/timelineActions'
 import type { EasingCurve, TimelineState } from '@/utils/timeline'
 
 export interface UseWorkspaceAnimationGenParams {
+  /** The raw timeline the presets write keyframes into. */
   timeline: TimelineState
+  /**
+   * Wraps each preset run in one value-pinned snapshot so the session recorder
+   * can replay it. Both presets use Math.random(), so without this they run
+   * fine and silently drop out of the recording.
+   */
+  recorderTimeline: RecorderAwareTimeline
   flameDescriptor: FlameDescriptor
   getCmdContext: () => CommandContext
   setAnimationEnabled: Setter<boolean>
@@ -200,6 +208,7 @@ export function useWorkspaceAnimationGen(
 ) {
   const {
     timeline,
+    recorderTimeline,
     flameDescriptor,
     getCmdContext,
     setAnimationEnabled,
@@ -215,7 +224,7 @@ export function useWorkspaceAnimationGen(
     setIsRandomizingAnimation(true)
     try {
       runTimelineSnapshotMutation(
-        timeline,
+        recorderTimeline,
         snapshotOrigin('timeline.random', presetIds.join(', ')),
         () => {
           randomizeAnimationTracks(
@@ -239,7 +248,7 @@ export function useWorkspaceAnimationGen(
     setIsRandomizingAnimation(true)
     try {
       runTimelineSnapshotMutation(
-        timeline,
+        recorderTimeline,
         snapshotOrigin('timeline.smart'),
         () => {
           if (clearFirst) timeline.clearAllTracks()

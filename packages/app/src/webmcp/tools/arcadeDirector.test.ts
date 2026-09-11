@@ -164,4 +164,25 @@ describe('arcade director tools', () => {
     expect(profile.preferredPalette).toBe('warm')
     expect(profile.summary).toContain('likes symmetry')
   })
+
+  it('keeps one session id across generations and starts a new one on restart', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const propose = (generation: number) =>
+      run(directorPropose, {
+        generation,
+        candidates: [{ flame: createTestFlame(), rationale: 'r' }],
+      })
+
+    await propose(1)
+    const first = ctx.director?.state()?.sessionId
+    await propose(2)
+    const second = ctx.director?.state()?.sessionId
+    await propose(1)
+    const restarted = ctx.director?.state()?.sessionId
+
+    expect(first).toEqual(expect.any(String))
+    expect(second).toBe(first)
+    expect(restarted).not.toBe(first)
+  })
 })

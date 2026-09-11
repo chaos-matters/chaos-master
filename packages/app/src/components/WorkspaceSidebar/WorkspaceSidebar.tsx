@@ -2,7 +2,6 @@ import { lazy, Show, Suspense } from 'solid-js'
 import ui from '@/App.module.css'
 import { AudioReactivePanel } from '@/components/AudioReactivePanel/AudioReactivePanel'
 import { BlendFlameGallery } from '@/components/BlendFlameGallery/BlendFlameGallery'
-import { DiffViewContent } from '@/components/DiffViewModal/DiffViewModal'
 import diffUi from '@/components/DiffViewModal/DiffViewModal.module.css'
 import { ExportActions } from '@/components/ExportJobs/ExportActions'
 import { QuickVariationPicker } from '@/components/QuickVariationPicker/QuickVariationPicker'
@@ -10,7 +9,6 @@ import { SonificationPanel } from '@/components/SonificationPanel/SonificationPa
 import { isVariationType } from '@/flame/variations'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { snapshotOrigin } from '@/recorder/snapshotOrigin'
-import { createAudioAnalyzer } from '@/utils/audioAnalysis'
 import { deepClone } from '@/utils/clone'
 import { AffineEditorSection } from './AffineEditorSection'
 import { ColorAndPaletteSection } from './ColorAndPaletteSection'
@@ -39,6 +37,14 @@ import type { SnapshotOrigin } from '@/recorder/snapshotOrigin'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from '@/utils/audioAnalysis'
 import type { HardwareTier } from '@/utils/hardwareTier'
 import type { SonificationConfig } from '@/utils/sonification'
+
+// Lazy, like MainWorkspace's DiffViewModal: a static import of this module from
+// here pinned it into the eager bundle and defeated that lazy boundary.
+const DiffViewContent = lazy(() =>
+  import('@/components/DiffViewModal/DiffViewModal').then((m) => ({
+    default: m.DiffViewContent,
+  })),
+)
 
 const BreedGallery = lazy(() =>
   import('@/components/BreedGallery/BreedGallery').then((m) => ({
@@ -88,14 +94,10 @@ export interface WorkspaceSidebarProps {
   breakRecordingCoalescing: () => void
 
   audioBuffer: Accessor<AudioBuffer | undefined>
-  setAudioBuffer: (buf: AudioBuffer | undefined) => void
-  setAudioTrackName: (name: string | undefined) => void
-  setFileAnalyzer: (analyzer: AudioAnalyzer | undefined) => void
+  /** Adopt a decoded file as the audio source, or clear it with undefined. */
+  onAudioChange: (buf: AudioBuffer | undefined, fileName?: string) => void
   analysisProgress: Accessor<number | null>
-  setAnalysisProgress: (progress: number | null) => void
-  setAudioEnabled: (enabled: boolean) => void
   setPlaybackPaused: (paused: boolean) => void
-  setPlaybackTime: (time: number) => void
   setSeekTarget: (target: number | null) => void
   audioMapping: Accessor<AudioMapping>
   audioEnabled: Accessor<boolean>
@@ -430,43 +432,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                           props.setShowAudioPanel(false)
                         }}
                         audioBuffer={props.audioBuffer}
-                        onAudioChange={(buf, fileName) => {
-                          props.history.takeOverOwnedPreview?.()
-                          props.setAudioBuffer(buf)
-                          props.setAudioTrackName(fileName)
-                          props.setFileAnalyzer(undefined)
-                          props.setAnalysisProgress(null)
-                          if (!buf) {
-                            props.setAudioEnabled(false)
-                          } else {
-                            props.setAnalysisProgress(0)
-                            setTimeout(async () => {
-                              let lastPercent = -1
-                              const analyzer = await createAudioAnalyzer(
-                                buf,
-                                30,
-                                (current, total) => {
-                                  if (total <= 0) return
-                                  const percent = Math.floor(
-                                    (current / total) * 100,
-                                  )
-                                  if (percent === lastPercent) return
-                                  lastPercent = percent
-                                  props.setAnalysisProgress(percent / 100)
-                                },
-                              )
-                              props.setFileAnalyzer(analyzer)
-                              props.setAnalysisProgress(null)
-                            }, 30)
-                          }
-                          props.setPlaybackPaused(false)
-                          props.setPlaybackTime(0)
-                          props.setSeekTarget(null)
-                          props.transformsSectionProps.executeCommand(
-                            'audio.applySnapshot',
-                            props.transformsSectionProps.cmdContext,
-                          )
-                        }}
+                        onAudioChange={props.onAudioChange}
                         audioMapping={props.audioMapping}
                         onMappingChange={(mapping) => {
                           props.transformsSectionProps.executeCommand(
@@ -664,7 +630,9 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                   </button>
                 </div>
                 <div class={diffUi.panelScroll}>
-                  <DiffViewContent flameA={dv.flameA} flameB={dv.flameB} />
+                  <Suspense>
+                    <DiffViewContent flameA={dv.flameA} flameB={dv.flameB} />
+                  </Suspense>
                 </div>
               </div>
             )}

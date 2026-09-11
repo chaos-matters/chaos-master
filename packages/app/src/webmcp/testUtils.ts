@@ -158,6 +158,7 @@ export function createMockCommandContext(): CommandContext {
       setMapping: vi.fn(),
       setEnabled: vi.fn(),
       setSource: vi.fn(),
+      loadBundledTrack: vi.fn(() => Promise.resolve()),
     },
     director: {
       open: () => directorOpen,

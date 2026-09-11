@@ -88,4 +88,60 @@ describe('tasteStore', () => {
     expect(profile.dislikeCount).toBe(1)
     expect(profile.summary).toContain('likes symmetry')
   })
+
+  it('keeps ratings from separate Director sessions that reuse generation numbers', () => {
+    const features = extractFlameTasteFeatures(createTestFlame())
+    for (const sessionId of ['session-a', 'session-b']) {
+      for (let candidateIndex = 0; candidateIndex < 6; candidateIndex++) {
+        recordCandidateFeedback({
+          sessionId,
+          generation: 1,
+          candidateIndex,
+          reaction: 'like',
+          tags: [],
+          wasSelected: false,
+          features,
+        })
+      }
+    }
+    // Every Director session starts at generation 1, so keying by
+    // (generation, candidateIndex) alone let session B overwrite session A.
+    expect(deriveTasteProfile().totalRatings).toBe(12)
+  })
+
+  it('still updates a rating in place within one session', () => {
+    const features = extractFlameTasteFeatures(createTestFlame())
+    const rate = (reaction: 'like' | 'dislike') =>
+      recordCandidateFeedback({
+        sessionId: 'session-a',
+        generation: 2,
+        candidateIndex: 3,
+        reaction,
+        tags: [],
+        wasSelected: false,
+        features,
+      })
+    rate('like')
+    rate('dislike')
+    expect(getStoredRatings()).toHaveLength(1)
+    expect(getStoredRatings()[0]?.reaction).toBe('dislike')
+  })
+
+  it('keeps records that predate session ids alongside new ones', () => {
+    const features = extractFlameTasteFeatures(createTestFlame())
+    const base = {
+      generation: 1,
+      candidateIndex: 0,
+      reaction: 'like' as const,
+      tags: [],
+      wasSelected: false,
+      features,
+    }
+    recordCandidateFeedback(base)
+    recordCandidateFeedback({ ...base, sessionId: 'session-a' })
+    expect(getStoredRatings().map((r) => r.id)).toEqual([
+      'cand-1-0',
+      'cand-session-a-1-0',
+    ])
+  })
 })

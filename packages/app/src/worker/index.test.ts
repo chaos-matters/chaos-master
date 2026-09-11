@@ -447,6 +447,53 @@ describe('worker — review host is kept out of search', () => {
   })
 })
 
+describe('worker — every non-production origin is kept out of search', () => {
+  const get = (url: string) => new Request(url, { method: 'GET' })
+
+  /*
+   * Written as a table so the next review origin cannot be missed. The PR
+   * preview is the one that slipped: `wrangler deploy --env preview` has no
+   * route, so it serves from *.workers.dev, and deploy.yml posts that URL on
+   * every public pull request.
+   */
+  const REVIEW_ORIGINS = [
+    'https://dev.lumenapeiron.com',
+    'https://about.dev.lumenapeiron.com',
+    'https://chaos-master-preview.komediruzecki.workers.dev',
+    'https://chaos-master.komediruzecki.workers.dev',
+  ]
+
+  it.each(REVIEW_ORIGINS)(
+    '%s never serves Allow: / or the production sitemap',
+    async (origin) => {
+      const res = await worker.fetch(
+        get(`${origin}/robots.txt`),
+        makeEnv(),
+        ctx,
+      )
+      const body = await res.text()
+      expect(body).toContain('Disallow: /')
+      expect(body).not.toContain('Allow: /')
+      expect(body).not.toContain('Sitemap:')
+    },
+  )
+
+  it.each(REVIEW_ORIGINS)('%s marks the SPA noindex', async (origin) => {
+    const res = await worker.fetch(get(`${origin}/`), makeEnv(), ctx)
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+  })
+
+  it('does not mistake a lookalike production host for a review host', async () => {
+    for (const origin of [
+      'https://lumenapeiron.com',
+      'https://notdev.lumenapeiron.com.example',
+    ]) {
+      const res = await worker.fetch(get(`${origin}/`), makeEnv(), ctx)
+      expect(res.headers.get('X-Robots-Tag')).toBeNull()
+    }
+  })
+})
+
 describe('worker OG meta injection — XSS escaping guard', () => {
   it('escapes a crafted OG title in the rendered <head>', async () => {
     const env = makeEnv()

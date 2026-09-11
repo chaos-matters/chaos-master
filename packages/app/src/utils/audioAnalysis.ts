@@ -162,14 +162,20 @@ function computeRms(data: Float32Array): number {
   return Math.sqrt(sum / data.length)
 }
 
-export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
+/** Decode encoded audio bytes -- a fetched or uploaded file -- into a buffer. */
+export async function decodeAudioBytes(
+  bytes: ArrayBuffer,
+): Promise<AudioBuffer> {
   const ctx = new AudioContext()
   try {
-    const arrayBuffer = await file.arrayBuffer()
-    return await ctx.decodeAudioData(arrayBuffer)
+    return await ctx.decodeAudioData(bytes)
   } finally {
     void ctx.close()
   }
+}
+
+export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
+  return decodeAudioBytes(await file.arrayBuffer())
 }
 
 // --- Beat detection ---

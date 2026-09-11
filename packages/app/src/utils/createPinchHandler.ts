@@ -8,8 +8,9 @@ type PinchEvent = {
   distance: number
 }
 
-function createPinchEvent(touches: [Touch, Touch]): PinchEvent {
-  const [a, b] = touches
+export type PinchPoint = { clientX: number; clientY: number }
+
+export function pinchEventFrom(a: PinchPoint, b: PinchPoint): PinchEvent {
   return {
     midpoint: {
       clientX: 0.5 * (a.clientX + b.clientX),
@@ -17,6 +18,23 @@ function createPinchEvent(touches: [Touch, Touch]): PinchEvent {
     },
     distance: hypot(a.clientX - b.clientX, a.clientY - b.clientY),
   }
+}
+
+/**
+ * Two touches reported at the same coordinate give distance 0, and a consumer
+ * dividing by it gets NaN or Infinity. `Math.min` and `Math.max` PROPAGATE NaN,
+ * so a downstream clamp does not rescue the value -- it has to be rejected
+ * here. WheelZoomCamera3D divided by this unguarded and wrote NaN or Infinity
+ * into camera3D.radius. Valibot rejects NaN, so that broke the render and the
+ * next reload; it accepts Infinity, which collapsed the radius and was saved.
+ */
+export function isUsablePinch(event: PinchEvent): boolean {
+  return (
+    Number.isFinite(event.distance) &&
+    event.distance > 0 &&
+    Number.isFinite(event.midpoint.clientX) &&
+    Number.isFinite(event.midpoint.clientY)
+  )
 }
 
 export type CreatePinchHandler = (event: PinchEvent) =>
@@ -51,7 +69,12 @@ export function createPinchHandler(createHandlers: CreatePinchHandler) {
       return
     }
 
-    const handlers = createHandlers(createPinchEvent(touches))
+    const initPinch = pinchEventFrom(touches[0], touches[1])
+    if (!isUsablePinch(initPinch)) {
+      return
+    }
+
+    const handlers = createHandlers(initPinch)
     if (!handlers) return
 
     inProgress = true
@@ -64,7 +87,12 @@ export function createPinchHandler(createHandlers: CreatePinchHandler) {
         return
       }
 
-      onPinchMove?.(createPinchEvent(touches))
+      const moved = pinchEventFrom(touches[0], touches[1])
+      if (!isUsablePinch(moved)) {
+        return
+      }
+
+      onPinchMove?.(moved)
     }
 
     function onTouchEnd() {

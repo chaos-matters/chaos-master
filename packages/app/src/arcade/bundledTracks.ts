@@ -39,6 +39,14 @@ export function getBundledTrack(id: string): BundledTrack | undefined {
   return BUNDLED_TRACKS.find((track) => track.id === id)
 }
 
+/** A bundled track by id or display name, ignoring case and surrounding space. */
+export function findBundledTrack(nameOrId: string): BundledTrack | undefined {
+  const key = nameOrId.trim().toLowerCase()
+  return BUNDLED_TRACKS.find(
+    (track) => track.id === key || track.name.toLowerCase() === key,
+  )
+}
+
 export async function fetchBundledTrackBuffer(
   track: BundledTrack,
 ): Promise<ArrayBuffer> {

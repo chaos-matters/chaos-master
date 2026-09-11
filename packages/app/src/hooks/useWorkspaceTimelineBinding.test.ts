@@ -147,4 +147,100 @@ describe('useWorkspaceTimelineBinding', () => {
     expect(getFlameValue(`${firstTid}.${firstVid}`)).toBe(0.42)
     expect(flame.transforms[firstTid]!.variations[firstVid]!.weight).toBe(0.42)
   })
+
+  /**
+   * A timeline whose playhead sits on a keyframe for `path` while it drives the
+   * view. The existing mock pins both of those to false, which is why the
+   * keyframe short-circuit could widen to every path without a test failing.
+   */
+  function timelineWithKeyframe(path: string, value: number): TimelineAccess {
+    return {
+      ...createMockTimeline(),
+      isDrivingView: vi.fn(() => true),
+      currentFrame: vi.fn(() => 30),
+      hasKeyframeAtFrame: vi.fn(
+        (p: string, f: number) => p === path && f === 30,
+      ),
+      tracks: vi.fn(() => [
+        {
+          parameterPath: path,
+          keyframes: [{ frame: 30, value, easing: 'linear' as const }],
+        },
+      ]),
+    }
+  }
+
+  function bind(flame: typeof example1, timeline: TimelineAccess) {
+    return useWorkspaceTimelineBinding({
+      flameDescriptor: flame,
+      history: {
+        setSilently: (updater: (draft: typeof flame) => void) => {
+          updater(flame)
+        },
+      },
+      timeline,
+      blendWeight: () => 0,
+    })
+  }
+
+  it('does not let a transform keyframe shadow a live edit to that transform', () => {
+    const flame = deepClone(example1)
+    const tid = Object.keys(flame.transforms)[0] as TransformId
+    const path = `transform.${tid}.probability`
+    const { getFlameValue, setFlameValue } = bind(
+      flame,
+      timelineWithKeyframe(path, 0.4),
+    )
+
+    setFlameValue(path, 0.9)
+
+    // The playhead sits on a keyframe for this path, but the user just moved
+    // the slider. The live edit wins; only camera paths short-circuit.
+    expect(getFlameValue(path)).toBe(0.9)
+  })
+
+  it('does not let a variation-weight keyframe shadow a live edit', () => {
+    const flame = deepClone(example1)
+    const tid = Object.keys(flame.transforms)[0] as TransformId
+    const vid = Object.keys(flame.transforms[tid]!.variations)[0] as VariationId
+    const path = `${tid}.${vid}`
+    const { getFlameValue, setFlameValue } = bind(
+      flame,
+      timelineWithKeyframe(path, 0.1),
+    )
+
+    setFlameValue(path, 0.42)
+
+    expect(getFlameValue(path)).toBe(0.42)
+  })
+
+  it.each([
+    'camera.x',
+    'camera.y',
+    'camera.zoom',
+    'camera3D.theta',
+    'camera3D.phi',
+    'camera3D.radius',
+    'camera3D.fov',
+  ])(
+    'still short-circuits %s to the keyframe while the timeline drives the view',
+    (path) => {
+      const flame = deepClone(example1)
+      const { getFlameValue } = bind(flame, timelineWithKeyframe(path, 2.5))
+
+      expect(getFlameValue(path)).toBe(2.5)
+    },
+  )
+
+  it('never short-circuits camera.rotation, which had no short-circuit before the extraction', () => {
+    const flame = deepClone(example1)
+    const { getFlameValue, setFlameValue } = bind(
+      flame,
+      timelineWithKeyframe('camera.rotation', 1.23),
+    )
+
+    setFlameValue('camera.rotation', 0.5)
+
+    expect(getFlameValue('camera.rotation')).toBe(0.5)
+  })
 })

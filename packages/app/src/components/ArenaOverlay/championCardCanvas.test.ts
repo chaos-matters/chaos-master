@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestFlame } from '@/webmcp/testUtils'
-import { drawChampionCard, drawRoundedRect, exportChampionCardPng, SCHOOL_COLORS, } from './championCardCanvas'
+import ui from '../ArenaOverlay.module.css'
+import { drawChampionCard, drawRoundedRect, exportChampionCardPng, getVictorImage, SCHOOL_COLORS, VICTOR_IMAGE_TIMEOUT_MS, } from './championCardCanvas'
 import type { ArenaFighterStats } from '@/commands/types'
 import type { GroundedFlameStats } from '@/flame/stats'
 
@@ -161,5 +162,30 @@ describe('championCardCanvas', () => {
       isWinner1: true,
     })
     expect(typeof result).toBe('boolean')
+  })
+})
+
+describe('getVictorImage', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ''
+  })
+
+  it('gives up instead of hanging when the canvas never delivers a blob', async () => {
+    vi.useFakeTimers()
+    const card = document.createElement('div')
+    card.className = ui.p1Card!
+    const canvas = document.createElement('canvas')
+    // A lost WebGPU device or a backgrounded tab: toBlob simply never calls
+    // back, and the champion card export sat on "Exporting" for good.
+    canvas.toBlob = () => {}
+    card.append(canvas)
+    document.body.append(card)
+
+    const pending = getVictorImage(true)
+    await vi.advanceTimersByTimeAsync(VICTOR_IMAGE_TIMEOUT_MS)
+
+    const result = await Promise.race([pending, Promise.resolve('pending')])
+    expect(result).toBeNull()
   })
 })

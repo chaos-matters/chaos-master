@@ -79,6 +79,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
 
     if (candidate.flame) {
       recordCandidateFeedback({
+        sessionId: s.sessionId,
         generation: s.generation,
         candidateIndex: index,
         reaction: newReaction ?? 'neutral',
@@ -123,6 +124,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
 
     if (candidate.flame) {
       recordCandidateFeedback({
+        sessionId: s.sessionId,
         generation: s.generation,
         candidateIndex: index,
         reaction: candidate.reaction ?? 'neutral',
@@ -156,6 +158,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
     })
 
     props.director.setState({
+      sessionId: s.sessionId,
       generation: s.generation + 1,
       steeringPrompt: prompt(),
       candidates: offspring.map((flame) => ({
@@ -222,6 +225,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
     }
 
     props.director.setState({
+      sessionId: s.sessionId,
       generation: s.generation + 1,
       steeringPrompt: prompt(),
       candidates: newCandidates,
