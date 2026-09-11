@@ -1,0 +1,162 @@
+---
+import Base from '../layouts/Base.astro'
+
+const CONTACT_EMAIL = 'hello@irchiinnuss.com'
+const discordUrl = 'https://lumenapeiron.com/discord'
+const issuesUrl = 'https://github.com/chaos-matters/chaos-master/issues'
+---
+
+<Base
+  title="Support — Lumen Apeiron"
+  description="Help with Lumen Apeiron on the web, iPhone, iPad and Android: requirements, saving your work, purchases and how to reach us."
+>
+  <main class="wrap legal-shell" id="main">
+    <article class="legal">
+      <a class="legal__back" href="/">&larr; Back to Lumen Apeiron</a>
+      <p class="legal__label">Help</p>
+      <h1>Support</h1>
+
+      <section>
+        <h2>Reach us</h2>
+        <ul>
+          <li>
+            <strong>Email:</strong>{' '}
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. We read
+            everything and answer as soon as we can.
+          </li>
+          <li>
+            <strong>Community:</strong> ask and share flames on our{' '}
+            <a href={discordUrl}>Discord</a>.
+          </li>
+          <li>
+            <strong>Bugs and ideas:</strong> open an issue on{' '}
+            <a href={issuesUrl}>GitHub</a>. Screenshots and your device model
+            help.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Requirements</h2>
+        <p>
+          Lumen Apeiron renders on your device's GPU through WebGPU, so it needs
+          a device that provides it:
+        </p>
+        <ul>
+          <li><strong>iPhone and iPad:</strong> iOS or iPadOS 26 or later.</li>
+          <li>
+            <strong>Android:</strong> Android 12 or later on a phone or tablet
+            with a Vulkan 1.1 GPU, with Android System WebView kept up to date
+            from Google Play.
+          </li>
+          <li>
+            <strong>Web:</strong> a browser with WebGPU enabled, such as a
+            current Chrome, Edge or Safari.
+          </li>
+        </ul>
+        <p>
+          If the canvas stays dark or reports that WebGPU is unavailable, update
+          the system (and, on Android, Android System WebView), then restart the
+          app.
+        </p>
+      </section>
+
+      <section>
+        <h2>Your flames</h2>
+        <p>
+          Everything you make is saved on your device, not in an account.
+          Uninstalling the app or clearing site data deletes it, so export a
+          backup to keep a copy or move it to another device.
+        </p>
+      </section>
+
+      <section>
+        <h2>Purchases</h2>
+        <p>
+          Purchases in the apps are handled by Apple or Google. If an unlock is
+          missing on a new device, use <strong>Restore purchases</strong> in the
+          app. Refunds are requested from Apple or Google directly.
+        </p>
+      </section>
+
+      <section>
+        <h2>Privacy</h2>
+        <p>
+          How we handle the little data we touch is described in the{' '}
+          <a href="/privacy/">Privacy Notice</a>.
+        </p>
+      </section>
+    </article>
+  </main>
+</Base>
+
+<style>
+  .legal-shell {
+    padding-block: clamp(3.5rem, 8vw, 7rem) clamp(4rem, 9vw, 8rem);
+  }
+
+  .legal {
+    max-width: 46rem;
+    margin-inline: auto;
+  }
+
+  .legal__back {
+    display: inline-block;
+    margin-bottom: 2.25rem;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .legal__label {
+    color: var(--solar);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .legal h1 {
+    margin-top: 0.6rem;
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--neutral-50);
+  }
+
+  .legal section {
+    padding-block: 0;
+    margin-top: 3rem;
+  }
+
+  .legal h2 {
+    color: var(--neutral-100);
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    letter-spacing: -0.015em;
+  }
+
+  .legal p,
+  .legal li {
+    max-width: 70ch;
+    margin-top: 0.9rem;
+    color: var(--neutral-400);
+    line-height: 1.72;
+  }
+
+  .legal ul {
+    margin: 1rem 0 0;
+    padding-left: 1.25rem;
+  }
+
+  .legal li + li {
+    margin-top: 1rem;
+  }
+
+  .legal strong {
+    color: var(--neutral-100);
+  }
+
+  .legal section a {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+</style>

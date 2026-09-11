@@ -1,0 +1,226 @@
+---
+import Base from '../layouts/Base.astro'
+
+// Who answers privacy requests. Same contact as the other Irchiinnuss sites.
+const CONTROLLER = 'Irchiinnuss'
+const CONTACT_EMAIL = 'hello@irchiinnuss.com'
+const UPDATED = 'September 11, 2026'
+---
+
+<Base
+  title="Privacy Notice — Lumen Apeiron"
+  description="How Lumen Apeiron handles the small amount of data it touches: no accounts, no ads, and flames that stay on your device unless you share them."
+>
+  <main class="wrap legal-shell" id="main">
+    <article class="legal">
+      <a class="legal__back" href="/">&larr; Back to Lumen Apeiron</a>
+      <p class="legal__label">Plain-language privacy</p>
+      <h1>Privacy Notice</h1>
+      <p class="legal__updated">Last updated: {UPDATED}</p>
+
+      <p class="legal__lead">
+        Lumen Apeiron is a fractal flame editor that renders on your device's
+        GPU. This notice covers the web app at <strong>lumenapeiron.com</strong
+        >, this site at <strong>about.lumenapeiron.com</strong>, and the Lumen
+        Apeiron apps for iPhone, iPad and Android. There are no accounts, and
+        the flames you make stay on your device unless you choose to share them.
+      </p>
+
+      <section>
+        <h2>What stays on your device</h2>
+        <ul>
+          <li>
+            <strong>Your work.</strong> Flames, sessions, your variation library
+            and settings are saved in your browser's storage, or in the app's own
+            storage on your phone or tablet. We never receive them unless you
+            share a flame. Clearing site data or uninstalling the app deletes
+            them, so use the backup export if you want a copy.
+          </li>
+          <li>
+            <strong>Microphone.</strong> Audio-reactive mode listens only while
+            you have it switched on. The sound is analysed on your device and is
+            never sent to us.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What we handle</h2>
+        <ul>
+          <li>
+            <strong>Share links.</strong> When you create a share link, the flame
+            you are sharing (its parameters, its name, and any custom variation
+            code in it) is stored with Cloudflare so the link can be opened. The
+            stored flame expires after 60 days. A preview image and title may be
+            kept so the link shows a preview when it is posted elsewhere.
+          </li>
+          <li>
+            <strong>Sharing to Discord (web app only).</strong> If you post a
+            flame to our Discord community, the image, its title and the name you
+            enter are sent to our Discord server. Cloudflare Turnstile checks that
+            the request comes from a person; see Cloudflare's{' '}
+            <a href="https://www.cloudflare.com/turnstile-privacy-policy/"
+              >Turnstile Privacy Notice</a
+            >. If you also choose to suggest the flame for the home gallery, we
+            store the flame, image, title and name for review, and publish it
+            only after a person has approved it.
+          </li>
+          <li>
+            <strong>Analytics (websites only).</strong> The web app and this site
+            use Google Analytics 4 to count visits and see which features are
+            used. The web app removes the query part of the address before a page
+            view is sent, so share links and their contents never reach Google.
+            See{' '}
+            <a href="https://policies.google.com/privacy">Google's Privacy Policy</a
+            >. <strong>The iPhone, iPad and Android apps contain no analytics.</strong
+            >
+          </li>
+          <li>
+            <strong>Operation and abuse protection.</strong> Cloudflare serves the
+            sites and the sharing service, and processes standard request data
+            such as IP addresses and security logs to do so. Short-lived rate
+            limits keyed to the requesting IP address protect sharing from spam.
+          </li>
+          <li>
+            <strong>In-app purchases (apps).</strong> Purchases are processed by
+            Apple or Google; we never see your payment details. We use RevenueCat
+            to confirm what you bought. It receives an anonymous app identifier
+            and your purchase history, not your name or email; see{' '}
+            <a href="https://www.revenuecat.com/privacy/">RevenueCat's Privacy Policy</a
+            >.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Why we use it</h2>
+        <p>
+          Share links, Discord posts and gallery suggestions exist because you
+          ask for them; we process that data to provide the feature you
+          requested. Hosting, security and rate limits rely on our legitimate
+          interest in keeping the service available and free of abuse.
+          Analytics rely on our legitimate interest in understanding how the
+          product is used; you can object at any time by contacting us, or block
+          it with your browser's tracking protection or Google's opt-out add-on.
+        </p>
+        <p>
+          We do not sell personal data, show ads, or track you across other
+          companies' apps and websites.
+        </p>
+      </section>
+
+      <section>
+        <h2>Retention and your choices</h2>
+        <p>
+          Stored share links expire after 60 days. Discord posts stay on Discord
+          until they are deleted, and gallery suggestions stay until they are
+          declined or removed. Event-level analytics data is kept for at most 14
+          months. If you want a share link, preview or gallery entry removed
+          sooner, send us the link.
+        </p>
+        <p>
+          If you are in the EU or EEA, you may ask to access, correct, erase,
+          restrict, object to, or receive a copy of personal data we hold about
+          you. You may also complain to your local supervisory authority; in
+          Croatia that is{' '}
+          <abbr title="Agencija za zaštitu osobnih podataka">AZOP</abbr>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Who we are</h2>
+        <p>
+          Lumen Apeiron is operated by {CONTROLLER} (Croatia), the data
+          controller for the data described above. Questions or requests:{' '}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. We will
+          update the date at the top when this notice changes.
+        </p>
+      </section>
+    </article>
+  </main>
+</Base>
+
+<style>
+  .legal-shell {
+    padding-block: clamp(3.5rem, 8vw, 7rem) clamp(4rem, 9vw, 8rem);
+  }
+
+  .legal {
+    max-width: 46rem;
+    margin-inline: auto;
+  }
+
+  .legal__back {
+    display: inline-block;
+    margin-bottom: 2.25rem;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .legal__label,
+  .legal__updated {
+    color: var(--solar);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .legal h1 {
+    margin-top: 0.6rem;
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--neutral-50);
+  }
+
+  .legal__updated {
+    margin-top: 1rem;
+    color: var(--neutral-500);
+    letter-spacing: 0.04em;
+  }
+
+  .legal__lead {
+    margin-top: 1.75rem;
+    color: var(--neutral-300);
+    font-size: clamp(1.05rem, 2vw, 1.25rem);
+    line-height: 1.65;
+  }
+
+  .legal section {
+    padding-block: 0;
+    margin-top: 3rem;
+  }
+
+  .legal h2 {
+    color: var(--neutral-100);
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    letter-spacing: -0.015em;
+  }
+
+  .legal p,
+  .legal li {
+    max-width: 70ch;
+    margin-top: 0.9rem;
+    color: var(--neutral-400);
+    line-height: 1.72;
+  }
+
+  .legal ul {
+    margin: 1rem 0 0;
+    padding-left: 1.25rem;
+  }
+
+  .legal li + li {
+    margin-top: 1rem;
+  }
+
+  .legal strong {
+    color: var(--neutral-100);
+  }
+
+  .legal section a {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+</style>
