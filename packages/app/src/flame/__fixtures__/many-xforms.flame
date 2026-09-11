@@ -1,0 +1,14 @@
+<flame name="Many Xforms" size="800 600" center="0 0" scale="200" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="0.083333" color="0.0" linear="1" coefs="0.3 0 0 0.3 -0.5 0.5"/>
+  <xform weight="0.083333" color="0.0909" linear="1" coefs="0.34 0 0 0.34 -0.41 0.41"/>
+  <xform weight="0.083333" color="0.1818" linear="1" coefs="0.38 0 0 0.38 -0.32 0.32"/>
+  <xform weight="0.083333" color="0.2727" linear="1" coefs="0.42 0 0 0.42 -0.23 0.23"/>
+  <xform weight="0.083333" color="0.3636" linear="1" coefs="0.46 0 0 0.46 -0.14 0.14"/>
+  <xform weight="0.083333" color="0.4545" linear="1" coefs="0.5 0 0 0.5 -0.05 0.05"/>
+  <xform weight="0.083333" color="0.5455" linear="1" coefs="0.54 0 0 0.54 0.04 -0.04"/>
+  <xform weight="0.083333" color="0.6364" linear="1" coefs="0.58 0 0 0.58 0.13 -0.13"/>
+  <xform weight="0.083333" color="0.7273" linear="1" coefs="0.62 0 0 0.62 0.22 -0.22"/>
+  <xform weight="0.083333" color="0.8182" linear="1" coefs="0.66 0 0 0.66 0.31 -0.31"/>
+  <xform weight="0.083333" color="0.9091" linear="1" coefs="0.7 0 0 0.7 0.4 -0.4"/>
+  <xform weight="0.083333" color="1.0" linear="1" coefs="0.74 0 0 0.74 0.49 -0.49"/>
+</flame>

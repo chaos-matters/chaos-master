@@ -867,7 +867,10 @@ export function exportFlameXml(flame: FlameDescriptor, name?: string): string {
     1,
     Math.round(Math.pow(2, (flame.renderSettings.exposure ?? 0.25) / 1.5)),
   )
-  const quality = Math.round(50 - (flame.renderSettings.skipIters ?? 20) * 3)
+  // The exact inverse of the import mapping, skipIters = round(50 - quality/3).
+  // It used to be 50 - 3 * skipIters, which sent skipIters 17 out as quality -1
+  // and brought it back as 30.
+  const quality = Math.round(3 * (50 - (flame.renderSettings.skipIters ?? 20)))
   // flam3 background is 0–255.
   const bg = (flame.renderSettings.backgroundColor ?? [0, 0, 0])
     .map((v) => Math.round(v * 255))

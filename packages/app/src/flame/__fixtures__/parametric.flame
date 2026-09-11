@@ -1,0 +1,3 @@
+<flame name="Parametric" size="800 600" center="0 0" scale="200" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="1" color="0.2" julian="1" julian_power="5" julian_dist="-0.5" coefs="1 0 0 1 0 0"/>
+</flame>
