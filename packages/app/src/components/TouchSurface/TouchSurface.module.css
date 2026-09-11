@@ -2,51 +2,67 @@
 
 .topHud {
   position: fixed;
-  top: max(8px, env(safe-area-inset-top));
+  top: var(--la-hud-top);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 45;
+  /* Above the popover backdrop, so the menu the backdrop belongs to stays
+     tappable while every other surface is covered. */
+  z-index: 42;
+  height: var(--la-hud-h);
+  max-width: calc(100% - 40px);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: rgba(15, 19, 32, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  pointer-events: auto;
-  touch-action: none;
-  max-width: calc(100vw - 32px);
+  gap: var(--la-s-1);
+  padding: 0 var(--la-s-1);
+  border-radius: var(--la-r-pill);
+  background: var(--la-glass);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
-.hudHomeBtn {
-  display: inline-flex;
+/* The tablet deck's header groups its icon buttons in one of these. */
+.hudActions {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
-  color: #38bdf8;
-  cursor: pointer;
+  gap: var(--la-s-1);
+}
+
+.hudButton {
+  width: var(--la-tap);
+  height: var(--la-hud-h);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--la-ink);
+  border-radius: var(--la-r-pill);
   padding: 0;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
+  cursor: pointer;
   touch-action: manipulation;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    transform var(--la-dur-press) var(--la-ease);
 }
 
-.hudHomeBtn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #7dd3fc;
-  border-color: rgba(56, 189, 248, 0.3);
-}
-
-.hudHomeBtn:active {
+.hudButton:active:not(:disabled) {
   transform: scale(0.94);
+}
+
+.hudButton:disabled {
+  color: var(--la-ink-4);
+  cursor: default;
+}
+
+.hudButtonIcon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
 }
 
 .hudTitleWrapper {
@@ -57,99 +73,56 @@
   min-width: 0;
 }
 
-.hudTitle {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
-  padding: 0 4px;
-  user-select: none;
-}
-
+/* The title is a control (it opens the tooltip), so its box is the pill's
+   full height even though the text is only 20px tall. */
 .hudTitleBtn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  height: var(--la-hud-h);
+  min-width: 0;
   background: transparent;
-  border: 1px solid transparent;
-  color: #f1f5f9;
+  border: 0;
+  padding: 0;
+  color: var(--la-ink);
   cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  max-width: 110px;
-  transition: all 0.15s ease;
+  border-radius: var(--la-r-pill);
   touch-action: manipulation;
 }
 
-.hudTitleBtn:hover,
-.hudTitleBtn:active {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.hudTitleIcon {
-  width: 14px;
-  height: 14px;
-  color: #38bdf8;
-  flex-shrink: 0;
-}
-
 .hudTitleText {
-  font-size: 0.82rem;
-  font-weight: 600;
-  white-space: nowrap;
+  font: 600 15px/20px var(--la-font-body);
+  color: var(--la-ink);
+  max-width: 160px;
+  padding: 0 var(--la-s-2);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .titleTooltip {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--la-s-2));
   left: 0;
-  background: rgba(15, 23, 42, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.75rem;
-  color: #f8fafc;
+  background: var(--la-glass-strong);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  border-radius: var(--la-r-sm);
+  padding: var(--la-s-2) var(--la-s-3);
+  font: var(--la-t-caption);
+  color: var(--la-ink);
   width: max-content;
   max-width: 220px;
   white-space: normal;
   word-break: break-word;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--la-e-3);
   z-index: 60;
   pointer-events: auto;
 }
 
-.controlsRail {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  flex-shrink: 0;
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.controlsRail.isDragging {
-  cursor: grabbing;
-}
-
-.controlsRail.isDragging * {
-  cursor: grabbing !important;
-  pointer-events: none;
-}
-
-.controlsRail::-webkit-scrollbar {
-  display: none;
+.titleTooltipBody {
+  margin-top: var(--la-s-1);
+  color: var(--la-ink-2);
 }
 
 .moreMenuWrapper {
@@ -160,278 +133,68 @@
 
 .moreMenuPopover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--la-s-2));
   right: 0;
-  background: rgba(15, 23, 42, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  padding: 6px;
+  background: var(--la-glass-strong);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  border-radius: var(--la-r-md);
+  padding: var(--la-s-1);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 210px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  gap: var(--la-s-1);
+  min-width: 232px;
+  box-shadow: var(--la-e-3);
   z-index: 60;
 }
 
 .moreMenuItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: var(--la-s-3);
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-3);
   background: transparent;
   border: none;
-  border-radius: 8px;
-  color: #f1f5f9;
-  font-size: 0.8rem;
-  font-weight: 500;
+  border-radius: var(--la-r-sm);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease;
+  transition: background var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
   width: 100%;
 }
 
-.moreMenuItem:hover,
 .moreMenuItem:active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: var(--la-surface-3);
 }
 
 .moreMenuIcon {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  color: #38bdf8;
+  color: var(--la-accent);
 }
 
+/* Covers the screen under the top bar: the rail (40) and the canvas below it
+   are out of reach while a popover is open, and a tap anywhere closes it.
+   The cursor is what makes the tap arrive: iOS Safari synthesises a click
+   for a bare div only where it takes the element for something clickable. */
 .popoverBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  z-index: 41;
   background: transparent;
-}
-
-.hudActions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.hudButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
   cursor: pointer;
-  padding: 0;
-  transition: all 0.15s ease;
-  touch-action: manipulation;
 }
 
-.hudButton:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.hudButton:active:not(:disabled) {
-  transform: scale(0.94);
-}
-
-.hudButton:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.hudButtonIcon {
-  width: 16px;
-  height: 16px;
-  color: inherit;
-  stroke: currentColor;
-  fill: none;
-}
-
-/* Bottom Sheet Container for Phone */
-.bottomSheet {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 40;
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-  touch-action: auto;
-}
-
-.collapsedPillBar {
-  margin: 0 auto max(8px, env(safe-area-inset-bottom)) auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: rgba(14, 18, 30, 0.92);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 9999px;
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
-  max-width: calc(100vw - 24px);
-  box-sizing: border-box;
-}
-
-.expandedSheet {
-  background: #0d121f;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.65);
-  max-height: min(65vh, 480px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-  contain: paint layout;
-}
-
-.sheetHandleRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 0 4px 0;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.sheetHandle {
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.25);
-  transition: background 0.15s ease;
-}
-
-.sheetHandleRow:hover .sheetHandle {
-  background: rgba(255, 255, 255, 0.45);
-}
-
-/* Tablet Split Layout */
-.tabletLayout {
-  display: flex;
-  flex-direction: row;
-  width: 100vw;
-  height: 100dvh;
-  overflow: hidden;
-  position: relative;
-}
-
-.tabletCanvasPane {
-  flex: 1 1 65%;
-  min-width: 0;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-.tabletInspectorPane {
-  grid-area: inspector;
-  width: clamp(340px, 35vw, 420px);
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: #0d121f;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  display: flex;
-  flex-direction: column;
-  z-index: 20;
-  padding: 16px 16px max(3.5rem, env(safe-area-inset-bottom)) 16px;
-  gap: 16px;
-  box-sizing: border-box;
-  contain: paint layout;
-}
-
-.tabletDeckHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.tabletDeckTitle {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #f8fafc;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tabletFlamePickBtn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 6px 12px;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-  min-width: 0;
-  max-width: calc(100% - 130px);
-  touch-action: manipulation;
-}
-
-.tabletFlamePickBtn:hover,
-.tabletFlamePickBtn:active {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(59, 130, 246, 0.5);
-  transform: translateY(-1px);
-}
-
-.tabletFlamePickIcon {
-  width: 18px;
-  height: 18px;
-  color: #38bdf8;
-  flex-shrink: 0;
-}
-
-.tabletFlameMeta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.tabletDeckSub {
-  font-size: 0.68rem;
-  color: #94a3b8;
-  line-height: 1.2;
-}
-
-.tabletFlameBadge {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  flex-shrink: 0;
-  margin-left: auto;
+@media (prefers-reduced-motion: reduce) {
+  .hudButton,
+  .moreMenuItem {
+    transition: none;
+  }
 }
 
 /* Touch Control Surface Shared Elements */
@@ -467,25 +230,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 34px;
-  padding: 0 8px;
-  border-radius: 17px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: #94a3b8;
+  min-width: var(--la-tap);
+  height: var(--la-tap);
+  padding: 0 var(--la-s-3);
+  border-radius: var(--la-r-pill);
+  border: 1px solid var(--la-hairline-strong);
+  background: var(--la-hairline);
+  color: var(--la-ink-3);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    color var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
 }
 
 .transformPillActive {
-  background: #38bdf8;
-  color: #04060c;
-  border-color: #38bdf8;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+  background: var(--la-accent);
+  color: var(--la-ink-invert);
+  border-color: var(--la-accent);
+  box-shadow: 0 0 12px var(--la-accent-edge);
 }
 
 .transformActions {
@@ -498,12 +263,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5e1;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink-2);
   cursor: pointer;
   padding: 0;
   touch-action: manipulation;
@@ -511,8 +276,8 @@
 }
 
 .iconBtnSmall:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: var(--la-hairline-strong);
+  color: var(--la-ink);
 }
 
 .iconBtnSmall:disabled {
@@ -538,23 +303,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #94a3b8;
-  font-size: 0.8rem;
-  font-weight: 500;
+  gap: var(--la-s-2);
+  height: 40px;
+  min-width: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink-2);
+  font: var(--la-t-body-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--la-dur-fast) var(--la-ease),
+    color var(--la-dur-fast) var(--la-ease);
   touch-action: manipulation;
 }
 
 .tabChipActive {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.35);
+  background: var(--la-accent-wash);
+  color: var(--la-accent);
+  border-color: var(--la-accent-edge);
 }
 
 .tabIcon {
@@ -570,7 +337,11 @@
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 12px;
+  /* The room under the last control is what keeps a slider's thumb whole: a
+     range input is as tall as its track, the thumb is drawn outside it, and
+     this box clips at its padding edge. With none, the bottom slider in a
+     panel (Color Speed) lost the lower half of its handle. */
+  padding: 0 var(--la-s-3) var(--la-s-3);
   box-sizing: border-box;
 }
 
@@ -593,8 +364,8 @@
   justify-content: space-between;
   gap: 6px;
   padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--la-hairline);
+  border: 1px solid var(--la-hairline);
   border-radius: 8px;
   overflow: hidden;
   min-width: 0;
@@ -604,7 +375,7 @@
 .varName {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #f1f5f9;
+  color: var(--la-ink);
   flex: 0 1 72px;
   min-width: 44px;
   max-width: 80px;
@@ -618,13 +389,13 @@
   min-width: 0;
   width: 100%;
   height: 4px;
-  accent-color: #38bdf8;
+  accent-color: var(--la-accent);
   cursor: pointer;
 }
 
 .varWeightVal {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--la-ink-3);
   font-variant-numeric: tabular-nums;
   min-width: 28px;
   flex-shrink: 0;
@@ -635,7 +406,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: var(--la-ink-3);
   margin-top: 4px;
 }
 
@@ -658,33 +429,35 @@
   align-items: center;
   gap: 4px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--la-hairline);
+  border: 1px solid var(--la-hairline);
   border-radius: 8px;
-  color: #f8fafc;
+  color: var(--la-ink);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
   min-width: 64px;
   touch-action: manipulation;
 }
 
 .quickPickCard svg {
-  color: #f8fafc;
+  color: var(--la-ink);
   stroke: currentColor;
 }
 
 .quickPickCard:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(56, 189, 248, 0.4);
+  background: var(--la-hairline);
+  border-color: var(--la-accent-edge);
 }
 
 .quickPickCard:hover svg {
-  color: #38bdf8;
+  color: var(--la-accent);
 }
 
 .quickPickName {
   font-size: 0.7rem;
-  color: #cbd5e1;
+  color: var(--la-ink-2);
   text-align: center;
 }
 
@@ -702,7 +475,7 @@
   aspect-ratio: 1 / 1;
   position: relative;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--la-hairline);
   border-radius: 12px;
   overflow: hidden;
   touch-action: none;
@@ -718,20 +491,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 32px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #94a3b8;
-  font-size: 0.78rem;
+  gap: var(--la-s-2);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink-2);
+  font: var(--la-t-body-sm);
   cursor: pointer;
   touch-action: manipulation;
 }
 
 .resetShapeBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: var(--la-hairline-strong);
+  color: var(--la-ink);
 }
 
 /* Colour Panel */
@@ -752,20 +525,20 @@
 }
 
 .paletteSwatch {
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline-strong);
   cursor: pointer;
   padding: 0;
   transition:
-    transform 0.15s ease,
-    border-color 0.15s ease;
+    transform var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
 }
 
 .paletteSwatch:hover {
   transform: scale(1.04);
-  border-color: #ffffff;
+  border-color: var(--la-ink);
 }
 
 .colourControlRow {
@@ -778,24 +551,62 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--la-ink-3);
 }
 
 .colourSlider {
   width: 100%;
   height: 6px;
-  accent-color: #38bdf8;
+  accent-color: var(--la-accent);
   cursor: pointer;
+}
+
+/* Vary panel: the rail's fourth chip. The deck keeps its footer instead. */
+.varyPanel {
+  display: grid;
+  gap: var(--la-s-3);
+  padding: var(--la-s-4);
+}
+
+.varyButton {
+  height: 56px;
+  border-radius: var(--la-r-pill);
+  border: var(--la-glass-edge);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.varyButtonPrimary {
+  background: var(--la-accent);
+  color: var(--la-ink-invert);
+  border-color: transparent;
+}
+
+.varyCaption {
+  margin: 0;
+  font: var(--la-t-caption);
+  color: var(--la-ink-3);
+  text-align: center;
 }
 
 /* Action Footer Bar */
 .surfaceFooter {
+  flex: 0 0 auto;
+  min-height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px 4px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  gap: var(--la-s-2);
+  padding: var(--la-s-2) var(--la-s-3);
+  border-top: 1px solid var(--la-hairline);
+  box-sizing: border-box;
 }
 
 .actionPillBtn {
@@ -803,22 +614,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
-  font-size: 0.78rem;
-  font-weight: 500;
+  gap: var(--la-s-2);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    color var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
 }
 
 .actionPillBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: var(--la-hairline-strong);
+  color: var(--la-ink);
 }
 
 .actionPillBtn svg {
@@ -827,20 +639,23 @@
 }
 
 .actionPillBtnPrimary {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.35);
-  color: #38bdf8;
+  background: var(--la-accent-wash);
+  border-color: var(--la-accent-edge);
+  color: var(--la-accent);
 }
 
 .actionPillBtnPrimary:hover {
-  background: rgba(56, 189, 248, 0.25);
-  color: #7dd3fc;
+  background: var(--la-accent-wash);
+  color: var(--la-accent-press);
 }
 
 /* Slide-over Advanced Tools Drawer */
 .drawerBackdrop {
   position: fixed;
   inset: 0;
+  /* As above: without it iOS may not synthesise the click that closes the
+     drawer from a tap beside it. */
+  cursor: pointer;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -854,17 +669,17 @@
   right: 0;
   bottom: 0;
   width: min(340px, 85vw);
-  background: rgba(14, 18, 30, 0.98);
+  background: var(--la-glass-solid);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 1px solid var(--la-hairline-strong);
   z-index: 95;
   display: flex;
   flex-direction: column;
   padding: 16px;
   gap: 16px;
   box-sizing: border-box;
-  animation: slideInRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideInRight var(--la-dur-sheet) var(--la-ease) forwards;
 }
 
 .drawerHeader {
@@ -872,13 +687,13 @@
   align-items: center;
   justify-content: space-between;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--la-hairline);
 }
 
 .drawerTitle {
   font-size: 1rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--la-ink);
   margin: 0;
 }
 
@@ -897,34 +712,36 @@
   gap: 12px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f1f5f9;
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink);
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
 }
 
 .drawerCard:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(56, 189, 248, 0.35);
+  background: var(--la-surface-3);
+  border-color: var(--la-accent-edge);
 }
 
 .drawerCardHighlight {
-  border-color: rgba(56, 189, 248, 0.3);
-  background: rgba(56, 189, 248, 0.08);
+  border-color: var(--la-accent-edge);
+  background: var(--la-accent-wash);
 }
 
 .drawerCardHighlight:hover {
-  background: rgba(56, 189, 248, 0.16);
-  border-color: rgba(56, 189, 248, 0.5);
+  background: var(--la-accent-wash);
+  border-color: var(--la-accent-edge);
 }
 
 .drawerCardIcon {
   width: 22px;
   height: 22px;
-  color: #38bdf8;
+  color: var(--la-accent);
   flex-shrink: 0;
 }
 
@@ -937,12 +754,12 @@
 .drawerCardTitle {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--la-ink);
 }
 
 .drawerCardSubtitle {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--la-ink-3);
 }
 
 @keyframes fadeIn {
@@ -983,24 +800,24 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--la-ink-3);
 }
 
 .searchToggleBtn {
   background: transparent;
   border: none;
-  color: #38bdf8;
+  color: var(--la-accent);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
-  transition: background 0.15s ease;
+  transition: background var(--la-dur-press) var(--la-ease);
 }
 
 .searchToggleBtn:hover,
 .searchToggleBtn:active {
-  background: rgba(56, 189, 248, 0.12);
+  background: var(--la-accent-wash);
 }
 
 .variationsCarousel {
@@ -1011,7 +828,7 @@
   padding: 4px 2px 10px 2px;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: var(--la-hairline-strong) transparent;
   -webkit-overflow-scrolling: touch;
   cursor: grab;
   user-select: none;
@@ -1034,7 +851,7 @@
 }
 
 .variationsCarousel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--la-hairline-strong);
   border-radius: 2px;
 }
 
@@ -1044,8 +861,8 @@
   height: 94px;
   min-height: 64px;
   border-radius: 12px;
-  background: #020617;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: var(--la-void);
+  border: 1.5px solid var(--la-hairline-strong);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -1055,15 +872,15 @@
   scroll-snap-align: start;
   cursor: pointer;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    border-color var(--la-dur-press) var(--la-ease),
+    box-shadow var(--la-dur-press) var(--la-ease),
+    transform var(--la-dur-press) var(--la-ease);
   touch-action: manipulation;
   text-align: left;
 }
 
 .variationTile:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--la-hairline-strong);
 }
 
 .variationTile:active {
@@ -1071,8 +888,8 @@
 }
 
 .variationTileSelected {
-  border-color: #22d3ee;
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.45);
+  border-color: var(--la-accent);
+  box-shadow: 0 0 12px var(--la-accent-edge);
 }
 
 .variationTileCanvas {
@@ -1086,7 +903,7 @@
   z-index: 2;
   font-size: 0.65rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--la-ink);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;

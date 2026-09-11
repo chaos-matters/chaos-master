@@ -20,7 +20,9 @@
 .trackerTouch {
   right: auto;
   left: max(0.75rem, env(safe-area-inset-left));
-  top: calc(max(0.75rem, env(safe-area-inset-top)) + 42px);
+  /* Below the top bar, wherever the safe area puts it: a hand-tuned offset
+     was measured against a pill that has since changed height. */
+  top: calc(var(--la-hud-bottom) + var(--la-s-2));
 }
 
 .headerBar {

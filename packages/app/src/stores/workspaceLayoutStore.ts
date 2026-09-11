@@ -1,4 +1,5 @@
 import { createMemo, createRoot, createSignal } from 'solid-js'
+import { IS_NATIVE } from '@/lib/platform'
 import { persistentSignal } from '@/utils/persistentSignal'
 import type { Accessor, Setter } from 'solid-js'
 
@@ -11,20 +12,61 @@ export function isWideLayout(): boolean {
   return window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
 }
 
-export function isPhoneLayout(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.innerWidth < PHONE_MAX_WIDTH
-}
-
-export function isTabletLayout(): boolean {
-  if (typeof window === 'undefined') return false
-  return (
-    window.innerWidth >= PHONE_MAX_WIDTH &&
-    window.innerWidth <= TABLET_MAX_WIDTH
-  )
-}
-
 export type TouchLayoutPreference = 'auto' | 'touch' | 'desktop'
+
+export type LayoutClass = 'phone' | 'tablet' | 'desktop'
+
+export interface LayoutInput {
+  readonly width: number
+  readonly height: number
+  /**
+   * The screen's short edge in CSS px. The window's short edge is not usable
+   * here: `interactive-widget=resizes-content` and Android's IME insets shrink
+   * the window when the soft keyboard opens, and a screen does not rotate
+   * under a keyboard.
+   */
+  readonly shortEdge: number
+  /** `(pointer: coarse)`: the primary pointer is a finger. */
+  readonly coarse: boolean
+  /** The Capacitor app. */
+  readonly native: boolean
+  readonly preference: TouchLayoutPreference
+}
+
+/** A screen whose short edge is under this is a phone, in any orientation. */
+export const COMPACT_MAX_SHORT_EDGE = PHONE_MAX_WIDTH
+/** Below this width a tablet uses the phone rail on its bigger canvas. */
+export const DECK_MIN_WIDTH = 900
+
+/**
+ * Which workspace to build. A device (the native app, or a coarse pointer on
+ * the web) is a phone or a tablet, decided by the short edge so a rotated
+ * phone stays a phone and an iPad in landscape stays a tablet; it never gets
+ * the desktop sidebar. A fine pointer on the web keeps the width rules the
+ * web has always had.
+ */
+export function classifyLayout(input: LayoutInput): LayoutClass {
+  if (input.preference === 'desktop') return 'desktop'
+  const device = input.native || input.coarse
+  if (device || input.preference === 'touch') {
+    // A device is measured by its screen: the soft keyboard shrinks the
+    // window, and a tablet that reclassified as a phone would unmount the
+    // deck together with the input the user is typing into. A desktop browser
+    // put into the touch layout by hand keeps the window measure, because its
+    // window is a fraction of the screen it sits on.
+    const shortEdge = device
+      ? input.shortEdge
+      : Math.min(input.width, input.height)
+    return shortEdge < COMPACT_MAX_SHORT_EDGE ? 'phone' : 'tablet'
+  }
+  if (input.width < PHONE_MAX_WIDTH) return 'phone'
+  if (input.width <= TABLET_MAX_WIDTH) return 'tablet'
+  return 'desktop'
+}
+
+export function deckFitsWidth(width: number): boolean {
+  return width >= DECK_MIN_WIDTH
+}
 
 export function isTouchDevice(): boolean {
   if (typeof window === 'undefined') return false
@@ -46,9 +88,7 @@ export interface WorkspaceLayoutStore {
   isMobile: Accessor<boolean>
   setIsMobile: Setter<boolean>
   isPhone: Accessor<boolean>
-  setIsPhone: Setter<boolean>
   isTablet: Accessor<boolean>
-  setIsTablet: Setter<boolean>
   isTouchLayout: Accessor<boolean>
 
   sidebarHidden: Accessor<boolean>
@@ -92,54 +132,97 @@ export interface WorkspaceLayoutStore {
 const [touchLayoutPreference, setTouchLayoutPreference] =
   persistentSignal<TouchLayoutPreference>('chaos-touch-layout-pref', 'auto')
 
-const [rawIsPhone, setRawIsPhone] = createSignal(
-  typeof window !== 'undefined' ? window.innerWidth < PHONE_MAX_WIDTH : false,
-)
-const [rawIsTablet, setRawIsTablet] = createSignal(
-  typeof window !== 'undefined'
-    ? window.innerWidth >= PHONE_MAX_WIDTH &&
-        window.innerWidth <= TABLET_MAX_WIDTH
-    : false,
+/**
+ * The short edge of the screen the window sits on, in CSS px. Only a device
+ * is classified by it (`classifyLayout`): on a desktop the screen says
+ * nothing about the size of the window. Where there is no usable screen the
+ * window is the honest measure.
+ */
+export function screenShortEdge(): number {
+  if (typeof window === 'undefined') return 768
+  const windowShort = Math.min(window.innerWidth, window.innerHeight)
+  const screen: Screen | undefined = window.screen
+  if (!screen) return windowShort
+  const screenShort = Math.min(screen.width, screen.height)
+  return Number.isFinite(screenShort) && screenShort > 0
+    ? screenShort
+    : windowShort
+}
+
+const readWindow = () => ({
+  width: typeof window === 'undefined' ? 1024 : window.innerWidth,
+  height: typeof window === 'undefined' ? 768 : window.innerHeight,
+  shortEdge: screenShortEdge(),
+})
+
+const [viewport, setViewport] = createSignal(readWindow())
+const [coarsePointer, setCoarsePointer] = createSignal(
+  typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches,
 )
 
-if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-  const mqPhone = window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH - 0.02}px)`)
-  const mqTablet = window.matchMedia(
-    `(min-width: ${PHONE_MAX_WIDTH}px) and (max-width: ${TABLET_MAX_WIDTH}px)`,
-  )
-  mqPhone.addEventListener?.('change', (e) => setRawIsPhone(e.matches))
-  mqTablet.addEventListener?.('change', (e) => setRawIsTablet(e.matches))
+if (typeof window !== 'undefined') {
+  // One listener; the class is derived, so a rotation or a Split View
+  // resize re-routes without a reload.
+  window.addEventListener('resize', () => setViewport(readWindow()))
+  if (typeof window.matchMedia === 'function') {
+    window
+      .matchMedia('(pointer: coarse)')
+      .addEventListener?.('change', (e) => setCoarsePointer(e.matches))
+  }
 }
 
 /**
  * Device classification outlives every component, so these memos are
- * deliberately global. `createRoot` makes that explicit and gives them an owner;
- * at module scope they were created outside any root and Solid warned, on every
- * page load, that they would never be disposed. The root is never disposed on
- * purpose, so its dispose function is discarded.
+ * deliberately global. `createRoot` makes that explicit and gives them an
+ * owner; at module scope they were created outside any root and Solid warned,
+ * on every page load, that they would never be disposed. The root is never
+ * disposed on purpose, so its dispose function is discarded.
  */
-const { isPhone, isTablet, isTouchLayout } = createRoot(() => {
-  const isPhone = createMemo(() => {
-    if (touchLayoutPreference() === 'desktop') return false
-    return rawIsPhone()
-  })
-  const isTablet = createMemo(() => {
-    if (touchLayoutPreference() === 'desktop') return false
-    if (touchLayoutPreference() === 'touch') return !rawIsPhone()
-    return rawIsTablet()
-  })
-  const isTouchLayout = createMemo(() => isPhone() || isTablet())
-  return { isPhone, isTablet, isTouchLayout }
-})
-
-export {
+const {
+  viewportWidth,
+  layoutClass,
   isPhone,
   isTablet,
   isTouchLayout,
+  deckFits,
+} = createRoot(() => {
+  const viewportWidth = createMemo(() => viewport().width)
+  const layoutClass = createMemo<LayoutClass>(() =>
+    classifyLayout({
+      ...viewport(),
+      coarse: coarsePointer(),
+      native: IS_NATIVE,
+      preference: touchLayoutPreference(),
+    }),
+  )
+  const isPhone = createMemo(() => layoutClass() === 'phone')
+  const isTablet = createMemo(() => layoutClass() === 'tablet')
+  const isTouchLayout = createMemo(() => isPhone() || isTablet())
+  /** The tablet shows the side deck; below the threshold it uses the phone rail. */
+  const deckFits = createMemo(
+    () => isTablet() && deckFitsWidth(viewportWidth()),
+  )
+  return {
+    viewportWidth,
+    layoutClass,
+    isPhone,
+    isTablet,
+    isTouchLayout,
+    deckFits,
+  }
+})
+
+export {
+  viewportWidth,
+  layoutClass,
+  isPhone,
+  isTablet,
+  isTouchLayout,
+  deckFits,
   touchLayoutPreference,
   setTouchLayoutPreference,
-  setRawIsPhone as setIsPhone,
-  setRawIsTablet as setIsTablet,
 }
 
 export function createWorkspaceLayoutStore(
@@ -191,9 +274,7 @@ export function createWorkspaceLayoutStore(
     isMobile,
     setIsMobile,
     isPhone,
-    setIsPhone: setRawIsPhone,
     isTablet,
-    setIsTablet: setRawIsTablet,
     isTouchLayout,
     sidebarHidden,
     setSidebarHidden,

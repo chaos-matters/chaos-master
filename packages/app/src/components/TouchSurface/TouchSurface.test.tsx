@@ -1,67 +1,160 @@
 import '@/commands/builtins'
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { safeRemoveItem } from '@/utils/storage'
 import { createMockCommandContext } from '@/webmcp/testUtils'
-import { AdvancedToolsDrawer, MobileBottomSurface, TabletInspectorDeck, TabletSplitLayout, TouchControlSurface, TouchHUD, } from './index'
+import { AdvancedToolsDrawer, TabletInspectorDeck, TouchControlSurface, TouchHUD, } from './index'
 import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
+import type * as StorageUtils from '@/utils/storage'
+
+// Every persisted signal writes through this, so a test can count the writes
+// a gesture costs. localStorage itself is not usable in this runtime.
+const storageWrite = vi.fn()
+vi.mock('@/utils/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof StorageUtils>()
+  return {
+    ...actual,
+    safeSetItem: (key: string, value: string) => {
+      storageWrite(key, value)
+      return actual.safeSetItem(key, value)
+    },
+  }
+})
 
 describe('TouchSurface Components', () => {
   afterEach(cleanup)
 
   describe('TouchHUD', () => {
-    it('renders flame name and action buttons', () => {
+    it('renders the flame name, Library and the history buttons', () => {
       const ctx = createMockCommandContext()
-      const onMutate = vi.fn()
-      const onRandomize = vi.fn()
-      const onSnapshot = vi.fn()
       const onPickGallery = vi.fn()
+      const onUndo = vi.fn()
+      const onRedo = vi.fn()
 
       render(() => (
         <TouchHUD
           ctx={ctx}
           flame={ctx.flameDescriptor}
-          onMutate={onMutate}
-          onRandomize={onRandomize}
-          onSnapshot={onSnapshot}
           onPickGallery={onPickGallery}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={() => true}
+          canRedo={() => false}
         />
       ))
 
       expect(screen.getByRole('banner')).toBeTruthy()
 
-      // Home button opens gallery
-      const homeBtn = screen.getByTitle('Browse & load flames from gallery')
-      expect(homeBtn).toBeTruthy()
-      homeBtn.click()
+      const library = screen.getByRole('button', { name: 'Library' })
+      library.click()
       expect(onPickGallery).toHaveBeenCalled()
 
-      // Title button toggles tooltip
+      // The title button keeps its tap tooltip.
       const titleBtn = screen.getByTitle(
-        ctx.flameDescriptor().metadata?.name || 'Chaos Master',
+        ctx.flameDescriptor().metadata?.name || 'Untitled flame',
       )
-      expect(titleBtn).toBeTruthy()
       titleBtn.click()
       expect(screen.getByRole('tooltip')).toBeTruthy()
 
-      // Snapshot button
-      const snapBtn = screen.getByTitle('Snapshot PNG')
-      snapBtn.click()
-      expect(onSnapshot).toHaveBeenCalled()
+      // Undo and Redo draw their disabled state instead of disappearing.
+      const undo = screen.getByRole('button', { name: 'Undo' })
+      const redo = screen.getByRole('button', { name: 'Redo' })
+      expect((redo as HTMLButtonElement).disabled).toBe(true)
+      expect((undo as HTMLButtonElement).disabled).toBe(false)
+      undo.click()
+      redo.click()
+      expect(onUndo).toHaveBeenCalledTimes(1)
+      expect(onRedo).not.toHaveBeenCalled()
+    })
 
-      // More menu opens popover with Mutate and Randomize
-      const moreBtn = screen.getByTitle('More Options')
-      expect(moreBtn).toBeTruthy()
-      moreBtn.click()
+    it('falls back to Untitled flame when the flame has no name', () => {
+      const ctx = createMockCommandContext()
+      const flame = () => ({
+        ...ctx.flameDescriptor(),
+        metadata: { ...ctx.flameDescriptor().metadata, name: '' },
+      })
 
-      const mutateBtn = screen.getByText('Mutate Flame')
-      mutateBtn.click()
-      expect(onMutate).toHaveBeenCalled()
+      render(() => <TouchHUD ctx={ctx} flame={flame} />)
 
-      // Open menu again for Randomize
-      moreBtn.click()
-      const randBtn = screen.getByText('Randomize Flame')
-      randBtn.click()
-      expect(onRandomize).toHaveBeenCalled()
+      expect(screen.getByTitle('Untitled flame')).toBeTruthy()
+    })
+
+    it('lists only the More items whose handler was given', () => {
+      const ctx = createMockCommandContext()
+      const onOpenExportModal = vi.fn()
+      const onOpenSettings = vi.fn()
+
+      render(() => (
+        <TouchHUD
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onOpenExportModal={onOpenExportModal}
+          onOpenSettings={onOpenSettings}
+        />
+      ))
+
+      screen.getByRole('button', { name: 'More' }).click()
+      expect(screen.getByText('Settings and more')).toBeTruthy()
+      expect(screen.queryByText('Share link')).toBeNull()
+
+      screen.getByText('Export options').click()
+      expect(onOpenExportModal).toHaveBeenCalled()
+      // Choosing an item closes the menu.
+      expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('offers both ways into the benchmarks', () => {
+      const ctx = createMockCommandContext()
+      const onOpenBenchmark = vi.fn()
+      const onOpenBenchmarkLab = vi.fn()
+
+      render(() => (
+        <TouchHUD
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onOpenBenchmark={onOpenBenchmark}
+          onOpenBenchmarkLab={onOpenBenchmarkLab}
+        />
+      ))
+
+      // Hiding the floating version menu on this layout took both entry
+      // points with it; the More menu is where they live now.
+      screen.getByRole('button', { name: 'More' }).click()
+      screen.getByText('Quick GPU benchmark').click()
+      expect(onOpenBenchmark).toHaveBeenCalledTimes(1)
+
+      screen.getByRole('button', { name: 'More' }).click()
+      screen.getByText('Benchmark Lab').click()
+      expect(onOpenBenchmarkLab).toHaveBeenCalledTimes(1)
+    })
+
+    it('closes its popovers from a tap anywhere on the screen', () => {
+      const ctx = createMockCommandContext()
+      render(() => (
+        <TouchHUD
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onOpenSettings={vi.fn()}
+        />
+      ))
+
+      screen.getByRole('button', { name: 'More' }).click()
+      expect(screen.getByRole('menu')).toBeTruthy()
+      const backdrop = screen.getByTestId('hud-popover-backdrop')
+      // The pill's blur and its centring transform make it the containing
+      // block for a fixed child, so a backdrop inside it covers the pill and
+      // nothing else: the canvas below stayed live and the menu never closed.
+      expect(screen.getByRole('banner').contains(backdrop)).toBe(false)
+      backdrop.click()
+      expect(screen.queryByRole('menu')).toBeNull()
+
+      const titleBtn = screen.getByTitle(
+        ctx.flameDescriptor().metadata?.name || 'Untitled flame',
+      )
+      titleBtn.click()
+      expect(screen.getByRole('tooltip')).toBeTruthy()
+      screen.getByTestId('hud-popover-backdrop').click()
+      expect(screen.queryByRole('tooltip')).toBeNull()
     })
   })
 
@@ -173,35 +266,19 @@ describe('TouchSurface Components', () => {
     })
   })
 
-  describe('MobileBottomSurface', () => {
-    it('renders collapsed pill bar and expands on chip tap', () => {
-      const ctx = createMockCommandContext()
-      const onRandomize = vi.fn()
-
-      render(() => (
-        <MobileBottomSurface
-          ctx={ctx}
-          flame={ctx.flameDescriptor}
-          onRandomize={onRandomize}
-        />
-      ))
-
-      expect(
-        screen.getByRole('region', { name: 'Mobile Controls' }),
-      ).toBeTruthy()
-      const openVariations = screen.getByRole('button', {
-        name: 'Open Variations',
-      })
-      expect(openVariations).toBeTruthy()
-
-      openVariations.click()
-      // Once clicked, bottom sheet expands and renders TouchControlSurface
-      expect(screen.getByRole('button', { name: 'T1' })).toBeTruthy()
-    })
-  })
-
   describe('TabletInspectorDeck', () => {
-    it('renders header and embedded control surface', () => {
+    beforeEach(() => {
+      // A landscape 11 inch iPad, and no width carried over from a sibling
+      // test. safeRemoveItem, because this runtime's localStorage is partial.
+      window.innerWidth = 1210
+      window.innerHeight = 834
+      safeRemoveItem('chaos-master-chaos-tablet-deck-width')
+    })
+
+    const deck = () =>
+      screen.getByRole('complementary', { name: 'Tablet Touch Inspector' })
+
+    it('renders the header, the segmented row and the control surface', () => {
       const ctx = createMockCommandContext()
       const onPickGallery = vi.fn()
 
@@ -213,36 +290,98 @@ describe('TouchSurface Components', () => {
         />
       ))
 
-      expect(
-        screen.getByRole('complementary', { name: 'Tablet Touch Inspector' }),
-      ).toBeTruthy()
-      expect(screen.getByText('Browse Gallery')).toBeTruthy()
-      const pickBtn = screen.getByRole('button', {
-        name: 'Browse & load flame from gallery',
-      })
-      pickBtn.click()
+      expect(deck()).toBeTruthy()
+      screen.getByRole('button', { name: 'Library' }).click()
       expect(onPickGallery).toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Redo' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Save image' })).toBeTruthy()
+      expect(
+        screen.getAllByRole('tab').map((t) => t.textContent?.trim()),
+      ).toEqual(['Variations', 'Shape', 'Colour'])
       expect(screen.getByRole('button', { name: 'T1' })).toBeTruthy()
     })
-  })
 
-  describe('TabletSplitLayout', () => {
-    it('renders split layout with canvas pane and inspector pane', () => {
+    it('collapses to an edge tab on a double tap and reopens', () => {
       const ctx = createMockCommandContext()
-
       render(() => (
-        <TabletSplitLayout ctx={ctx} flame={ctx.flameDescriptor}>
-          <div data-testid="test-canvas-pane">Canvas Hero</div>
-        </TabletSplitLayout>
+        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
       ))
 
+      fireEvent.dblClick(screen.getByTestId('deck-divider'))
       expect(
-        screen.getByRole('main', { name: 'Tablet Split Studio' }),
-      ).toBeTruthy()
-      expect(screen.getByTestId('test-canvas-pane')).toBeTruthy()
-      expect(
-        screen.getByRole('complementary', { name: 'Tablet Touch Inspector' }),
-      ).toBeTruthy()
+        screen.queryByRole('complementary', { name: 'Tablet Touch Inspector' }),
+      ).toBeNull()
+
+      screen.getByRole('button', { name: 'Show inspector' }).click()
+      expect(deck()).toBeTruthy()
+    })
+
+    it('saves on a tap and opens the export options on a long press', () => {
+      vi.useFakeTimers()
+      const ctx = createMockCommandContext()
+      const onSnapshot = vi.fn()
+      const onOpenExportOptions = vi.fn()
+      render(() => (
+        <TabletInspectorDeck
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onSnapshot={onSnapshot}
+          onOpenExportOptions={onOpenExportOptions}
+        />
+      ))
+
+      const save = screen.getByRole('button', { name: 'Save image' })
+      fireEvent.pointerDown(save)
+      fireEvent.pointerUp(save)
+      fireEvent.click(save)
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+
+      fireEvent.pointerDown(save)
+      vi.advanceTimersByTime(600)
+      fireEvent.pointerUp(save)
+      fireEvent.click(save)
+      expect(onOpenExportOptions).toHaveBeenCalledTimes(1)
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+      vi.useRealTimers()
+    })
+
+    it('resizes by dragging the divider', () => {
+      const ctx = createMockCommandContext()
+      render(() => (
+        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+      ))
+
+      const divider = screen.getByTestId('deck-divider')
+      expect(deck().style.width).toBe('380px')
+      fireEvent.pointerDown(divider, { clientX: 900, pointerId: 1 })
+      fireEvent.pointerMove(divider, { clientX: 860, pointerId: 1 })
+      fireEvent.pointerUp(divider, { clientX: 860, pointerId: 1 })
+      expect(deck().style.width).toBe('420px')
+    })
+
+    it('stores the width once the divider is let go', () => {
+      const ctx = createMockCommandContext()
+      render(() => (
+        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+      ))
+
+      const divider = screen.getByTestId('deck-divider')
+      fireEvent.pointerDown(divider, { clientX: 900, pointerId: 1 })
+      storageWrite.mockClear()
+      fireEvent.pointerMove(divider, { clientX: 880, pointerId: 1 })
+      fireEvent.pointerMove(divider, { clientX: 860, pointerId: 1 })
+      // The deck follows the finger; a JSON serialise and a synchronous
+      // storage write per pointermove do not go with it.
+      expect(deck().style.width).toBe('420px')
+      expect(storageWrite).not.toHaveBeenCalled()
+
+      fireEvent.pointerUp(divider, { clientX: 860, pointerId: 1 })
+      expect(storageWrite).toHaveBeenCalledTimes(1)
+      expect(storageWrite).toHaveBeenCalledWith(
+        'chaos-master-chaos-tablet-deck-width',
+        '420',
+      )
     })
   })
 })

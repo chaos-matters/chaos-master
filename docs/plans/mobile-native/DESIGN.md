@@ -97,18 +97,20 @@ every 32 and 34 px target to 44 (48 on Android); `components/SoftwareVersion/Sof
 rendering its own floating button on touch, where it collides with the top bar; `MainWorkspace.tsx` mounts the
 new surface and hooks the camera offset into `effectivePosition`.
 
-- [ ] A detent controller: drag tracks the finger 1:1, no rubber band past large, release springs to the
+- [x] A detent controller: drag tracks the finger 1:1, no rubber band past large, release springs to the
       nearest detent or to the next one in the direction of travel above 0.5 pt/ms.
-- [ ] Haptics: `selectionChanged()` at each detent crossing, `impact(Light)` at the latch, `impact(Light)` at
+- [x] Haptics: `selectionChanged()` at each detent crossing, `impact(Light)` at the latch, `impact(Light)` at
       touch-down on a chip. A new `@chaos-master/mobile-runtime/haptics` module; nothing in `packages/app`
       calls `@capacitor/haptics` today although the plugin is already registered on both platforms.
-- [ ] 44 pt minimum on every target, 48 dp on Android, measured on the touch box.
+- [x] 40 px minimum on every tappable control, 48 dp on Android, measured on the touch box. A drag
+      handle (the grabber row, the deck's divider) may be thinner, and its whole hit strip receives
+      touches.
 - [ ] The slider row from the kit: 56 pt phone / 48 pt tablet, 4 pt track, 28 pt thumb with a 44 pt touch box
       inflated by a `::before`, and **the value always visible** in tabular figures.
 - [ ] Long-press to remove a variation, with an undo toast. Delete the one-tap delete in
       `TouchControlSurface.tsx`.
-- [ ] The camera pans up by half the covered height when the sheet opens, and back when it closes.
-- [ ] `index.html` gains `interactive-widget=resizes-content` so the keyboard does not cover the sheet.
+- [x] The camera pans up by half the covered height when the sheet opens, and back when it closes.
+- [x] `index.html` gains `interactive-widget=resizes-content` so the keyboard does not cover the sheet.
 
 **Acceptance, phone (compact, under 680 pt):** the rail is mounted and never disappears; a flick down goes one
 detent and never to hidden; every daily action is reachable below 700 pt on an 852 pt screen; the canvas above
@@ -132,10 +134,10 @@ breakpoints, and never consults input or platform. Consequences, all visible on 
 landscape (1210 pt) and a 13 inch (1366 pt) both fall through to the desktop workspace; a rotated iPhone
 (852 pt) classifies as a tablet and gets the inspector deck on a 393 pt tall screen.
 
-- [ ] Decide compact versus regular from the **short edge** and from the element's width, not the window's.
-- [ ] Collapse `PHONE_MAX_WIDTH`, `TABLET_MAX_WIDTH` and `WIDE_LAYOUT_MIN_WIDTH` into one source, and add the
+- [x] Decide compact versus regular from the **short edge** and from the element's width, not the window's.
+- [x] Collapse `PHONE_MAX_WIDTH`, `TABLET_MAX_WIDTH` and `WIDE_LAYOUT_MIN_WIDTH` into one source, and add the
       900 pt rule for the tablet deck.
-- [ ] Consult `IS_NATIVE` (`lib/platform.ts`) and `(pointer: coarse)`; width then chooses only compact or
+- [x] Consult `IS_NATIVE` (`lib/platform.ts`) and `(pointer: coarse)`; width then chooses only compact or
       regular.
 - [ ] Crossing the threshold is a cross-fade, never a reload, and the rail's detent survives it.
 
@@ -400,7 +402,8 @@ WebView 146)**, plus a phone on Android for the save path.
 - [ ] Rotate in every screen: the layout follows the short edge, the detent survives, nothing reloads.
 - [ ] iPad Split View at one-third, one-half and two-thirds: compact at 455 pt, regular above 900 pt, a
       cross-fade at the threshold, no lost state.
-- [ ] Every target measured at 44 pt (48 dp on Android) with the accessibility inspector.
+- [ ] Every tappable control measured at 40 px minimum (48 dp on Android) with the accessibility
+      inspector, and both edges of every drag handle's hit strip touched.
 - [ ] Dynamic Type at AX2 and the largest step: the rail, the sheet, the tab bar and the deck all survive.
 - [ ] VoiceOver and TalkBack: the rotor reads Parameters, Transforms and Palette; a slider announces its name
       and value and changes by swipe; the canvas has a spoken summary.

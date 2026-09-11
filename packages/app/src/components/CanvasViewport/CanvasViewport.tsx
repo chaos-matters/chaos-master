@@ -38,6 +38,8 @@ export interface CanvasViewportProps {
   onCanvasClick: () => void
   onToggleMobileSidebar: () => void
   hideMobileSidebarToggle?: boolean
+  /** Px of viewport the editor rail's sheet covers; the canvas pans up by half. */
+  railInset?: Accessor<number>
 
   // Flame / rendering
   flameDescriptor: FlameDescriptor
@@ -98,6 +100,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
       class={ui.canvasContainer}
       data-tour-target="canvas"
       classList={{ [ui.fullscreen as string]: !props.showSidebar() }}
+      style={{ '--rail-inset': `${props.railInset?.() ?? 0}px` }}
       onClick={props.onCanvasClick}
     >
       <Show when={props.isMobile() && !props.hideMobileSidebarToggle}>

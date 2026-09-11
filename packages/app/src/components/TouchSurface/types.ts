@@ -1,8 +1,8 @@
-import type { Accessor, JSXElement } from 'solid-js'
+import type { Accessor } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
-export type TouchTab = 'variations' | 'shape' | 'colour'
+export type TouchTab = 'variations' | 'shape' | 'colour' | 'vary'
 
 export type TouchSurfaceMode = 'bottom-sheet' | 'tablet-deck'
 
@@ -11,6 +11,10 @@ export interface TouchControlSurfaceProps {
   flame: Accessor<FlameDescriptor>
   mode: TouchSurfaceMode
   initialTab?: TouchTab
+  /** When given, the surface follows it and its own tab row is not the source of truth. */
+  tab?: Accessor<TouchTab>
+  hideTabRow?: boolean
+  hideFooter?: boolean
   onOpenDrawer?: () => void
   onRandomize?: () => void
   onMutate?: () => void
@@ -22,34 +26,16 @@ export interface TouchControlSurfaceProps {
   onPickGallery?: () => void
 }
 
-export interface MobileBottomSurfaceProps {
+export interface EditorRailProps {
   ctx: CommandContext
   flame: Accessor<FlameDescriptor>
-  initialTab?: TouchTab
+  onRandomize: () => void
+  onMutate: () => void
+  onQuickExport: () => void
+  onOpenExportOptions: () => void
   onOpenDrawer?: () => void
-  onRandomize?: () => void
-  onMutate?: () => void
-  onUndo?: () => void
-  onRedo?: () => void
-  canUndo?: Accessor<boolean>
-  canRedo?: Accessor<boolean>
-  onSnapshot?: () => void
-  onPickGallery?: () => void
-}
-
-export interface TabletSplitLayoutProps {
-  ctx: CommandContext
-  flame: Accessor<FlameDescriptor>
-  children: JSXElement
-  onOpenDrawer?: () => void
-  onRandomize?: () => void
-  onMutate?: () => void
-  onUndo?: () => void
-  onRedo?: () => void
-  canUndo?: Accessor<boolean>
-  canRedo?: Accessor<boolean>
-  onSnapshot?: () => void
-  onPickGallery?: () => void
+  /** The height of the viewport the sheet covers at its current detent, in px; 0 at peek. */
+  onCoveredHeightChange?: (px: number) => void
 }
 
 export interface AdvancedDrawerItem {

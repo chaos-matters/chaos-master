@@ -63,9 +63,11 @@ export function createLazyShowHelp(
   setCompact: (value: boolean) => void,
   theme: () => Theme,
   onThemeChange: (theme: Theme) => void,
-  onInjectCrash?: () => void,
-  hardwareTier?: () => HardwareTier | null,
-  onHardwareTierChange?: (tier: HardwareTier) => void,
+  onInjectCrash: (() => void) | undefined,
+  hardwareTier: () => HardwareTier | null,
+  onHardwareTierChange: ((tier: HardwareTier) => void) | undefined,
+  hapticsEnabled: () => boolean,
+  onHapticsEnabledChange: (enabled: boolean) => void,
 ) {
   const owner = getOwner()
   let instancePromise: Promise<ReturnType<typeof createShowHelp>> | null = null
@@ -87,6 +89,8 @@ export function createLazyShowHelp(
               onInjectCrash,
               hardwareTier,
               onHardwareTierChange,
+              hapticsEnabled,
+              onHapticsEnabledChange,
             ),
           )!,
       )

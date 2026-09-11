@@ -14,6 +14,16 @@
       "types": "./src/capacitor/index.ts",
       "import": "./src/capacitor/index.ts",
       "default": "./src/capacitor/index.ts"
+    },
+    "./haptics": {
+      "types": "./src/haptics.ts",
+      "import": "./src/haptics.ts",
+      "default": "./src/haptics.ts"
+    },
+    "./capacitor-haptics": {
+      "types": "./src/capacitor/haptics.ts",
+      "import": "./src/capacitor/haptics.ts",
+      "default": "./src/capacitor/haptics.ts"
     }
   },
   "scripts": {
@@ -23,6 +33,7 @@
   "dependencies": {
     "@capacitor/core": "^8.5.1",
     "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/share": "^8.0.1"
   },
   "devDependencies": {

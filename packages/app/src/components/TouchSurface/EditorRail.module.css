@@ -1,0 +1,183 @@
+/* The editor rail: one surface at three detents. Colour, radius, spacing,
+   duration and easing come from the --la-* set only (styles/designSystem/lumen.css);
+   a hex literal here would not follow a direction switch, and a test enforces it. */
+
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  /* The padding is the chrome the sheet may not grow into, and the rail reads
+     it back through getComputedStyle to cap the large detent: the top bar and
+     the gap under it above, the home indicator below. The box grows upward
+     from the bottom of the screen and is inert, so the padding blocks
+     nothing. */
+  padding-top: calc(var(--la-hud-bottom) + var(--la-s-2));
+  padding-right: max(var(--la-float-inset), var(--la-safe-right));
+  padding-bottom: var(--la-dock-bottom);
+  padding-left: max(var(--la-float-inset), var(--la-safe-left));
+  /* The dock is a frame around the sheet; the canvas stays reachable beside it. */
+  pointer-events: none;
+}
+
+.sheet {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--la-r-sheet) var(--la-r-sheet) 0 0;
+  background: var(--la-glass-strong);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-e-sheet);
+  box-sizing: border-box;
+  overflow: hidden;
+  contain: layout paint;
+  transition: height var(--la-dur-sheet) var(--la-ease);
+}
+
+/* While the finger is the clock there is no easing between frames. */
+.sheet.dragging {
+  transition: none;
+}
+
+/* Glass belongs where chrome floats over the artwork. Open, the sheet covers
+   up to 88% of a canvas that repaints while the flame converges, and the
+   compositor re-blurs all of it every frame; the ground is solid instead
+   until the sheet is back at peek. */
+.sheet.opaque {
+  background: var(--la-glass-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.grabberRow {
+  height: 24px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: grab;
+}
+
+.grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--la-hairline-strong);
+}
+
+.peekRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  padding: 0 var(--la-s-2) var(--la-s-2);
+}
+
+/* Behind the chips and the shutter, so a drag started on the row's background
+   is a drag and a drag started on a control is not. */
+.dragSurface {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.chips {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  /* Shrink to the row rather than scroll inside it: at 360px the four chips
+     wanted 278 of 254, which cut the last one off behind the shutter and made
+     a horizontal swipe scroll the row. The tap token is the floor. */
+  flex: 1 1 0;
+  min-width: var(--la-tap);
+  height: var(--la-tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  border-radius: var(--la-r-pill);
+  color: var(--la-ink-2);
+  font: var(--la-t-tab);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background var(--la-dur-fast) var(--la-ease),
+    color var(--la-dur-fast) var(--la-ease);
+}
+
+.chip[aria-selected='true'] {
+  color: var(--la-accent);
+  background: var(--la-accent-wash);
+}
+
+.chipIcon {
+  width: 26px;
+  height: 26px;
+}
+
+.shutter {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--la-glass);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+  color: var(--la-accent);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--la-dur-press) var(--la-ease);
+}
+
+.shutter:active {
+  transform: scale(0.94);
+}
+
+.shutterIcon {
+  width: 26px;
+  height: 26px;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  /* No safe area here: the dock already lifts the whole sheet above the home
+     indicator, and counting it twice leaves a gap under the last row. */
+  padding-bottom: var(--la-s-4);
+}
+
+/* Peek: the panel stays built but stops painting, which is what pauses the
+   variation previews through their IntersectionObserver. */
+.body[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .chip,
+  .shutter {
+    transition: none;
+  }
+}

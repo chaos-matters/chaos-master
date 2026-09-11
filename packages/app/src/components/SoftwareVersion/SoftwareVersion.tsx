@@ -15,6 +15,11 @@ export interface SoftwareVersionProps {
   touchLayoutPreference?: () => TouchLayoutPreference
   setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
   isTouchLayout?: () => boolean
+  /**
+   * True where the editor's top bar is drawn: the floating trigger would sit
+   * under it, and the top bar's More menu already carries these items.
+   */
+  hideTrigger?: () => boolean
   onPickGallery?: () => void
 }
 
@@ -170,10 +175,43 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
   return (
     <div>
       <DebugPanel />
-      <Show
-        when={isTouch()}
-        fallback={
-          <div class={ui.desktopContainer}>
+      <Show when={!props.hideTrigger?.()}>
+        <Show
+          when={isTouch()}
+          fallback={
+            <div class={ui.desktopContainer}>
+              <Show when={open()}>
+                <div
+                  class={ui.popoverBackdrop}
+                  onClick={() => setOpen(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  class={ui.menuPopoverUp}
+                  role="menu"
+                  aria-label="Chaos Master menu"
+                >
+                  {renderMenuItems(false)}
+                </div>
+              </Show>
+
+              <button
+                type="button"
+                class={ui.desktopTrigger}
+                classList={{ [ui.desktopTriggerActive as string]: open() }}
+                onClick={() => setOpen(!open())}
+                aria-expanded={open()}
+                aria-haspopup="menu"
+                aria-label={`Chaos Master v${DISPLAY_VERSION} menu`}
+                title={`Chaos Master v${DISPLAY_VERSION} menu`}
+              >
+                <Info class={ui.pillIcon} />
+                <span>v{DISPLAY_VERSION}</span>
+              </button>
+            </div>
+          }
+        >
+          <div class={ui.touchContainer}>
             <Show when={open()}>
               <div
                 class={ui.popoverBackdrop}
@@ -181,59 +219,28 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
                 aria-hidden="true"
               />
               <div
-                class={ui.menuPopoverUp}
+                class={ui.menuPopover}
                 role="menu"
                 aria-label="Chaos Master menu"
               >
-                {renderMenuItems(false)}
+                {renderMenuItems(true)}
               </div>
             </Show>
 
             <button
               type="button"
-              class={ui.desktopTrigger}
-              classList={{ [ui.desktopTriggerActive as string]: open() }}
+              class={ui.menuTrigger}
+              classList={{ [ui.menuTriggerActive as string]: open() }}
               onClick={() => setOpen(!open())}
               aria-expanded={open()}
               aria-haspopup="menu"
-              aria-label={`Chaos Master v${DISPLAY_VERSION} menu`}
-              title={`Chaos Master v${DISPLAY_VERSION} menu`}
+              aria-label="Chaos Master menu"
+              title="Chaos Master menu"
             >
-              <Info class={ui.pillIcon} />
-              <span>v{DISPLAY_VERSION}</span>
+              <Menu class={ui.triggerIcon} />
             </button>
           </div>
-        }
-      >
-        <div class={ui.touchContainer}>
-          <Show when={open()}>
-            <div
-              class={ui.popoverBackdrop}
-              onClick={() => setOpen(false)}
-              aria-hidden="true"
-            />
-            <div
-              class={ui.menuPopover}
-              role="menu"
-              aria-label="Chaos Master menu"
-            >
-              {renderMenuItems(true)}
-            </div>
-          </Show>
-
-          <button
-            type="button"
-            class={ui.menuTrigger}
-            classList={{ [ui.menuTriggerActive as string]: open() }}
-            onClick={() => setOpen(!open())}
-            aria-expanded={open()}
-            aria-haspopup="menu"
-            aria-label="Chaos Master menu"
-            title="Chaos Master menu"
-          >
-            <Menu class={ui.triggerIcon} />
-          </button>
-        </div>
+        </Show>
       </Show>
     </div>
   )

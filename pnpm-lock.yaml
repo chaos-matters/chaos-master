@@ -351,6 +351,9 @@ importers:
       '@capacitor/filesystem':
         specifier: ^8.1.3
         version: 8.1.3(@capacitor/core@8.5.2)
+      '@capacitor/haptics':
+        specifier: ^8.0.2
+        version: 8.0.2(@capacitor/core@8.5.2)
       '@capacitor/share':
         specifier: ^8.0.1
         version: 8.0.2(@capacitor/core@8.5.2)

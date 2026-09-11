@@ -11,6 +11,7 @@ import { variationTypesFor } from '@/flame/variationRegistry'
 import { filterVariations } from '@/flame/variations/search'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { ColourWedge, Cross, Minus, Plus, Reset, ShapeTriangle, Shuffle, SidebarPanel, Sparkle, VariationSpiral, } from '@/icons'
+import { haptic } from '@/lib/haptics'
 import { createHorizontalScrollDrag } from '@/utils/createHorizontalScrollDrag'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
@@ -67,12 +68,17 @@ function readableType(type: string): string {
 
 export function TouchControlSurface(props: TouchControlSurfaceProps) {
   const [activeTab, setActiveTab] = createSignal<TouchTab>(
-    props.initialTab ?? 'variations',
+    props.tab?.() ?? props.initialTab ?? 'variations',
   )
   createEffect(() => {
     if (props.initialTab) {
       setActiveTab(props.initialTab)
     }
+  })
+  // The rail owns the tab when it passes one: the chips are the tab row there.
+  createEffect(() => {
+    const controlled = props.tab?.()
+    if (controlled) setActiveTab(controlled)
   })
 
   const [selectedTransformId, setSelectedTransformId] =
@@ -194,41 +200,43 @@ export function TouchControlSurface(props: TouchControlSurfaceProps) {
       </div>
 
       {/* 2. Primary Tabs */}
-      <div class={ui.tabRow} role="tablist">
-        <button
-          type="button"
-          class={ui.tabChip}
-          classList={{ [ui.tabChipActive!]: activeTab() === 'variations' }}
-          role="tab"
-          aria-selected={activeTab() === 'variations'}
-          onClick={() => setActiveTab('variations')}
-        >
-          <VariationSpiral class={ui.tabIcon} />
-          Variations
-        </button>
-        <button
-          type="button"
-          class={ui.tabChip}
-          classList={{ [ui.tabChipActive!]: activeTab() === 'shape' }}
-          role="tab"
-          aria-selected={activeTab() === 'shape'}
-          onClick={() => setActiveTab('shape')}
-        >
-          <ShapeTriangle class={ui.tabIcon} />
-          Shape
-        </button>
-        <button
-          type="button"
-          class={ui.tabChip}
-          classList={{ [ui.tabChipActive!]: activeTab() === 'colour' }}
-          role="tab"
-          aria-selected={activeTab() === 'colour'}
-          onClick={() => setActiveTab('colour')}
-        >
-          <ColourWedge class={ui.tabIcon} />
-          Colour
-        </button>
-      </div>
+      <Show when={!props.hideTabRow}>
+        <div class={ui.tabRow} role="tablist">
+          <button
+            type="button"
+            class={ui.tabChip}
+            classList={{ [ui.tabChipActive!]: activeTab() === 'variations' }}
+            role="tab"
+            aria-selected={activeTab() === 'variations'}
+            onClick={() => setActiveTab('variations')}
+          >
+            <VariationSpiral class={ui.tabIcon} />
+            Variations
+          </button>
+          <button
+            type="button"
+            class={ui.tabChip}
+            classList={{ [ui.tabChipActive!]: activeTab() === 'shape' }}
+            role="tab"
+            aria-selected={activeTab() === 'shape'}
+            onClick={() => setActiveTab('shape')}
+          >
+            <ShapeTriangle class={ui.tabIcon} />
+            Shape
+          </button>
+          <button
+            type="button"
+            class={ui.tabChip}
+            classList={{ [ui.tabChipActive!]: activeTab() === 'colour' }}
+            role="tab"
+            aria-selected={activeTab() === 'colour'}
+            onClick={() => setActiveTab('colour')}
+          >
+            <ColourWedge class={ui.tabIcon} />
+            Colour
+          </button>
+        </div>
+      </Show>
 
       {/* 3. Panel Body */}
       <div class={ui.panelContent}>
@@ -562,43 +570,80 @@ export function TouchControlSurface(props: TouchControlSurfaceProps) {
             </>
           )}
         </Show>
+
+        {/* TAB D: VARY. Outside the transform Show: it acts on the flame. */}
+        <Show when={activeTab() === 'vary'}>
+          <div class={ui.varyPanel}>
+            <button
+              type="button"
+              class={ui.varyButton}
+              onPointerDown={() => {
+                haptic.impactLight()
+              }}
+              onClick={() => {
+                if (props.onMutate) props.onMutate()
+                else dispatch('flame.mutate')
+              }}
+            >
+              <Sparkle class={ui.hudButtonIcon} /> Mutate
+            </button>
+            <button
+              type="button"
+              class={`${ui.varyButton} ${ui.varyButtonPrimary}`}
+              onPointerDown={() => {
+                haptic.impactMedium()
+              }}
+              onClick={() => {
+                if (props.onRandomize) props.onRandomize()
+                else dispatch('flame.randomize')
+              }}
+            >
+              <Shuffle class={ui.hudButtonIcon} /> Randomize
+            </button>
+            <p class={ui.varyCaption}>
+              Mutate nudges the current flame. Randomize starts a new one.
+            </p>
+          </div>
+        </Show>
       </div>
 
       {/* 4. Action Footer */}
-      <div class={ui.surfaceFooter}>
-        <button
-          type="button"
-          class={ui.actionPillBtn}
-          title="Mutate Flame"
-          onClick={() => {
-            if (props.onMutate) props.onMutate()
-            else dispatch('flame.mutate')
-          }}
-        >
-          <Sparkle class={ui.hudButtonIcon} /> Mutate
-        </button>
-        <button
-          type="button"
-          class={`${ui.actionPillBtn} ${ui.actionPillBtnPrimary}`}
-          title="Randomize Flame"
-          onClick={() => {
-            if (props.onRandomize) props.onRandomize()
-            else dispatch('flame.randomize')
-          }}
-        >
-          <Shuffle class={ui.hudButtonIcon} /> Randomize
-        </button>
-        <Show when={props.onOpenDrawer}>
+      <Show when={!props.hideFooter}>
+        <div class={ui.surfaceFooter}>
           <button
             type="button"
             class={ui.actionPillBtn}
-            title="More Tools"
-            onClick={props.onOpenDrawer}
+            title="Mutate Flame"
+            onClick={() => {
+              if (props.onMutate) props.onMutate()
+              else dispatch('flame.mutate')
+            }}
           >
-            <SidebarPanel class={ui.hudButtonIcon} /> More
+            <Sparkle class={ui.hudButtonIcon} /> Mutate
           </button>
-        </Show>
-      </div>
+          <button
+            type="button"
+            class={`${ui.actionPillBtn} ${ui.actionPillBtnPrimary}`}
+            title="Randomize Flame"
+            onClick={() => {
+              if (props.onRandomize) props.onRandomize()
+              else dispatch('flame.randomize')
+            }}
+          >
+            <Shuffle class={ui.hudButtonIcon} /> Randomize
+          </button>
+          <Show when={props.onOpenDrawer}>
+            <button
+              type="button"
+              class={ui.actionPillBtn}
+              title="More Tools"
+              onClick={props.onOpenDrawer}
+            >
+              <SidebarPanel class={ui.hudButtonIcon} /> More
+            </button>
+          </Show>
+        </div>
+      </Show>
     </div>
   )
 }
