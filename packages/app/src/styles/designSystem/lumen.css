@@ -176,8 +176,9 @@
   --la-t-tab-android: 500 12px/16px var(--la-font-body);
 
   /* ---------- 11. Targets and safe areas ------------------------------
-     44pt on iOS, 48dp on Android. The platform attribute is written on
-     <html> by the native shell from Capacitor.getPlatform(). */
+     40px is the floor on every tappable control; this set keeps 44, and
+     48dp on Android. index.tsx writes the platform attribute on <html> in
+     the native build (lib/platform.ts, nativePlatform). */
   --la-tap: 44px;
   --la-tap-icon: 44px; /* icon button box; the glyph inside is 24px */
   --la-tap-row: 56px; /* a slider row on the phone */
@@ -194,6 +195,9 @@
   --la-hud-h: 44px;
   --la-rail-h: 64px;
   --la-hud-top: max(var(--la-s-2), calc(var(--la-safe-top) + var(--la-s-2)));
+  /* Where the top bar ends. Everything that floats under it is placed from
+     here, so a bar that moves takes the tracker and the toasts with it. */
+  --la-hud-bottom: calc(var(--la-hud-top) + var(--la-hud-h));
   --la-dock-bottom: max(
     var(--la-s-2),
     calc(var(--la-safe-bottom) + var(--la-s-2))

@@ -174,6 +174,22 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+
+  /* The rail's sheet covers the bottom of the canvas; half of that height
+     pans the picture up so the subject stays in view (DESIGN.md, Phase A).
+     A transform, not a camera change: nothing enters the flame or its undo
+     history, and it reverts when the sheet closes. It rides the canvas
+     rather than its container because a transformed container would become
+     the containing block for the fixed progress bar and export tracker
+     inside it. */
+  transform: translateY(calc(var(--rail-inset, 0px) / -2));
+  transition: transform var(--la-dur-sheet) var(--la-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas {
+    transition: none;
+  }
 }
 
 /* Global: prevent text selection popups on all canvas elements on touch devices */
@@ -1267,9 +1283,9 @@
   right: auto;
   left: max(0.75rem, env(safe-area-inset-left));
   align-items: flex-start;
+  /* Below the top bar, from the same token the bar is placed with. */
   top: calc(
-    max(0.75rem, env(safe-area-inset-top)) + 42px +
-      var(--toast-stack-offset, 0px)
+    var(--la-hud-bottom) + var(--la-s-2) + var(--toast-stack-offset, 0px)
   );
 }
 

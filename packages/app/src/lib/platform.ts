@@ -19,6 +19,19 @@ declare const __NATIVE_BUILD__: boolean
  */
 export const IS_NATIVE: boolean = __NATIVE_BUILD__
 
+/**
+ * Which native shell the app is running in, or null on the web. The styles
+ * that differ by platform key off it: lumen.css raises the minimum target to
+ * 48dp under `[data-platform='android']`, which index.tsx writes on <html>.
+ */
+export function nativePlatform(
+  native: boolean,
+  userAgent: string,
+): 'android' | 'ios' | null {
+  if (!native) return null
+  return /Android/i.test(userAgent) ? 'android' : 'ios'
+}
+
 const originFromEnv = (value: unknown): string =>
   typeof value === 'string' ? value.replace(/\/+$/, '') : ''
 

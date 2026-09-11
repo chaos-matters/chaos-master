@@ -3,7 +3,12 @@ import { createEffect, onCleanup } from 'solid-js'
 export type CreateClickAndDragHandler = (event: PointerEvent) =>
   | {
       onPointerMove?: (event: PointerEvent) => void
-      onDone?: () => void
+      /**
+       * The event that ended the drag, where one did. It is absent when
+       * something else ended it: a second touch starting a pinch, or the
+       * component unmounting mid-drag.
+       */
+      onDone?: (event?: PointerEvent) => void
     }
   | undefined
 
@@ -126,7 +131,7 @@ export function createDragHandler(
       cleanupController.abort()
       event?.preventDefault()
       event?.stopImmediatePropagation()
-      onDone?.()
+      onDone?.(event)
     }
 
     function preventDefaultIfMoved(event: Event) {

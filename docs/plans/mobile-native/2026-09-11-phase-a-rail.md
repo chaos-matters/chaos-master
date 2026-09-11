@@ -17,7 +17,7 @@
 - `pnpm check` (from the repo root: typecheck, lint:fix, fmt:fix, WGSL validation) must pass before every commit; it rewrites files, so run it, then stage. `pnpm --filter chaos-master exec vitest run` must pass before every commit.
 - No emojis anywhere: code, copy, comments, commit messages. Icons are the SVG components in `packages/app/src/icons/index.ts` (`GridIcon`, `Undo`, `Redo`, `CameraIcon`, `VariationSpiral`, `ShapeTriangle`, `ColourWedge`, `Sparkle`, `Shuffle`, `Download`, `Share`, `SidebarPanel`, `Info`, `Book`, `Zap`, `Menu`); add a new SVG under `packages/app/src/icons/` if one is missing, never an emoji.
 - Copy in product voice, no hype. The unnamed flame is `Untitled flame`. No new user-visible string may contain "Chaos Master" (the About row in HelpModal keeps its existing one).
-- Every touch target is 44 x 44 CSS px minimum (it is pt on iOS, dp on Android); measure the touch box, not the glyph. Values inside native chrome are in px, never rem.
+- Every tappable control is 40 x 40 CSS px minimum (48 dp on Android; it is pt on iOS), and the set keeps 44 where it already had it; measure the touch box, not the glyph. A drag handle may be thinner, and its whole hit strip must receive touches. Values inside native chrome are in px, never rem.
 - New CSS uses only `--la-*` tokens for colour, radius, spacing, duration and easing. No hex literal in `EditorRail.module.css`, `TabletDeck.module.css` or `TouchSurface.module.css` after Task 8 (a test enforces it). Never `transition: all`.
 - A haptic call is never awaited and never fires when the Haptics setting is off. Anything that imports `@capacitor/*` is reached only through a dynamic import guarded by the literal `__NATIVE_BUILD__` in the same module (see `packages/app/src/lib/nativeSave.ts` `loadRuntime`); a cross-module `IS_NATIVE` check does not keep the chunk out of the web build.
 - After Task 8 the web build (`pnpm --filter chaos-master build`) must contain no `capacitor-*` chunk in `packages/app/dist/assets/`, and the native build (`pnpm --filter chaos-master build:native`) must succeed.
@@ -48,7 +48,7 @@
 
 **Files:** none.
 
-- [ ] **Step 1:** From the worktree you were started in, verify the base and create the branch.
+- [x] **Step 1:** From the worktree you were started in, verify the base and create the branch.
 
 ```bash
 git fetch origin
@@ -56,7 +56,7 @@ git checkout -b feat/native-rail origin/feat/mobile-capacitor-scaffolding-9224ec
 git log --oneline -1   # must be e47f2ba7 "docs(mobile): native design plan, and the probe results" or a later commit on that branch
 ```
 
-- [ ] **Step 2:** Install dependencies if `node_modules` is missing in this worktree, then confirm the baseline is green.
+- [x] **Step 2:** Install dependencies if `node_modules` is missing in this worktree, then confirm the baseline is green.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -80,7 +80,7 @@ Expected: check exits 0 (warnings are fine, no errors), 2531 app tests pass, 16 
 
 - Produces: the custom properties every later task's CSS uses. The ones this plan relies on by name: `--la-void`, `--la-ground`, `--la-surface`, `--la-surface-2`, `--la-surface-3`, `--la-hairline`, `--la-hairline-strong`, `--la-ink`, `--la-ink-2`, `--la-ink-3`, `--la-ink-4`, `--la-ink-invert`, `--la-accent`, `--la-accent-press`, `--la-accent-wash`, `--la-glass`, `--la-glass-blur`, `--la-glass-edge`, `--la-glass-shadow`, `--la-scrim-sheet`, `--la-r-sm`, `--la-r-md`, `--la-r-lg`, `--la-r-sheet`, `--la-r-pill`, `--la-s-1` … `--la-s-9`, `--la-e-2`, `--la-e-sheet`, `--la-e-focus`, `--la-dur-press`, `--la-dur-fast`, `--la-dur-base`, `--la-dur-sheet`, `--la-ease`, `--la-ease-in`, `--la-ease-spring`, `--la-font-body`, `--la-t-tab`, `--la-t-caption`, `--la-t-value`, `--la-t-body-sm`, `--la-tap`, `--la-tap-row`, `--la-hud-h`, `--la-rail-h`, `--la-track`, `--la-thumb`, `--la-float-inset`, `--la-safe-top`, `--la-safe-bottom`, `--la-safe-left`, `--la-safe-right`.
 
-- [ ] **Step 1:** Copy `~/agent-out/chaos-master-fp/2026-09-11/lumen-native-plan/B/tokens.css` to `packages/app/src/styles/designSystem/lumen.css`. Delete from the copy: every `[data-direction="d1"]` and `[data-direction="d3"]` block (the app ships one direction; the showcase page keeps the other two), any `[data-theme="light"]` block (the touch chrome is dark by construction; the web's light theme is untouched by this phase), and the replacement-map comment section at the end. Keep the `:root` block and the reduced-motion / reduced-transparency blocks. Add a header comment:
+- [x] **Step 1:** Copy `~/agent-out/chaos-master-fp/2026-09-11/lumen-native-plan/B/tokens.css` to `packages/app/src/styles/designSystem/lumen.css`. Delete from the copy: every `[data-direction="d1"]` and `[data-direction="d3"]` block (the app ships one direction; the showcase page keeps the other two), any `[data-theme="light"]` block (the touch chrome is dark by construction; the web's light theme is untouched by this phase), and the replacement-map comment section at the end. Keep the `:root` block and the reduced-motion / reduced-transparency blocks. Add a header comment:
 
 ```css
 /* Lumen Apeiron design tokens, direction D2 "Ember Glass" (docs/plans/mobile-native/DESIGN.md, section 2).
@@ -98,7 +98,7 @@ If any of the names listed under Interfaces above is missing from the copy, add 
 --la-safe-right: env(safe-area-inset-right, 0px);
 ```
 
-- [ ] **Step 2:** Import it. In `packages/app/src/styles/index.css` the import list becomes:
+- [x] **Step 2:** Import it. In `packages/app/src/styles/index.css` the import list becomes:
 
 ```css
 @import './preflight.css';
@@ -110,9 +110,9 @@ If any of the names listed under Interfaces above is missing from the copy, add 
 
 (the Google Fonts import on line 1 stays where it is).
 
-- [ ] **Step 3:** Verify nothing changed visually: `pnpm --filter chaos-master build` succeeds; `grep -c -- '--la-accent' packages/app/dist/assets/*.css` is at least 1.
+- [x] **Step 3:** Verify nothing changed visually: `pnpm --filter chaos-master build` succeeds; `grep -c -- '--la-accent' packages/app/dist/assets/*.css` is at least 1.
 
-- [ ] **Step 4:** Commit.
+- [x] **Step 4:** Commit.
 
 ```bash
 pnpm check && git add packages/app/src/styles && git commit -m "feat(app): Lumen Apeiron design tokens, direction D2
@@ -160,7 +160,7 @@ export function settleDetent(
 
 `velocity` is in px/ms, positive when the sheet is growing (the finger moving up).
 
-- [ ] **Step 1:** Write the failing tests.
+- [x] **Step 1:** Write the failing tests.
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -218,9 +218,9 @@ describe('settleDetent', () => {
 })
 ```
 
-- [ ] **Step 2:** Run `pnpm --filter chaos-master exec vitest run src/components/TouchSurface/detents.test.ts`. Expected: FAIL, module not found.
+- [x] **Step 2:** Run `pnpm --filter chaos-master exec vitest run src/components/TouchSurface/detents.test.ts`. Expected: FAIL, module not found.
 
-- [ ] **Step 3:** Implement.
+- [x] **Step 3:** Implement.
 
 ```ts
 /**
@@ -298,9 +298,9 @@ export function settleDetent(
 }
 ```
 
-- [ ] **Step 4:** Run the test again. Expected: PASS (all 6).
+- [x] **Step 4:** Run the test again. Expected: PASS (all 6).
 
-- [ ] **Step 5:** Commit.
+- [x] **Step 5:** Commit.
 
 ```bash
 pnpm check && git add packages/app/src/components/TouchSurface/detents.ts packages/app/src/components/TouchSurface/detents.test.ts && git commit -m "feat(touch): detent arithmetic for the editor rail
@@ -356,7 +356,7 @@ export const NO_HAPTICS: Haptics // every method a no-op
 - Produces (runtime, `@chaos-master/mobile-runtime/capacitor-haptics`): `export const hapticPorts: HapticPorts`.
 - Produces (app, `@/lib/haptics`): `export const haptic: Haptics`, `export const [hapticsEnabled, setHapticsEnabled]` (a `persistentSignal<boolean>('chaos-haptics', true)`), `export function loadHaptics(): Promise<void>` (idempotent).
 
-- [ ] **Step 1:** Write the failing runtime tests in `packages/mobile-runtime/src/haptics.test.ts`.
+- [x] **Step 1:** Write the failing runtime tests in `packages/mobile-runtime/src/haptics.test.ts`.
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -454,9 +454,9 @@ describe('hapticsWith', () => {
 })
 ```
 
-- [ ] **Step 2:** Run `pnpm --filter @chaos-master/mobile-runtime test`. Expected: FAIL, cannot resolve `./haptics`.
+- [x] **Step 2:** Run `pnpm --filter @chaos-master/mobile-runtime test`. Expected: FAIL, cannot resolve `./haptics`.
 
-- [ ] **Step 3:** Implement `packages/mobile-runtime/src/haptics.ts`.
+- [x] **Step 3:** Implement `packages/mobile-runtime/src/haptics.ts`.
 
 ```ts
 /**
@@ -540,9 +540,9 @@ export const NO_HAPTICS: Haptics = {
 }
 ```
 
-- [ ] **Step 4:** Run the runtime tests. Expected: PASS (21 total).
+- [x] **Step 4:** Run the runtime tests. Expected: PASS (21 total).
 
-- [ ] **Step 5:** Add the Capacitor adapter `packages/mobile-runtime/src/capacitor/haptics.ts`.
+- [x] **Step 5:** Add the Capacitor adapter `packages/mobile-runtime/src/capacitor/haptics.ts`.
 
 ```ts
 /**
@@ -585,7 +585,7 @@ Then in `packages/mobile-runtime/package.json` add to `dependencies`: `"@capacit
 
 Run `pnpm install` from the repo root (this updates `pnpm-lock.yaml`; commit it) and `pnpm --filter @chaos-master/mobile-runtime typecheck`. Expected: exit 0.
 
-- [ ] **Step 6:** Write the failing app test `packages/app/src/lib/haptics.test.ts`.
+- [x] **Step 6:** Write the failing app test `packages/app/src/lib/haptics.test.ts`.
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -609,7 +609,7 @@ describe('haptic facade', () => {
 })
 ```
 
-- [ ] **Step 7:** Implement `packages/app/src/lib/haptics.ts`.
+- [x] **Step 7:** Implement `packages/app/src/lib/haptics.ts`.
 
 ```ts
 import { hapticsWith, NO_HAPTICS } from '@chaos-master/mobile-runtime/haptics'
@@ -666,11 +666,11 @@ export const haptic: Haptics = {
 
 Add `"@chaos-master/mobile-runtime": "workspace:*"` to `packages/app/package.json` dependencies only if it is not already there (it is, for `@/lib/nativeSave`; check with `grep mobile-runtime packages/app/package.json`).
 
-- [ ] **Step 8:** Call `void loadHaptics()` once at startup, in `packages/app/src/index.tsx`, right after the Android viewport block (import it at the top with the other imports).
+- [x] **Step 8:** Call `void loadHaptics()` once at startup, in `packages/app/src/index.tsx`, right after the Android viewport block (import it at the top with the other imports).
 
-- [ ] **Step 9:** Run `pnpm --filter chaos-master exec vitest run src/lib/haptics.test.ts`. Expected: PASS. Then `pnpm --filter chaos-master build` and check `ls packages/app/dist/assets | grep -ci 'capacitor\|haptics'` prints `0`; then `pnpm --filter chaos-master build:native` and check the same grep on `dist-native/assets` prints at least 1.
+- [x] **Step 9:** Run `pnpm --filter chaos-master exec vitest run src/lib/haptics.test.ts`. Expected: PASS. Then `pnpm --filter chaos-master build` and check `ls packages/app/dist/assets | grep -ci 'capacitor\|haptics'` prints `0`; then `pnpm --filter chaos-master build:native` and check the same grep on `dist-native/assets` prints at least 1.
 
-- [ ] **Step 10:** Commit.
+- [x] **Step 10:** Commit.
 
 ```bash
 pnpm check && git add pnpm-lock.yaml packages/mobile-runtime packages/app/src/lib/haptics.ts packages/app/src/lib/haptics.test.ts packages/app/src/index.tsx && git commit -m "feat(mobile): the haptic vocabulary
@@ -722,7 +722,7 @@ Rules:
 2. Otherwise, if `native || coarse || preference === 'touch'`: `phone` when `min(width, height) < 680`, else `tablet`. Never `desktop`: a tablet's browser or the native app never gets the desktop sidebar.
 3. Otherwise (a fine pointer on the web) today's rules: `phone` when `width < 680`, `tablet` when `width <= 1024`, else `desktop`.
 
-- [ ] **Step 1:** Write the failing table test.
+- [x] **Step 1:** Write the failing table test.
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -831,9 +831,9 @@ describe('classifyLayout on the web', () => {
 })
 ```
 
-- [ ] **Step 2:** Run it. Expected: FAIL, `classifyLayout` is not exported.
+- [x] **Step 2:** Run it. Expected: FAIL, `classifyLayout` is not exported.
 
-- [ ] **Step 3:** Implement in `workspaceLayoutStore.ts`. Keep `WIDE_LAYOUT_MIN_WIDTH`, `PHONE_MAX_WIDTH`, `TABLET_MAX_WIDTH` and `isWideLayout`, `isPhoneLayout`, `isTabletLayout`, `isTouchDevice` exported (other files import them); add:
+- [x] **Step 3:** Implement in `workspaceLayoutStore.ts`. Keep `WIDE_LAYOUT_MIN_WIDTH`, `PHONE_MAX_WIDTH`, `TABLET_MAX_WIDTH` and `isWideLayout`, `isPhoneLayout`, `isTabletLayout`, `isTouchDevice` exported (other files import them); add:
 
 ```ts
 import { IS_NATIVE } from '@/lib/platform'
@@ -930,11 +930,11 @@ export { touchLayoutPreference, setTouchLayoutPreference }
 
 Update the `export { ... setRawIsPhone as setIsPhone, setRawIsTablet as setIsTablet }` block accordingly (remove the two setters) and remove `setIsPhone` / `setIsTablet` from the `WorkspaceLayoutStore` interface and from `createWorkspaceLayoutStore` if they are wired there (grep the file).
 
-- [ ] **Step 4:** In `MainWorkspace.tsx:393-422`, delete `mqPhone`, `mqTablet`, `setIsPhone(...)`, `setIsTablet(...)`, `phoneHandler`, `tabletHandler` and their `addEventListener`/`removeEventListener` lines; keep `mq` (isMobile / compact) exactly as it is, and replace `if (mq.matches || mqPhone.matches) setCompact(true)` with `if (mq.matches || isPhone()) setCompact(true)`. Remove `setIsPhone` and `setIsTablet` from the destructuring near line 253-257 and any import of `PHONE_MAX_WIDTH` / `TABLET_MAX_WIDTH` that becomes unused.
+- [x] **Step 4:** In `MainWorkspace.tsx:393-422`, delete `mqPhone`, `mqTablet`, `setIsPhone(...)`, `setIsTablet(...)`, `phoneHandler`, `tabletHandler` and their `addEventListener`/`removeEventListener` lines; keep `mq` (isMobile / compact) exactly as it is, and replace `if (mq.matches || mqPhone.matches) setCompact(true)` with `if (mq.matches || isPhone()) setCompact(true)`. Remove `setIsPhone` and `setIsTablet` from the destructuring near line 253-257 and any import of `PHONE_MAX_WIDTH` / `TABLET_MAX_WIDTH` that becomes unused.
 
-- [ ] **Step 5:** Run `pnpm check` and the full app test suite. Expected: both green. If a test relied on `setIsPhone` (grep the tests), replace it with `window.innerWidth = …; window.dispatchEvent(new Event('resize'))`.
+- [x] **Step 5:** Run `pnpm check` and the full app test suite. Expected: both green. If a test relied on `setIsPhone` (grep the tests), replace it with `window.innerWidth = …; window.dispatchEvent(new Event('resize'))`.
 
-- [ ] **Step 6:** Commit.
+- [x] **Step 6:** Commit.
 
 ```bash
 git add packages/app/src/stores/workspaceLayoutStore.ts packages/app/src/stores/workspaceLayoutStore.test.ts packages/app/src/MainWorkspace.tsx && git commit -m "feat(app): route the touch layout by input and platform
@@ -963,9 +963,9 @@ MainWorkspace; deckFits says whether a tablet is wide enough for the deck."
 
 Geometry (B/components.md section 6): a floating glass pill, 44 px tall, centred, `max-width: calc(100% - 40px)`, `top: max(var(--la-s-2), calc(var(--la-safe-top) + var(--la-s-2)))`; five 44 x 44 buttons (glyph 22); title `600 15px/20px`, `max-width: 160px`, ellipsised. Order: Library (`GridIcon`, `aria-label="Library"`), title, Undo, Redo, More. Undo and Redo render `disabled` instead of disappearing. The title fallback is `Untitled flame`. Tapping the title keeps today's tooltip. The More button opens the existing popover with these items, in this order, each closing the menu: `Export options` (`Download`, `props.onOpenExportModal`), `Share link` (`Share`, `props.onShare`), `Advanced tools` (`SidebarPanel`, `props.onOpenDrawer`), `Lumen Arcade` (`Zap`, `setActiveTab('arcade')` from `@/lib/activeTab`), `Documentation` (`Book`, `props.onOpenDocs`), `Settings and more` (`Info`, `props.onOpenSettings`), `Desktop layout` (`Menu`, `props.onDesktopLayout`). Items whose handler prop is undefined are not rendered. Haptics: `haptic.impactLight()` on Undo and Redo press (`onPointerDown`), nothing on More.
 
-- [ ] **Step 1:** Update the `TouchHUD` tests first: the Library button is found by `screen.getByRole('button', { name: 'Library' })` and calls `onPickGallery`; `Undo` / `Redo` are disabled when `canUndo`/`canRedo` return false and call `onUndo`/`onRedo` otherwise; the More menu lists `Export options`, `Settings and more` when their props are given and omits `Share link` when `onShare` is absent; the title reads `Untitled flame` when the flame has no name (build the ctx with `createMockCommandContext()` and set `metadata.name` to an empty string via the context's setter, or assert against the mock's own name and add a second render with a nameless flame). Run them: expected FAIL.
+- [x] **Step 1:** Update the `TouchHUD` tests first: the Library button is found by `screen.getByRole('button', { name: 'Library' })` and calls `onPickGallery`; `Undo` / `Redo` are disabled when `canUndo`/`canRedo` return false and call `onUndo`/`onRedo` otherwise; the More menu lists `Export options`, `Settings and more` when their props are given and omits `Share link` when `onShare` is absent; the title reads `Untitled flame` when the flame has no name (build the ctx with `createMockCommandContext()` and set `metadata.name` to an empty string via the context's setter, or assert against the mock's own name and add a second render with a nameless flame). Run them: expected FAIL.
 
-- [ ] **Step 2:** Rewrite the JSX to the structure above. Remove `handleFlashExport`, the snapshot button, `MoreDotsIcon` stays. Replace the `.topHud` / `.hudHomeBtn` / `.hudButton` / `.hudTitle*` / `.moreMenu*` rules in `TouchSurface.module.css` with token-based rules; the essential ones:
+- [x] **Step 2:** Rewrite the JSX to the structure above. Remove `handleFlashExport`, the snapshot button, `MoreDotsIcon` stays. Replace the `.topHud` / `.hudHomeBtn` / `.hudButton` / `.hudTitle*` / `.moreMenu*` rules in `TouchSurface.module.css` with token-based rules; the essential ones:
 
 ```css
 .topHud {
@@ -1027,9 +1027,9 @@ Geometry (B/components.md section 6): a floating glass pill, 44 px tall, centred
 }
 ```
 
-- [ ] **Step 3:** Run the TouchSurface tests and `pnpm check`. Expected: PASS (the `MobileBottomSurface` cases still pass; they go in Task 6).
+- [x] **Step 3:** Run the TouchSurface tests and `pnpm check`. Expected: PASS (the `MobileBottomSurface` cases still pass; they go in Task 6).
 
-- [ ] **Step 4:** Commit.
+- [x] **Step 4:** Commit.
 
 ```bash
 git add packages/app/src/components/TouchSurface && git commit -m "feat(touch): the phone top bar
@@ -1090,7 +1090,7 @@ Behaviour (A/screens.md 0.4, B/motion.md 2.1-2.3, 2.9):
 - The viewport height comes from a `createSignal(window.innerHeight)` updated on `resize` (use `window.visualViewport?.height ?? window.innerHeight`).
 - Dock padding: `padding: 0 max(var(--la-float-inset), var(--la-safe-left)) max(var(--la-s-2), calc(var(--la-safe-bottom) + var(--la-s-2))) max(var(--la-float-inset), var(--la-safe-right))`. The sheet panel: `border-radius: var(--la-r-sheet) var(--la-r-sheet) 0 0`, `background: var(--la-glass-strong)` with blur, `border: var(--la-glass-edge)`, `box-shadow: var(--la-e-sheet)`, `contain: layout paint`.
 
-- [ ] **Step 1:** Write the failing tests in `EditorRail.test.tsx`.
+- [x] **Step 1:** Write the failing tests in `EditorRail.test.tsx`.
 
 ```tsx
 import '@/commands/builtins'
@@ -1223,9 +1223,9 @@ describe('EditorRail', () => {
 
 Note: the drag test's velocity depends on `timeStamp` deltas that happy-dom may report as 0; the implementation must treat a non-positive `dt` as "no velocity sample" (keep the previous velocity, initially 0). The first release therefore settles at the nearest detent, which is why the test accepts either.
 
-- [ ] **Step 2:** Run `pnpm --filter chaos-master exec vitest run src/components/TouchSurface/EditorRail.test.tsx`. Expected: FAIL, module not found.
+- [x] **Step 2:** Run `pnpm --filter chaos-master exec vitest run src/components/TouchSurface/EditorRail.test.tsx`. Expected: FAIL, module not found.
 
-- [ ] **Step 3:** Implement `EditorRail.tsx`. The gesture core:
+- [x] **Step 3:** Implement `EditorRail.tsx`. The gesture core:
 
 ```tsx
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
@@ -1568,7 +1568,7 @@ export function EditorRail(props: EditorRailProps) {
 }
 ```
 
-- [ ] **Step 4:** In `types.ts` add `'vary'` to `TouchTab`, the three optional props to `TouchControlSurfaceProps`, and `EditorRailProps` (above). Remove `MobileBottomSurfaceProps`. In `TouchControlSurface.tsx`: follow the controlled tab (`createEffect(() => { const t = props.tab?.(); if (t) setActiveTab(t) })`), wrap the tab row in `<Show when={!props.hideTabRow}>`, wrap the footer in `<Show when={!props.hideFooter}>`, and add the `vary` panel next to the other three:
+- [x] **Step 4:** In `types.ts` add `'vary'` to `TouchTab`, the three optional props to `TouchControlSurfaceProps`, and `EditorRailProps` (above). Remove `MobileBottomSurfaceProps`. In `TouchControlSurface.tsx`: follow the controlled tab (`createEffect(() => { const t = props.tab?.(); if (t) setActiveTab(t) })`), wrap the tab row in `<Show when={!props.hideTabRow}>`, wrap the footer in `<Show when={!props.hideFooter}>`, and add the `vary` panel next to the other three:
 
 ```tsx
 <Show when={activeTab() === 'vary'}>
@@ -1604,11 +1604,11 @@ export function EditorRail(props: EditorRailProps) {
 
 with `.varyPanel { display: grid; gap: var(--la-s-3); padding: var(--la-s-4); }`, `.varyButton { height: 56px; border-radius: var(--la-r-pill); border: var(--la-glass-edge); background: var(--la-surface-2); color: var(--la-ink); font: var(--la-t-body-sm); display: flex; align-items: center; justify-content: center; gap: var(--la-s-2); }`, `.varyButtonPrimary { background: var(--la-accent); color: var(--la-ink-invert); border-color: transparent; }`, `.varyCaption { margin: 0; font: var(--la-t-caption); color: var(--la-ink-3); text-align: center; }` in `TouchSurface.module.css`. Move Mutate and Randomize out of the `tablet-deck` mode's footer only if a later task says so (it does not: the deck keeps its footer as its action bar).
 
-- [ ] **Step 5:** Delete `MobileBottomSurface.tsx`; update `index.ts` (`export * from './EditorRail'`); in `TouchSurface.test.tsx` remove the `MobileBottomSurface` cases (their behaviours are covered by `EditorRail.test.tsx`). In `packages/app/index.html:7` the viewport content becomes `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content` (the Android block in `src/index.tsx` strips only `viewport-fit=cover`, so this survives it).
+- [x] **Step 5:** Delete `MobileBottomSurface.tsx`; update `index.ts` (`export * from './EditorRail'`); in `TouchSurface.test.tsx` remove the `MobileBottomSurface` cases (their behaviours are covered by `EditorRail.test.tsx`). In `packages/app/index.html:7` the viewport content becomes `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content` (the Android block in `src/index.tsx` strips only `viewport-fit=cover`, so this survives it).
 
-- [ ] **Step 6:** Run the rail tests, the TouchSurface tests and `pnpm check`. Expected: PASS. (`MainWorkspace.tsx` still imports `MobileBottomSurface` and fails typecheck at this point; that is fixed in Task 7. If `pnpm check` must be green to commit, do the minimal `MainWorkspace` swap from Task 7 Step 1 now and fold it into this commit.)
+- [x] **Step 6:** Run the rail tests, the TouchSurface tests and `pnpm check`. Expected: PASS. (`MainWorkspace.tsx` still imports `MobileBottomSurface` and fails typecheck at this point; that is fixed in Task 7. If `pnpm check` must be green to commit, do the minimal `MainWorkspace` swap from Task 7 Step 1 now and fold it into this commit.)
 
-- [ ] **Step 7:** Commit.
+- [x] **Step 7:** Commit.
 
 ```bash
 git add -A packages/app/src/components/TouchSurface packages/app/index.html packages/app/src/MainWorkspace.tsx && git commit -m "feat(touch): the editor rail
@@ -1636,7 +1636,7 @@ crossing, light impact at the latch, medium impact on Randomize."
 
 - Consumes: `EditorRail` (Task 6), `TouchHUD` props (Task 5), `deckFits` / `isTouchLayout` (Task 4).
 
-- [ ] **Step 1:** Replace the `<Show when={isPhone()}>` block with one that renders for the phone AND for a tablet too narrow for the deck:
+- [x] **Step 1:** Replace the `<Show when={isPhone()}>` block with one that renders for the phone AND for a tablet too narrow for the deck:
 
 ```tsx
 <Show when={isPhone() || (isTablet() && !deckFits())}>
@@ -1688,7 +1688,7 @@ crossing, light impact at the latch, medium impact on Randomize."
 
 where `openHelp`, `openDocs`, `openBenchmark` are the functions that reach `SoftwareVersion` as `showHelp`, `showDocs`, `showBenchmark`. `SoftwareVersion` is rendered by `packages/app/src/components/WorkspaceModalsHost/WorkspaceModalsHost.tsx`; trace where those three props come from (they originate in `MainWorkspace` or in the modals host itself) and pass the same functions to `TouchHUD`, lifting them to `MainWorkspace` if they live in the host. `import { deckFits, isPhone, isTablet, isTouchLayout, setTouchLayoutPreference } from '@/stores/workspaceLayoutStore'` (adjust to what MainWorkspace already imports from the store).
 
-- [ ] **Step 2:** Add `const [railInset, setRailInset] = createSignal(0)` next to `touchDrawerOpen` (line 293), and pass it to the canvas container as a custom property. Find the element with `class={ui['canvas-container']}` (or the `CanvasViewport` wrapper that carries `grid-area: viewport`) and add `style={{ '--rail-inset': `${railInset()}px` }}`. In `App.module.css` add to `.canvas-container`:
+- [x] **Step 2:** Add `const [railInset, setRailInset] = createSignal(0)` next to `touchDrawerOpen` (line 293), and pass it to the canvas container as a custom property. Find the element with `class={ui['canvas-container']}` (or the `CanvasViewport` wrapper that carries `grid-area: viewport`) and add `style={{ '--rail-inset': `${railInset()}px` }}`. In `App.module.css` add to `.canvas-container`:
 
 ```css
 /* The rail's sheet covers the bottom of the canvas; half of that height
@@ -1701,11 +1701,11 @@ transition: transform var(--la-dur-sheet) var(--la-ease);
 
 and under `@media (prefers-reduced-motion: reduce)` in the same file, `.canvas-container { transition: none; }`.
 
-- [ ] **Step 3:** Hide the floating `SoftwareVersion` trigger on touch layouts: wrap its render in `<Show when={!isTouchLayout()}>` (its menu items are in the top bar's More menu now). Keep the tablet-deck path (`isTablet() && deckFits()`) rendering `TabletInspectorDeck` as today (restyled in Task 8).
+- [x] **Step 3:** Hide the floating `SoftwareVersion` trigger on touch layouts: wrap its render in `<Show when={!isTouchLayout()}>` (its menu items are in the top bar's More menu now). Keep the tablet-deck path (`isTablet() && deckFits()`) rendering `TabletInspectorDeck` as today (restyled in Task 8).
 
-- [ ] **Step 4:** `pnpm check`, full app tests, `pnpm --filter chaos-master build:native`. Expected: green. Then a manual check in the dev server at a 393 x 852 viewport (`pnpm --filter chaos-master dev`, the browser's device mode): the top bar sits under the status bar area, the rail at the bottom, a chip opens the sheet to 44%, the canvas shifts up by half the covered height, the shutter saves.
+- [x] **Step 4:** `pnpm check`, full app tests, `pnpm --filter chaos-master build:native`. Expected: green. Then a manual check in the dev server at a 393 x 852 viewport (`pnpm --filter chaos-master dev`, the browser's device mode): the top bar sits under the status bar area, the rail at the bottom, a chip opens the sheet to 44%, the canvas shifts up by half the covered height, the shutter saves.
 
-- [ ] **Step 5:** Commit.
+- [x] **Step 5:** Commit.
 
 ```bash
 git add packages/app/src/MainWorkspace.tsx packages/app/src/App.module.css && git commit -m "feat(app): mount the rail on phones and narrow tablets
@@ -1735,9 +1735,9 @@ version menu leaves the touch layouts: its items moved to the top bar's More."
 
 Geometry (B/components.md section 9): width 380 px in landscape, 360 px in portrait by default, user-resizable between 320 and 480 by dragging the divider on the deck's leading edge (a 12 px wide hit strip, `touch-action: none`); double-tap on the divider collapses the deck to a 44 px edge tab (`aria-label="Show inspector"`) that reopens it. Opaque `var(--la-surface)` (a page, no glass), `border-left: 1px solid var(--la-hairline)`. Inside: a 72 px header (Library button `GridIcon` 44, the flame's name `600 20px/26px`, Undo/Redo/Save 44 px each; `Untitled flame` fallback), a 40 px segmented row (the `TouchControlSurface` tab row in `tablet-deck` mode: `Variations`, `Shape`, `Colour` — no Vary tab on the deck), a scrolling body with 24 px gutters, and the surface's footer as a 64 px action bar pinned at the bottom (Mutate, Randomize, More tools). Every button 44 x 44 minimum. `App.module.css` `.tabletLayout` becomes `grid-template-columns: 1fr var(--deck-width, 380px)`; the deck sets `--deck-width` on the layout root through a `style` prop passed up, or simpler: the deck element itself is the grid's second column with `width: var(--deck-width)` and the column is `auto` (keep `1fr auto`, set the width on the aside).
 
-- [ ] **Step 1:** Write the failing tests (append to `TouchSurface.test.tsx` `TabletInspectorDeck` cases): renders the Library button by role and name, `Undo`/`Redo`/`Save image`; the segmented row has exactly `Variations`, `Shape`, `Colour`; double-tapping the divider (`screen.getByTestId('deck-divider')`, two `fireEvent.click` within 300 ms with fake timers, or a `dblclick` event) collapses to the `Show inspector` button and clicking it restores; dragging the divider (`pointerDown` at clientX 900, `pointerMove` to 860, `pointerUp`) grows the width by 40 (`aside.style.width` is `'420px'` from a 380 start; set `window.innerWidth = 1210` and `window.innerHeight = 834` first). Run: FAIL.
+- [x] **Step 1:** Write the failing tests (append to `TouchSurface.test.tsx` `TabletInspectorDeck` cases): renders the Library button by role and name, `Undo`/`Redo`/`Save image`; the segmented row has exactly `Variations`, `Shape`, `Colour`; double-tapping the divider (`screen.getByTestId('deck-divider')`, two `fireEvent.click` within 300 ms with fake timers, or a `dblclick` event) collapses to the `Show inspector` button and clicking it restores; dragging the divider (`pointerDown` at clientX 900, `pointerMove` to 860, `pointerUp`) grows the width by 40 (`aside.style.width` is `'420px'` from a 380 start; set `window.innerWidth = 1210` and `window.innerHeight = 834` first). Run: FAIL.
 
-- [ ] **Step 2:** Implement. Divider drag mirrors the rail's drag (pointer capture, 1:1, clamp 320-480, `haptic.selectionChanged()` on each 40 px stop crossed is not required; `haptic.impactLight()` on collapse/expand). Persist the width with `persistentSignal`. Landscape/portrait default: `window.innerWidth > window.innerHeight ? 380 : 360` used only when nothing is persisted.
+- [x] **Step 2:** Implement. Divider drag mirrors the rail's drag (pointer capture, 1:1, clamp 320-480, `haptic.selectionChanged()` on each 40 px stop crossed is not required; `haptic.impactLight()` on collapse/expand). Persist the width with `persistentSignal`. Landscape/portrait default: `window.innerWidth > window.innerHeight ? 380 : 360` used only when nothing is persisted.
 
 The essential CSS in `TabletDeck.module.css`:
 
@@ -1832,9 +1832,9 @@ The essential CSS in `TabletDeck.module.css`:
 
 The surface's tab row in `tablet-deck` mode becomes the 40 px segmented row: restyle `.tabRow` / `.tabChip` in `TouchSurface.module.css` with tokens (`.tabChip { height: 40px; min-width: var(--la-tap); border-radius: var(--la-r-sm); font: var(--la-t-body-sm); color: var(--la-ink-2); }`, `.tabChipActive { background: var(--la-accent-wash); color: var(--la-accent); }`), and the footer `.surfaceFooter` becomes the 64 px action bar (`.actionPillBtn` 44 px tall minimum).
 
-- [ ] **Step 3:** Migrate colours in `TouchSurface.module.css`: replace every `#…` hex and colour-carrying `rgba(…)` with the matching token (`#38bdf8`/`#7dd3fc` → `var(--la-accent)`/`var(--la-accent-press)`; `#0d121f`, `rgba(14, 18, 30, 0.92)`, `rgba(15, 19, 32, 0.88)` → `var(--la-surface)` / `var(--la-glass-strong)`; `rgba(255, 255, 255, 0.14)` and `0.12` → `var(--la-hairline-strong)`; `rgba(255, 255, 255, 0.25)` → `var(--la-hairline-strong)`; text greys → `var(--la-ink-2)` / `var(--la-ink-3)`; `blur(16px)`/`blur(18px)` → `var(--la-glass-blur)`; `0.26s cubic-bezier(0.16, 1, 0.3, 1)` → `var(--la-dur-sheet) var(--la-ease)`; `all 0.15s ease` → the named property with `var(--la-dur-press) var(--la-ease)`). Shadows may keep their `rgba(0, 0, 0, …)` values. Delete the rules that no longer have a consumer.
+- [x] **Step 3:** Migrate colours in `TouchSurface.module.css`: replace every `#…` hex and colour-carrying `rgba(…)` with the matching token (`#38bdf8`/`#7dd3fc` → `var(--la-accent)`/`var(--la-accent-press)`; `#0d121f`, `rgba(14, 18, 30, 0.92)`, `rgba(15, 19, 32, 0.88)` → `var(--la-surface)` / `var(--la-glass-strong)`; `rgba(255, 255, 255, 0.14)` and `0.12` → `var(--la-hairline-strong)`; `rgba(255, 255, 255, 0.25)` → `var(--la-hairline-strong)`; text greys → `var(--la-ink-2)` / `var(--la-ink-3)`; `blur(16px)`/`blur(18px)` → `var(--la-glass-blur)`; `0.26s cubic-bezier(0.16, 1, 0.3, 1)` → `var(--la-dur-sheet) var(--la-ease)`; `all 0.15s ease` → the named property with `var(--la-dur-press) var(--la-ease)`). Shadows may keep their `rgba(0, 0, 0, …)` values. Delete the rules that no longer have a consumer.
 
-- [ ] **Step 4:** The guard test `tokens.test.ts`:
+- [x] **Step 4:** The guard test `tokens.test.ts`:
 
 ```ts
 import { readdirSync, readFileSync } from 'node:fs'
@@ -1859,9 +1859,9 @@ describe('touch surface stylesheets', () => {
 })
 ```
 
-- [ ] **Step 5:** `pnpm check`, all app tests, `build` and `build:native`; a manual check in the dev server at 1210 x 834 (the deck) and at 834 x 1210 (the rail on the tablet canvas). Expected: green; the deck resizes and collapses.
+- [x] **Step 5:** `pnpm check`, all app tests, `build` and `build:native`; a manual check in the dev server at 1210 x 834 (the deck) and at 834 x 1210 (the rail on the tablet canvas). Expected: green; the deck resizes and collapses.
 
-- [ ] **Step 6:** Commit.
+- [x] **Step 6:** Commit.
 
 ```bash
 git add -A packages/app/src/components/TouchSurface packages/app/src/App.module.css && git commit -m "feat(touch): the tablet inspector deck
@@ -1882,9 +1882,9 @@ only --la-* tokens, and a test keeps hex literals out of them."
 - Modify: `packages/app/src/components/HelpModal/HelpModal.tsx:319` (after the General Settings heading)
 - Test: `packages/app/src/components/HelpModal/HelpModal.test.tsx` (create if absent; if a test file exists, add to it)
 
-- [ ] **Step 1:** Write the failing test: with `vi.mock('@/lib/platform', () => ({ IS_NATIVE: true, apiUrl: (p: string) => p, publicOrigin: () => 'https://lumenapeiron.com' }))`, rendering the modal (see how other HelpModal tests build its props; if none exist, render it with the minimal props its type requires and `createMockCommandContext()`) shows a checkbox labelled `Haptics`, checked by default; unchecking it makes `hapticsEnabled()` false. Without the mock the row is absent.
+- [x] **Step 1:** Write the failing test: with `vi.mock('@/lib/platform', () => ({ IS_NATIVE: true, apiUrl: (p: string) => p, publicOrigin: () => 'https://lumenapeiron.com' }))`, rendering the modal (see how other HelpModal tests build its props; if none exist, render it with the minimal props its type requires and `createMockCommandContext()`) shows a checkbox labelled `Haptics`, checked by default; unchecking it makes `hapticsEnabled()` false. Without the mock the row is absent.
 
-- [ ] **Step 2:** Implement: under the `General Settings` heading add
+- [x] **Step 2:** Implement: under the `General Settings` heading add
 
 ```tsx
 <Show when={IS_NATIVE}>
@@ -1900,9 +1900,9 @@ only --la-* tokens, and a test keeps hex literals out of them."
 
 with `import { Checkbox } from '../Checkbox/Checkbox'`, `import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'`, `import { IS_NATIVE } from '@/lib/platform'`. Give the checkbox an accessible name (`aria-label="Haptics"` if the `Checkbox` component does not wire the label).
 
-- [ ] **Step 3:** Run the test and `pnpm check`. Expected: PASS.
+- [x] **Step 3:** Run the test and `pnpm check`. Expected: PASS.
 
-- [ ] **Step 4:** Commit.
+- [x] **Step 4:** Commit.
 
 ```bash
 git add packages/app/src/components/HelpModal && git commit -m "feat(app): a Haptics switch in settings, native only"
@@ -1917,9 +1917,9 @@ git add packages/app/src/components/HelpModal && git commit -m "feat(app): a Hap
 - Modify: `docs/plans/mobile-native/DESIGN.md` (tick the Phase A boxes this branch delivers; leave the rest)
 - Modify: `docs/plans/mobile-native/2026-09-11-phase-a-rail.md` (this file: tick every step you completed)
 
-- [ ] **Step 1:** In `DESIGN.md` section 3 tick: the detent controller, haptics, 44 pt targets, the camera pan, `interactive-widget=resizes-content`. Leave unticked: the slider row rewrite, long-press to remove a variation. In section 4 tick the four routing items; leave the shell items. Commit: `docs(mobile): Phase A status`.
+- [x] **Step 1:** In `DESIGN.md` section 3 tick: the detent controller, haptics, 44 pt targets, the camera pan, `interactive-widget=resizes-content`. Leave unticked: the slider row rewrite, long-press to remove a variation. In section 4 tick the four routing items; leave the shell items. Commit: `docs(mobile): Phase A status`.
 
-- [ ] **Step 2:** Final verification, all from the repo root:
+- [x] **Step 2:** Final verification, all from the repo root:
 
 ```bash
 pnpm check
@@ -1930,7 +1930,7 @@ pnpm --filter chaos-master build:native
 git log --oneline origin/feat/mobile-capacitor-scaffolding-9224ec..HEAD
 ```
 
-- [ ] **Step 3:** Push and open the PR against the scaffolding branch.
+- [x] **Step 3:** Push and open the PR against the scaffolding branch.
 
 ```bash
 git push -u origin feat/native-rail
@@ -1939,4 +1939,4 @@ gh pr create --repo Komediruzecki/chaos-master-fp --base feat/mobile-capacitor-s
 
 The body (write it to `/tmp/pr-body.md` first): what changed per task, the decisions taken (listed under "Decisions" in this plan's introduction of the PR: tokens are additive, the alias remap waits; the tab capsule and the shell wait for Phase B; the phone-landscape vertical rail, the slider fine mode and the Vary candidates are follow-ups; the web's phone and tablet layouts get the rail too), how to test on a phone (portrait: chips, drag, flick, shutter tap and long press, the canvas pan, Undo/Redo haptics), on a tablet (the deck at 900 px and above, resize, collapse; the rail below), and on the web (a fine pointer keeps the old width rules). No emojis, no attribution lines.
 
-- [ ] **Step 4:** Report back with: the PR URL, the commit list, every decision you took that this plan did not settle, anything you could not make pass, and anything in the spec you deliberately did not do.
+- [x] **Step 4:** Report back with: the PR URL, the commit list, every decision you took that this plan did not settle, anything you could not make pass, and anything in the spec you deliberately did not do.

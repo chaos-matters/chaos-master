@@ -9,6 +9,7 @@ import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
+import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { trackAppInit } from '@/lib/telemetry'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -23,13 +24,13 @@ import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { useRequestModal } from './components/Modal/ModalContext'
 import { qualityPresets } from './components/Quality/QualityPresets'
 import { recorderExportPending, recorderTaskPending, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
-import { AdvancedToolsDrawer, MobileBottomSurface, TabletInspectorDeck, TouchHUD, } from './components/TouchSurface'
+import { AdvancedToolsDrawer, EditorRail, TabletInspectorDeck, TouchHUD, } from './components/TouchSurface'
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
-import { isTouchDevice, PHONE_MAX_WIDTH, TABLET_MAX_WIDTH, } from './stores/workspaceLayoutStore'
+import { deckFits, isTouchDevice } from './stores/workspaceLayoutStore'
 
 const AncestryTreeModal = lazy(() =>
   import('./components/AncestryTreeModal/AncestryTreeModal').then((m) => ({
@@ -86,6 +87,7 @@ import { captureTransformColors, runPaletteRestoreTransition, } from './recorder
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
+import { BENCHMARKS_PATH } from './routing/appPath'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer, decodeAudioBytes } from './utils/audioAnalysis'
 import { downloadBlob } from './utils/blob'
@@ -255,9 +257,7 @@ export function MainWorkspace(props: AppProps) {
     isMobile,
     setIsMobile,
     isPhone,
-    setIsPhone,
     isTablet,
-    setIsTablet,
     isTouchLayout,
     sidebarHidden,
     setSidebarHidden,
@@ -294,6 +294,10 @@ export function MainWorkspace(props: AppProps) {
   } = layoutStore
 
   const [touchDrawerOpen, setTouchDrawerOpen] = createSignal(false)
+  /** How much of the viewport the rail's sheet covers; 0 while it is at peek. */
+  const [railInset, setRailInset] = createSignal(0)
+  /** The phone, and a tablet too narrow for the deck, both get the rail. */
+  const railLayout = createMemo(() => isPhone() || (isTablet() && !deckFits()))
 
   const {
     selectedTransformId,
@@ -392,18 +396,12 @@ export function MainWorkspace(props: AppProps) {
   let sidebarScrollRef: HTMLDivElement | undefined
   let randomizerCardRef: HTMLDivElement | undefined
   createEffect(() => {
+    // The phone and tablet classes come from the layout store's one resize
+    // listener now; this effect only keeps the sidebar's own breakpoint.
     const mq = window.matchMedia('(max-width: 768px)')
-    const mqPhone = window.matchMedia(
-      `(max-width: ${PHONE_MAX_WIDTH - 0.02}px)`,
-    )
-    const mqTablet = window.matchMedia(
-      `(min-width: ${PHONE_MAX_WIDTH}px) and (max-width: ${TABLET_MAX_WIDTH}px)`,
-    )
 
     setIsMobile(mq.matches)
-    setIsPhone(mqPhone.matches)
-    setIsTablet(mqTablet.matches)
-    if (mq.matches || mqPhone.matches) setCompact(true)
+    if (mq.matches || isPhone()) setCompact(true)
 
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches)
@@ -413,21 +411,10 @@ export function MainWorkspace(props: AppProps) {
         else setSidebarHidden(true)
       }
     }
-    const phoneHandler = (e: MediaQueryListEvent) => {
-      setIsPhone(e.matches)
-      if (e.matches) setCompact(true)
-    }
-    const tabletHandler = (e: MediaQueryListEvent) => {
-      setIsTablet(e.matches)
-    }
 
     mq.addEventListener('change', handler)
-    mqPhone.addEventListener('change', phoneHandler)
-    mqTablet.addEventListener('change', tabletHandler)
     onCleanup(() => {
       mq.removeEventListener('change', handler)
-      mqPhone.removeEventListener('change', phoneHandler)
-      mqTablet.removeEventListener('change', tabletHandler)
     })
   })
   // The session currently open for replay (M4), if any. Lives here rather than
@@ -1417,6 +1404,8 @@ export function MainWorkspace(props: AppProps) {
     IS_DEV ? () => setDevCrashTest(true) : undefined,
     () => props.hardwareTier ?? null,
     props.onHardwareTierChange,
+    hapticsEnabled,
+    setHapticsEnabled,
   )
 
   onMount(() => {
@@ -3314,7 +3303,7 @@ export function MainWorkspace(props: AppProps) {
     <ChangeHistoryContextProvider value={history}>
       <TimelineContextProvider value={recorderTimeline}>
         <Dropzone
-          class={`${ui.layout} ${isPhone() ? ui.phoneLayout : ''} ${isTablet() ? ui.tabletLayout : ''}`}
+          class={`${ui.layout} ${railLayout() ? ui.phoneLayout : ''} ${isTablet() && deckFits() ? ui.tabletLayout : ''}`}
           onDrop={onDrop}
         >
           <>
@@ -3322,6 +3311,7 @@ export function MainWorkspace(props: AppProps) {
               isMobile={isMobile}
               showSidebar={showSidebar}
               hideMobileSidebarToggle={isPhone() || isTablet()}
+              railInset={railInset}
               onCanvasClick={() => {
                 // Tap canvas to close sidebar on mobile
                 if (isMobile()) hideMobileSidebarAsAuthoredAction()
@@ -3453,58 +3443,66 @@ export function MainWorkspace(props: AppProps) {
               </Show>
             </CanvasViewport>
           </>
-          {/* Mobile Phone Touch Interface */}
-          <Show when={isPhone()}>
+          {/* The rail layout: the phone, and a tablet under the deck's width */}
+          <Show when={railLayout()}>
             <TouchHUD
               ctx={cmdContext}
               flame={effectiveFlame}
               canUndo={undoRouter.canUndo}
               canRedo={undoRouter.canRedo}
-              onRandomize={() => {
-                executeCommand('flame.randomize', cmdContext)
-              }}
-              onMutate={() => {
-                executeCommand('flame.mutate', cmdContext)
-              }}
               onUndo={() => {
                 executeCommand('history.undo', cmdContext)
               }}
               onRedo={() => {
                 executeCommand('history.redo', cmdContext)
               }}
-              onFlashExport={quickExport}
               onOpenExportModal={() => {
                 executeCommand('export.png', cmdContext)
               }}
-              onSnapshot={quickExport}
+              onShare={() => {
+                void showShareLinkModal()
+              }}
               onOpenDrawer={() => setTouchDrawerOpen(true)}
               onPickGallery={pickGalleryFlame}
+              onOpenSettings={showHelp}
+              onOpenDocs={showDocumentation}
+              onOpenBenchmark={() => {
+                void showBenchmark()
+              }}
+              // The Benchmark Lab is a page of its own and web only
+              // (DESIGN.md, decision 1), so the native app is not offered it.
+              onOpenBenchmarkLab={
+                IS_NATIVE
+                  ? undefined
+                  : () => {
+                      window.location.assign(BENCHMARKS_PATH)
+                    }
+              }
+              onDesktopLayout={() => {
+                setTouchLayoutPreference('desktop')
+                showToast('Switched to the desktop layout', 3500)
+              }}
             />
-            <MobileBottomSurface
+            <EditorRail
               ctx={cmdContext}
               flame={effectiveFlame}
-              canUndo={undoRouter.canUndo}
-              canRedo={undoRouter.canRedo}
               onRandomize={() => {
                 executeCommand('flame.randomize', cmdContext)
               }}
               onMutate={() => {
                 executeCommand('flame.mutate', cmdContext)
               }}
-              onUndo={() => {
-                executeCommand('history.undo', cmdContext)
+              onQuickExport={quickExport}
+              onOpenExportOptions={() => {
+                executeCommand('export.png', cmdContext)
               }}
-              onRedo={() => {
-                executeCommand('history.redo', cmdContext)
-              }}
-              onSnapshot={quickExport}
               onOpenDrawer={() => setTouchDrawerOpen(true)}
-              onPickGallery={pickGalleryFlame}
+              onCoveredHeightChange={setRailInset}
             />
           </Show>
 
           {/* Tablet Split Touch Interface */}
-          <Show when={isTablet()}>
+          <Show when={isTablet() && deckFits()}>
             <TabletInspectorDeck
               ctx={cmdContext}
               flame={effectiveFlame}
@@ -3523,6 +3521,9 @@ export function MainWorkspace(props: AppProps) {
                 executeCommand('history.redo', cmdContext)
               }}
               onSnapshot={quickExport}
+              onOpenExportOptions={() => {
+                executeCommand('export.png', cmdContext)
+              }}
               onOpenDrawer={() => setTouchDrawerOpen(true)}
               onPickGallery={pickGalleryFlame}
             />
@@ -4150,6 +4151,7 @@ export function MainWorkspace(props: AppProps) {
             touchLayoutPreference={touchLayoutPreference}
             setTouchLayoutPreference={setTouchLayoutPreference}
             isTouchLayout={isTouchLayout}
+            hideVersionTrigger={railLayout}
             onPickGallery={pickGalleryFlame}
             duelShowing={duelShowing}
             playerFlame={effectiveFlame}

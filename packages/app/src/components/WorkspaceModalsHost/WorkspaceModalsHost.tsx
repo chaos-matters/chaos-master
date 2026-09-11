@@ -46,6 +46,8 @@ export interface WorkspaceModalsHostProps {
   touchLayoutPreference?: () => TouchLayoutPreference
   setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
   isTouchLayout?: () => boolean
+  /** True where the editor's top bar is drawn; see SoftwareVersion. */
+  hideVersionTrigger?: () => boolean
   onPickGallery?: () => void
 }
 
@@ -60,6 +62,7 @@ export function WorkspaceModalsHost(props: WorkspaceModalsHostProps) {
         touchLayoutPreference={props.touchLayoutPreference}
         setTouchLayoutPreference={props.setTouchLayoutPreference}
         isTouchLayout={props.isTouchLayout}
+        hideTrigger={props.hideVersionTrigger}
         onPickGallery={props.onPickGallery}
       />
       <Show when={props.devCrashTest()}>
