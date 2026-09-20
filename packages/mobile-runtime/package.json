@@ -1,0 +1,32 @@
+{
+  "name": "@chaos-master/mobile-runtime",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "Native capabilities for the Lumen Apeiron web app, loaded only by its native (Capacitor) build",
+  "exports": {
+    "./files": {
+      "types": "./src/files.ts",
+      "import": "./src/files.ts",
+      "default": "./src/files.ts"
+    },
+    "./capacitor": {
+      "types": "./src/capacitor/index.ts",
+      "import": "./src/capacitor/index.ts",
+      "default": "./src/capacitor/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

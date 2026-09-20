@@ -1,0 +1,30 @@
+{
+  "name": "@chaos-master/mobile",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "Capacitor shell (iOS, iPadOS, Android) around the Lumen Apeiron web app in packages/app",
+  "scripts": {
+    "build:web": "pnpm --filter chaos-master build:native",
+    "sync": "pnpm build:web && cap sync",
+    "sync:ios": "pnpm build:web && cap sync ios",
+    "sync:android": "pnpm build:web && cap sync android",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android",
+    "run:android": "pnpm sync:android && cap run android",
+    "icons": "bash scripts/generate-icons.sh"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/share": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/ios": "^8.5.1"
+  }
+}

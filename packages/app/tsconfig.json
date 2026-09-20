@@ -16,5 +16,6 @@
   // while CI (which typechecks before building, so no dist/) caught real errors
   // — the root cause of issue #30. Specifying `exclude` overrides tsc's default,
   // so node_modules must be listed explicitly. See docs/plans/typecheck-ci-parity-plan.md.
-  "exclude": ["dist", "e2e", "node_modules"]
+  // dist-native is the Capacitor build (pnpm build:native) and has the same effect.
+  "exclude": ["dist", "dist-native", "e2e", "node_modules"]
 }

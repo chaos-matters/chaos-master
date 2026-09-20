@@ -3,7 +3,7 @@ import { Book, GridIcon, Info, Menu, SidebarPanel, Star, Zap } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { BENCHMARKS_PATH } from '@/routing/appPath'
 import { isTouchLayout as globalIsTouchLayout, setTouchLayoutPreference as globalSetTouchLayoutPref, } from '@/stores/workspaceLayoutStore'
-import { VERSION } from '@/version'
+import { DISPLAY_VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
 import ui from './SoftwareVersion.module.css'
 import type { TouchLayoutPreference } from '@/stores/workspaceLayoutStore'
@@ -159,7 +159,9 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
         <Info class={ui.menuIcon} />
         <div class={ui.menuMeta}>
           <span class={ui.menuLabel}>Settings and More</span>
-          <span class={ui.menuSub}>Preferences, about & v{VERSION}</span>
+          <span class={ui.menuSub}>
+            Preferences, about & v{DISPLAY_VERSION}
+          </span>
         </div>
       </button>
     </>
@@ -194,11 +196,11 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
               onClick={() => setOpen(!open())}
               aria-expanded={open()}
               aria-haspopup="menu"
-              aria-label={`Chaos Master v${VERSION} menu`}
-              title={`Chaos Master v${VERSION} menu`}
+              aria-label={`Chaos Master v${DISPLAY_VERSION} menu`}
+              title={`Chaos Master v${DISPLAY_VERSION} menu`}
             >
               <Info class={ui.pillIcon} />
-              <span>v{VERSION}</span>
+              <span>v{DISPLAY_VERSION}</span>
             </button>
           </div>
         }

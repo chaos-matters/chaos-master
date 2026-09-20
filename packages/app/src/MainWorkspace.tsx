@@ -79,6 +79,7 @@ import { extractFlameUniforms, generateTransformId, generateVariationId, } from 
 import { extractFlameUniforms3D } from './flame/transformFunction3D'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
+import { IS_NATIVE } from './lib/platform'
 import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
 import { canEnableReplayAudio } from './recorder/replay'
 import { captureTransformColors, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
@@ -1753,13 +1754,11 @@ export function MainWorkspace(props: AppProps) {
     promise
       .then((blob) => {
         if (blob.size === 0) return // cancelled
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'animation.mp4'
-        a.click()
-        URL.revokeObjectURL(url)
-        showToast('Animation exported')
+        downloadBlob(blob, 'animation.mp4')
+        // The native app reports where the file went itself.
+        if (!IS_NATIVE) {
+          showToast('Animation exported')
+        }
       })
 
       .catch((err: unknown) => {

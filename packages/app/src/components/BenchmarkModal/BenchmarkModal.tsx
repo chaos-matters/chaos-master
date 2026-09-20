@@ -4,9 +4,12 @@ import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
+import { shareNative } from '@/lib/nativeSave'
+import { IS_NATIVE } from '@/lib/platform'
 import { Root } from '@/lib/Root'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { downloadBlob } from '@/utils/blob'
 import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
@@ -14,6 +17,10 @@ import { useRequestModal } from '../Modal/ModalContext'
 import ui from './BenchmarkModal.module.css'
 
 const BENCHMARK_SECONDS = 10
+
+// The native app shares the card instead: in a WebView the image clipboard
+// write resolves on Android, but nothing reaches the system clipboard.
+const COPY_IMAGE_LABEL = IS_NATIVE ? 'Share Image' : 'Copy Image'
 
 // Selectable benchmark workloads of increasing per-point cost, so users can
 // measure different regimes (light vs transform/variation-heavy flames).
@@ -515,10 +522,17 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     return canvas
   }
 
+  const benchmarkImageName = () =>
+    `chaos-master-benchmark-${finalBps().toFixed(2)}Bps.png`
+
   function copyBenchmarkImage() {
     const canvas = renderBenchmarkCard()
     canvas.toBlob((blob) => {
       if (!blob) return
+      if (IS_NATIVE) {
+        void shareNative(blob, benchmarkImageName())
+        return
+      }
       void globalThis.navigator.clipboard
         .write([new ClipboardItem({ 'image/png': blob })])
         .then(() => {
@@ -534,14 +548,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     const canvas = renderBenchmarkCard()
     canvas.toBlob((blob) => {
       if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `chaos-master-benchmark-${finalBps().toFixed(2)}Bps.png`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, benchmarkImageName())
     }, 'image/png')
   }
 
@@ -811,7 +818,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 </>
               )}
             </svg>
-            {imageCopied() ? 'Copied!' : 'Copy Image'}
+            {imageCopied() ? 'Copied!' : COPY_IMAGE_LABEL}
           </button>
           <button
             class={ui.copyBtn}

@@ -13,10 +13,10 @@
     "fmt:fix": "prettier packages --write --log-level warn",
     "lint": "NODE_OPTIONS=\"--max-old-space-size=4096\" eslint",
     "lint:fix": "NODE_OPTIONS=\"--max-old-space-size=4096\" eslint --fix",
-    "typecheck": "pnpm --filter @chaos-master/core typecheck && NODE_OPTIONS=\"--max-old-space-size=8192\" tsc --noEmit --project packages/app/tsconfig.json && pnpm --filter @chaos-master/landing check",
+    "typecheck": "pnpm --filter @chaos-master/core typecheck && pnpm --filter @chaos-master/mobile-runtime typecheck && NODE_OPTIONS=\"--max-old-space-size=8192\" tsc --noEmit --project packages/app/tsconfig.json && pnpm --filter @chaos-master/landing check",
     "validate-wgsl": "npx --yes tsx scripts/validate-wgsl-props.ts",
     "check": "pnpm typecheck && pnpm lint:fix && pnpm fmt:fix && pnpm validate-wgsl",
-    "test": "pnpm --filter @chaos-master/core test && pnpm --filter chaos-master exec vitest run && pnpm --filter chaos-master test:scripts",
+    "test": "pnpm --filter @chaos-master/core test && pnpm --filter @chaos-master/mobile-runtime test && pnpm --filter chaos-master exec vitest run && pnpm --filter chaos-master test:scripts",
     "test:ui": "pnpm --filter chaos-master exec vitest --ui",
     "test:watch": "pnpm --filter chaos-master exec vitest",
     "test:e2e": "playwright test",
@@ -25,7 +25,10 @@
     "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'",
     "deploy:dev": "pnpm --filter chaos-master deploy:dev",
     "deploy:prod": "pnpm --filter chaos-master deploy:prod",
-    "wr-dev": "pnpm --filter chaos-master wr-dev"
+    "wr-dev": "pnpm --filter chaos-master wr-dev",
+    "mobile:build": "pnpm --filter chaos-master build:native",
+    "mobile:sync": "pnpm --filter @chaos-master/mobile sync",
+    "mobile:android": "pnpm --filter @chaos-master/mobile run:android"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "^6.20.3",

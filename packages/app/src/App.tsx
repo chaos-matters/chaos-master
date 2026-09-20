@@ -3,6 +3,7 @@ import { ArcadeHub } from './components/Arcade/ArcadeHub'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
+import { NativeSaveToasts } from './components/NativeSaveToasts/NativeSaveToasts'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { WorkspaceSkeleton } from './components/WorkspaceSkeleton'
@@ -259,6 +260,7 @@ export function Wrappers() {
         <ThemeContextProvider>
           <KeyframeTargetProvider>
             <ToastProvider>
+              <NativeSaveToasts />
               <Root
                 adapterOptions={{
                   powerPreference: 'high-performance',

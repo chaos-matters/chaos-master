@@ -60,7 +60,7 @@ const workerProxy: ProxyOptions = {
   },
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     solidPlugin(),
     solidSvg({ defaultAsComponent: true }),
@@ -79,6 +79,10 @@ export default defineConfig({
   define: {
     __GIT_SHA__: JSON.stringify(commitHash),
     __COMMIT_HASH__: JSON.stringify(commitHash),
+    // True only for `vite build --mode native` (pnpm build:native), the bundle
+    // the Capacitor shell in packages/mobile wraps. A build-time constant, so
+    // native-only branches are dead code in the web bundle.
+    __NATIVE_BUILD__: JSON.stringify(mode === 'native'),
   },
   css: {
     modules: {
@@ -109,6 +113,8 @@ export default defineConfig({
   base: './',
   build: {
     target: 'esnext',
-    sourcemap: true,
+    // Native builds ship inside the IPA/APK, where maps only add download
+    // size (they are most of dist-native's bytes). The web keeps them.
+    sourcemap: mode !== 'native',
   },
-})
+}))

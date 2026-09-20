@@ -5,7 +5,7 @@ import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
-import { GIT_SHA, VERSION } from '@/version'
+import { BUILD_NUMBER, DISPLAY_VERSION, GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { DataManagement } from '../DataManagement/DataManagement'
@@ -126,7 +126,7 @@ function gatherFullDeviceInfo(
   const lines: string[] = []
   const { navigator: n, screen } = globalThis
 
-  lines.push(`App Version : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
+  lines.push(`App Version : ${DISPLAY_VERSION}`)
   lines.push(`User Agent  : ${n.userAgent}`)
   // eslint-disable-next-line @typescript-eslint/no-deprecated
   lines.push(`Platform    : ${n.platform}`)
@@ -293,7 +293,10 @@ function HelpModal(props: HelpModalProps) {
             </Show>
           </div>
           <div class={ui.badgeRow}>
-            <span class={ui.versionBadge}>v{VERSION}</span>
+            <span class={ui.versionBadge}>
+              v{VERSION}
+              {BUILD_NUMBER === '' ? '' : `-ci.${BUILD_NUMBER}`}
+            </span>
             {GIT_SHA ? <span class={ui.shaBadge}>{GIT_SHA}</span> : null}
           </div>
         </div>

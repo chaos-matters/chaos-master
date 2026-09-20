@@ -34,6 +34,7 @@ export default defineConfig({
   },
   define: {
     __GIT_SHA__: '"test-sha"',
+    __NATIVE_BUILD__: 'false',
   },
   resolve: {
     conditions: ['development', 'browser'],

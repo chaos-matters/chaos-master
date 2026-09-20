@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The Lumen Apeiron "Deep C" mark without its tile: the arc band and the four
+       ember pills of packages/app/src/assets/favicon.svg on a transparent ground.
+       This is the single source for scripts/generate-icons.sh (pnpm icons), so keep
+       its geometry in step with the favicon.
+       Geometry the generator relies on: the mark is centred at (32,32) and its
+       circumscribed circle has a radius of 24.85 units (the arc's outer edge sits
+       at 24.76, the leftmost ember reaches x = 7.19, 24.81 from the centre).
+       Two flat inks, no gradients, no glow. Use fill/stroke attributes for colour:
+       the monochrome icon is made by rewriting every non-"none" fill and stroke. -->
+  <path d="M 20.69 15.47 A 20.03 20.03 0 1 1 20.69 48.53"
+        fill="none" stroke="#F2F3F5" stroke-width="9.46" stroke-linecap="butt" />
+  <g fill="#FF7448">
+    <rect x="14.79" y="22.76" width="17.22" height="3.72" rx="1.86" />
+    <rect x="14.79" y="30.14" width="13.05" height="3.72" rx="1.86" />
+    <rect x="7.19" y="30.14" width="5.87" height="3.72" rx="1.86" />
+    <rect x="17.40" y="37.52" width="14.61" height="3.72" rx="1.86" />
+  </g>
+</svg>

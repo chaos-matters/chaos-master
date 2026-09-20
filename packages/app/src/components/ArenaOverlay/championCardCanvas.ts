@@ -1,3 +1,4 @@
+import { downloadBlob } from '@/utils/blob'
 import ui from '../ArenaOverlay.module.css'
 import type { ArenaFighterStats } from '@/commands/types'
 import type { FlameSchool, GroundedFlameStats } from '@/flame/stats'
@@ -442,16 +443,14 @@ export async function exportChampionCardPng(options: {
       thumbnailImg: img,
     })
 
-    const dataUrl = offscreen.toDataURL('image/png')
-    const a = document.createElement('a')
+    const blob = await new Promise<Blob | null>((resolve) => {
+      offscreen.toBlob(resolve, 'image/png')
+    })
+    if (blob === null) return false
     const safeName = (options.victor.name || 'champion')
       .toLowerCase()
       .replace(/[^a-z0-9_-]+/g, '-')
-    a.download = `champion-${safeName}.png`
-    a.href = dataUrl
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    downloadBlob(blob, `champion-${safeName}.png`)
     return true
   } catch {
     return false

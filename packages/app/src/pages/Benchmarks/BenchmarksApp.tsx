@@ -1,6 +1,7 @@
 import { ErrorBoundary, Suspense } from 'solid-js'
 import { AppCrashed } from '@/components/ErrorHandling/ErrorHandling'
 import { Modal } from '@/components/Modal/Modal'
+import { NativeSaveToasts } from '@/components/NativeSaveToasts/NativeSaveToasts'
 import { ToastHost } from '@/components/Toast/Toast'
 import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { ThemeContextProvider } from '@/contexts/ThemeContext'
@@ -14,6 +15,7 @@ export function BenchmarksApp() {
     <CompactModeProvider>
       <ThemeContextProvider>
         <ToastProvider>
+          <NativeSaveToasts />
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <TimelineProvider>
               <Modal>

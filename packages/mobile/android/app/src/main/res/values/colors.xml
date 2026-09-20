@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lumen Apeiron ground, the Android 12+ system splash background. Keep it equal to
+         ic_launcher_background and to BG in packages/mobile/scripts/generate-icons.sh. -->
+    <color name="lumen_background">#080A0E</color>
+</resources>

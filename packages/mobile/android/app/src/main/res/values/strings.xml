@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lumen Apeiron</string>
+    <string name="title_activity_main">Lumen Apeiron</string>
+    <string name="package_name">com.irchiinnuss.lumenapeiron</string>
+    <string name="custom_url_scheme">com.irchiinnuss.lumenapeiron</string>
+</resources>

@@ -11,6 +11,7 @@ import { compileCustomVariationCode } from '@/flame/variations/custom'
 import { getVariationDoc } from '@/flame/variations/docs'
 import { gpuStatus } from '@/lib/gpuStatus'
 import { useRootContext } from '@/lib/RootContext'
+import { downloadBlob } from '@/utils/blob'
 import { deepClone } from '@/utils/clone'
 import { useElementIsScrolling } from '@/utils/isScrolling'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -305,16 +306,7 @@ function correctnessLabel(status: BenchmarkCorrectnessStatus): string {
 }
 
 function downloadTextFile(file: BenchmarkTextExport): void {
-  const url = URL.createObjectURL(
-    new Blob([file.text], { type: file.mimeType }),
-  )
-  const link = document.createElement('a')
-  link.href = url
-  link.download = file.filename
-  link.click()
-  setTimeout(() => {
-    URL.revokeObjectURL(url)
-  }, 0)
+  downloadBlob(new Blob([file.text], { type: file.mimeType }), file.filename)
 }
 
 function drawShareCard(run: CompletedLabRun): void {
@@ -409,14 +401,7 @@ function drawShareCard(run: CompletedLabRun): void {
 
   canvas.toBlob((blob) => {
     if (!blob) return
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `lumen-apeiron-benchmark-${run.result.id}.png`
-    link.click()
-    setTimeout(() => {
-      URL.revokeObjectURL(url)
-    }, 0)
+    downloadBlob(blob, `lumen-apeiron-benchmark-${run.result.id}.png`)
   }, 'image/png')
 }
 

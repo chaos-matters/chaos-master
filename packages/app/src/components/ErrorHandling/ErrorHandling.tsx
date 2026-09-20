@@ -2,7 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { ConsoleLog } from '@/components/ConsoleLog/ConsoleLog'
 import { GPUWEB_IMPL_STATUS_URL } from '@/components/ErrorHandling/PreviewPoster'
 import { GitHub } from '@/icons'
-import { GIT_SHA, VERSION } from '@/version'
+import { DISPLAY_VERSION, GIT_SHA, VERSION } from '@/version'
 import ui from './ErrorHandling.module.css'
 
 export function WebgpuNotSupported() {
@@ -48,7 +48,7 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   // App
   entries.push({
     label: 'App Version',
-    value: `${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`,
+    value: DISPLAY_VERSION,
   })
 
   // Browser / OS
