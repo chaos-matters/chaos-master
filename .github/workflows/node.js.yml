@@ -51,14 +51,19 @@ jobs:
     - name: 🛠️ Build project
       run: pnpm --filter chaos-master run build
 
+    # The landing site has no tests, which is defensible for a marketing page.
+    # Not building it is not: nothing else in CI compiles it.
+    - name: Build landing
+      run: pnpm --filter @chaos-master/landing run build
+
     - name: 🎭 Install Playwright browsers
       run: pnpm exec playwright install --with-deps chromium
 
-    # CI-stable subset only (tests/smoke.spec.ts): GitHub runners provide flaky
-    # software WebGPU (swiftshader), so the full WebGPU-dependent e2e suite
-    # stays local/manual (see packages/app/TESTING.md). The smoke suite still
-    # guards build/serve/boot regressions unit tests can't catch.
-    - name: 🎭 Run e2e smoke tests
+    # The chromium-ci Playwright project: every *.ci.spec.ts, i.e. the specs
+    # that hold on the software WebGPU (swiftshader) GitHub runners provide.
+    # The rest of tests/ is not enforced here (see packages/app/TESTING.md).
+    # A skip in this project fails the run.
+    - name: Run CI-safe e2e
       run: pnpm test:e2e:ci
 
     - name: 📎 Upload Playwright report

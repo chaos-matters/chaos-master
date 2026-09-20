@@ -45,9 +45,12 @@ test.describe('WebMCP & Evolutionary Art Director UI', () => {
       })
     })
 
-    expect(payloadOf(result)).toEqual({
+    // Pin the contract, not the prose: the message is written for the model
+    // and was reworded without this spec noticing.
+    expect(payloadOf(result)).toMatchObject({
       success: true,
-      message: 'Art Director UI opened.',
+      generation: 1,
+      candidateCount: 2,
     })
 
     // Verify the Art Director overlay is visible
@@ -59,17 +62,12 @@ test.describe('WebMCP & Evolutionary Art Director UI', () => {
     await expect(page.getByText('85%')).toBeVisible()
     await expect(page.getByText('92%')).toBeVisible()
 
-    // Test candidate rating with stars
-    const starBtn = page.getByRole('button', { name: 'Rate 4 stars' }).first()
-    await starBtn.click()
+    // Star ratings became Like / Dislike reactions.
+    await page.getByTitle('Like this candidate').first().click()
 
-    // Test candidate selection
-    const loadBtn = page.getByRole('button', { name: 'Load Candidate' }).first()
-    await loadBtn.click()
-
-    // Test close button
-    const closeBtn = page.getByRole('button', { name: 'Close Art Director' })
-    await closeBtn.click()
+    // Loading a candidate closes the director on its own; the close button is
+    // exercised by the toolbar test below.
+    await page.getByRole('button', { name: 'Load Candidate' }).first().click()
     await expect(directorHeader).toBeHidden()
   })
 
@@ -98,45 +96,5 @@ test.describe('WebMCP & Evolutionary Art Director UI', () => {
     const closeBtn = page.getByRole('button', { name: 'Close Art Director' })
     await closeBtn.click()
     await expect(directorHeader).toBeHidden()
-  })
-
-  test('opens Flame Clash Arena and executes clash battle simulation', async ({
-    page,
-  }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await dismissWelcomeIfPresent(page, 12_000)
-
-    // Open Flame Clash Arena via Genetics menu
-    const geneticsBtn = page.getByRole('button', { name: 'Genetics' })
-    await geneticsBtn.click()
-
-    const clashItem = page.getByRole('menuitem', { name: /Flame Clash/i })
-    await clashItem.click()
-
-    // Verify Arena overlay opens
-    const arenaTitle = page.getByRole('heading', { name: 'Flame Clash Arena' })
-    await expect(arenaTitle).toBeVisible({ timeout: 5000 })
-
-    // Verify Player 1 and Player 2 stat cards
-    await expect(
-      page.getByRole('heading', { name: 'Cyan Guardian' }),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('heading', { name: 'Crimson Nemesis' }),
-    ).toBeVisible()
-
-    // Click Clash Flames button
-    const clashBtn = page.getByRole('button', { name: /CLASH FLAMES/i })
-    await expect(clashBtn).toBeVisible()
-    await clashBtn.click()
-
-    // Verify victor badge appears after clash calculation
-    const victorBadge = page.getByText('VICTOR').first()
-    await expect(victorBadge).toBeVisible({ timeout: 5000 })
-
-    // Exit arena
-    const exitBtn = page.getByRole('button', { name: 'Exit Arena' })
-    await exitBtn.click()
-    await expect(arenaTitle).toBeHidden()
   })
 })

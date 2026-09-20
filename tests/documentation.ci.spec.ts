@@ -1,25 +1,17 @@
-import { dismissWelcomeIfPresent, expect, test } from './helpers'
+import { dismissWelcomeIfPresent, expect, openWorkspaceMenuItem, test, } from './helpers'
 
 test.describe('Documentation modal', () => {
-  test('opens from the Docs pill and shows the three tabs with content', async ({
+  test('opens from the workspace menu and shows the three tabs with content', async ({
     page,
   }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3000)
     await dismissWelcomeIfPresent(page)
 
-    // The Docs pill lives next to the version in the main workspace, which only
-    // mounts once WebGPU initializes. The swiftshader + --enable-unsafe-webgpu
-    // launch flags (playwright.config.ts) provide a software adapter headless.
-    const docsButton = page.locator('button:has-text("Docs")').first()
-    const docsVisible = await docsButton
-      .isVisible({ timeout: 8000 })
-      .catch(() => false)
-    test.skip(!docsVisible, 'WebGPU unavailable — docs pill not mounted')
-
-    // dispatchEvent rather than click(): the welcome backdrop can still be
-    // fading and would otherwise intercept the pointer.
-    await docsButton.dispatchEvent('click')
+    // v0.9.11 had a Docs pill; the entry now lives in the workspace menu. This
+    // spec used to skip when the old selector missed, and so reported green
+    // while testing nothing.
+    await openWorkspaceMenuItem(page, /Documentation/)
 
     const modal = page.locator('dialog', { hasText: 'Documentation' }).first()
     await expect(modal).toBeVisible()

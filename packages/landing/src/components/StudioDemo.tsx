@@ -6,6 +6,7 @@ import { encodeSharePayload } from '@/utils/jsonQueryParam'
 import { APP_URL, posterFor, prettyVariation, PREVIEW_QUALITY, } from '../lib/flame'
 import { webgpuLive } from '../lib/webgpuHealth'
 import PosterFlame from './PosterFlame'
+import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
 
 /**
  * Interactive "Studio" demo — the live flame viewport and the TRANSFORMS panel
@@ -111,6 +112,9 @@ const MORPHS: ReadonlyArray<Morph> = [
 ]
 
 export default function StudioDemo() {
+  /** A transform by the plain string ids the panel iterates. */
+  const transformOf = (f: typeof example45, tid: string) =>
+    f.transforms[tid as TransformId]
   const [flame, setFlame] = createStore<typeof example45>(
     structuredClone(example45),
   )
@@ -142,11 +146,7 @@ export default function StudioDemo() {
   // instead of letting a value read as >1.
   const probTotal = createMemo(
     () =>
-      tids.reduce(
-        (s, tid) =>
-          s + ((flame.transforms as never)[tid].probability as number),
-        0,
-      ) || 1,
+      tids.reduce((s, tid) => s + transformOf(flame, tid).probability, 0) || 1,
   )
 
   // "Open in app": encode the live (scrubbed) flame into the app's self-contained
@@ -230,7 +230,7 @@ export default function StudioDemo() {
   const snapshotAffines = (): Record<string, Affine> => {
     const snap: Record<string, Affine> = {}
     for (const tid of tids) {
-      snap[tid] = { ...((flame.transforms as never)[tid].preAffine as Affine) }
+      snap[tid] = { ...(transformOf(flame, tid).preAffine as Affine) }
     }
     return snap
   }
@@ -299,24 +299,19 @@ export default function StudioDemo() {
     setAnimating(false)
     const fresh = structuredClone(example45)
     for (const tid of tids) {
-      const ft = (fresh.transforms as never)[tid]
+      const ft = transformOf(fresh, tid)
       // Restore everything the panel can scrub: affine coefs, probability, and
       // each variation weight — not just the affine.
-      setFlame('transforms', tid as never, 'preAffine' as never, ft.preAffine)
-      setFlame(
-        'transforms',
-        tid as never,
-        'probability' as never,
-        ft.probability,
-      )
-      for (const vid of Object.keys(ft.variations)) {
+      setFlame('transforms', tid as TransformId, 'preAffine', ft.preAffine)
+      setFlame('transforms', tid as TransformId, 'probability', ft.probability)
+      for (const vid of Object.keys(ft.variations) as VariationId[]) {
         setFlame(
           'transforms',
-          tid as never,
-          'variations' as never,
-          vid as never,
-          'weight' as never,
-          (ft.variations as never)[vid].weight,
+          tid as TransformId,
+          'variations',
+          vid,
+          'weight',
+          ft.variations[vid].weight,
         )
       }
     }
@@ -442,8 +437,7 @@ export default function StudioDemo() {
                   <span
                     class="scrub"
                     onPointerDown={beginScrub({
-                      get: () =>
-                        (flame.transforms as never)[tid].probability as number,
+                      get: () => transformOf(flame, tid).probability,
                       set: (v) => {
                         setFlame(
                           'transforms',
@@ -459,8 +453,7 @@ export default function StudioDemo() {
                     })}
                   >
                     {(
-                      ((flame.transforms as never)[tid].probability as number) /
-                      probTotal()
+                      transformOf(flame, tid).probability / probTotal()
                     ).toFixed(2)}
                   </span>
                 </span>
@@ -473,10 +466,7 @@ export default function StudioDemo() {
                       <b
                         class="scrub"
                         onPointerDown={beginScrub({
-                          get: () =>
-                            (flame.transforms as never)[tid].preAffine[
-                              k
-                            ] as number,
+                          get: () => transformOf(flame, tid).preAffine[k],
                           set: (v) => {
                             setFlame(
                               'transforms',
@@ -490,11 +480,7 @@ export default function StudioDemo() {
                           decimals: 3,
                         })}
                       >
-                        {(
-                          (flame.transforms as never)[tid].preAffine[
-                            k
-                          ] as number
-                        ).toFixed(2)}
+                        {transformOf(flame, tid).preAffine[k].toFixed(2)}
                       </b>
                     </span>
                   )}
@@ -503,7 +489,7 @@ export default function StudioDemo() {
               <div class="vbar">
                 <For
                   each={Object.entries(
-                    (flame.transforms as never)[tid].variations as Record<
+                    transformOf(flame, tid).variations as Record<
                       string,
                       { type: string; weight: number }
                     >,
@@ -516,8 +502,9 @@ export default function StudioDemo() {
                         class="scrub"
                         onPointerDown={beginScrub({
                           get: () =>
-                            (flame.transforms as never)[tid].variations[vid]
-                              .weight as number,
+                            transformOf(flame, tid).variations[
+                              vid as VariationId
+                            ].weight,
                           set: (w) => {
                             setFlame(
                               'transforms',
@@ -534,10 +521,9 @@ export default function StudioDemo() {
                           max: 2,
                         })}
                       >
-                        {(
-                          (flame.transforms as never)[tid].variations[vid]
-                            .weight as number
-                        ).toFixed(2)}
+                        {transformOf(flame, tid).variations[
+                          vid as VariationId
+                        ].weight.toFixed(2)}
                       </span>
                     </span>
                   )}

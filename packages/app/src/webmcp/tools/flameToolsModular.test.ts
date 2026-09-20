@@ -188,3 +188,31 @@ describe('scoreClashRound tool execution contract', () => {
     expect(res.ownershipA + res.ownershipB + res.contested).toBeCloseTo(1, 2)
   })
 })
+
+describe('scoreClashRound verdict margin', () => {
+  it('calls a draw when both fighters own exactly the same share', () => {
+    // Equal total probability gives each side (1 - contested) / 2, so the
+    // ownerships are identical and only a draw is correct. An audit mutation
+    // turned the A-wins margin into a handicap and nothing noticed.
+    const side = (x: number) => ({
+      probability: 1,
+      visible: true,
+      color: { x, y: 1 },
+      colorSpeed: 0.5,
+      preAffine: { a: 0.5, b: 0, c: 0, d: 0, e: 0.5, f: 0 },
+      postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+      variations: { v: { type: 'linearVar', weight: 1 } },
+    })
+    const clashFlame = {
+      version: '1',
+      transforms: { p1_t1_0: side(0.2), p2_t1_0: side(0.8) },
+    }
+    const res = scoreClashRound.execute({ clashFlame, seed: 7 }, {}) as {
+      ownershipA: number
+      ownershipB: number
+      verdict: string
+    }
+    expect(res.ownershipA).toBe(res.ownershipB)
+    expect(res.verdict).toBe('draw')
+  })
+})

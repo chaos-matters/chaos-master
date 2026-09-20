@@ -10,7 +10,8 @@ import { watchDevice } from '../lib/webgpuHealth'
 export default function GpuHealthWatch() {
   const { device } = useRootContext()
   onMount(() => {
-    watchDevice(device)
+    // The degraded shell provides no device; there is nothing to watch.
+    if (device) watchDevice(device)
   })
   return null
 }

@@ -1,4 +1,4 @@
-import { dismissWelcomeIfPresent, expect, test } from './helpers'
+import { dismissWelcomeIfPresent, expect, openWorkspaceMenuItem, test, } from './helpers'
 
 test.describe('Console panel', () => {
   test('shows the snapshot taken at log time, not the live object', async ({
@@ -8,17 +8,6 @@ test.describe('Console panel', () => {
     await page.waitForTimeout(3000)
     await dismissWelcomeIfPresent(page)
 
-    // The About pill carries the version and lives next to the Docs pill in the
-    // main workspace, which only mounts once WebGPU initializes.
-    const aboutButton = page
-      .locator('button')
-      .filter({ hasText: /^v\d+\.\d+/ })
-      .first()
-    const aboutVisible = await aboutButton
-      .isVisible({ timeout: 8000 })
-      .catch(() => false)
-    test.skip(!aboutVisible, 'WebGPU unavailable — about pill not mounted')
-
     // Log a live object and then mutate it. The panel used to hold the argument
     // by reference and format it at render time, so it would show 'after'.
     await page.evaluate(() => {
@@ -27,9 +16,11 @@ test.describe('Console panel', () => {
       live.state = 'after'
     })
 
-    // dispatchEvent rather than click(): the welcome backdrop can still be
-    // fading and would otherwise intercept the pointer.
-    await aboutButton.dispatchEvent('click')
+    // The console sits behind Settings and More in the workspace menu and is
+    // open by default there. The version pill used to open the About modal
+    // directly; it now opens the menu, so this spec failed on a dialog that
+    // never appeared.
+    await openWorkspaceMenuItem(page, /Settings and More/)
 
     const modal = page
       .locator('dialog')

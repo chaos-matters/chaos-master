@@ -1,107 +1,49 @@
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import colorAndPaletteSectionSource from '../components/WorkspaceSidebar/ColorAndPaletteSection.tsx?raw'
-import randomizerSectionSource from '../components/WorkspaceSidebar/RandomizerSection.tsx?raw'
-import renderSettingsSectionSource from '../components/WorkspaceSidebar/RenderSettingsSection.tsx?raw'
-import transformsSectionSource from '../components/WorkspaceSidebar/TransformsSection.tsx?raw'
-import sidebarSource from '../components/WorkspaceSidebar/WorkspaceSidebar.tsx?raw'
-import animationGenSource from '../hooks/useWorkspaceAnimationGen.ts?raw'
-import replaySource from '../hooks/useWorkspaceReplay.ts?raw'
-import workspaceSource from '../MainWorkspace.tsx?raw'
 
-const workspacePath = 'src/MainWorkspace.tsx'
-const workspaceAst = ts.createSourceFile(
-  workspacePath,
-  workspaceSource,
-  ts.ScriptTarget.Latest,
-  true,
-  ts.ScriptKind.TSX,
+/**
+ * The files this ratchet reads, derived rather than listed: MainWorkspace, every
+ * sidebar section and every useWorkspace* hook it was decomposed into. The list
+ * used to be hand-maintained and was widened twice, each time inside the commit
+ * that made widening necessary; a new extraction is now covered as it lands.
+ */
+const RAW_SOURCES = import.meta.glob(
+  [
+    '../MainWorkspace.tsx',
+    '../components/WorkspaceSidebar/*.tsx',
+    '../hooks/useWorkspace*.{ts,tsx}',
+    '!**/*.test.*',
+  ],
+  { query: '?raw', import: 'default', eager: true },
 )
 
-const allAstEntries = [
-  { path: workspacePath, ast: workspaceAst },
-  {
-    path: 'src/components/WorkspaceSidebar/WorkspaceSidebar.tsx',
-    ast: ts.createSourceFile(
-      'src/components/WorkspaceSidebar/WorkspaceSidebar.tsx',
-      sidebarSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    ),
-  },
-  {
-    path: 'src/components/WorkspaceSidebar/ColorAndPaletteSection.tsx',
-    ast: ts.createSourceFile(
-      'src/components/WorkspaceSidebar/ColorAndPaletteSection.tsx',
-      colorAndPaletteSectionSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    ),
-  },
-  {
-    path: 'src/components/WorkspaceSidebar/RandomizerSection.tsx',
-    ast: ts.createSourceFile(
-      'src/components/WorkspaceSidebar/RandomizerSection.tsx',
-      randomizerSectionSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    ),
-  },
-  {
-    path: 'src/components/WorkspaceSidebar/TransformsSection.tsx',
-    ast: ts.createSourceFile(
-      'src/components/WorkspaceSidebar/TransformsSection.tsx',
-      transformsSectionSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    ),
-  },
-  {
-    path: 'src/components/WorkspaceSidebar/RenderSettingsSection.tsx',
-    ast: ts.createSourceFile(
-      'src/components/WorkspaceSidebar/RenderSettingsSection.tsx',
-      renderSettingsSectionSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    ),
-  },
-  {
-    path: 'src/hooks/useWorkspaceAnimationGen.ts',
-    ast: ts.createSourceFile(
-      'src/hooks/useWorkspaceAnimationGen.ts',
-      animationGenSource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    ),
-  },
-  {
-    path: 'src/hooks/useWorkspaceReplay.ts',
-    ast: ts.createSourceFile(
-      'src/hooks/useWorkspaceReplay.ts',
-      replaySource,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    ),
-  },
-]
+/**
+ * Bump this deliberately when an extraction adds a file. The file is covered
+ * either way; the count makes the widening visible in review instead of silent.
+ */
+const EXPECTED_SOURCE_COUNT = 18
 
-const allSources = [
-  workspaceSource,
-  sidebarSource,
-  colorAndPaletteSectionSource,
-  randomizerSectionSource,
-  transformsSectionSource,
-  renderSettingsSectionSource,
-  animationGenSource,
-  replaySource,
-].join('\n')
+const sources = Object.entries(RAW_SOURCES).map(([relative, text]) => ({
+  path: relative.replace(/^\.\.\//, 'src/'),
+  text,
+}))
+
+const workspacePath = 'src/MainWorkspace.tsx'
+
+const allAstEntries = sources.map(({ path, text }) => ({
+  path,
+  ast: ts.createSourceFile(
+    path,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  ),
+}))
+
+const workspaceAst = allAstEntries.find((e) => e.path === workspacePath)!.ast
+
+const allSources = sources.map(({ text }) => text).join('\n')
 
 /**
  * MainWorkspace owns the final callbacks for most editor controls, but mounting
@@ -207,6 +149,11 @@ function expectSomeOpeningToUse(tagName: string, ...fragments: string[]) {
 }
 
 describe('real UI recorder coverage ratchet', () => {
+  it('reads every workspace source file, and says so when that grows', () => {
+    expect(sources.map(({ path }) => path).sort()).toContain(workspacePath)
+    expect(sources).toHaveLength(EXPECTED_SOURCE_COUNT)
+  })
+
   it('keeps randomize, mutate and load-result workflows value-pinned', () => {
     expectNamedDeclarationToUse(
       'executeFlameLoad',

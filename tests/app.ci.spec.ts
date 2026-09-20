@@ -1,4 +1,4 @@
-import { expect, test } from './helpers'
+import { dismissWelcomeIfPresent, expect, test } from './helpers'
 
 test.describe('App Loading', () => {
   test('should load the app without fatal errors', async ({
@@ -47,19 +47,17 @@ test.describe('App Loading', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3000)
 
-    // App should handle WebGPU unavailability gracefully
-    // Either it shows WebGPU not supported, or it renders without crashing
+    await dismissWelcomeIfPresent(page, 12_000)
+
+    // One of two real states: the unsupported notice, or the workspace (its
+    // version pill). A crash lands on the error boundary, which is neither;
+    // "#root has children" could not tell those apart.
     const webgpuError = page.locator('text=WebGPU is not supported')
-    const hasRoot = page.locator('#root')
-
-    // Either WebGPU error is shown OR the app rendered without crashing
-    const webgpuShown = await webgpuError
-      .isVisible({ timeout: 1000 })
-      .catch(() => false)
-    const rootHasContent = await hasRoot.evaluate(
-      (el) => el.children.length > 0,
-    )
-
-    expect(webgpuShown || rootHasContent).toBeTruthy()
+    const workspace = page.getByRole('button', {
+      name: /^Chaos Master v\S+ menu$/,
+    })
+    await expect(webgpuError.or(workspace).first()).toBeVisible({
+      timeout: 20_000,
+    })
   })
 })
