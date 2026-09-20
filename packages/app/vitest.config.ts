@@ -26,6 +26,24 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./src/vitest.setup.ts'],
+    // `vitest run --coverage` turns this on. It lives here rather than in a
+    // flag string so an IDE run, `vitest --ui` and CI all measure the same set.
+    // Vitest 4 reports every file matched by `include`, loaded or not, which is
+    // what the old --coverage.all flag asked for.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.{test,spec}.{ts,tsx}',
+        // Variation bodies: 'use gpu' functions compiled to WGSL. The registry
+        // imports all ~380 of them, so their lines "run" on import without any
+        // assertion reaching the shader. Counting them tracks shader volume, not
+        // tested code. Their CPU side (registry, param editors, docs) stays in.
+        'src/flame/variations/{simple,simple3D,parametric,parametric3D}/**',
+      ],
+      reporter: ['text-summary', 'json-summary'],
+      reportsDirectory: 'coverage-audit',
+    },
     css: {
       modules: {
         classNameStrategy: 'non-scoped',
