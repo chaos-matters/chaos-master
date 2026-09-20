@@ -1,5 +1,13 @@
 node_modules
 dist
+# packages/app native (Capacitor) build; `cap sync` copies it into packages/mobile
+dist-native
+# Signing material never enters the repo (the vault is the source of truth)
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
 .idea
 .env.local
 # Local Worker secrets for `wrangler dev` (never commit)

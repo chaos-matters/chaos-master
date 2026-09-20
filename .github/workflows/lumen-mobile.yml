@@ -1,0 +1,135 @@
+name: Lumen Apeiron Mobile
+
+# A caller. See `.github/workflows/capacitor-app.yml` for what it does and
+# why — every lesson in it was paid for by Beside Cue's builds in the
+# MercuryPitch repository, and this app reuses them rather than re-learning
+# them. What stays here is what is genuinely Lumen Apeiron's: which paths are
+# its own, which tag releases it, and which secrets it may reach.
+#
+# WHAT RUNS WHEN. This fork is PRIVATE, so a macOS minute is billed at ten
+# ubuntu minutes against the plan quota, and iOS runs only where it proves
+# something the Android job cannot. The reusable workflow's `changes` job
+# (ubuntu, about a minute) decides, and writes its reasons to the run summary.
+#
+#   trigger                    Android (ubuntu)            iOS (macOS, billed x10)
+#   -------------------------  --------------------------  -------------------------------------
+#   pull request to main that  tests, lint, debug APK      simulator build, only if the PR
+#   touches the paths below                                touches packages/mobile/,
+#                                                          packages/mobile-runtime/ or these
+#                                                          two workflow files; never signed
+#   push to main               tests, lint, debug APK,     nothing
+#                              only if the push touched
+#                              the paths below
+#   push of a mobile-v* tag    the above, plus release     signed archive uploaded to
+#                              AAB and APK                 TestFlight, plus an ad-hoc IPA
+#   workflow_dispatch on a     the above, plus release     signed archive, NOT uploaded: proves
+#   branch                     AAB and APK                 the certificate, the profile and the
+#                                                          device compile
+#   workflow_dispatch on a     same as the tag push        same as the tag push: a retry, with
+#   mobile-v* tag                                          a new build number
+#
+# Missing secrets never fail a run. Android release artifacts come out
+# unsigned; an iOS job whose signing secrets are not all set is not started at
+# all; and a tag or manual run that cannot sign falls back to the simulator
+# build, so iOS is still compiled.
+#
+# To stop every macOS job without a commit (quota running low), set the
+# repository variable LUMEN_IOS_CI to "off":
+#
+#   gh variable set LUMEN_IOS_CI --body off
+#
+# and delete the variable to turn iOS back on.
+#
+# VERSIONS. A tag names the marketing version (mobile-v0.9.12 -> 0.9.12; it
+# must be one to three dot-separated integers, or the run stops before any
+# build); every other run carries packages/app/package.json's "version". The
+# iOS build number and the Android versionCode are github.run_number, which
+# only rises. The native app versions independently of the web app:
+# `mobile-v*` does not match deploy.yml's `v*`, so a mobile release never
+# deploys the web app, and a web release never builds the native one.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/app/**'
+      - 'packages/core/**'
+      - 'packages/mobile/**'
+      - 'packages/mobile-runtime/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/lumen-mobile.yml'
+      - '.github/workflows/capacitor-app.yml'
+  # No `paths:` on a trigger that also carries tags — a tag placed on a commit
+  # already on main contains no commits, so the filter would match nothing and
+  # skip the release. The reusable workflow's `changes` job filters pushes and
+  # lets every tag through.
+  push:
+    branches: [main]
+    tags: ['mobile-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A superseded pull-request run is wasted work and cancelling it is free. A
+# superseded main or tag run is an upload in flight, and cancelling that burns
+# a build number on a build nobody ever sees, so those queue instead.
+concurrency:
+  group: lumen-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    uses: ./.github/workflows/capacitor-app.yml
+    permissions:
+      contents: read
+    with:
+      app-name: Lumen Apeiron
+      app-slug: lumen-apeiron
+      web-package-name: chaos-master
+      web-build-script: build:native
+      # capacitor.config.ts names this as `webDir` (`../app/dist-native`).
+      web-dist-dir: packages/app/dist-native
+      mobile-dir: packages/mobile
+      mobile-package-name: '@chaos-master/mobile'
+      version-file: packages/app/package.json
+      bundle-id: com.irchiinnuss.lumenapeiron
+      tag-prefix: mobile-v
+      signing-env-prefix: LUMEN
+      profile-build-setting: LUMEN_PROFILE
+      # Kept in step with the pull_request `paths:` filter above.
+      changed-paths-regex: '^(packages/(app|core|mobile|mobile-runtime)/|package\.json$|pnpm-lock\.yaml$|\.github/workflows/(capacitor-app|lumen-mobile)\.yml$)'
+      # The subset that can break the Swift compile. The web app, the core
+      # package and a lockfile-only bump cannot; a Capacitor upgrade changes
+      # packages/mobile/package.json, and anything that slips past is caught by
+      # the next tag's archive or by a manual run.
+      ios-changed-paths-regex: '^(packages/(mobile|mobile-runtime)/|\.github/workflows/(capacitor-app|lumen-mobile)\.yml$)'
+      run-ios: ${{ vars.LUMEN_IOS_CI != 'off' }}
+    secrets:
+      keystore-base64: ${{ secrets.LUMEN_KEYSTORE_BASE64 }}
+      keystore-password: ${{ secrets.LUMEN_KEYSTORE_PASSWORD }}
+      key-alias: ${{ secrets.LUMEN_KEY_ALIAS }}
+      key-password: ${{ secrets.LUMEN_KEY_PASSWORD }}
+      debug-keystore-base64: ${{ secrets.LUMEN_DEBUG_KEYSTORE_BASE64 }}
+      # Per-team: one certificate and one App Store Connect key for every app
+      # under the team. These are the only unprefixed names, and they are
+      # unprefixed because they are genuinely shared.
+      apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
+      apple-asc-key-id: ${{ secrets.APPLE_ASC_KEY_ID }}
+      apple-asc-issuer-id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+      apple-asc-key-p8: ${{ secrets.APPLE_ASC_KEY_P8 }}
+      apple-certificate-p12-base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      apple-certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      # Per-app, and the reason the reusable workflow takes named secrets
+      # rather than inheriting.
+      appstore-profile-base64: ${{ secrets.LUMEN_APPSTORE_PROFILE_BASE64 }}
+      appstore-profile-name: ${{ secrets.LUMEN_APPSTORE_PROFILE_NAME }}
+      adhoc-profile-base64: ${{ secrets.LUMEN_ADHOC_PROFILE_BASE64 }}
+      adhoc-profile-name: ${{ secrets.LUMEN_ADHOC_PROFILE_NAME }}
+      # PURCHASES: not wired yet (see capacitor-app.yml). Once that file
+      # declares the two RevenueCat secrets, map them here as
+      #   revenuecat-ios-key     <- LUMEN_REVENUECAT_IOS_KEY
+      #   revenuecat-android-key <- LUMEN_REVENUECAT_ANDROID_KEY
+      # A caller may not pass a secret the reusable workflow does not declare,
+      # so the two change together.

@@ -17,7 +17,7 @@ import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
 import { applyTracksToFlame } from '@/utils/timeline'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
-import { VERSION } from '@/version'
+import { DISPLAY_VERSION } from '@/version'
 import ui from './WelcomeScreen.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
@@ -548,7 +548,7 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
                       <line x1="12" y1="16" x2="12" y2="12" />
                       <line x1="12" y1="8" x2="12.01" y2="8" />
                     </svg>
-                    v{VERSION}
+                    v{DISPLAY_VERSION}
                   </button>
                 </Show>
               </div>

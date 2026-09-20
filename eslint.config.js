@@ -14,6 +14,11 @@ export default defineConfig(
       '**/*.css.d.ts',
       '**/coverage',
       '**/dist',
+      '**/dist-native', // packages/app native (Capacitor) build output
+      // Capacitor native projects: generated Xcode/Gradle files plus, after
+      // `cap sync`, a full copy of the built web bundle.
+      'packages/mobile/ios',
+      'packages/mobile/android',
       '**/.astro', // Astro generated cache (packages/landing)
       '**/node_modules',
       '**/.pnpm-store', // present in CI

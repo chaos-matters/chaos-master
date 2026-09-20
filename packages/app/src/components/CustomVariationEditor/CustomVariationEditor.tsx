@@ -9,6 +9,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { mathModeTutorial } from '@/tutorials/mathModeTutorial'
+import { downloadBlob } from '@/utils/blob'
 import { MathEditor } from '../MathEditor/MathEditor'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -368,12 +369,7 @@ function ShowCustomVariationEditor(props: {
 
   function handleExportItem(def: CustomVariationDef) {
     const blob = new Blob([def.wgsl], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${def.name.replace(/\s+/g, '_')}.wgsl`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `${def.name.replace(/\s+/g, '_')}.wgsl`)
   }
 
   function handleUseItem(def: CustomVariationDef) {

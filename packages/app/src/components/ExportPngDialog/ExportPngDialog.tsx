@@ -13,6 +13,7 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { lastFinishedSession } from '@/recorder/recorder'
+import { downloadBlob } from '@/utils/blob'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
 import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, snapshotExportSession, } from '@/utils/exportPreferences'
@@ -1032,13 +1033,7 @@ export function createExportPngDialog(
             ).arrayBuffer(),
           )
           saveRecentFlame(flameDescriptor, undefined, currentTracks)
-          const fileUrlExt = URL.createObjectURL(
-            new Blob([pngBytes], { type: 'image/png' }),
-          )
-          const downloadLink = window.document.createElement('a')
-          downloadLink.href = fileUrlExt
-          downloadLink.download = 'flame.png'
-          downloadLink.click()
+          downloadBlob(new Blob([pngBytes], { type: 'image/png' }), 'flame.png')
         },
         'image/png',
         1,

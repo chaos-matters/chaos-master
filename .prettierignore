@@ -1,0 +1,6 @@
+# Capacitor's native projects (packages/mobile). After `cap sync` both trees
+# hold a full copy of the built web bundle (ios/App/App/public and
+# android/app/src/main/assets/public), which `pnpm fmt:fix` would otherwise
+# walk and rewrite; the rest is generated Xcode and Gradle output.
+packages/mobile/ios
+packages/mobile/android

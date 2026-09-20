@@ -1,0 +1,1178 @@
+name: Capacitor app
+
+# Native builds for a Capacitor app in this repository, as a reusable workflow.
+#
+# Ported on 2026-09-11 from MercuryPitch's `.github/workflows/capacitor-app.yml`.
+# Beside Cue wrote every rule below and paid for most of them in failed runs;
+# the comments are kept verbatim because they are the reason each branch
+# exists. This file is what an app reuses instead of a copy of its own, and
+# `.github/workflows/lumen-mobile.yml` is its caller. There is exactly one
+# place to fix a build lesson.
+#
+# Four ways in, and each answers a different question:
+#
+#   pull request      Does this change still build? An installable Android
+#                     debug APK, plus an iOS simulator build when, and only
+#                     when, the pull request touches the native iOS side.
+#                     Nothing is signed for iOS and nothing is uploaded.
+#   push to main      What does the merged app do? The Android debug APK from
+#                     the merge commit, which is not the code any PR tested —
+#                     a PR is built against its own base. No macOS runner.
+#   release tag       The release. Android store artifacts, a signed iOS
+#                     archive uploaded to TestFlight with the tag's version as
+#                     the marketing version, and an ad-hoc IPA.
+#   manual run        A release rehearsal that stops short of the store: the
+#                     Android release artifacts, and a signed iOS archive that
+#                     is thrown away. Run from a release tag, it is the release
+#                     again (a retry, with a new build number).
+#
+# WHY A PULL REQUEST DOES NOT UPLOAD (maff, 2026-09-04). It did, from
+# 2026-09-01, and the reason was good: a signed upload is the only way to get
+# an iOS build onto a phone, since the simulator artifact is compiled for the
+# wrong ABI. What that missed is that App Store Connect meters uploads per app
+# per day, and answers a run over the line with
+#
+#   error 90382: Upload limit reached. The upload limit for your application
+#   has been reached. Please wait 1 day and try again.
+#
+# — after the archive has already been built and signed. A day of ordinary
+# pushing therefore spends the quota on builds nobody installs and then refuses
+# the one that was wanted, with a red X on the pull request for a reason that
+# has nothing to do with the change. The archive is the part that proves
+# anything (it compiles, it signs, the profile is current); the upload is the
+# part that costs. So a pull request keeps the first and drops the second, and
+# TestFlight comes from main and from tags, where every build is one somebody
+# means to install.
+#
+# THIS COPY UPLOADS FROM TAGS ONLY, AND ARCHIVES LESS (2026-09-11). Mercury
+# Pitch already moved its own uploads to tags, because its main moves several
+# times a day; this app starts there. It also runs on a PRIVATE fork, where a
+# macOS minute is billed at ten ubuntu minutes against the plan quota, and a
+# signed archive or a simulator build is four or five of those minutes in
+# MercuryPitch's runs. So a macOS minute is spent only where it proves
+# something nothing cheaper can:
+#
+#   - The signed archive runs on release tags and manual runs, never on a pull
+#     request or a push to main, and it uploads from release tags only.
+#   - The simulator build runs on a pull request only when the pull request
+#     touches the native iOS side (`ios-changed-paths-regex`). A web-only
+#     change cannot break the Swift compile — `cap sync` copies the bundle in
+#     as resources — and the Android job already proves the bundle builds and
+#     syncs. On a tag or a manual run it stands in for the archive when the
+#     Apple secrets are absent, so iOS is still compiled.
+#   - All of it is decided once, up front, on ubuntu, by the `changes` job,
+#     including whether the signing secrets exist. A macOS job that starts only
+#     to find its secrets missing is still billed, ten times over.
+#
+# Android is untouched. Its release artifact is an APK attached to the run —
+# nothing is published to a store, so there is no quota to spend. (Its release
+# build does run on tags and manual runs only here: ubuntu minutes are metered
+# on a private repository too, just not ten times over.)
+#
+# Signing is opt-in. Without the secrets the release builds still run and still
+# prove the app compiles — they are simply unsigned, and the store-upload
+# artifacts are skipped rather than failing the run.
+#
+# EVERY SECRET IS PASSED EXPLICITLY, never `secrets: inherit`. Two apps in one
+# repository share a secret namespace, and a generic name is how one app's
+# release ends up carrying the other's store key. The caller names what it
+# hands over, and this file cannot reach anything else.
+#
+# THE LAYOUT DIFFERS FROM MERCURYPITCH'S. There, each app is one package that
+# is both the web app and the shell. Here the web app (`web-package-name`)
+# writes its native bundle into `web-dist-dir`, and the Capacitor shell
+# (`mobile-package-name`, in `mobile-dir`) wraps that directory as its
+# `webDir`. One bundle serves both platforms: the build's `native` mode already
+# knows it runs inside a shell, and Capacitor answers "which platform" at
+# runtime, so there is no per-platform build and no platform variable.
+#
+# PURCHASES ARE NOT WIRED YET, and every PURCHASES comment below marks where
+# they go. MercuryPitch's copy carries a purchase mode (an app-owned mock for
+# internal TestFlight, or real StoreKit) and builds the web bundle twice per
+# platform: once with the RevenueCat Test Store key for the sideloadable debug
+# and simulator artifacts, and again with the real store key for the release
+# artifacts, because the SDK aborts a release binary that configures a `test_`
+# key. Until the app sells something none of that has anything to switch, and
+# the second build would double a metered build for a byte-identical bundle,
+# so it is left out rather than left inert. When RevenueCat lands, bring back
+# from MercuryPitch's file: the optional `revenuecat-ios-key` and
+# `revenuecat-android-key` secrets (the caller already lists
+# LUMEN_REVENUECAT_IOS_KEY and LUMEN_REVENUECAT_ANDROID_KEY), the build-time
+# variables the app reads, the release rebuild after the debug APK and the
+# simulator build, and `testFlightInternalTestingOnly` for a build that carries
+# mocks. No job here needs a RevenueCat secret to run.
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: 'Display name, for job summaries. e.g. "Lumen Apeiron"'
+        required: true
+        type: string
+      app-slug:
+        description: 'Artifact-name prefix and log identity. e.g. "lumen-apeiron"'
+        required: true
+        type: string
+      web-package-name:
+        description: >-
+          pnpm --filter target that builds the web bundle the shell wraps,
+          e.g. "chaos-master".
+        required: true
+        type: string
+      web-build-script:
+        description: 'Script in web-package-name that writes the native bundle. e.g. "build:native"'
+        required: true
+        type: string
+      web-dist-dir:
+        description: >-
+          Where that script writes the bundle, from the repo root, e.g.
+          "packages/app/dist-native". Must be the directory the shell's
+          capacitor.config names as `webDir`.
+        required: true
+        type: string
+      mobile-dir:
+        description: 'The Capacitor shell, from the repo root, holding android/ and ios/. e.g. "packages/mobile"'
+        required: true
+        type: string
+      mobile-package-name:
+        description: 'pnpm --filter target that owns @capacitor/cli, for cap sync. e.g. "@chaos-master/mobile"'
+        required: true
+        type: string
+      version-file:
+        description: >-
+          package.json whose "version" is the marketing version of every run
+          that is not a release tag, e.g. "packages/app/package.json".
+        required: true
+        type: string
+      bundle-id:
+        description: 'iOS bundle identifier, the key in ExportOptions.plist'
+        required: true
+        type: string
+      tag-prefix:
+        description: 'Release tag prefix, stripped to get the marketing version. e.g. "mobile-v"'
+        required: true
+        type: string
+      signing-env-prefix:
+        description: >-
+          Prefix for the Gradle signing variables the shell's
+          gradle/signing.gradle reads: "LUMEN" yields LUMEN_KEYSTORE_FILE and
+          the rest.
+        required: true
+        type: string
+      profile-build-setting:
+        description: >-
+          The user-defined Xcode build setting the App target reads its
+          provisioning profile from, e.g. "LUMEN_PROFILE". It must be
+          named on the App TARGET in App.xcodeproj and nowhere else — a build
+          setting given on the xcodebuild command line applies to every target
+          in the build, and the SwiftPM frameworks refuse a profile.
+        required: true
+        type: string
+      changed-paths-regex:
+        description: 'ERE matched against changed files to decide whether a push to main is worth a native build'
+        required: true
+        type: string
+      ios-changed-paths-regex:
+        description: >-
+          ERE matched against a pull request's changed files to decide whether
+          it is worth an iOS simulator build on a metered macOS runner. Only
+          what can break the native compile belongs here — the shell, its
+          plugins, these workflows — because a web-only change cannot.
+        required: true
+        type: string
+      ios-export-method:
+        description: >-
+          ExportOptions method for the ad-hoc release job. "release-testing" is
+          Xcode 15+ for what used to be called ad-hoc: signed with the
+          DISTRIBUTION certificate, installable only on devices whose UDID is
+          in the profile.
+        required: false
+        type: string
+        default: 'release-testing'
+      verify-assets:
+        description: >-
+          Optional shell run in every job after the built-in bundle check, once
+          `cap sync` has copied the bundle into the platform project, to assert
+          what this app's bundle must carry. Reads $DIST_DIR, $PLATFORM
+          ("android" or "ios") and $PLATFORM_ASSETS_DIR. Empty means the
+          built-in check only.
+        required: false
+        type: string
+        default: ''
+      run-android:
+        required: false
+        type: boolean
+        default: true
+      run-ios:
+        description: >-
+          False starts no macOS job at all. The caller wires it to a repository
+          variable, so metered minutes can be stopped without a commit.
+        required: false
+        type: boolean
+        default: true
+
+    secrets:
+      # Android upload signing. Absent, the release artifacts are unsigned.
+      keystore-base64:
+        required: false
+      keystore-password:
+        required: false
+      key-alias:
+        required: false
+      key-password:
+        required: false
+      # Shared between CI and developer machines so an install can be updated
+      # rather than reinstalled. Signs nothing Play would accept.
+      debug-keystore-base64:
+        required: false
+
+      # Per-TEAM, shared by every app here: one certificate, one API key.
+      apple-team-id:
+        required: false
+      apple-asc-key-id:
+        required: false
+      apple-asc-issuer-id:
+        required: false
+      apple-asc-key-p8:
+        required: false
+      apple-certificate-p12-base64:
+        required: false
+      apple-certificate-password:
+        required: false
+
+      # Per-APP. These are the ones that must never be shared, and the reason
+      # this workflow takes them as named secrets rather than inheriting.
+      appstore-profile-base64:
+        required: false
+      appstore-profile-name:
+        required: false
+      adhoc-profile-base64:
+        required: false
+      adhoc-profile-name:
+        required: false
+      # PURCHASES: revenuecat-ios-key and revenuecat-android-key go here, both
+      # `required: false`, when the app has something to sell.
+
+permissions:
+  contents: read
+
+jobs:
+  # What this run builds, decided once, on ubuntu.
+  #
+  # The caller's pull_request trigger already has a `paths:` filter, and a tag
+  # is always a release, so "did the app change" only has a real answer to
+  # find for a push to main: a merge that touches only the landing page, the
+  # docs or the web deploy changes nothing a phone runs. Building those would
+  # spend a runner and put an identical binary in the artifacts, where every
+  # build has to be told apart from the one before it by hand.
+  #
+  # This copy also decides what MercuryPitch's jobs decided for themselves:
+  # which iOS work a trigger earns, and whether the secrets that work needs
+  # exist. A job with nothing to do is never started, because on this private
+  # fork even an idle macOS minute is billed ten times over. The reasons go to
+  # the run summary.
+  #
+  # One ubuntu minute to decide, against ten macOS minutes to not.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      android: ${{ steps.plan.outputs.android }}
+      android-release: ${{ steps.plan.outputs.android-release }}
+      ios-simulator: ${{ steps.plan.outputs.ios-simulator }}
+      ios-archive: ${{ steps.plan.outputs.ios-archive }}
+      testflight-upload: ${{ steps.plan.outputs.testflight-upload }}
+      ios-adhoc: ${{ steps.plan.outputs.ios-adhoc }}
+      version: ${{ steps.plan.outputs.version }}
+    env:
+      # Secrets cannot be read inside `if:`, so their presence is resolved once
+      # here into plain booleans. Only names ever reach the log.
+      HAS_TEAM_ID: ${{ secrets.apple-team-id != '' }}
+      HAS_ASC_KEY_ID: ${{ secrets.apple-asc-key-id != '' }}
+      HAS_ASC_ISSUER_ID: ${{ secrets.apple-asc-issuer-id != '' }}
+      HAS_ASC_KEY_P8: ${{ secrets.apple-asc-key-p8 != '' }}
+      HAS_CERT: ${{ secrets.apple-certificate-p12-base64 != '' }}
+      HAS_CERT_PASSWORD: ${{ secrets.apple-certificate-password != '' }}
+      HAS_APPSTORE_PROFILE: ${{ secrets.appstore-profile-base64 != '' }}
+      HAS_APPSTORE_PROFILE_NAME: ${{ secrets.appstore-profile-name != '' }}
+      HAS_ADHOC_PROFILE: ${{ secrets.adhoc-profile-base64 != '' }}
+      HAS_ADHOC_PROFILE_NAME: ${{ secrets.adhoc-profile-name != '' }}
+    steps:
+      # Full history: the comparison reaches back to the previous tip of main,
+      # which a shallow clone does not contain.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Decide what to build
+        id: plan
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          PATTERN: ${{ inputs.changed-paths-regex }}
+          IOS_PATTERN: ${{ inputs.ios-changed-paths-regex }}
+          APP_NAME: ${{ inputs.app-name }}
+          TAG_PREFIX: ${{ inputs.tag-prefix }}
+          VERSION_FILE: ${{ inputs.version-file }}
+          RUN_ANDROID: ${{ inputs.run-android }}
+          RUN_IOS: ${{ inputs.run-ios }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          notes=()
+          note () { notes+=("$*"); }
+
+          # Which of these secrets are absent, from name=true|false pairs.
+          missing () {
+            local pair absent=()
+            for pair in "$@"; do
+              [[ "${pair#*=}" == true ]] || absent+=("${pair%%=*}")
+            done
+            echo "${absent[*]:-}"
+          }
+
+          release=false
+          if [[ "$GITHUB_REF" == "refs/tags/${TAG_PREFIX}"* ]]; then release=true; fi
+          dispatch=false
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then dispatch=true; fi
+
+          # A tag names the version it is releasing; everything else carries
+          # the app's own. The run number tells two uploads of the same
+          # version apart, and rises across all of them.
+          #
+          # `mobile-v0.9.12` -> versionName 0.9.12. Play rejects a re-used
+          # versionCode, and the run number is the only value here that is
+          # guaranteed to increase, so it is the code regardless of the tag.
+          if [[ "$release" == true ]]; then
+            version="${GITHUB_REF_NAME#"$TAG_PREFIX"}"
+            version_from="tag $GITHUB_REF_NAME"
+          else
+            version="$(jq -r '.version // empty' "$VERSION_FILE")"
+            version_from="$VERSION_FILE"
+          fi
+
+          # App Store Connect takes a marketing version only as one to three
+          # dot-separated integers (ITMS-90060), and says so after the archive
+          # has been built, signed and uploaded. Refused here instead, before
+          # a single runner is spent on it.
+          marketing='^[0-9]+(\.[0-9]+){0,2}$'
+          if [[ ! "$version" =~ $marketing ]]; then
+            echo "::error::Marketing version '$version' (from $version_from) is not one to three dot-separated integers, which App Store Connect requires. Release tags look like ${TAG_PREFIX}1.2.3."
+            exit 1
+          fi
+
+          app=false
+          ios_changed=false
+          why=""
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == branch ]]; then
+            # A first push, a force-push, or a rewritten history leaves nothing
+            # to compare against. Build rather than guess -- the failure mode of
+            # a wasted run is minutes, and of a skipped one is a change that
+            # silently never reached a device.
+            if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              app=true
+              why="push to $GITHUB_REF_NAME with no usable previous commit"
+            else
+              # Collected first and matched from a string: `git diff | grep -q`
+              # under pipefail can report failure when grep stops reading
+              # before git stops writing.
+              files="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+              changed="$(grep -Ec "$PATTERN" <<< "$files" || true)"
+              if (( changed > 0 )); then
+                app=true
+                why="push to $GITHUB_REF_NAME changed $changed file(s) under the app"
+              else
+                why="push to $GITHUB_REF_NAME changed no $APP_NAME files"
+              fi
+            fi
+          elif [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            # The caller's `paths:` filter already chose this pull request.
+            # What is left is whether it touches the NATIVE iOS side. HEAD is
+            # GitHub's merge of the pull request into its base, so its first
+            # parent is the base and the diff between the two is exactly what
+            # the pull request changes.
+            app=true
+            why="pull request (chosen by the caller's paths filter)"
+            if git rev-parse -q --verify 'HEAD^2' > /dev/null; then
+              files="$(git diff --name-only 'HEAD^1' HEAD)"
+              if grep -Eq "$IOS_PATTERN" <<< "$files"; then ios_changed=true; fi
+            else
+              ios_changed=true
+              note "HEAD is not a merge commit, so the changed files are unknown: the iOS simulator build runs rather than guessing."
+            fi
+          else
+            app=true
+            why="$GITHUB_EVENT_NAME on $GITHUB_REF_TYPE $GITHUB_REF_NAME"
+          fi
+
+          asc_missing="$(missing \
+            apple-team-id="$HAS_TEAM_ID" \
+            apple-asc-key-id="$HAS_ASC_KEY_ID" \
+            apple-asc-issuer-id="$HAS_ASC_ISSUER_ID" \
+            apple-asc-key-p8="$HAS_ASC_KEY_P8" \
+            apple-certificate-p12-base64="$HAS_CERT" \
+            apple-certificate-password="$HAS_CERT_PASSWORD" \
+            appstore-profile-base64="$HAS_APPSTORE_PROFILE" \
+            appstore-profile-name="$HAS_APPSTORE_PROFILE_NAME")"
+          adhoc_missing="$(missing \
+            apple-team-id="$HAS_TEAM_ID" \
+            apple-certificate-p12-base64="$HAS_CERT" \
+            apple-certificate-password="$HAS_CERT_PASSWORD" \
+            adhoc-profile-base64="$HAS_ADHOC_PROFILE" \
+            adhoc-profile-name="$HAS_ADHOC_PROFILE_NAME")"
+
+          android=false
+          android_release=false
+          simulator=false
+          archive=false
+          upload=false
+          adhoc=false
+
+          if [[ "$app" == true && "$RUN_ANDROID" == true ]]; then
+            android=true
+            if [[ "$release" == true || "$dispatch" == true ]]; then android_release=true; fi
+          fi
+
+          if [[ "$app" == true && "$RUN_IOS" == true ]]; then
+            if [[ "$release" == true || "$dispatch" == true ]]; then
+              if [[ -z "$asc_missing" ]]; then
+                archive=true
+                upload="$release"
+              else
+                note "No signed iOS archive: secret(s) not set: $asc_missing."
+              fi
+              if [[ "$release" == true ]]; then
+                if [[ -z "$adhoc_missing" ]]; then
+                  adhoc=true
+                else
+                  note "No ad-hoc IPA: secret(s) not set: $adhoc_missing."
+                fi
+              fi
+              # Nothing signed can run, so the simulator build is the only
+              # proof left that the app compiles for iOS at all.
+              if [[ "$archive" == false && "$adhoc" == false ]]; then simulator=true; fi
+            elif [[ "$GITHUB_EVENT_NAME" == pull_request && "$ios_changed" == true ]]; then
+              simulator=true
+            fi
+          elif [[ "$app" == true ]]; then
+            note "iOS is switched off for this repository (run-ios is false)."
+          fi
+
+          {
+            echo "android=$android"
+            echo "android-release=$android_release"
+            echo "ios-simulator=$simulator"
+            echo "ios-archive=$archive"
+            echo "testflight-upload=$upload"
+            echo "ios-adhoc=$adhoc"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### $APP_NAME native builds"
+            echo ""
+            echo "Why: $why. Version $version (from $version_from), build ${RUN_NUMBER}."
+            echo ""
+            echo "| Work | Runs |"
+            echo "| --- | --- |"
+            echo "| Android tests, lint and debug APK | $android |"
+            echo "| Android release bundle and APK | $android_release |"
+            echo "| iOS simulator build | $simulator |"
+            echo "| iOS signed archive | $archive |"
+            echo "| TestFlight upload | $upload |"
+            echo "| iOS ad-hoc IPA | $adhoc |"
+            for line in "${notes[@]}"; do
+              echo ""
+              echo "$line"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  android:
+    name: Android
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Secrets cannot be read inside `if:`, so their presence is resolved once
+      # here into a plain boolean the steps below can branch on.
+      HAS_UPLOAD_KEY: ${{ secrets.keystore-base64 != '' && secrets.keystore-password != '' && secrets.key-alias != '' && secrets.key-password != '' }}
+      HAS_DEBUG_KEY: ${{ secrets.debug-keystore-base64 != '' }}
+      BUILD_RELEASE: ${{ needs.changes.outputs.android-release }}
+      VERSION_NAME: ${{ needs.changes.outputs.version }}
+      VERSION_CODE: ${{ github.run_number }}
+      PREFIX: ${{ inputs.signing-env-prefix }}
+      TAG_PREFIX: ${{ inputs.tag-prefix }}
+      WEB_PKG: ${{ inputs.web-package-name }}
+      WEB_BUILD_SCRIPT: ${{ inputs.web-build-script }}
+      DIST_DIR: ${{ inputs.web-dist-dir }}
+      MOBILE_DIR: ${{ inputs.mobile-dir }}
+      MOBILE_PKG: ${{ inputs.mobile-package-name }}
+      PLATFORM: android
+      PLATFORM_ASSETS_DIR: ${{ inputs.mobile-dir }}/android/app/src/main/assets/public
+      VERIFY_ASSETS: ${{ inputs.verify-assets }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      # No `version:` on purpose. The action reads `packageManager` from the
+      # root package.json (pnpm 10.32.1, pinned with its hash), which is what
+      # deploy.yml already relies on; given a `version:` as well it compares
+      # the two, and a mismatch is a hard error. One pin, in one place.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      # The same Node major as node.js.yml and deploy.yml.
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Not the action's default. That default installs the obsolete
+          # `tools` package, which Google withdrew from the SDK repository --
+          # sdkmanager reports "Failed to find package 'tools'" and exits 1, so
+          # every Android run failed from 2026-09-20. The next step installs
+          # what the build actually needs.
+          packages: 'platform-tools'
+
+      - name: Install Android SDK packages
+        run: sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+
+      # One bundle for both platforms (see the header). PURCHASES: build-time
+      # store keys join this step's env, and a release rebuild follows the
+      # debug APK, once the app sells something.
+      - name: Build web assets
+        env:
+          # Lets the web app show which run built it, next to its version.
+          VITE_BUILD_NUMBER: ${{ github.run_number }}
+        run: pnpm --filter "$WEB_PKG" run "$WEB_BUILD_SCRIPT"
+
+      - name: Synchronize Android project
+        run: pnpm --filter "$MOBILE_PKG" exec cap sync android
+
+      # Capacitor itself checks only that webDir holds an index.html. A page
+      # with no script beside it boots to a blank WebView, and a bundle that
+      # never reached the platform project ships an app with nothing to show,
+      # so both are checked here, where the failure names its cause.
+      - name: Verify the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail () { echo "::error::$*"; exit 1; }
+          [[ -f "$DIST_DIR/index.html" ]] || fail "$DIST_DIR/index.html is missing: the web build wrote nothing Capacitor can load."
+          [[ -n "$(find "$DIST_DIR" -type f -name '*.js' -print -quit)" ]] || fail "No JavaScript chunk under $DIST_DIR."
+          [[ -f "$PLATFORM_ASSETS_DIR/index.html" ]] || fail "$PLATFORM_ASSETS_DIR/index.html is missing: cap sync $PLATFORM did not copy the bundle into the native project."
+          if [[ -n "$VERIFY_ASSETS" ]]; then
+            bash -euo pipefail -c "$VERIFY_ASSETS"
+          fi
+
+      - name: Decode upload keystore
+        if: env.HAS_UPLOAD_KEY == 'true' && env.BUILD_RELEASE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.keystore-base64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          # Never echo the path contents; only confirm the decode produced a file.
+          test -s "$RUNNER_TEMP/upload.jks"
+
+      # Without this the runner invents a debug key per run, and a phone refuses
+      # to update an install signed by any other one. Absent the secret the
+      # build still works; the artifact just cannot update an existing install.
+      - name: Decode debug keystore
+        if: env.HAS_DEBUG_KEY == 'true'
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.debug-keystore-base64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/debug.jks"
+          test -s "$RUNNER_TEMP/debug.jks"
+
+      - name: Test, lint, and package debug
+        shell: bash
+        env:
+          DEBUG_KEYSTORE_FILE: ${{ env.HAS_DEBUG_KEY == 'true' && format('{0}/debug.jks', runner.temp) || '' }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          export "${PREFIX}_DEBUG_KEYSTORE_FILE=$DEBUG_KEYSTORE_FILE"
+          # The debug APK carries the real version NAME plus the run, so the
+          # installed build shows in Settings > Apps (0.9.11-ci.4) and a report
+          # says exactly which one it was, but keeps signing.gradle's versionCode
+          # of 1. Android refuses to install a lower versionCode over a higher
+          # one, so a CI APK numbered by run would lock every local build out
+          # until an uninstall — the very wipe the shared debug keystore exists
+          # to prevent. The version name has no such rule.
+          export "${PREFIX}_VERSION_NAME=$VERSION_NAME-ci.$RUN_NUMBER"
+          cd "$MOBILE_DIR/android"
+          ./gradlew test lint assembleDebug --no-daemon
+
+      # The APK goes up as the file itself (archive: false), not zipped, so a
+      # phone can download and install it straight from the run page. The
+      # artifact then takes the file's name, hence the copy to a name that says
+      # which app, version and run it is. Zipping would save about 40% here (a
+      # debug build stores its dex and resources uncompressed), but the
+      # retention below keeps that small.
+      #
+      # Retention is short on purpose: artifact storage on a private repository
+      # counts against the plan quota too, and once it is full every upload,
+      # and so every run, fails. A pull request's APK is superseded by the next
+      # push anyway.
+      - name: Name debug APK
+        id: debug-apk
+        shell: bash
+        env:
+          APP_SLUG: ${{ inputs.app-slug }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          apk="$RUNNER_TEMP/$APP_SLUG-$VERSION_NAME-run$RUN_NUMBER-debug.apk"
+          cp "$MOBILE_DIR/android/app/build/outputs/apk/debug/app-debug.apk" "$apk"
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.debug-apk.outputs.path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lint and unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app-slug }}-android-reports
+          path: |
+            ${{ inputs.mobile-dir }}/android/app/build/reports/
+            ${{ inputs.mobile-dir }}/android/app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build release bundle and APK
+        if: env.BUILD_RELEASE == 'true'
+        shell: bash
+        env:
+          KEYSTORE_FILE: ${{ env.HAS_UPLOAD_KEY == 'true' && format('{0}/upload.jks', runner.temp) || '' }}
+          KEYSTORE_PASSWORD: ${{ secrets.keystore-password }}
+          KEY_ALIAS: ${{ secrets.key-alias }}
+          KEY_PASSWORD: ${{ secrets.key-password }}
+        run: |
+          set -euo pipefail
+          export "${PREFIX}_VERSION_CODE=$VERSION_CODE"
+          export "${PREFIX}_VERSION_NAME=$VERSION_NAME"
+          export "${PREFIX}_KEYSTORE_FILE=$KEYSTORE_FILE"
+          export "${PREFIX}_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+          export "${PREFIX}_KEY_ALIAS=$KEY_ALIAS"
+          export "${PREFIX}_KEY_PASSWORD=$KEY_PASSWORD"
+          cd "$MOBILE_DIR/android"
+          ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - name: Upload release artifacts
+        if: env.BUILD_RELEASE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app-slug }}-android-release
+          path: |
+            ${{ inputs.mobile-dir }}/android/app/build/outputs/bundle/release/app-release*.aab
+            ${{ inputs.mobile-dir }}/android/app/build/outputs/apk/release/app-release*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Report signing state
+        if: always()
+        shell: bash
+        run: |
+          if [[ "$BUILD_RELEASE" != "true" ]]; then
+            echo "Android: debug APK only; release artifacts come from ${TAG_PREFIX}* tags and manual runs." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$HAS_UPLOAD_KEY" == "true" ]]; then
+            echo "Release artifacts are signed with the upload key." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No upload keystore secrets for ${PREFIX}: release artifacts are UNSIGNED and cannot be uploaded to Play." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "$HAS_DEBUG_KEY" != "true" ]]; then
+            echo "No shared debug keystore: the debug APK cannot update an install made by another machine." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # A signed release archive on the runs that mean it, and an upload on the
+  # runs that release: tags only (see the header). The simulator artifact
+  # cannot run on hardware, so this upload is still the only way to hold a
+  # build on an iPhone; internal TestFlight testers get it a few minutes after
+  # processing, no UDID registration.
+  #
+  # Build numbers must rise monotonically per marketing version for
+  # TestFlight to accept the upload; github.run_number does exactly that.
+  ios-testflight:
+    name: iOS TestFlight
+    needs: changes
+    # Started only when `changes` found every secret this job reads.
+    if: needs.changes.outputs.ios-archive == 'true'
+    runs-on: macos-latest
+    # A hung macOS job bills ten times its timeout. MercuryPitch's archive
+    # takes about four minutes; thirty leaves room for a slow SwiftPM fetch.
+    timeout-minutes: 30
+    env:
+      UPLOAD: ${{ needs.changes.outputs.testflight-upload }}
+      VERSION: ${{ needs.changes.outputs.version }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      TAG_PREFIX: ${{ inputs.tag-prefix }}
+      APP_SLUG: ${{ inputs.app-slug }}
+      WEB_PKG: ${{ inputs.web-package-name }}
+      WEB_BUILD_SCRIPT: ${{ inputs.web-build-script }}
+      DIST_DIR: ${{ inputs.web-dist-dir }}
+      MOBILE_DIR: ${{ inputs.mobile-dir }}
+      MOBILE_PKG: ${{ inputs.mobile-package-name }}
+      PLATFORM: ios
+      PLATFORM_ASSETS_DIR: ${{ inputs.mobile-dir }}/ios/App/App/public
+      VERIFY_ASSETS: ${{ inputs.verify-assets }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # No `version:`: see the Android job.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # PURCHASES: this is where MercuryPitch chose between the internal mock
+      # and real StoreKit for a TestFlight build.
+      - name: Build web assets
+        env:
+          # Lets the web app show which run built it, next to its version.
+          VITE_BUILD_NUMBER: ${{ github.run_number }}
+        run: pnpm --filter "$WEB_PKG" run "$WEB_BUILD_SCRIPT"
+
+      - name: Synchronize iOS project
+        run: pnpm --filter "$MOBILE_PKG" exec cap sync ios
+
+      # Capacitor itself checks only that webDir holds an index.html. A page
+      # with no script beside it boots to a blank WebView, and a bundle that
+      # never reached the platform project ships an app with nothing to show,
+      # so both are checked here, where the failure names its cause.
+      - name: Verify the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail () { echo "::error::$*"; exit 1; }
+          [[ -f "$DIST_DIR/index.html" ]] || fail "$DIST_DIR/index.html is missing: the web build wrote nothing Capacitor can load."
+          [[ -n "$(find "$DIST_DIR" -type f -name '*.js' -print -quit)" ]] || fail "No JavaScript chunk under $DIST_DIR."
+          [[ -f "$PLATFORM_ASSETS_DIR/index.html" ]] || fail "$PLATFORM_ASSETS_DIR/index.html is missing: cap sync $PLATFORM did not copy the bundle into the native project."
+          if [[ -n "$VERIFY_ASSETS" ]]; then
+            bash -euo pipefail -c "$VERIFY_ASSETS"
+          fi
+
+      # A throwaway keychain keeps the runner's login keychain untouched and
+      # dies with the runner, so the private key never outlives the job.
+      #
+      # The .p12 must have been exported with `openssl pkcs12 -export -legacy`:
+      # the OpenSSL 3 default is refused by the macOS keychain, and CI does not
+      # say why (docs/plans/mobile-native/README.md).
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.apple-certificate-p12-base64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.apple-certificate-password }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          # Lets codesign use the key without an interactive prompt.
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      # Only an upload talks to App Store Connect, so only an upload gets the key.
+      - name: Write App Store Connect API key
+        if: env.UPLOAD == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.apple-asc-key-p8 }}
+          ASC_KEY_ID: ${{ secrets.apple-asc-key-id }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+
+      # The export signs manually with this profile. Cloud-managed signing
+      # was the first attempt and the archive half of it works, but the
+      # export needs the cloud-managed DISTRIBUTION certificate, and that
+      # is a separate grant the API key's App Manager role does not carry
+      # ("Cloud signing permission error"). A classic App Store profile
+      # against the imported cert needs no special permission at all.
+      - name: Install App Store provisioning profile
+        env:
+          PROFILE_BASE64: ${{ secrets.appstore-profile-base64 }}
+        run: |
+          set -euo pipefail
+          profiles="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$profiles"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profiles/${APP_SLUG}-appstore.mobileprovision"
+
+      - name: Archive, and upload from release tags
+        shell: bash
+        env:
+          TEAM_ID: ${{ secrets.apple-team-id }}
+          ASC_KEY_ID: ${{ secrets.apple-asc-key-id }}
+          ASC_ISSUER_ID: ${{ secrets.apple-asc-issuer-id }}
+          PROFILE_NAME: ${{ secrets.appstore-profile-name }}
+          PROFILE_SETTING: ${{ inputs.profile-build-setting }}
+          BUNDLE_ID: ${{ inputs.bundle-id }}
+        run: |
+          set -euo pipefail
+          cd "$MOBILE_DIR/ios/App"
+
+          # The deployment target is iOS 26.0, which only the Xcode 26 SDK
+          # builds for; macos-latest ran Xcode 26.6 in MercuryPitch's runs of
+          # 2026-09-11. Printed first, so a runner-image change shows up as a
+          # version here rather than as a deployment-target error below.
+          xcodebuild -version
+
+          # -clonedSourcePackagesDirPath keeps SwiftPM's checkouts inside
+          # the run instead of ~/Library/Caches/org.swift.swiftpm, whose
+          # shared repository cache has failed resolution mid-flight on a
+          # hosted runner:
+          #
+          #   Git command 'git -C .../purchases-hybrid-common-b6416392
+          #   config --get remote.origin.url' failed: fatal: cannot change
+          #   to '...': No such file or directory
+          #
+          # A cache entry the resolver believed in and then could not read.
+          # A run-local directory starts empty every time, so there is
+          # nothing stale to trust. It costs one clean fetch per run, which
+          # is the right trade against an upload that fails at random.
+          #
+          # Manual signing, with the certificate and profile the two steps
+          # above already installed. Automatic signing asks Apple to mint
+          # what it needs, and on an account that has reached its
+          # certificate limit that is a hard stop:
+          #
+          #   error: Choose a certificate to revoke. Your account has
+          #   reached the maximum number of certificates.
+          #   error: No profiles for 'com.irchiinnuss.besidecue' were
+          #   found ... iOS App Development provisioning profiles
+          #
+          # It was asking for a DEVELOPMENT profile to archive a release,
+          # which nothing here wants, and every build from 163 onward
+          # failed on it. The export step below has always signed
+          # manually with these same materials; the archive now does too,
+          # so a build depends on the secrets it was given and never on
+          # what Apple will let the account create today.
+          #
+          # The signing settings themselves are on the App target in
+          # App.xcodeproj, not here, and that is the whole trick. A build
+          # setting given on the xcodebuild command line applies to EVERY
+          # target in the build, including the SwiftPM frameworks, and
+          # they refuse it:
+          #
+          #   error: RevenueCat_RevenueCatUI does not support
+          #   provisioning profiles, but provisioning profile *** has
+          #   been manually specified.
+          #
+          # So the App target names its own certificate and asks for its
+          # profile through the build setting named by
+          # `profile-build-setting` -- which no other target reads.
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            "${PROFILE_SETTING}=$PROFILE_NAME" \
+            archive
+
+          if [[ "$UPLOAD" != "true" ]]; then
+            # A manual run from anything but a release tag stops here. The
+            # archive above is the whole point of the job on that trigger:
+            # it proves the app compiles for a device, that the distribution
+            # certificate imported, and that the profile still matches the
+            # bundle id -- which are the three things that break between
+            # releases. Exporting an IPA as well would prove nothing extra,
+            # because an app-store IPA cannot be installed on a phone without
+            # going through TestFlight anyway.
+            echo "Archived $VERSION ($BUILD_NUMBER); this ref does not upload." >> "$GITHUB_STEP_SUMMARY"
+            echo "TestFlight builds come from ${TAG_PREFIX}* tags only." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # destination=upload makes xcodebuild itself deliver the build to
+          # App Store Connect -- no altool, no Transporter, no IPA artifact.
+          #
+          # testFlightInternalTestingOnly is false: nothing in this build is a
+          # mock, so every upload can be promoted to external testers and to
+          # review. PURCHASES: a build that carries app-owned purchase mocks
+          # must set it true, as MercuryPitch's mock purchase mode does.
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><false/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          echo "Uploaded $VERSION ($BUILD_NUMBER) to App Store Connect." >> "$GITHUB_STEP_SUMMARY"
+          echo "TestFlight shows it after processing, usually a few minutes." >> "$GITHUB_STEP_SUMMARY"
+
+  # The iOS compile check, and the ad-hoc IPA a release tag exports.
+  #
+  # The simulator build runs only where nothing stronger does: on a pull
+  # request that touches the native iOS side, and on a tag or manual run with
+  # no signing secrets to archive with. Everywhere else a signed archive
+  # already proves the app compiles, and for a real device. A push to main
+  # never gets here: a merge that changes the native iOS side came through a
+  # pull request that built it.
+  ios:
+    name: iOS
+    needs: changes
+    if: needs.changes.outputs.ios-simulator == 'true' || needs.changes.outputs.ios-adhoc == 'true'
+    runs-on: macos-latest
+    # A hung macOS job bills ten times its timeout.
+    timeout-minutes: 30
+    env:
+      SIMULATOR: ${{ needs.changes.outputs.ios-simulator }}
+      ADHOC: ${{ needs.changes.outputs.ios-adhoc }}
+      VERSION: ${{ needs.changes.outputs.version }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      APP_SLUG: ${{ inputs.app-slug }}
+      WEB_PKG: ${{ inputs.web-package-name }}
+      WEB_BUILD_SCRIPT: ${{ inputs.web-build-script }}
+      DIST_DIR: ${{ inputs.web-dist-dir }}
+      MOBILE_DIR: ${{ inputs.mobile-dir }}
+      MOBILE_PKG: ${{ inputs.mobile-package-name }}
+      PLATFORM: ios
+      PLATFORM_ASSETS_DIR: ${{ inputs.mobile-dir }}/ios/App/App/public
+      VERIFY_ASSETS: ${{ inputs.verify-assets }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # No `version:`: see the Android job.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # PURCHASES: the simulator build takes the Test Store key and the IPA a
+      # release rebuild with the real one, as in the Android job.
+      - name: Build web assets
+        env:
+          # Lets the web app show which run built it, next to its version.
+          VITE_BUILD_NUMBER: ${{ github.run_number }}
+        run: pnpm --filter "$WEB_PKG" run "$WEB_BUILD_SCRIPT"
+
+      - name: Synchronize iOS project
+        run: pnpm --filter "$MOBILE_PKG" exec cap sync ios
+
+      # Capacitor itself checks only that webDir holds an index.html. A page
+      # with no script beside it boots to a blank WebView, and a bundle that
+      # never reached the platform project ships an app with nothing to show,
+      # so both are checked here, where the failure names its cause.
+      - name: Verify the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail () { echo "::error::$*"; exit 1; }
+          [[ -f "$DIST_DIR/index.html" ]] || fail "$DIST_DIR/index.html is missing: the web build wrote nothing Capacitor can load."
+          [[ -n "$(find "$DIST_DIR" -type f -name '*.js' -print -quit)" ]] || fail "No JavaScript chunk under $DIST_DIR."
+          [[ -f "$PLATFORM_ASSETS_DIR/index.html" ]] || fail "$PLATFORM_ASSETS_DIR/index.html is missing: cap sync $PLATFORM did not copy the bundle into the native project."
+          if [[ -n "$VERIFY_ASSETS" ]]; then
+            bash -euo pipefail -c "$VERIFY_ASSETS"
+          fi
+
+      # This is the check that the app and its SwiftPM dependencies actually
+      # compile for iOS, with no signing at all; a signed archive only adds
+      # distribution on top of it. SwiftPM checks out into the run, for the
+      # reason the TestFlight job's archive step gives.
+      - name: Build for simulator
+        if: env.SIMULATOR == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$MOBILE_DIR/ios/App"
+          xcodebuild -version
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload simulator build
+        if: env.SIMULATOR == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app-slug }}-ios-simulator
+          path: ${{ runner.temp }}/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Import signing certificate
+        if: env.ADHOC == 'true'
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.apple-certificate-p12-base64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.apple-certificate-password }}
+          PROFILE_BASE64: ${{ secrets.adhoc-profile-base64 }}
+        run: |
+          set -euo pipefail
+
+          # A throwaway keychain keeps the runner's login keychain untouched and
+          # dies with the runner, so the private key never outlives the job.
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          # Lets codesign use the key without an interactive prompt.
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          profiles="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$profiles"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profiles/${APP_SLUG}-adhoc.mobileprovision"
+
+      - name: Archive and export IPA
+        if: env.ADHOC == 'true'
+        shell: bash
+        env:
+          TEAM_ID: ${{ secrets.apple-team-id }}
+          PROFILE_NAME: ${{ secrets.adhoc-profile-name }}
+          PROFILE_SETTING: ${{ inputs.profile-build-setting }}
+          BUNDLE_ID: ${{ inputs.bundle-id }}
+          EXPORT_METHOD: ${{ inputs.ios-export-method }}
+        run: |
+          set -euo pipefail
+          cd "$MOBILE_DIR/ios/App"
+          xcodebuild -version
+
+          # Manual signing through the App target's own build setting, and
+          # run-local SwiftPM checkouts: the TestFlight job's archive step
+          # says why for both.
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            "${PROFILE_SETTING}=$PROFILE_NAME" \
+            archive
+
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>${EXPORT_METHOD}</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+      - name: Upload IPA
+        if: env.ADHOC == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app-slug }}-ios-release
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Report signing state
+        if: always()
+        shell: bash
+        run: |
+          if [[ "$ADHOC" == "true" ]]; then
+            echo "Ad-hoc IPA exported: installable on the devices registered in the ad-hoc profile." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Simulator build only: no installable IPA on this trigger." >> "$GITHUB_STEP_SUMMARY"
+          fi

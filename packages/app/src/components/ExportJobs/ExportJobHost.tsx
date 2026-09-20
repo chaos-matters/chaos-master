@@ -7,6 +7,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { downloadBlob } from '@/utils/blob'
 import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobFinalizing, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
@@ -143,16 +144,13 @@ function OffscreenRender(props: { job: ImageJob }) {
     saveRecentFlame(job.flame, undefined, job.tracks)
     // The user may have cancelled (job removed) while we were encoding.
     if (!jobExists(job.id)) return
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
+    const png = new Blob([bytes], { type: 'image/png' })
     setJobResult(job.id, {
-      blobUrl: url,
+      blobUrl: URL.createObjectURL(png),
       width: job.dimensions.width,
       height: job.dimensions.height,
     })
-    const downloadLink = window.document.createElement('a')
-    downloadLink.href = url
-    downloadLink.download = `${job.name?.trim() || 'flame'}.png`
-    downloadLink.click()
+    downloadBlob(png, `${job.name?.trim() || 'flame'}.png`)
   }
 
   const handleExport: ExportImageType = (canvas, info) => {

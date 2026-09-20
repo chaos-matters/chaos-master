@@ -1,5 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { IS_NATIVE } from '@/lib/platform'
 import { isTouchLayout } from '@/stores/workspaceLayoutStore'
+import { downloadBlob } from '@/utils/blob'
 import { dismissJob, exportJobs, markJobDownloaded, requestJobForceExport, } from '@/utils/exportJobs'
 import { formatEta } from '@/utils/formatEta'
 import { formatPointCount } from '@/utils/formatPointCount'
@@ -258,8 +260,20 @@ function JobCard(props: { job: ExportJob }) {
                 class={ui.download}
                 href={result.blobUrl}
                 download={fileName()}
-                onClick={() => {
+                onClick={(event) => {
                   markJobDownloaded(job.id)
+                  if (IS_NATIVE) {
+                    // The WebView ignores `download`; the app saves the file.
+                    event.preventDefault()
+                    void fetch(result.blobUrl)
+                      .then((response) => response.blob())
+                      .then((blob) => {
+                        downloadBlob(blob, fileName())
+                      })
+                      .catch((error: unknown) => {
+                        console.error('Saving the export failed:', error)
+                      })
+                  }
                 }}
               >
                 Download
