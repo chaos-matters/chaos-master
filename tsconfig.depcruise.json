@@ -1,0 +1,22 @@
+{
+  // Resolution-only tsconfig for `pnpm arch`. The real `@/*` mapping lives in
+  // packages/app/tsconfig.json, but dependency-cruiser runs from the repo root
+  // where that file's relative `include` does not resolve. 2,209 of the app's
+  // imports use `@/`, so without these paths the dependency graph loses most of
+  // its edges and the no-circular rule passes vacuously.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "esnext",
+    "jsx": "preserve",
+    "allowJs": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["packages/app/src/*"],
+      "@chaos-master/core": ["packages/core/src/index.ts"],
+      "@chaos-master/core/*": ["packages/core/src/*"]
+    }
+  },
+  "include": ["packages/app/src/**/*", "packages/core/src/**/*"]
+}
