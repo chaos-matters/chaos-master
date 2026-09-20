@@ -139,6 +139,13 @@ describe('benchmarkResultBuilder', () => {
       expect(signatureLooksRendered([[2, 3, 0, 0]])).toBe(false) // max is 3, not > 4
     })
 
+    it('needs two lit values: one bright value alone is not a rendered frame', () => {
+      // Pins the lit >= 2 boundary: an audit mutation lowered it to 1 and the
+      // existing cases, whose max never exceeded 4 with one lit value, missed it.
+      expect(signatureLooksRendered([[0, 0, 0, 9]])).toBe(false)
+      expect(signatureLooksRendered([[0, 2, 0, 9]])).toBe(true)
+    })
+
     it('returns true when at least 2 elements > 1 and max > 4', () => {
       expect(signatureLooksRendered([[2, 5, 0, 0]])).toBe(true)
       expect(

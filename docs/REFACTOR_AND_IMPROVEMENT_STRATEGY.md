@@ -246,4 +246,4 @@ pnpm test
 
 - Run `ifsPipeline.resolveAll.test.ts` to guarantee that all 2D and 3D variations compile to valid WGSL.
 - Run `flameXml.test.ts` to ensure compatibility with flam3 XML import/export.
-- Run `playwright test tests/smoke.spec.ts` to confirm no console errors occur during interactive navigation, canvas resizing, and preset changes.
+- Run `playwright test tests/smoke.ci.spec.ts` to confirm no console errors occur during interactive navigation, canvas resizing, and preset changes.

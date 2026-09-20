@@ -6,7 +6,7 @@ import { example34 } from '@/flame/examples/example34'
 import { example40 } from '@/flame/examples/example40'
 import { example45 } from '@/flame/examples/example45'
 import { example46 } from '@/flame/examples/example46'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
 
 /** The app's origin — where `?flame=` links open. */
 export const APP_URL = 'https://lumenapeiron.com'
@@ -33,6 +33,7 @@ export function overrideFlame(
   base: FlameDescriptor,
   o: FlameOverride,
 ): FlameDescriptor {
+  // structurajs types its result as deeply frozen; callers here only read it.
   return produce(base, (draft) => {
     if (o.renderSettings) {
       const { camera, camera3D, ...rest } = o.renderSettings
@@ -42,7 +43,7 @@ export function overrideFlame(
     }
     if (o.finalTransform !== undefined) draft.finalTransform = o.finalTransform
     if (o.metadata) Object.assign(draft.metadata, o.metadata)
-  })
+  }) as FlameDescriptor
 }
 
 /**
@@ -194,7 +195,7 @@ export function applyFlameRecipe(
     clone.renderSettings = { ...clone.renderSettings, ...recipe.render }
   }
   if (recipe.transforms) {
-    const keys = Object.keys(clone.transforms)
+    const keys = Object.keys(clone.transforms) as TransformId[]
     recipe.transforms.forEach((ov, i) => {
       const t = clone.transforms[keys[i]]
       if (!t) return

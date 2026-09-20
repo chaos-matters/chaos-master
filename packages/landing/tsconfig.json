@@ -1,5 +1,19 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules"],
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["@webgpu/types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/components/ErrorHandling/ErrorHandling": [
+        "./src/flame/stubs/ErrorHandling.tsx"
+      ],
+      "@chaos-master/core": ["../core/src"],
+      "@chaos-master/core/*": ["../core/src/*"],
+      "@/*": ["../app/src/*"]
+    }
+  }
 }

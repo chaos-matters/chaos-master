@@ -1086,3 +1086,21 @@ describe('Timeline Utilities', () => {
     })
   })
 })
+
+describe('resolveKeyframeValue segment ownership', () => {
+  it("lets the segment's later keyframe own its interpolation mode", () => {
+    // An audit mutation read the mode from the earlier keyframe instead and all
+    // 86 tests here stayed green. Each case below differs under the two readings.
+    const holdIntoNext = [
+      { frame: 0, value: 0, interp: 'linear' as const },
+      { frame: 10, value: 10, interp: 'constant' as const },
+    ]
+    expect(resolveKeyframeValue(holdIntoNext, 5)).toBe(0)
+
+    const lerpIntoNext = [
+      { frame: 0, value: 0, interp: 'constant' as const },
+      { frame: 10, value: 10, interp: 'linear' as const },
+    ]
+    expect(resolveKeyframeValue(lerpIntoNext, 5)).toBe(5)
+  })
+})

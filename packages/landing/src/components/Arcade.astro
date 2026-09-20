@@ -78,7 +78,7 @@ const modes = [
       modes.map((m) => (
         <article class="mode">
           <div class="mode-top">
-            <span class="mode-icon" set:html={icons[m.icon]} />
+            <span class="mode-icon" set:html={icons[m.icon as keyof typeof icons]} />
             <span class="mode-tag">{m.tag}</span>
           </div>
           <h3>{m.name}</h3>

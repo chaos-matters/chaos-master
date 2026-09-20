@@ -16,8 +16,8 @@
     "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod"
   },
   "dependencies": {
-    "@chaos-master/core": "workspace:*",
     "@astrojs/solid-js": "^7.0.2",
+    "@chaos-master/core": "workspace:*",
     "@typegpu/color": "0.12.0",
     "@typegpu/noise": "0.12.0",
     "@typegpu/sdf": "0.12.0",
@@ -30,8 +30,10 @@
     "wgpu-matrix": "3.4.2"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@webgpu/types": "^0.1.69",
+    "typescript": "^5.9.3",
     "unplugin-typegpu": "^0.12.1",
     "vite-plugin-qrcode": "^0.4.1",
     "wrangler": "^4.103.0"

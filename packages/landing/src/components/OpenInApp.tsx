@@ -31,7 +31,9 @@ export default function OpenInApp(props: { flame: FlameDescriptor }) {
         rel="noopener"
         title="Open this flame in Lumen Apeiron"
         aria-label="Open this flame in Lumen Apeiron"
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+        }}
       >
         <svg
           viewBox="0 0 24 24"

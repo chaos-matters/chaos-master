@@ -2017,3 +2017,25 @@ describe('follow-cam hints', () => {
     })
   })
 })
+
+describe('session action ordering', () => {
+  it('rejects a session whose action timestamps go backwards', () => {
+    // The schema guard exists so a hand-edited or corrupted session cannot
+    // replay its actions out of order. An audit mutation deleted it and all 75
+    // tests here stayed green.
+    startSessionRecording(examples.example1)
+    recordSyntheticAction('flame.setGamma', [1])
+    recordSyntheticAction('flame.setGamma', [2])
+    const session = stopOrThrow()
+    const withTimes = (a: number, b: number) => {
+      const copy = JSON.parse(JSON.stringify(session)) as {
+        actions: { t: number }[]
+      }
+      copy.actions[0]!.t = a
+      copy.actions[1]!.t = b
+      return copy
+    }
+    expect(validateSession(withTimes(10, 20))).toBeDefined()
+    expect(validateSession(withTimes(20, 10))).toBeUndefined()
+  })
+})

@@ -79,6 +79,24 @@ describe('applyAudioMappingsToFlame modular target appliers', () => {
     expect(rs.camera?.zoom).toBe(5)
   })
 
+  it('scales the output by the mapping sensitivity', () => {
+    // range [1, 5] at full signal: sensitivity 0.5 lands halfway, at 3. An
+    // audit mutation dropped the sensitivity factor; the existing cases all
+    // used sensitivity 1, where the factor is invisible.
+    const flame = createSampleFlame()
+    const mappings: AudioMappingEntry[] = [
+      {
+        audioFeature: 'rms',
+        target: { kind: 'renderSetting', param: 'zoom' },
+        sensitivity: 0.5,
+        range: [1, 5],
+      },
+    ]
+    applyAudioMappingsToFlame(flame, LOUD_FRAME, mappings)
+    const rs = flame.renderSettings as { camera?: { zoom?: number } }
+    expect(rs.camera?.zoom).toBe(3)
+  })
+
   it('modulates transform affine parameters on target transform index', () => {
     const flame = createSampleFlame()
     const mappings: AudioMappingEntry[] = [
