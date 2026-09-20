@@ -1549,21 +1549,6 @@ export function MainWorkspace(props: AppProps) {
         ? 0
         : DEFAULT_RENDER_INTERVAL_MS
 
-  const resolvedBlendWeight = createMemo(() => {
-    if (
-      blendFlame() &&
-      timeline.animationEnabled() &&
-      timeline.tracks().length > 0
-    ) {
-      const val = timeline.resolveValueAtPath(
-        'blendWeight',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return blendWeight()
-  })
-
   // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
   const showBenchmark = createLazyShowBenchmark()
 
@@ -1725,6 +1710,35 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const timeline = createTimelineState({ seatId: 'player' })
+
+  /*
+   * Below `timeline` on purpose, and the guard in
+   * src/eagerComputationOrder.test.ts keeps it there.
+   *
+   * `createMemo` runs its callback once, straight away. From further up this
+   * body it read `timeline` before the line above had run, which is a
+   * ReferenceError -- hidden for as long as `blendFlame()` was falsy and
+   * short-circuited the read. A flame that ARRIVES blended (a share link, a
+   * restored draft, a PNG at startup) makes it truthy on that first run, and
+   * the component died there: every share link of a blended flame opened the
+   * crash screen instead (tests/blend-mount.ci.spec.ts).
+   *
+   * Its one reader is the canvas further down, so the move costs nothing.
+   */
+  const resolvedBlendWeight = createMemo(() => {
+    if (
+      blendFlame() &&
+      timeline.animationEnabled() &&
+      timeline.tracks().length > 0
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'blendWeight',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return blendWeight()
+  })
 
   const captureTimelineSnapshot = (): TimelineSnapshot => ({
     config: deepClone(timeline.config()),
