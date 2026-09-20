@@ -96,8 +96,17 @@ export async function buildFlameBackupZip(
         savedAt: r.savedAt,
         flame: r.flame,
       }
-      if (r.tracks && r.tracks.length > 0)
-        payload.animation = { tracks: r.tracks }
+      // The share link's envelope, so one reader serves both. The timeline
+      // goes out whether or not there are tracks: a flame with none still
+      // has a frame rate and an end frame, and a backup that dropped it
+      // brought every flame home at 30fps over 90 frames.
+      const hasTracks = !!r.tracks && r.tracks.length > 0
+      if (hasTracks || r.config) {
+        payload.animation = {
+          ...(hasTracks ? { tracks: r.tracks } : {}),
+          ...(r.config ? { config: r.config } : {}),
+        }
+      }
       files[`recent-flames/${fileStem(r.name, i)}.json`] = [
         jsonBytes(payload),
         { level: 6 },

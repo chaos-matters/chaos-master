@@ -1,11 +1,31 @@
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { TimelineSnapshotConfig } from '@/flame/schema/timeline'
 import { deepClone } from '@/utils/clone'
 import { safeGetItem, safeRemoveItem, safeSetItem } from '@/utils/storage'
+import { clampTimelineConfig } from '@/utils/timeline'
+import * as v from '@/valibot'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { TimelineTrack } from '@/utils/timeline'
+import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const STORAGE_KEY = 'chaos-master-recent-flames'
 export const MAX_RECENT_FLAMES = 150
+
+/**
+ * What a write to Recents did.
+ *
+ * `full` is the one a caller may resolve by asking the user, because the only
+ * way to make room is to destroy an entry they chose to keep. Every other
+ * refusal is `refused`: storage said no, and there is nothing to ask about.
+ *
+ * ONE RULE GOVERNS EVERY WRITER HERE: no write evicts a flame the user kept
+ * unless the user was asked. The list is a shelf the user put things on; an
+ * automatic write - the autosave's interval, a load boundary, a crash rescue
+ * - is work they have not asked to keep, and pushing the oldest entry off the
+ * end to store it destroys something irreplaceable to save something the app
+ * can offer back anyway. `saveRecentFlame` takes the answer to that question
+ * as `forceOverwriteOldest`, and it is the only way past the guard.
+ */
+export type RecentWriteOutcome = 'saved' | 'full' | 'refused'
 
 export type RecentFlame = {
   id: string
@@ -13,6 +33,17 @@ export type RecentFlame = {
   flame: FlameDescriptor
   savedAt: number
   tracks?: TimelineTrack[]
+  /**
+   * The timeline the flame was last seen at: how fast it runs, how long it
+   * is, whether it loops. Stored beside the tracks because it is not derived
+   * from them - a flame with no keyframes still has a frame rate and an end
+   * frame, and an entry that kept the tracks and dropped this came back at
+   * the workspace's defaults, 30fps over 90 frames.
+   *
+   * Absent in every record written before this existed, which is why it is
+   * optional and why nothing downstream may assume it.
+   */
+  config?: TimelineConfig
 }
 
 export function newRecentFlameId(): string {
@@ -28,6 +59,56 @@ function isValidRecentFlame(item: unknown): item is RecentFlame {
     typeof obj.savedAt === 'number' &&
     typeof obj.flame === 'object'
   )
+}
+
+/** The shape of a timeline, with none of its limits.
+ *
+ *  Splitting the two is what lets an out-of-range config be repaired instead
+ *  of thrown away: what this rejects is not a timeline at all - a string
+ *  where the frame rate goes, a missing `loop` - and there is nothing to
+ *  repair. Ranges are not checked here; `clampTimelineConfig` owns those, and
+ *  it also rounds, so a stored `fps: 29.5` is a fixable value rather than a
+ *  fatal one. */
+const StoredTimelineShape = v.object({
+  fps: v.pipe(v.number(), v.finite()),
+  timeScale: v.pipe(v.number(), v.finite()),
+  startFrame: v.pipe(v.number(), v.finite()),
+  endFrame: v.pipe(v.number(), v.finite()),
+  loop: v.boolean(),
+  autoFps: v.optional(v.boolean()),
+  loopMode: v.optional(v.picklist(['off', 'seamless', 'cycle'])),
+})
+
+/** The stored timeline, validated like the flame beside it. What it decides -
+ *  the frame rate, the speed, the end frame - is what playback does, so a
+ *  value from an older build or a hand-edited backup cannot be trusted
+ *  straight in: `fps: 0` would stop the timeline dead.
+ *
+ *  A value merely past a limit is clamped rather than dropped. Dropping it
+ *  took the whole config with it, so a flame stored before the clamp existed
+ *  - a seamless loop pushes `endFrame` past the ceiling on its own
+ *  (utils/timeline.ts) - came back at 30fps over 90 frames, silently, having
+ *  been reported as saved. Only a config that is structurally unusable is
+ *  dropped, and its entry kept, the way a flame that fails drops its entry. */
+function parseStoredConfig(raw: unknown): TimelineConfig | undefined {
+  if (raw === null || typeof raw !== 'object') return undefined
+  const result = v.safeParse(TimelineSnapshotConfig, raw)
+  // Pinned at the call site: valibot's inferred output widens in ways that
+  // differ between a local typecheck and CI.
+  if (result.success) return result.output
+  const loose = v.safeParse(StoredTimelineShape, raw)
+  if (!loose.success) return undefined
+  const { fps, timeScale, startFrame, endFrame, loop, autoFps, loopMode } =
+    loose.output
+  return clampTimelineConfig({
+    fps,
+    timeScale,
+    startFrame,
+    endFrame,
+    loop,
+    ...(autoFps === undefined ? {} : { autoFps }),
+    ...(loopMode === undefined ? {} : { loopMode }),
+  })
 }
 
 /** Memo for `loadRecentFlames`, keyed on the exact payload it was built from.
@@ -84,7 +165,10 @@ export function loadRecentFlames(): RecentFlame[] {
     if (!Array.isArray(parsed)) return []
     const entries = parsed.filter(isValidRecentFlame).flatMap((item) => {
       const flame = tryValidateFlame(item.flame)
-      return flame ? [{ ...item, flame }] : []
+      if (!flame) return []
+      const { config: stored, ...rest } = item
+      const config = parseStoredConfig(stored)
+      return [{ ...rest, flame, ...(config ? { config } : {}) }]
     })
     if (import.meta.env.DEV) entries.forEach((entry) => deepFreeze(entry))
     validatedCache = { raw, entries }
@@ -94,19 +178,80 @@ export function loadRecentFlames(): RecentFlame[] {
   }
 }
 
+/**
+ * One entry, read exactly the way the Library reads the list it shows.
+ *
+ * Same validation as {@link loadRecentFlames}, over one entry instead of 150.
+ * That pass costs about 90ms for a full list, and a caller that cares about a
+ * single id - every writer, confirming its own write - should not pay it. The
+ * memo is used when it is already warm, so a caller on a screen that has just
+ * loaded the list pays nothing.
+ *
+ * Read-only, like every entry this module hands out: it can come from the
+ * shared memo.
+ */
+export function loadRecentFlame(id: string): RecentFlame | undefined {
+  try {
+    const raw = safeGetItem(STORAGE_KEY)
+    if (raw === null) return undefined
+    if (validatedCache?.raw === raw) {
+      return validatedCache.entries.find((entry) => entry.id === id)
+    }
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return undefined
+    const item = parsed
+      .filter(isValidRecentFlame)
+      .find((entry) => entry.id === id)
+    if (!item) return undefined
+    const flame = tryValidateFlame(item.flame)
+    if (!flame) return undefined
+    const { config: stored, ...rest } = item
+    const config = parseStoredConfig(stored)
+    return { ...rest, flame, ...(config ? { config } : {}) }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Did the write land as something the Library can read, timeline and all?
+ *
+ * "Saved" is a claim about where the user's work is, and every caller acts on
+ * it: Save for Later says so and marks the workspace clean, the autosave
+ * resets its baseline, the draft rescue clears the slot that held the only
+ * other copy. The loader keeps an entry whose config fails validation and
+ * drops the config, so a flame could be stored while the timeline it was
+ * authored at quietly was not - and nothing retried, because the write had
+ * reported success.
+ *
+ * So a writer confirms its own write the way the Library will read it.
+ */
+function landedIntact(id: string, config?: TimelineConfig): boolean {
+  const stored = loadRecentFlame(id)
+  if (!stored) return false
+  return config === undefined || stored.config !== undefined
+}
+
 export function saveRecentFlame(
   flame: FlameDescriptor,
   name?: string,
   tracks?: TimelineTrack[],
-  forceOverwriteOldest: boolean = true,
-): boolean {
+  /**
+   * The user's own answer to "may this replace the oldest flame?". Defaults
+   * to no: a caller that has not asked must not be able to evict by leaving
+   * an argument out, which is how two export paths were quietly dropping the
+   * oldest entry every time they saved the exported flame.
+   */
+  forceOverwriteOldest: boolean = false,
+  config?: TimelineConfig,
+): RecentWriteOutcome {
   // Read-modify-write: use the structural loader, not the schema one. Rewriting
   // the list from schema-validated entries silently deletes every entry the
   // validator rejects, and under-counts the list so the "full" guard below
   // never fires. Same reasoning as `upsertRecentFlame`.
   const recent = loadRecentFlamesForRewrite()
   if (recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest) {
-    return false
+    return 'full'
   }
   const id = newRecentFlameId()
   const entry: RecentFlame = {
@@ -119,11 +264,15 @@ export function saveRecentFlame(
   if (tracks && tracks.length > 0) {
     entry.tracks = deepClone(tracks)
   }
+  // The timeline goes in whether or not there are tracks: it is what says
+  // how fast the flame runs and how long it is.
+  if (config) entry.config = deepClone(config)
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
   // Report the real outcome. This used to return `true` unconditionally, so a
   // write that failed on quota or in private mode still told the caller the
   // flame was saved — and the caller marks the workspace clean on success.
-  return safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+  if (!safeSetItem(STORAGE_KEY, JSON.stringify(updated))) return 'refused'
+  return landedIntact(id, config) ? 'saved' : 'refused'
 }
 
 /**
@@ -158,17 +307,35 @@ export function loadRecentFlamesForRewrite(): RecentFlame[] {
 /**
  * Insert-or-update a recent entry by id and move it to the front. Used by
  * autosave so one editing session keeps updating a single entry instead of
- * flooding the list; drops the oldest entry when the list is full.
- * @returns false when the localStorage write failed.
+ * flooding the list.
+ *
+ * At the cap it declines rather than dropping the oldest entry. Nobody asks
+ * the user before an autosave, so this write may not do what Save for Later
+ * stops and asks about: at 150 kept flames, one crash restore and a single
+ * keystroke used to delete the oldest of them with no prompt. Writing into an
+ * id already on the list replaces that entry and grows nothing, so only a new
+ * id can be refused.
  */
 export function upsertRecentFlame(
   id: string,
   flame: FlameDescriptor,
   name?: string,
   tracks?: TimelineTrack[],
-): boolean {
+  config?: TimelineConfig,
+  /**
+   * The user's own answer to "may this replace the oldest flame?", the same
+   * one `saveRecentFlame` takes. Defaults to no, so leaving it out cannot
+   * evict anything. Two callers ever set it, and both have the answer: the
+   * flush at a document replacement, which asked (lib/documentLoad.ts), and
+   * the pagehide flush, which has nobody left to ask and a document about to
+   * cease to exist (hooks/useWorkspaceAutosave.ts).
+   */
+  forceOverwriteOldest: boolean = false,
+): RecentWriteOutcome {
   const recent = loadRecentFlamesForRewrite()
   const existing = recent.find((item) => item.id === id)
+  if (!existing && recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest)
+    return 'full'
   const entry: RecentFlame = {
     id,
     name: name || flame.metadata?.name || existing?.name || 'Autosave',
@@ -178,11 +345,13 @@ export function upsertRecentFlame(
   if (tracks && tracks.length > 0) {
     entry.tracks = deepClone(tracks)
   }
+  if (config) entry.config = deepClone(config)
   const updated = [entry, ...recent.filter((item) => item.id !== id)].slice(
     0,
     MAX_RECENT_FLAMES,
   )
-  return safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+  if (!safeSetItem(STORAGE_KEY, JSON.stringify(updated))) return 'refused'
+  return landedIntact(id, config) ? 'saved' : 'refused'
 }
 
 /** The oldest stored entry — the one a save would evict. Structural load only:

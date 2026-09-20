@@ -1,6 +1,15 @@
+import { createSignal } from 'solid-js'
+
 /**
- * The rail's three resting heights and how a drag settles between them.
- * Pure, so the rail's gesture handling is testable without a DOM.
+ * The rail's three resting heights and how a drag settles between them. The
+ * arithmetic is pure, so the gesture handling is testable without a DOM.
+ *
+ * The module also owns `railDetent`, which is UI state rather than geometry
+ * and is neither pure nor DOM-free - it lives here because it has to survive
+ * the rail's remount at the rail-or-deck threshold. Lifting it into the store
+ * whose decision causes that remount (stores/workspaceLayoutStore.ts) is
+ * still open, and would also let the detent's back entry survive the flip.
+ *
  * Heights are CSS px measured from the bottom of the viewport; the peek
  * height includes the bottom safe area.
  */
@@ -24,6 +33,14 @@ export const FLICK_MAX_AGE_MS = 100
  * the panel inside must stay on screen until the height has arrived.
  */
 export const SHEET_TRANSITION_MS = 280
+
+/**
+ * Where the rail rests, kept outside the component on purpose: crossing the
+ * rail-or-deck threshold (a tablet rotating, an iPad resizing its Split View)
+ * unmounts one surface and mounts the other, and a sheet the user had opened
+ * must come back open rather than at the floor.
+ */
+export const [railDetent, setRailDetent] = createSignal<Detent>('peek')
 
 export interface DetentHeights {
   readonly peek: number

@@ -1,0 +1,56 @@
+/* The More list itself, shared by the top bar and the shell bar. Only the
+   list's own appearance lives here; each host positions it from its own
+   stylesheet, because one anchors under a pill and the other above a dock.
+   Colour, radius, spacing, duration and easing come from the --la-* set. */
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-s-1);
+  min-width: 232px;
+  padding: var(--la-s-1);
+  border-radius: var(--la-r-md);
+  background: var(--la-glass-strong);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-e-3);
+  /* The shell's dock is pointer-events: none so the canvas stays reachable
+     beside it; everything in it that has to be touched takes that back. */
+  pointer-events: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-3);
+  width: 100%;
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-3);
+  border: 0;
+  background: none;
+  border-radius: var(--la-r-sm);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--la-dur-press) var(--la-ease);
+}
+
+.item:active {
+  background: var(--la-surface-3);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--la-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+}

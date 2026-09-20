@@ -87,7 +87,7 @@ test.describe('CI smoke', () => {
     await dismissWelcomeIfPresent(page, 12_000)
 
     const menuTrigger = page.getByRole('button', {
-      name: /Chaos Master.*menu/i,
+      name: /Lumen Apeiron.*menu/i,
     })
     if (await menuTrigger.isVisible()) {
       await menuTrigger.click()

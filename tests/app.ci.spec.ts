@@ -54,7 +54,7 @@ test.describe('App Loading', () => {
     // "#root has children" could not tell those apart.
     const webgpuError = page.locator('text=WebGPU is not supported')
     const workspace = page.getByRole('button', {
-      name: /^Chaos Master v\S+ menu$/,
+      name: /^Lumen Apeiron v\S+ menu$/,
     })
     await expect(webgpuError.or(workspace).first()).toBeVisible({
       timeout: 20_000,

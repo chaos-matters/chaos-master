@@ -16,6 +16,16 @@
   box-sizing: border-box;
   contain: layout paint;
   z-index: 20;
+  /* The threshold between the phone rail and this deck is a cross-fade, never
+     a reload (DESIGN.md section 4). `global(...)` keeps the keyframe in
+     lumen.css reachable: a CSS module renames a bare animation name. */
+  animation: global(la-surface-enter) var(--la-dur-fast) var(--la-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck {
+    animation: none;
+  }
 }
 
 /* A 12px hit strip inside the deck's leading edge: wide enough for a finger,

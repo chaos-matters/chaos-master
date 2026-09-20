@@ -16,8 +16,10 @@ export interface SoftwareVersionProps {
   setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
   isTouchLayout?: () => boolean
   /**
-   * True where the editor's top bar is drawn: the floating trigger would sit
-   * under it, and the top bar's More menu already carries these items.
+   * True on every touch layout. Each one already offers this list from a More
+   * menu of its own (Shell/moreMenuItems.ts), and the floating trigger has
+   * nowhere to sit that is not on top of one: under the phone's top bar, or
+   * over the first two items of the tablet's navigation rail.
    */
   hideTrigger?: () => boolean
   onPickGallery?: () => void
@@ -189,7 +191,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
                 <div
                   class={ui.menuPopoverUp}
                   role="menu"
-                  aria-label="Chaos Master menu"
+                  aria-label="Lumen Apeiron menu"
                 >
                   {renderMenuItems(false)}
                 </div>
@@ -202,8 +204,8 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
                 onClick={() => setOpen(!open())}
                 aria-expanded={open()}
                 aria-haspopup="menu"
-                aria-label={`Chaos Master v${DISPLAY_VERSION} menu`}
-                title={`Chaos Master v${DISPLAY_VERSION} menu`}
+                aria-label={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
+                title={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
               >
                 <Info class={ui.pillIcon} />
                 <span>v{DISPLAY_VERSION}</span>
@@ -221,7 +223,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
               <div
                 class={ui.menuPopover}
                 role="menu"
-                aria-label="Chaos Master menu"
+                aria-label="Lumen Apeiron menu"
               >
                 {renderMenuItems(true)}
               </div>
@@ -234,8 +236,8 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
               onClick={() => setOpen(!open())}
               aria-expanded={open()}
               aria-haspopup="menu"
-              aria-label="Chaos Master menu"
-              title="Chaos Master menu"
+              aria-label="Lumen Apeiron menu"
+              title="Lumen Apeiron menu"
             >
               <Menu class={ui.triggerIcon} />
             </button>

@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { zipSync } from 'fflate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseFlameXml } from '@/flame/flameXml'
-import { applyFlameImport, flameSignature, mergeHistoryEntries, mergeRecentFlames, parseBackupZip, parseFlameEnvelope, readFlameFiles, summarizeImport, } from './flameImport'
+import { applyFlameImport, flameSignature, mergeHistoryEntries, mergeRecentFlames, parseBackupZip, parseFlameEnvelope, readFlameFiles, readSingleFlameFile, summarizeImport, } from './flameImport'
 import { addFlameDataToPng } from './flameInPng'
 import { compressJsonQueryParam } from './jsonQueryParam'
 import { clearRecentFlames, loadRecentFlames, MAX_RECENT_FLAMES, } from './recentFlames'
@@ -39,11 +39,36 @@ function jsonBytes(value: unknown): Uint8Array {
 
 async function flamePng(
   descriptor: FlameDescriptor,
+  animation?: { tracks: unknown[]; config: unknown },
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const encoded = await compressJsonQueryParam(descriptor)
+  const encoded = await compressJsonQueryParam(
+    animation ? { flame: descriptor, animation } : descriptor,
+  )
   const blob = addFlameDataToPng(encoded, MINIMAL_PNG)
   return new Uint8Array(await blob.arrayBuffer())
 }
+
+/** The timeline the app writes into everything it exports: what says how
+ *  fast the flame runs and how long it is. */
+const CONFIG = {
+  fps: 60,
+  timeScale: 2,
+  startFrame: 0,
+  endFrame: 300,
+  loop: false,
+  autoFps: false,
+  loopMode: 'seamless' as const,
+}
+
+const TRACKS = [
+  {
+    parameterPath: 'renderSettings.brightness',
+    keyframes: [
+      { frame: 0, value: 1 },
+      { frame: 60, value: 2 },
+    ],
+  },
+]
 
 function recent(name: string, savedAt: number): RecentFlame {
   return { id: `id-${name}`, name, flame: flame(name), savedAt }
@@ -141,6 +166,23 @@ describe('parseBackupZip', () => {
     expect(parsed.candidates[0]?.thumbnail).toMatch(/^data:image\/png;base64,/)
   })
 
+  it('carries the timeline out of a PNG member, like its .json sibling', async () => {
+    // The backup writes the animation into both halves of a history flame.
+    // The PNG reader stopped at the tracks, so an archive restored through
+    // its images came back at the workspace's defaults.
+    const zip = zipSync({
+      'generated/0001-anim.png': await flamePng(flame('Animated'), {
+        tracks: TRACKS,
+        config: CONFIG,
+      }),
+    })
+
+    const parsed = await parseBackupZip(zip)
+
+    expect(parsed.candidates[0]?.name).toBe('Animated')
+    expect(parsed.candidates[0]?.config?.endFrame).toBe(300)
+  })
+
   it('recovers a flame from the PNG when its .json sibling is corrupt', async () => {
     const descriptor = flame('Png only')
     const zip = zipSync({
@@ -208,6 +250,66 @@ describe('parseBackupZip', () => {
     const [first, second] = parsed.candidates
 
     expect(first?.savedAt).toBeGreaterThan(second?.savedAt ?? 0)
+  })
+})
+
+describe('readSingleFlameFile', () => {
+  // One flame opens straight away rather than going to Recents, and that path
+  // had a reader of its own that stopped at the tracks. So the app wrote a
+  // timeline into an exported PNG and read the same file back at the
+  // workspace's defaults - 30fps over 90 frames, however it was authored.
+  it('keeps the timeline out of a PNG the app exported', async () => {
+    const png = new File(
+      [await flamePng(flame('From PNG'), { tracks: TRACKS, config: CONFIG })],
+      'a.png',
+    )
+    const parsed = await readSingleFlameFile(png)
+    expect(parsed?.flame.metadata?.name).toBe('From PNG')
+    expect(parsed?.tracks?.[0]?.parameterPath).toBe('renderSettings.brightness')
+    expect(parsed?.config?.endFrame).toBe(300)
+    expect(parsed?.config?.fps).toBe(60)
+  })
+
+  it('keeps the timeline out of a JSON envelope', async () => {
+    const json = new File(
+      [
+        JSON.stringify({
+          flame: flame('From JSON'),
+          animation: { tracks: [], config: CONFIG },
+        }),
+      ],
+      'b.json',
+    )
+    const parsed = await readSingleFlameFile(json)
+    expect(parsed?.flame.metadata?.name).toBe('From JSON')
+    expect(parsed?.config?.endFrame).toBe(300)
+  })
+
+  it('reads a bare descriptor and an Apophysis file, and rejects junk', async () => {
+    const bare = new File([JSON.stringify(flame('Bare'))], 'c.json')
+    expect((await readSingleFlameFile(bare))?.flame.metadata?.name).toBe('Bare')
+
+    const xml = new File([SIMPLE_FLAME_XML], 'd.flame')
+    expect((await readSingleFlameFile(xml))?.flame).toBeDefined()
+
+    expect(
+      await readSingleFlameFile(new File(['not a flame'], 'e.png')),
+    ).toBeUndefined()
+  })
+
+  it('drops a timeline that does not validate, and keeps the flame', async () => {
+    const json = new File(
+      [
+        JSON.stringify({
+          flame: flame('Bad timeline'),
+          animation: { tracks: [], config: { fps: 0, endFrame: -5 } },
+        }),
+      ],
+      'f.json',
+    )
+    const parsed = await readSingleFlameFile(json)
+    expect(parsed?.flame.metadata?.name).toBe('Bad timeline')
+    expect(parsed?.config).toBeUndefined()
   })
 })
 

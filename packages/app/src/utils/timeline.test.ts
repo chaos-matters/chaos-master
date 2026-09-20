@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { TimelineSnapshotConfig } from '@/flame/schema/timeline'
+import * as v from '@/valibot'
 import { catmullRom } from './easing'
 import { applyTracksToFlame, createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
 import type { TimelineTrack } from './timeline'
@@ -586,6 +588,28 @@ describe('Timeline Utilities', () => {
       expect(timeline.tracks()[0]!.keyframes).toHaveLength(before)
     })
 
+    it('seamless never extends past a frame the config can be stored at', () => {
+      // The extension IS the document: it is what the stored timeline says
+      // the animation is. Past the schema's maximum the whole config fails
+      // validation on the way back in, so the entry reloads at the default
+      // 30fps over 90 frames - after Save for Later reported success and
+      // marked the workspace clean, so nothing ever retried.
+      timeline.setConfig({
+        ...timeline.config(),
+        startFrame: 0,
+        endFrame: 1200,
+      })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 1200, 0.9, 'linear')
+
+      timeline.setLoopMode('seamless')
+
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+      expect(timeline.config().endFrame).toBe(2000)
+    })
+
     it('seamless is idempotent — re-selecting does not pile up frames', () => {
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
@@ -631,6 +655,65 @@ describe('Timeline Utilities', () => {
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
       expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.9)
+    })
+  })
+
+  describe('a config the app can always store', () => {
+    // Whatever the workspace is holding has to survive the round trip
+    // through Recents, or "saved" is a claim about work that is not there.
+    it('clamps a length typed past the maximum', () => {
+      // The Frames input has no maximum of its own: the scrubber stops at
+      // 999 but a typed value goes straight in.
+      timeline.setConfig({ ...timeline.config(), endFrame: 2500 })
+      expect(timeline.config().endFrame).toBe(2000)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('clamps a frame rate and a speed out of range', () => {
+      timeline.setConfig({ ...timeline.config(), fps: 0, timeScale: 99 })
+      expect(timeline.config().fps).toBe(1)
+      expect(timeline.config().timeScale).toBe(10)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('falls back to the default for a value that is not a number', () => {
+      // A speed clamped to the low end of its range is a timeline frozen at
+      // zero, which reads as the app hanging rather than as a value being
+      // rejected. So a value that is not a number at all takes the field's
+      // default instead of its floor. An emptied number input is a different
+      // case: it sends 0, which is a number, and clamps into range.
+      timeline.setConfig({
+        ...timeline.config(),
+        fps: Number.NaN,
+        timeScale: Number.NaN,
+        endFrame: Number.NaN,
+      })
+      expect(timeline.config().fps).toBe(30)
+      expect(timeline.config().timeScale).toBe(1)
+      expect(timeline.config().endFrame).toBe(90)
+
+      timeline.setConfig({ ...timeline.config(), fps: 0, endFrame: 0 })
+      expect(timeline.config().fps).toBe(1)
+      expect(timeline.config().endFrame).toBe(1)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('leaves an ordinary config exactly as it was', () => {
+      const next = {
+        ...timeline.config(),
+        fps: 24,
+        timeScale: 1.5,
+        startFrame: 10,
+        endFrame: 120,
+      }
+      timeline.setConfig(next)
+      expect(timeline.config()).toEqual(next)
     })
   })
 

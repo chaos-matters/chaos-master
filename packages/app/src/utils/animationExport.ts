@@ -68,7 +68,8 @@ export function createAnimationExport(
 ): { cancel: () => void; promise: Promise<Blob> } {
   let cancelled = false
 
-  // Snapshot original flame state so we can restore it after export.
+  // Snapshot the parts of the flame the per-frame writes below overwrite, so
+  // they can be put back when the export ends (see restoreFlameState).
   // baseFlame is a reactive store proxy — deep-clone to a plain object.
   const baseFlameSnapshot = deepClone(baseFlame)
 
@@ -335,11 +336,21 @@ export function createAnimationExport(
         )
       }
 
+      /**
+       * Put back exactly what the export overwrote, and nothing else.
+       *
+       * The per-frame setup above writes `renderSettings` and `transforms`
+       * for every frame it renders, so both are the export's to return.
+       * `metadata` is not: nothing here ever writes it, and restoring it
+       * reverted a name or a description typed while the export ran. A
+       * main-canvas animation export takes minutes and the editor stays
+       * usable throughout, so that is a real edit being silently undone at
+       * the moment the export happens to finish.
+       */
       function restoreFlameState() {
         setFlameDescriptor((draft) => {
           draft.renderSettings = baseFlameSnapshot.renderSettings
           draft.transforms = baseFlameSnapshot.transforms
-          draft.metadata = baseFlameSnapshot.metadata
         })
       }
 

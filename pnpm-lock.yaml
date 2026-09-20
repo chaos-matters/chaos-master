@@ -345,6 +345,9 @@ importers:
 
   packages/mobile-runtime:
     dependencies:
+      '@capacitor/app':
+        specifier: ^8.1.1
+        version: 8.1.1(@capacitor/core@8.5.2)
       '@capacitor/core':
         specifier: ^8.5.1
         version: 8.5.2

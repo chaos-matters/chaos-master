@@ -2,6 +2,7 @@
 import './styles/index.css'
 import { render } from 'solid-js/web'
 import { loadHaptics } from './lib/haptics'
+import { loadLifecycle } from './lib/lifecycle'
 import { IS_NATIVE, nativePlatform } from './lib/platform'
 import { isBenchmarksPath } from './routing/appPath'
 
@@ -39,6 +40,10 @@ if (platform === 'android') {
 // Binds the Capacitor haptic ports in the native build; a no-op on the web.
 // Not awaited: nothing on screen waits for a vibration motor.
 void loadHaptics()
+
+// Same shape for the lifecycle: the Android back gesture has to reach the back
+// registry from the first frame, and the web keeps its visibilitychange ports.
+void loadLifecycle()
 
 const root = document.getElementById('root')
 

@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
+import { useToast } from '@/contexts/ToastContext'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { condenseFlameDescriptor } from '@/flame/schema/flameSchema'
@@ -11,7 +12,7 @@ import { downloadBlob } from '@/utils/blob'
 import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobFinalizing, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
-import { saveRecentFlame } from '@/utils/recentFlames'
+import { MAX_RECENT_FLAMES, saveRecentFlame } from '@/utils/recentFlames'
 import ui from './ExportJobHost.module.css'
 import { OffscreenAnimationRender } from './OffscreenAnimationRender'
 import type { Vec3 } from 'wgpu-matrix'
@@ -70,6 +71,7 @@ export function ExportJobHost() {
 
 function OffscreenRender(props: { job: ImageJob }) {
   const { job } = props
+  const { showToast } = useToast()
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
 
   const cam = job.flame.renderSettings.camera
@@ -141,7 +143,29 @@ function OffscreenRender(props: { job: ImageJob }) {
         await addFlameDataToPng(encoded, bytes, encodedSteps).arrayBuffer(),
       )
     }
-    saveRecentFlame(job.flame, undefined, job.tracks)
+    // Not forced: at the cap this declines rather than dropping the oldest
+    // kept flame for a flame the user exported rather than saved
+    // (utils/recentFlames.ts). Declining costs nothing WHEN the PNG carries
+    // the flame, because the file is then a copy of it - which is exactly
+    // the condition above, and with "Embed flame" off it does not hold. That
+    // export writes a plain image, so the refused entry was the only record
+    // this flame ever had, and saying nothing loses it without a trace.
+    // `authoredFlame`, never `job.flame`: the rendered one carries the audio
+    // overlay that was on the canvas when Export was pressed, and filing that
+    // would make one frame of a track the flame the user comes back to.
+    const stored = saveRecentFlame(
+      job.authoredFlame,
+      undefined,
+      job.tracks,
+      false,
+      job.config,
+    )
+    if (stored === 'full' && !job.embedFlame) {
+      showToast(
+        `Recents is full (${MAX_RECENT_FLAMES} flames), so this flame was not added to it - and the PNG carries no flame data. Delete one in Library, or use Save for Later.`,
+        12000,
+      )
+    }
     // The user may have cancelled (job removed) while we were encoding.
     if (!jobExists(job.id)) return
     const png = new Blob([bytes], { type: 'image/png' })

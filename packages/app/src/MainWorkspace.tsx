@@ -8,7 +8,9 @@ import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
+import { createBackLayer } from '@/lib/backStack'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
+import { replaceOpenDocument } from '@/lib/documentLoad'
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { trackAppInit } from '@/lib/telemetry'
 import { createDragHandler } from '@/utils/createDragHandler'
@@ -24,6 +26,9 @@ import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { useRequestModal } from './components/Modal/ModalContext'
 import { qualityPresets } from './components/Quality/QualityPresets'
 import { recorderExportPending, recorderTaskPending, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
+import { goToDestination, shellDestination, } from './components/Shell/destinations'
+import { NavRail } from './components/Shell/NavRail'
+import { ShellBar } from './components/Shell/ShellBar'
 import { AdvancedToolsDrawer, EditorRail, TabletInspectorDeck, TouchHUD, } from './components/TouchSurface'
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
@@ -31,6 +36,7 @@ import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 import { deckFits, isTouchDevice } from './stores/workspaceLayoutStore'
+import type { MoreMenuHandlers } from './components/Shell/moreMenuItems'
 
 const AncestryTreeModal = lazy(() =>
   import('./components/AncestryTreeModal/AncestryTreeModal').then((m) => ({
@@ -61,6 +67,13 @@ const ConfirmOverwriteRecentModal = lazy(() =>
     }),
   ),
 )
+const ConfirmDiscardUnsavedModal = lazy(() =>
+  import('./components/LoadFlameModal/ConfirmDiscardUnsavedModal').then(
+    (m) => ({
+      default: m.ConfirmDiscardUnsavedModal,
+    }),
+  ),
+)
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { useCompactMode } from './contexts/CompactModeContext'
@@ -80,8 +93,9 @@ import { extractFlameUniforms, generateTransformId, generateVariationId, } from 
 import { extractFlameUniforms3D } from './flame/transformFunction3D'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
+import { installPauseSave } from './lib/pauseSave'
 import { IS_NATIVE } from './lib/platform'
-import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
+import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
 import { canEnableReplayAudio } from './recorder/replay'
 import { captureTransformColors, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
@@ -89,7 +103,7 @@ import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldStopHi
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { BENCHMARKS_PATH } from './routing/appPath'
 import { createAnimationExport } from './utils/animationExport'
-import { createAudioAnalyzer, decodeAudioBytes } from './utils/audioAnalysis'
+import { applyAudioTargetValues, createAudioAnalyzer, decodeAudioBytes, } from './utils/audioAnalysis'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
@@ -124,12 +138,12 @@ import type { RecordedSession } from './recorder/schema'
 import type { SnapshotOrigin } from './recorder/snapshotOrigin'
 import type { SonificationSnapshot } from './recorder/sonificationState'
 import type { AnimationExportConfig } from './utils/animationExport'
-import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
+import type { AudioAnalyzer, AudioTargetValue, LiveAudioAnalyzer, } from './utils/audioAnalysis'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
-import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
+import type { EasingCurve, KeyframeInterpolation, TimelineConfig, TimelineTrack, } from './utils/timeline'
 import type { BundledTrack } from '@/arcade/bundledTracks'
 import type { CommandContext } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
@@ -159,6 +173,12 @@ export type AppProps = {
   }
   flameFromWelcome?: () => FlameDescriptor | undefined
   welcomeTracks?: () => TimelineTrack[] | undefined
+  /**
+   * The timeline the seeded flame's animation was authored at, where the
+   * seeding has one. A pick that carries none keeps the hand-off reset's
+   * defaults.
+   */
+  welcomeConfig?: () => TimelineConfig | undefined
   /**
    * One-shot request from a Home "Explore" card: open the tool this flame was
    * curated to demonstrate, not just the flame. The value is the row's
@@ -294,6 +314,14 @@ export function MainWorkspace(props: AppProps) {
   } = layoutStore
 
   const [touchDrawerOpen, setTouchDrawerOpen] = createSignal(false)
+  // The drawer is a layer over the editor: back closes it (lib/backStack.ts).
+  createBackLayer(
+    touchDrawerOpen,
+    () => {
+      setTouchDrawerOpen(false)
+    },
+    'advanced tools',
+  )
   /** How much of the viewport the rail's sheet covers; 0 while it is at peek. */
   const [railInset, setRailInset] = createSignal(0)
   /** The phone, and a tablet too narrow for the deck, both get the rail. */
@@ -524,24 +552,61 @@ export function MainWorkspace(props: AppProps) {
    * recorder still needs a self-contained action that can reproduce the
    * resulting document. Keep one replacement-style history entry and log the
    * exact descriptor it produced, mirroring the 2D/3D switch path below.
+   *
+   * The flush belongs here, at the one point every document replacement
+   * passes through, rather than at the buttons: the desktop's Load did it
+   * and the touch layouts' way into the same dialog - the HUD, the rail and
+   * the tools drawer all reach it through `pickGalleryFlame` - did not, so
+   * opening a flame from Library on a phone dropped whatever was unsaved.
+   *
+   * Every caller settles the cap question first, with
+   * `prepareDocumentReplacement`: the chokepoint's answer to a replacement
+   * that skipped it is to refuse, so a call without the gate does not fall
+   * back to the old destructive behaviour - it does nothing at all, and the
+   * drop or the migration behind it appears to be ignored. A caller that
+   * forgets is caught by a guard over this file in lib/documentLoad.test.ts.
+   *
+   * @returns whether the document was actually replaced.
    */
   const replaceLoadedFlame = (
     next: FlameDescriptor,
     label = 'Load flame',
     origin?: SnapshotOrigin,
-  ) => {
+  ): boolean => {
     const flame = deepClone(next)
     const description = snapshotOriginLabel(origin) ?? label
-    // A different document cannot inherit another flame's pre-palette stash.
-    // If the loaded flame already carries a palette, its earlier natural
-    // colours are unknowable; Unselect safely keeps its current colours. The
-    // history side effects restore the outgoing provenance if this load is
-    // undone and clear it again on redo.
-    withRecordingSuppressed(() => {
-      withPaletteRestoreTransition({}, description, () => {
-        setFlameDescriptor(() => flame, description)
-      })
+    const replaced = replaceOpenDocument({
+      // Reads the OUTGOING flame and its tracks, so it has to run before the
+      // replacement below drops them (lib/documentLoad.ts).
+      flushUnsaved: flushDirtyToRecents,
+      // A different document cannot inherit another flame's pre-palette
+      // stash. If the loaded flame already carries a palette, its earlier
+      // natural colours are unknowable; Unselect safely keeps its current
+      // colours. The history side effects restore the outgoing provenance if
+      // this load is undone and clear it again on redo.
+      replace: () => {
+        withRecordingSuppressed(() => {
+          withPaletteRestoreTransition({}, description, () => {
+            setFlameDescriptor(() => flame, description)
+          })
+        })
+      },
     })
+    // A refused replacement opened nothing, so there is no load to record:
+    // a `flame.load` for a document that never landed makes a replay apply
+    // every action after it to the wrong flame.
+    if (!replaced) return false
+    // A replacement IS the load boundary, so it is taken here rather than by
+    // each caller. Two of the four reached this function and nothing else -
+    // an accepted migration and a generated logo - and so took no boundary at
+    // all: the session id was never rotated, so the new flame's autosaves
+    // overwrote the entry the flush had just written the OUTGOING flame into,
+    // and the baseline still described the flame that had left, so the
+    // incoming one read as unsaved work from the moment it opened. The other
+    // two also seed an animation, whose effect takes a boundary as well -
+    // re-taking it there is what picks up the tracks and the timeline that
+    // land after this returns (hooks/useWorkspaceAutosave).
+    markLoadedBaseline()
     recordSyntheticAction(
       'flame.load',
       origin === undefined
@@ -549,6 +614,7 @@ export function MainWorkspace(props: AppProps) {
         : [deepClone(flame), description, {}, origin],
       description,
     )
+    return true
   }
   // Blend composition is part of the flame document too (renderSettings
   // .blendFlame / .blendWeight): picking, adjusting, or clearing a blend is
@@ -590,54 +656,90 @@ export function MainWorkspace(props: AppProps) {
         showToast('Stop or discard the recording before opening a Home flame')
         return
       }
-      const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
-      // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
-      // and its tracks, so it has to run before the reset drops them —
-      // otherwise a hand-off would silently destroy unsaved work.
-      flushDirtyToRecents()
-      // Then a clean slate, THEN this flame's own state. Every hand-off starts
-      // from the same baseline, so the second flame you open from Home looks
-      // exactly like the first one would have. See resetWorkspaceForHandoff for
-      // what was leaking and why.
-      resetWorkspaceForHandoff()
-      runPaletteRestoreTransition(
-        history,
-        outgoingPaletteRestoreColors,
-        {},
-        (colors) => {
-          setPrePaletteColors(colors)
-        },
-        'Load Home flame',
-        () => {
-          setFlameDescriptor(() => deepClone(newFlame), 'Load Home flame')
-        },
-      )
-      // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
-      const capability = props.capabilityFromHome?.()
-      if (capability !== undefined) {
-        setPendingCapability(capability)
-      }
-      // Load animation tracks if the welcome selection includes them
-      const tracks = props.welcomeTracks?.()
-      if (IS_DEV) {
-        console.info('[welcome] flame selected, tracks:', {
-          hasTracks: !!tracks,
-          trackCount: tracks?.length ?? 0,
-          trackPaths: tracks?.map((t) => t.parameterPath) ?? [],
+      // The hand-off replaces the open document, so whatever is unsaved in
+      // it has to reach Recents before the reset below drops it - and at the
+      // cap, whether that save may evict the oldest kept flame is the user's
+      // question (lib/documentLoad.ts).
+      void (async () => {
+        if (!(await prepareDocumentReplacement())) {
+          // They chose to keep what is open, so the pending selection has to
+          // go: nothing re-triggers this effect, and a hand-off left standing
+          // would sit there unapplied for the rest of the session.
+          props.resetFlameFromWelcome?.()
+          return
+        }
+        // Read after the answer, not before it. Everything this hand-off
+        // needs is either live state or a prop accessor, so the only thing
+        // that could go stale across the question is the outgoing palette
+        // provenance - and taking it here means there is nothing to go
+        // stale. The signal is read outside the effect's tracking scope now,
+        // which is also what stops a palette edit from replaying a hand-off
+        // that has already happened.
+        const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
+        replaceOpenDocument({
+          // Reads the OUTGOING flame and its tracks, so it has to run before
+          // the reset drops them (lib/documentLoad.ts).
+          flushUnsaved: flushDirtyToRecents,
+          // Then a clean slate, THEN this flame's own state. Every hand-off
+          // starts from the same baseline, so the second flame you open from
+          // Home looks exactly like the first one would have. See
+          // resetWorkspaceForHandoff for what was leaking and why.
+          replace: () => {
+            resetWorkspaceForHandoff()
+            runPaletteRestoreTransition(
+              history,
+              outgoingPaletteRestoreColors,
+              {},
+              (colors) => {
+                setPrePaletteColors(colors)
+              },
+              'Load Home flame',
+              () => {
+                setFlameDescriptor(() => deepClone(newFlame), 'Load Home flame')
+              },
+            )
+          },
         })
-      }
-      if (tracks && tracks.length > 0) {
-        setLoadedAnimation({
-          flame: deepClone(newFlame),
-          tracks: tracks.map((t) => ({
-            ...t,
-            keyframes: t.keyframes.map((kf) => ({ ...kf })),
-          })),
-        })
-      }
-      props.resetFlameFromWelcome?.()
-      // A welcome pick is a fresh starting point for dirty tracking.
-      markLoadedBaseline()
+        // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
+        const capability = props.capabilityFromHome?.()
+        if (capability !== undefined) {
+          setPendingCapability(capability)
+        }
+        // Load animation tracks if the welcome selection includes them
+        const tracks = props.welcomeTracks?.()
+        const config = props.welcomeConfig?.()
+        if (IS_DEV) {
+          console.info('[welcome] flame selected, tracks:', {
+            hasTracks: !!tracks,
+            trackCount: tracks?.length ?? 0,
+            trackPaths: tracks?.map((t) => t.parameterPath) ?? [],
+          })
+        }
+        if (tracks && tracks.length > 0) {
+          setLoadedAnimation({
+            flame: deepClone(newFlame),
+            tracks: tracks.map((t) => ({
+              ...t,
+              keyframes: t.keyframes.map((kf) => ({ ...kf })),
+            })),
+            ...(config ? { config } : {}),
+          })
+        } else if (config) {
+          // A flame with no tracks still has a timeline, and the reset above
+          // has just replaced it with the default one. Nothing downstream puts
+          // a seeded fps and end frame back on this path: setLoadedAnimation
+          // is the animation loader, and there is no animation here to load.
+          timeline.setConfig({ ...timeline.config(), ...config })
+        }
+        props.resetFlameFromWelcome?.()
+        // Every hand-off is a fresh starting point for dirty tracking: the
+        // flame that arrives here came from somewhere the user can reach it
+        // again - the welcome grid, a Home card, the Library - so nothing is
+        // lost by counting it as loaded, while leaving it dirty made the
+        // autosave prompt and the five-minute reminder fire on a launch
+        // nobody had touched.
+        markLoadedBaseline()
+      })()
     }
   })
 
@@ -703,6 +805,10 @@ export function MainWorkspace(props: AppProps) {
       replace: (next, label) => {
         replaceLoadedFlame(next, label, loadModalOrigin)
       },
+      // Settled once the user has picked, before the dialog's batch drops
+      // the open document. A thunk because the autosave that answers this is
+      // created further down, after the modal is wired up.
+      prepareReplace: () => prepareDocumentReplacement(),
     },
     () => flameDescriptor.renderSettings.dimensions ?? 2,
   )
@@ -761,6 +867,22 @@ export function MainWorkspace(props: AppProps) {
       },
     ],
   })
+  /**
+   * The frame of modulation the renderer is layering on right now, or
+   * `undefined` when nothing is modulating.
+   *
+   * Modulation used to be written into the document 30 times a second through
+   * `history.setSilently`, which meant that after any audio-reactive playback
+   * the user's flame WAS the frame the music stopped on — permanently, with no
+   * undo to reach it (those writes were kept out of history deliberately), and
+   * with the autosave and the pause write then filing that frame as their
+   * work. It is a render-time overlay instead: the document is never touched,
+   * so there is nothing to stash when the music starts and nothing to restore
+   * when it stops.
+   */
+  const [audioModulation, setAudioModulation] = createSignal<
+    AudioTargetValue[] | undefined
+  >(undefined)
   const [audioSource, setAudioSource] = createSignal<'file' | 'mic'>('file')
   // Named, not carried: a recorded session can say which track it was wired
   // against, but an AudioBuffer can never ride in a `.steps.json`.
@@ -1071,16 +1193,28 @@ export function MainWorkspace(props: AppProps) {
             flame={flameDescriptor}
             hardwareTier={props.hardwareTier}
             onApply={(flame) => {
-              if (blendFlame())
-                showToast(
-                  'Blend is still active — the loaded flame will look mixed',
-                  4000,
-                )
-              executeFlameLoad(
-                flame,
-                undefined,
-                snapshotOrigin('flame.simulator'),
-              )
+              // A document replacement like any other, and it was not going
+              // through the chokepoint: applying a simulator result dropped
+              // whatever was unsaved in the flame it replaced
+              // (lib/documentLoad.ts).
+              void (async () => {
+                if (!(await prepareDocumentReplacement())) return
+                if (blendFlame())
+                  showToast(
+                    'Blend is still active — the loaded flame will look mixed',
+                    4000,
+                  )
+                replaceOpenDocument({
+                  flushUnsaved: flushDirtyToRecents,
+                  replace: () => {
+                    executeFlameLoad(
+                      flame,
+                      undefined,
+                      snapshotOrigin('flame.simulator'),
+                    )
+                  },
+                })
+              })()
             }}
             respond={respond}
           />
@@ -1097,16 +1231,28 @@ export function MainWorkspace(props: AppProps) {
             flame={flameDescriptor}
             hardwareTier={props.hardwareTier}
             onApply={(flame) => {
-              if (blendFlame())
-                showToast(
-                  'Blend is still active — the loaded flame will look mixed',
-                  4000,
-                )
-              executeFlameLoad(
-                flame,
-                undefined,
-                snapshotOrigin('flame.ancestry'),
-              )
+              // A document replacement like any other, and it was not going
+              // through the chokepoint: applying an ancestry result dropped
+              // whatever was unsaved in the flame it replaced
+              // (lib/documentLoad.ts).
+              void (async () => {
+                if (!(await prepareDocumentReplacement())) return
+                if (blendFlame())
+                  showToast(
+                    'Blend is still active — the loaded flame will look mixed',
+                    4000,
+                  )
+                replaceOpenDocument({
+                  flushUnsaved: flushDirtyToRecents,
+                  replace: () => {
+                    executeFlameLoad(
+                      flame,
+                      undefined,
+                      snapshotOrigin('flame.ancestry'),
+                    )
+                  },
+                })
+              })()
             }}
             onCompare={openDiffAsModal}
             respond={respond}
@@ -1357,6 +1503,39 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
+  /**
+   * What the canvas draws: the effective flame with this frame of audio
+   * modulation laid over it.
+   *
+   * Given only to the renderers, never to the editing surfaces, and that
+   * split is the whole point. Modulation changes something 30 times a second;
+   * handing that to the inspector would mean its memos re-run on every frame
+   * (they track `effectiveFlame` as a whole, not the store paths they read)
+   * and its sliders would show numbers that are not in the document — the
+   * same confusion the document writes created, minus the data loss.
+   *
+   * `deepClone` reads the whole store, so an edit made while the music plays
+   * re-runs this and the next frame is modulated from the edited flame. That
+   * is the intent: edits during playback are ordinary edits, and the audio
+   * goes on to drive the new flame.
+   *
+   * With nothing modulating this is `effectiveFlame` itself — the store
+   * proxy, when nothing is hovered either — so the renderer keeps its
+   * fine-grained tracking and nobody pays for a clone.
+   */
+  const renderedFlame = createMemo<FlameDescriptor>(() => {
+    const base = effectiveFlame()
+    const values = audioModulation()
+    if (values === undefined || values.length === 0) return base
+    try {
+      const clone: FlameDescriptor = deepClone(base)
+      applyAudioTargetValues(clone, values)
+      return clone
+    } catch {
+      return base
+    }
+  })
+
   const finalRenderInterval = () =>
     // Home covers the workspace while it is showing, so the canvas has nothing
     // to display — pause it exactly as an open modal does rather than paying
@@ -1533,12 +1712,20 @@ export function MainWorkspace(props: AppProps) {
       replace: (next, label) => {
         replaceLoadedFlame(next, label, snapshotOrigin('flame.file'))
       },
+      // Settled once the dropped file has been read, before the hook's batch
+      // drops the open document - and beside `replace` rather than inside it
+      // for the same reason the load dialog does it here: an await from
+      // inside that batch would let the animation seed take the load
+      // boundary while the outgoing flame was still on screen. A thunk
+      // because the autosave that answers this is created further down.
+      prepareReplace: () => prepareDocumentReplacement(),
     },
     setLoadedAnimation,
     importReplaySession,
   )
 
   const timeline = createTimelineState({ seatId: 'player' })
+
   const captureTimelineSnapshot = (): TimelineSnapshot => ({
     config: deepClone(timeline.config()),
     currentFrame: timeline.currentFrame(),
@@ -1551,19 +1738,22 @@ export function MainWorkspace(props: AppProps) {
   // Ctrl+Z/Ctrl+Y and the toolbar buttons all route through this.
   const undoRouter = createUndoRouter(history, timeline)
 
-  // Audio-reactive loop: plays audio through AudioContext, drives
-  // renderSettings at 30fps synced to playback time.
+  /*
+   * Audio-reactive loop: plays audio through AudioContext and publishes one
+   * frame of modulation values at 30fps, synced to playback time.
+   *
+   * It used to write those values into the document through
+   * `history.setSilently`, and so had to tell the recorder about a derived
+   * write and warn once per take that the take was unreplayable. Neither is
+   * true of a publish: the document the recorder captures is the authored one,
+   * frame by frame, whatever the music is doing to the canvas.
+   */
   useAudioReactive(
     audioEnabled,
     audioBuffer,
     audioMapping,
-    (write) => {
-      reportDerivedWorkspaceWrite()
-      reportUnreplayableOnce(
-        'live-audio-modulation',
-        'Live audio modulation changed the flame without embedding the audio source',
-      )
-      history.setSilently(write)
+    (values) => {
+      setAudioModulation(values)
     },
     liveAnalyzer,
     audioSource,
@@ -1593,6 +1783,11 @@ export function MainWorkspace(props: AppProps) {
    * clean, quality-graded image, then scales it down (aspect preserved).
    */
   async function captureOgImageBlob(maxDim = 1000): Promise<Blob | null> {
+    // The flame behind the frame this capture keeps. Filled in when that frame
+    // lands, because the preview is an image of the canvas: the overlay the
+    // audio loop republishes 30 times a second is in those pixels, and the
+    // flame the PNG carries has to be the one that drew them.
+    let capturedFlame: FlameDescriptor | undefined
     const rawBlob = await new Promise<Blob | null>((resolve) => {
       let settled = false
       const finish = (b: Blob | null) => {
@@ -1612,6 +1807,7 @@ export function MainWorkspace(props: AppProps) {
             // Wait for the export driver's clean, quality-graded frame.
             if (info?.finalImageReady !== true) return
             clearTimeout(timer)
+            capturedFlame = deepClone(renderedFlame())
             canvas.toBlob(
               (b) => {
                 finish(b)
@@ -1624,7 +1820,8 @@ export function MainWorkspace(props: AppProps) {
       // Same render path as PNG export; current quality keeps the canvas as-is.
       setExportQuality(qualityPresets[qualityPreset()])
     })
-    if (!rawBlob) return null
+    // No frame, or no flame behind it, means no honest preview to upload.
+    if (!rawBlob || !capturedFlame) return null
 
     const url = URL.createObjectURL(rawBlob)
     try {
@@ -1658,8 +1855,8 @@ export function MainWorkspace(props: AppProps) {
       const config = timeline.config()
       const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
       const payload = hasAnimation
-        ? { flame: flameDescriptor, animation: { tracks, config } }
-        : flameDescriptor
+        ? { flame: capturedFlame, animation: { tracks, config } }
+        : capturedFlame
       const encoded = await compressJsonQueryParam(payload)
       const pngBytes = new Uint8Array(await downscaled.arrayBuffer())
       return addFlameDataToPng(encoded, pngBytes)
@@ -1685,8 +1882,16 @@ export function MainWorkspace(props: AppProps) {
 
   const { showShareVariationLoadModal } = createLazyShareVariationLoadModal()
 
-  const { showMigrationModal } = createLazyMigrationModal((flame) => {
-    replaceLoadedFlame(flame, 'Load migrated flame')
+  const { showMigrationModal } = createLazyMigrationModal(async (flame) => {
+    // Accepting a migration replaces the open document like any other load,
+    // so the cap question is settled here. Without it the chokepoint refuses
+    // the replacement and the modal closes having done nothing.
+    if (!(await prepareDocumentReplacement())) return
+    if (!replaceLoadedFlame(flame, 'Load migrated flame')) return
+    // A migrated flame carries no animation, but it still has a timeline.
+    // Without this it opened on the keyframe tracks, frame rate and end frame
+    // of the document it replaced, and autosaved there (lib/documentLoad.ts).
+    setLoadedAnimation({ flame, tracks: [], config: defaultTimelineConfig() })
   })
 
   /** Waits until the canvas backing-store size stops changing (the resize is
@@ -1762,6 +1967,7 @@ export function MainWorkspace(props: AppProps) {
   const { showExportPngDialog, quickExport, exportModalIsOpen } =
     createExportPngDialog(
       flameDescriptor,
+      renderedFlame,
       () => timeline,
       pixelRatio,
       setPixelRatio,
@@ -1791,7 +1997,10 @@ export function MainWorkspace(props: AppProps) {
   async function shareToDiscord() {
     // Freeze one authored document for the entire flow. The capture callback,
     // share-link shortener and consent modal all resolve asynchronously; using
-    // the live store again later could pair flame B with flame A's PNG.
+    // the live store again later could pair flame B with flame A's PNG. What
+    // is read off this below is the document's own description - its name, and
+    // which custom variations it references - never the artifact the post
+    // carries, which is `postedFlame`.
     const sharedFlame = deepClone(flameDescriptor)
     const tracks = deepClone(timeline.tracks())
     const config = deepClone(timeline.config())
@@ -1805,10 +2014,15 @@ export function MainWorkspace(props: AppProps) {
       ),
     )
 
-    // Step 1: Capture the current flame at its current resolution to prevent flickering/resizing
+    // Step 1: Capture the current flame at its current resolution to prevent
+    // flickering/resizing. The pixels come off the LIVE canvas, so the flame
+    // that produced them - the open document with this frame of audio
+    // modulation over it - is frozen alongside them.
+    let capturedFlame: FlameDescriptor | undefined
     const rawBlob = await new Promise<Blob | null>((resolve) => {
       setOnExportImage(() => (canvas: HTMLCanvasElement) => {
         setOnExportImage(undefined)
+        capturedFlame = deepClone(renderedFlame())
         canvas.toBlob(
           (b) => {
             resolve(b)
@@ -1819,22 +2033,37 @@ export function MainWorkspace(props: AppProps) {
       })
     })
 
-    if (!rawBlob) {
+    if (!rawBlob || !capturedFlame) {
       showToast('Failed to capture flame image')
       return
     }
+
+    /**
+     * One post, one artifact: the flame in the image, in the link beside it,
+     * and in the showcase entry the post can become.
+     *
+     * These used to disagree. The PNG carried the captured frame while the
+     * link and the showcase carried the authored document, so while a track
+     * played, someone clicking "Copy share link" under the picture got a
+     * flame that does not look like it - the same post saying two things.
+     *
+     * Recents, the autosave and the pause write are untouched by this and
+     * keep the authored flame: that is the user's work, and a picture of one
+     * frame of it is not something to save over it.
+     */
+    const postedFlame = capturedFlame
 
     // Step 2: Embed flame data into the PNG so it can be loaded back
     const animation = hasAnimation ? { tracks, config } : undefined
     const payload =
       hasAnimation || customVariations.length > 0
         ? {
-            flame: sharedFlame,
+            flame: postedFlame,
             animation,
             customVariations:
               customVariations.length > 0 ? customVariations : undefined,
           }
-        : sharedFlame
+        : postedFlame
     const encoded = await compressJsonQueryParam(payload)
     let pngBytes = new Uint8Array(await rawBlob.arrayBuffer())
     pngBytes = new Uint8Array(
@@ -1851,7 +2080,7 @@ export function MainWorkspace(props: AppProps) {
     // fallback "Copy share link" is instant and correct. Runs in parallel; the
     // OG preview upload is best-effort so the copied link shows a rich card.
     const sharePromise = createShareLink({
-      flame: sharedFlame,
+      flame: postedFlame,
       animation,
       customVariations:
         customVariations.length > 0 ? customVariations : undefined,
@@ -1886,7 +2115,7 @@ export function MainWorkspace(props: AppProps) {
             ? {
                 consent: true,
                 consentVersion: SHOWCASE_CONSENT_VERSION,
-                flame: sharedFlame,
+                flame: postedFlame,
                 animation,
                 shareUrl: (await sharePromise).primaryUrl,
               }
@@ -1920,8 +2149,15 @@ export function MainWorkspace(props: AppProps) {
   const { showLogoFaviconGenerator } = createLazyLogoFaviconGenerator(
     flameDescriptor,
     () => selectedPalette(),
-    (flame) => {
-      replaceLoadedFlame(flame, 'Load generated logo')
+    async (flame) => {
+      // Same as the migration modal: the generated logo replaces the open
+      // document, so the question is asked here or the chokepoint refuses
+      // the replacement and the generator appears to load nothing.
+      if (!(await prepareDocumentReplacement())) return
+      if (!replaceLoadedFlame(flame, 'Load generated logo')) return
+      // Same as the migration above: a generated logo has no animation and a
+      // timeline of its own, and inherited the previous document's otherwise.
+      setLoadedAnimation({ flame, tracks: [], config: defaultTimelineConfig() })
     },
   )
 
@@ -2385,17 +2621,25 @@ export function MainWorkspace(props: AppProps) {
     ])
   }
 
-  const handleLoadHistory = (entry: RandomizerHistoryEntry) => {
+  const handleLoadHistory = async (entry: RandomizerHistoryEntry) => {
+    // Asked before anything moves, including the highlight: a no means this
+    // entry was never opened, so nothing should look as though it was
+    // (lib/documentLoad.ts).
+    if (!(await prepareDocumentReplacement())) return
     setSelectedHistoryTimestamp(entry.timestamp)
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
-    flushDirtyToRecents()
-    executeFlameLoad(
-      entry.flame,
-      'Load History Flame',
-      snapshotOrigin('flame.history'),
-    )
-    markLoadedBaseline()
+    replaceOpenDocument({
+      flushUnsaved: flushDirtyToRecents,
+      replace: () => {
+        executeFlameLoad(
+          entry.flame,
+          'Load History Flame',
+          snapshotOrigin('flame.history'),
+        )
+        markLoadedBaseline()
+      },
+    })
   }
 
   const runTourCommand: { fn?: (id: string, ...args: unknown[]) => void } = {}
@@ -2544,7 +2788,23 @@ export function MainWorkspace(props: AppProps) {
         timeline.setAnimationEnabled(true)
         setAnimationEnabled(true)
         setShowTimeline(true)
-        timeline.setConfig({ ...timeline.config(), loop: true })
+      }
+      // A load brings the timeline its animation was authored at. Without it
+      // the hand-off's reset (30fps, endFrame 90) truncated every longer
+      // animation and halved its speed, while the same flame through `?s=`
+      // came back intact. Applied outside the branch above because the
+      // envelope carries a config whether or not it carries tracks, and
+      // inside it the stored fps and end frame of a flame with no animation
+      // were read back and then dropped. Loop stays on by default for a
+      // loaded animation; a stored config decides for itself.
+      if (anim.config || anim.tracks.length > 0) {
+        timeline.setConfig({
+          ...timeline.config(),
+          ...(anim.tracks.length > 0 ? { loop: true } : {}),
+          ...anim.config,
+        })
+      }
+      if (anim.tracks.length > 0) {
         timeline.goToFrame(0)
         timeline.play()
       }
@@ -2588,14 +2848,230 @@ export function MainWorkspace(props: AppProps) {
     markLoadedBaseline()
   })
 
-  // ── Autosave & save-awareness ──────────────────────────────────────────
-  const { markSavedBaseline, markLoadedBaseline, flushDirtyToRecents } =
-    useWorkspaceAutosave({
-      flameDescriptor,
-      getTracks: () => timeline.tracks(),
-      agentDriving,
-      showToast,
+  /**
+   * The one question a save at the cap has to have an answer to: Recents is
+   * full, so storing this flame means destroying the oldest one the user
+   * kept. Asked by the two writes that are allowed to ask - the user's own
+   * Save for Later, and the flush at a document replacement, which is the
+   * last moment the open document's work exists anywhere
+   * (lib/documentLoad.ts).
+   */
+  const confirmOverwriteOldest = async () => {
+    const oldestName = getOldestRecentFlame()?.name || 'Flame'
+    return await _requestModal<boolean>({
+      content: ({ respond }) => (
+        <Suspense>
+          <ConfirmOverwriteRecentModal
+            oldestName={oldestName}
+            respond={respond}
+          />
+        </Suspense>
+      ),
     })
+  }
+
+  /**
+   * The other way a flush writes nothing: storage refused it, so the open
+   * document is not in Recents and going ahead would lose it outright. There
+   * is nothing to trade here - no oldest flame to spend - so it is its own
+   * question, and the answer that keeps their work is the one a dismissed
+   * modal gives (lib/documentLoad.ts).
+   */
+  const confirmDiscardUnsaved = async () =>
+    await _requestModal<boolean>({
+      content: ({ respond }) => (
+        <Suspense>
+          <ConfirmDiscardUnsavedModal respond={respond} />
+        </Suspense>
+      ),
+    })
+
+  // ── Autosave & save-awareness ──────────────────────────────────────────
+  const {
+    markSavedBaseline,
+    markLoadedBaseline,
+    flushDirtyToRecents,
+    prepareDocumentReplacement,
+    saveOnPause,
+  } = useWorkspaceAutosave({
+    flameDescriptor,
+    getTracks: () => timeline.tracks(),
+    // The timeline is part of the document: a change to the frame rate or
+    // the end frame alone is unsaved work like any other.
+    getConfig: () => timeline.config(),
+    agentDriving,
+    showToast,
+    confirmOverwriteOldest,
+    confirmDiscardUnsaved,
+  })
+
+  /**
+   * The user's own save: the one write allowed to replace a flame they kept,
+   * because it is the one that asks first.
+   *
+   * Named and declared here rather than inline on the desktop button, so the
+   * touch layouts can offer the same action - the restore notice tells the
+   * user to save the flame for later, and on the device that notice is
+   * written for there was nothing to tap (components/Shell/moreMenuItems.ts).
+   *
+   * Nothing here claims more than happened: `full` is the only outcome worth
+   * asking about, anything else means the write did not land and the
+   * workspace stays dirty so the next boundary tries again.
+   */
+  const saveFlameForLater = async () => {
+    const tracks = timeline.tracks()
+    const config = timeline.config()
+    const saved = (force: boolean) =>
+      saveRecentFlame(flameDescriptor, undefined, tracks, force, config)
+    const announce = (replacedOldest: boolean) => {
+      markSavedBaseline()
+      showToast(
+        tracks.length > 0
+          ? `Flame + animation saved${replacedOldest ? ' (replaced oldest)' : ' for later'}`
+          : `Flame saved${replacedOldest ? ' (replaced oldest)' : ' for later'}`,
+      )
+    }
+    const outcome = saved(false)
+    if (outcome === 'saved') {
+      announce(false)
+      return
+    }
+    if (outcome === 'refused') {
+      showToast('Could not save the flame to Recents', 5000)
+      return
+    }
+    if (!(await confirmOverwriteOldest())) return
+    if (saved(true) === 'saved') {
+      announce(true)
+    } else {
+      showToast('Could not save the flame to Recents', 5000)
+    }
+  }
+
+  /**
+   * Start again from the starter flame. A document replacement like any
+   * other: the outgoing flame and its animation reach Recents first, because
+   * undo restores the flame but keyframe tracks are not part of change
+   * history (lib/documentLoad.ts).
+   */
+  const loadNewFlame = async () => {
+    // Before the pause, so a no leaves the workspace exactly as it was.
+    if (!(await prepareDocumentReplacement())) return
+    if (timeline.isPlaying()) timeline.pause()
+    replaceOpenDocument({
+      flushUnsaved: flushDirtyToRecents,
+      replace: () => {
+        const is3D = (flameDescriptor.renderSettings.dimensions ?? 2) === 3
+        const flame = deepClone(is3D ? initExample3D : initExample)
+        executeFlameLoad(flame, 'New Flame', snapshotOrigin('flame.new'))
+        // The timeline is part of the document too. A fresh flame that said
+        // nothing about it kept the frame rate, the end frame and the loop
+        // mode of the flame it replaced, because the effect that consumes
+        // this only applies a timeline when it is handed one.
+        setLoadedAnimation({
+          flame,
+          tracks: [],
+          config: defaultTimelineConfig(),
+        })
+      },
+    })
+    showToast('Fresh flame loaded — undo restores the previous one')
+  }
+
+  /**
+   * Switch between 2D and 3D, each keeping its own flame and animation.
+   *
+   * The stash is in memory only, so this is a document replacement too: what
+   * is unsaved reaches Recents before the switch, or switch-then-close loses
+   * it (lib/documentLoad.ts).
+   */
+  const switchDimensions = async (v: number) => {
+    if ((flameDescriptor.renderSettings.dimensions ?? 2) === v) return
+    // The stash the switch restores from is in memory only, so this is the
+    // same boundary as a load: what is unsaved reaches Recents first, or
+    // switch-then-close loses it (lib/documentLoad.ts).
+    if (!(await prepareDocumentReplacement())) return
+    // Read after the answer. `current` decides which dimension's stash the
+    // outgoing flame is filed under, so a value taken before the question
+    // would be a guess about what is still open by the time it runs.
+    const current = flameDescriptor.renderSettings.dimensions ?? 2
+    if (v === current) return
+    replaceOpenDocument({
+      flushUnsaved: flushDirtyToRecents,
+      replace: () => {
+        // Stash the active flame AND its animation tracks under the current
+        // dimension; restore the target dimension's own pair so 2D and 3D
+        // each keep independent animations.
+        if (current === 3) {
+          stashedFlame3D = deepClone(flameDescriptor)
+          stashedTracks3D = deepClone(timeline.tracks())
+        } else {
+          stashedFlame2D = deepClone(flameDescriptor)
+          stashedTracks2D = deepClone(timeline.tracks())
+        }
+        // Fly mode only makes sense in 3D.
+        if (v !== 3 && flyMode()) {
+          executeCommand('view.setFlyMode', cmdContext, false)
+        }
+        const restored =
+          v === 3
+            ? (stashedFlame3D ?? example34)
+            : (stashedFlame2D ?? initExample)
+        const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
+        // These document-boundary writes are represented by the two synthetic
+        // actions below. Suppress their coverage hooks so the recorder does
+        // not also flag the same, faithfully represented switch as an unnamed
+        // write.
+        withRecordingSuppressed(() => {
+          withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
+            setFlameDescriptor(() => deepClone(restored), `Switch to ${v}D`)
+          })
+          // Swap the timeline to the target dimension's tracks (empty on
+          // first entry — matches the starter flame).
+          timeline.loadTracks(restoredTracks ?? [])
+        })
+        // The switch restores from an in-memory stash, so replaying it as
+        // "switch to 3D" would land on the VIEWER's stash, not ours. Log the
+        // descriptor and tracks it actually produced instead — those replay
+        // exactly. The live path keeps one replacement-style history entry,
+        // including its palette provenance.
+        const flameOrigin = snapshotOrigin('flame.dimension', `${v}D`)
+        recordSyntheticAction(
+          'flame.load',
+          [deepClone(restored), `Switch to ${v}D`, {}, flameOrigin],
+          snapshotOriginLabel(flameOrigin) ?? `Switch to ${v}D`,
+        )
+        const timelineOrigin = snapshotOrigin('timeline.dimension', `${v}D`)
+        recordSyntheticAction(
+          'timeline.loadTimeline',
+          [
+            {
+              config: deepClone(timeline.config()),
+              tracks: deepClone(restoredTracks ?? []),
+            },
+            timelineOrigin,
+          ],
+          snapshotOriginLabel(timelineOrigin) ?? `Load ${v}D animation`,
+        )
+        // Mode switches restore stashed/starter state — not an edit.
+        markLoadedBaseline()
+      },
+    })
+  }
+
+  /**
+   * The editor's autosave (hooks/useWorkspaceAutosave.ts) flushes to Recents
+   * on pagehide, which a WebView the OS force-stops never fires, so the same
+   * write is made when the OS backgrounds the app - the last moment a native
+   * app is told about (lib/pauseSave.ts).
+   *
+   * No `onCleanup`, deliberately: an ErrorBoundary catch (App.tsx) or a
+   * WebGPU degrade unmounts this component, and unregistering here would take
+   * the crash net down at the moment there is unsaved work and no editor left
+   * to write it. The subscription lives in the module and a remount replaces
+   * its one writer.
+   */
+  installPauseSave({ native: IS_NATIVE, save: saveOnPause })
 
   // Apply flame and animation from shared URL (fires once when resource resolves)
   let queryApplied = false
@@ -3288,6 +3764,49 @@ export function MainWorkspace(props: AppProps) {
     executeCommand(id, cmdContext, ...args)
   }
 
+  /**
+   * One More list for the editor's two shells (components/Shell/moreMenuItems.ts):
+   * the phone's top bar carries it, and now so does the tablet's navigation
+   * rail, which had no More at all - so Library on a landscape tablet reached
+   * neither the Arcade nor Share link, Export options, Advanced tools,
+   * Documentation nor the benchmark until you went back to Create. Settings
+   * keeps its own item on the rail as well; a tablet reaches for it there.
+   */
+  const moreHandlers: MoreMenuHandlers = {
+    onSaveForLater: () => {
+      void saveFlameForLater()
+    },
+    onOpenExportModal: () => {
+      executeCommand('export.png', cmdContext)
+    },
+    onShare: () => {
+      void showShareLinkModal()
+    },
+    onOpenDrawer: () => {
+      setTouchDrawerOpen(true)
+    },
+    onOpenSettings: () => {
+      void showHelp()
+    },
+    onOpenDocs: () => {
+      void showDocumentation()
+    },
+    onOpenBenchmark: () => {
+      void showBenchmark()
+    },
+    // The Benchmark Lab is a page of its own and web only (DESIGN.md,
+    // decision 1), so the native app is not offered it.
+    onOpenBenchmarkLab: IS_NATIVE
+      ? undefined
+      : () => {
+          window.location.assign(BENCHMARKS_PATH)
+        },
+    onDesktopLayout: () => {
+      setTouchLayoutPreference('desktop')
+      showToast('Switched to the desktop layout', 3500)
+    },
+  }
+
   const startSidebarDrag = createDragHandler((_initEvent) => {
     const sidebar = sidebarRef
     if (!sidebar) return
@@ -3318,7 +3837,7 @@ export function MainWorkspace(props: AppProps) {
               }}
               onToggleMobileSidebar={toggleMobileSidebarAsAuthoredAction}
               flameDescriptor={flameDescriptor}
-              effectiveFlame={effectiveFlame}
+              effectiveFlame={renderedFlame}
               canvasPixelRatio={canvasPixelRatio}
               exportDimensions={exportDimensions}
               qualityPreset={qualityPreset}
@@ -3443,7 +3962,15 @@ export function MainWorkspace(props: AppProps) {
               </Show>
             </CanvasViewport>
           </>
-          {/* The rail layout: the phone, and a tablet under the deck's width */}
+          {/* The rail layout: the phone, and a tablet under the deck's width.
+              Home and the Arcade hub already cover these completely, so they
+              stay mounted while a destination is up. Gating on visibility
+              bought nothing and cost a full rebuild of TouchHUD, the rail and
+              the capsule on every round trip - a getComputedStyle at mount,
+              listeners re-bound, the chip row reset to Variations, an open
+              sheet rebuilding every preview canvas, and the canvas re-panning
+              because the unmount reports a covered height of 0 - all of it
+              synchronously inside the edge swipe's pointermove. */}
           <Show when={railLayout()}>
             <TouchHUD
               ctx={cmdContext}
@@ -3456,32 +3983,8 @@ export function MainWorkspace(props: AppProps) {
               onRedo={() => {
                 executeCommand('history.redo', cmdContext)
               }}
-              onOpenExportModal={() => {
-                executeCommand('export.png', cmdContext)
-              }}
-              onShare={() => {
-                void showShareLinkModal()
-              }}
-              onOpenDrawer={() => setTouchDrawerOpen(true)}
               onPickGallery={pickGalleryFlame}
-              onOpenSettings={showHelp}
-              onOpenDocs={showDocumentation}
-              onOpenBenchmark={() => {
-                void showBenchmark()
-              }}
-              // The Benchmark Lab is a page of its own and web only
-              // (DESIGN.md, decision 1), so the native app is not offered it.
-              onOpenBenchmarkLab={
-                IS_NATIVE
-                  ? undefined
-                  : () => {
-                      window.location.assign(BENCHMARKS_PATH)
-                    }
-              }
-              onDesktopLayout={() => {
-                setTouchLayoutPreference('desktop')
-                showToast('Switched to the desktop layout', 3500)
-              }}
+              {...moreHandlers}
             />
             <EditorRail
               ctx={cmdContext}
@@ -3498,11 +4001,29 @@ export function MainWorkspace(props: AppProps) {
               }}
               onOpenDrawer={() => setTouchDrawerOpen(true)}
               onCoveredHeightChange={setRailInset}
+              leading={
+                <ShellBar
+                  mode="capsule"
+                  current={() => 'create'}
+                  onSelect={goToDestination}
+                />
+              }
             />
           </Show>
 
           {/* Tablet Split Touch Interface */}
           <Show when={isTablet() && deckFits()}>
+            {/* The shell, permanent on the leading edge. Only the deck layout
+                has the width for it; the rail layout docks the capsule in the
+                editor rail instead. */}
+            <NavRail
+              current={shellDestination}
+              onSelect={goToDestination}
+              onOpenSettings={() => {
+                void showHelp()
+              }}
+              more={moreHandlers}
+            />
             <TabletInspectorDeck
               ctx={cmdContext}
               flame={effectiveFlame}
@@ -3902,79 +4423,15 @@ export function MainWorkspace(props: AppProps) {
               disabled={animationExportRunning()}
               initialLeft={floatingLeft()}
               initialTop={floatingTop()}
-              onNewFlame={() => {
-                if (timeline.isPlaying()) timeline.pause()
-                // Undo restores the flame, but keyframe tracks aren't part of
-                // change history — flush unsaved work (flame + animation) to
-                // Recents so a reset can't silently destroy anything. Unlike
-                // saveRecentFlame, the upsert never declines on a full list.
-                flushDirtyToRecents()
-                const is3D =
-                  (flameDescriptor.renderSettings.dimensions ?? 2) === 3
-                const flame = deepClone(is3D ? initExample3D : initExample)
-                executeFlameLoad(
-                  flame,
-                  'New Flame',
-                  snapshotOrigin('flame.new'),
-                )
-                setLoadedAnimation({ flame, tracks: [] })
-                showToast('Fresh flame loaded — undo restores the previous one')
-              }}
+              onNewFlame={loadNewFlame}
               onLoadFlame={() => {
                 if (timeline.isPlaying()) timeline.pause()
-                // Loading replaces the flame and resets dirty tracking — flush
-                // unsaved work first so it stays recoverable from Recents.
-                flushDirtyToRecents()
+                // Unsaved work is flushed where the replacement happens
+                // (replaceLoadedFlame), so every way into this dialog is
+                // covered rather than only this button.
                 void showLoadFlameModal()
               }}
-              onSaveForLater={async () => {
-                const tracks = timeline.tracks()
-                const success = saveRecentFlame(
-                  flameDescriptor,
-                  undefined,
-                  tracks,
-                  false,
-                )
-                if (!success) {
-                  const oldest = getOldestRecentFlame()
-                  const oldestName = oldest?.name || 'Flame'
-                  const confirmed = await _requestModal<boolean>({
-                    content: ({ respond }) => (
-                      <Suspense>
-                        <ConfirmOverwriteRecentModal
-                          oldestName={oldestName}
-                          respond={respond}
-                        />
-                      </Suspense>
-                    ),
-                  })
-                  if (confirmed) {
-                    // Honour the write result. `saveRecentFlame` now reports a
-                    // failed write instead of always claiming success, so marking
-                    // the workspace clean here unconditionally would tell the user
-                    // their flame is safe when nothing landed.
-                    if (
-                      saveRecentFlame(flameDescriptor, undefined, tracks, true)
-                    ) {
-                      markSavedBaseline()
-                      showToast(
-                        tracks.length > 0
-                          ? 'Flame + animation saved (replaced oldest)'
-                          : 'Flame saved (replaced oldest)',
-                      )
-                    } else {
-                      showToast('Could not save the flame to Recents', 5000)
-                    }
-                  }
-                } else {
-                  markSavedBaseline()
-                  showToast(
-                    tracks.length > 0
-                      ? 'Flame + animation saved for later'
-                      : 'Flame saved for later',
-                  )
-                }
-              }}
+              onSaveForLater={saveFlameForLater}
               onRender={() => {
                 if (timeline.isPlaying()) timeline.pause()
                 executeCommand('export.png', cmdContext)
@@ -4044,76 +4501,7 @@ export function MainWorkspace(props: AppProps) {
               collapsed={floatingActionsCollapsed}
               setCollapsed={setFloatingActionsCollapsed}
               dimensions={() => flameDescriptor.renderSettings.dimensions ?? 2}
-              setDimensions={(v) => {
-                const current = flameDescriptor.renderSettings.dimensions ?? 2
-                if (v === current) return
-                // The stash below is in-memory only — flush unsaved work to
-                // Recents first so switch-then-close can't lose it.
-                flushDirtyToRecents()
-                // Stash the active flame AND its animation tracks under the
-                // current dimension; restore the target dimension's own pair so
-                // 2D and 3D each keep independent animations.
-                if (current === 3) {
-                  stashedFlame3D = deepClone(flameDescriptor)
-                  stashedTracks3D = deepClone(timeline.tracks())
-                } else {
-                  stashedFlame2D = deepClone(flameDescriptor)
-                  stashedTracks2D = deepClone(timeline.tracks())
-                }
-                // Fly mode only makes sense in 3D.
-                if (v !== 3 && flyMode()) {
-                  executeCommand('view.setFlyMode', cmdContext, false)
-                }
-                const restored =
-                  v === 3
-                    ? (stashedFlame3D ?? example34)
-                    : (stashedFlame2D ?? initExample)
-                const restoredTracks =
-                  v === 3 ? stashedTracks3D : stashedTracks2D
-                // These document-boundary writes are represented by the two
-                // synthetic actions below. Suppress their coverage hooks so the
-                // recorder does not also flag the same, faithfully represented
-                // switch as an unnamed write.
-                withRecordingSuppressed(() => {
-                  withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
-                    setFlameDescriptor(
-                      () => deepClone(restored),
-                      `Switch to ${v}D`,
-                    )
-                  })
-                  // Swap the timeline to the target dimension's tracks (empty
-                  // on first entry — matches the starter flame).
-                  timeline.loadTracks(restoredTracks ?? [])
-                })
-                // The switch restores from an in-memory stash, so replaying it
-                // as "switch to 3D" would land on the VIEWER's stash, not ours.
-                // Log the descriptor and tracks it actually produced instead —
-                // those replay exactly. The live path keeps one replacement-
-                // style history entry, including its palette provenance.)
-                const flameOrigin = snapshotOrigin('flame.dimension', `${v}D`)
-                recordSyntheticAction(
-                  'flame.load',
-                  [deepClone(restored), `Switch to ${v}D`, {}, flameOrigin],
-                  snapshotOriginLabel(flameOrigin) ?? `Switch to ${v}D`,
-                )
-                const timelineOrigin = snapshotOrigin(
-                  'timeline.dimension',
-                  `${v}D`,
-                )
-                recordSyntheticAction(
-                  'timeline.loadTimeline',
-                  [
-                    {
-                      config: deepClone(timeline.config()),
-                      tracks: deepClone(restoredTracks ?? []),
-                    },
-                    timelineOrigin,
-                  ],
-                  snapshotOriginLabel(timelineOrigin) ?? `Load ${v}D animation`,
-                )
-                // Mode switches restore stashed/starter state — not an edit.
-                markLoadedBaseline()
-              }}
+              setDimensions={switchDimensions}
               flyMode={flyMode}
               setFlyMode={(v) => {
                 executeCommand('view.setFlyMode', cmdContext, v)
@@ -4151,10 +4539,15 @@ export function MainWorkspace(props: AppProps) {
             touchLayoutPreference={touchLayoutPreference}
             setTouchLayoutPreference={setTouchLayoutPreference}
             isTouchLayout={isTouchLayout}
-            hideVersionTrigger={railLayout}
+            /* Every touch layout, not just the ones with the rail. Gated on
+               `railLayout` this hid on the phone and on a narrow tablet and
+               showed on the one layout that also mounts the NavRail: the
+               hamburger landed at 8,8 directly over the rail's Create and
+               Library, offering a second copy of the same More list. */
+            hideVersionTrigger={isTouchLayout}
             onPickGallery={pickGalleryFlame}
             duelShowing={duelShowing}
-            playerFlame={effectiveFlame}
+            playerFlame={renderedFlame}
             playerZoom={[effectiveZoom, setFlameZoom]}
             playerPosition={[effectivePosition, setFlamePosition]}
             playerCamera3D={{

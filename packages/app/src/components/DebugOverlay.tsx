@@ -1,5 +1,6 @@
 import { createMemo, createSignal } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { workspaceIsVisible } from '@/lib/activeTab'
 import { buildReadableIds } from '@/utils/readableIds'
 import { resolveKeyframeValue } from '@/utils/timeline'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -22,6 +23,16 @@ export function DebugOverlay(props: DebugOverlayProps) {
   const readable = createMemo(() =>
     buildReadableIds(props.flameDescriptor.transforms),
   )
+
+  // Dev only, and behind Home and the Arcade while either is up, like the
+  // rest of the editor: the z-index of 10000 below buys nothing against
+  // them, because this sits inside `.layout`, which is `isolation: isolate`
+  // and clamps every layer in it. So it was a focusable control under a
+  // full-screen overlay, and the same `inert` its neighbours carry takes it
+  // out of the tab order and off the screen reader (CanvasViewport). The
+  // name is worth keeping either way: the label is an arrow glyph.
+  const toggleLabel = () =>
+    expanded() ? 'Hide debug panel' : 'Show debug panel'
 
   const resolvedValues = createMemo(() => {
     const f = frame()
@@ -74,6 +85,7 @@ export function DebugOverlay(props: DebugOverlayProps) {
     <>
       {/* Toggle tab */}
       <button
+        inert={!workspaceIsVisible()}
         onClick={() => setExpanded(!expanded())}
         style={{
           position: 'fixed',
@@ -92,13 +104,15 @@ export function DebugOverlay(props: DebugOverlayProps) {
           'line-height': '1',
           transition: 'right 0.2s ease',
         }}
-        title={expanded() ? 'Hide debug panel' : 'Show debug panel'}
+        aria-label={toggleLabel()}
+        title={toggleLabel()}
       >
         {expanded() ? '▶' : '◀'}
       </button>
 
       {/* Panel */}
       <div
+        inert={!workspaceIsVisible()}
         style={{
           position: 'fixed',
           top: topStyle(),

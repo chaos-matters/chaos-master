@@ -1,7 +1,7 @@
 import { createRoot, createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAudioReactive } from './useAudioReactive'
-import type { LiveAudioAnalyzer } from './audioAnalysis'
+import type { AudioTargetValue, LiveAudioAnalyzer } from './audioAnalysis'
 import type { AudioMapping } from '@/components/AudioReactivePanel/AudioReactivePanel'
 
 const mapping: AudioMapping = {
@@ -34,11 +34,11 @@ describe('audio modulation suspension', () => {
     vi.useRealTimers()
   })
 
-  it('freezes both live writes and smoothing time while replay owns the document', async () => {
+  it('freezes both the overlay and smoothing time while replay owns the document', async () => {
     vi.useFakeTimers()
     let dispose = () => {}
     let setSuspended: ((value: boolean) => boolean) | undefined
-    const setFlame = vi.fn()
+    const published: (AudioTargetValue[] | undefined)[] = []
     createRoot((rootDispose) => {
       dispose = rootDispose
       const [suspended, updateSuspended] = createSignal(false)
@@ -48,7 +48,9 @@ describe('audio modulation suspension', () => {
         () => true,
         () => undefined,
         () => mapping,
-        setFlame,
+        (values) => {
+          published.push(values)
+        },
         () => mic,
         () => 'mic',
         () => false,
@@ -66,15 +68,24 @@ describe('audio modulation suspension', () => {
     if (!setSuspended) throw new Error('audio test did not initialize')
 
     vi.advanceTimersByTime(34)
-    expect(setFlame).toHaveBeenCalledTimes(1)
+    expect(published).toHaveLength(1)
+    const firstFrame = published[0]
+    expect(firstFrame).toHaveLength(1)
 
     setSuspended(true)
     vi.advanceTimersByTime(100)
-    expect(setFlame).toHaveBeenCalledTimes(1)
+    // The overlay comes down once and stays down: what a replay shows must be
+    // the document it replayed, with nothing of the live mic over it.
+    expect(published).toEqual([firstFrame, undefined])
 
     setSuspended(false)
     vi.advanceTimersByTime(34)
-    expect(setFlame).toHaveBeenCalledTimes(2)
+    // And back up on the very first tick after the suspension. The smoothing
+    // state survived the gap, so this frame settles inside the dirty
+    // threshold and reports no change - which must not be read as "leave the
+    // overlay down" while modulation is plainly running.
+    expect(published).toHaveLength(3)
+    expect(published[2]).toEqual(firstFrame)
     dispose()
   })
 })

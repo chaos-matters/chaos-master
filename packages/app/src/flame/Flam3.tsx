@@ -371,6 +371,21 @@ export function Flam3(props: Flam3Props) {
     }
   })
 
+  /*
+   * The draw mode alone, not the flame it came from.
+   *
+   * `colorGradingPipeline` below builds a real GPU pipeline, and it used to
+   * read `props.flameDescriptor.renderSettings.drawMode` inline. That reads
+   * one store path while the workspace hands over the store proxy, but a
+   * whole new object whenever the flame is derived — a hovered variation, or
+   * audio modulation at 30fps — and the pipeline was then rebuilt for every
+   * one of those frames. Memoizing the mode gives the pipeline a dependency
+   * that changes when the draw mode does and not before.
+   */
+  const drawModeImpl = createMemo(
+    () => drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
+  )
+
   const colorGradingPipeline = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -393,7 +408,7 @@ export function Flam3(props: Flam3Props) {
         ? typedPostprocessBuffer
         : typedAccumulationBuffer,
       canvasFormat,
-      drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
+      drawModeImpl(),
       props.palette?.(),
     )
   })

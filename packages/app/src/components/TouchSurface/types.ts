@@ -1,4 +1,4 @@
-import type { Accessor } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -36,6 +36,8 @@ export interface EditorRailProps {
   onOpenDrawer?: () => void
   /** The height of the viewport the sheet covers at its current detent, in px; 0 at peek. */
   onCoveredHeightChange?: (px: number) => void
+  /** The shell's capsule, docked at the leading end of the peek row. */
+  leading?: JSX.Element
 }
 
 export interface AdvancedDrawerItem {

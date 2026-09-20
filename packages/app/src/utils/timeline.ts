@@ -10,6 +10,7 @@ interface WindowTimelineState {
   getFrame: () => number
 }
 
+import { MAX_TIMELINE_FRAME, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, } from '@chaos-master/core'
 import type { EasingCurve } from '@chaos-master/core'
 
 export type { EasingCurve }
@@ -324,6 +325,49 @@ export type TimelineConfig = {
   autoFps?: boolean
   /** Resolve-time loop synthesis mode (see resolveLoopValue). */
   loopMode?: LoopMode
+}
+
+/**
+ * A config the app can always store and read back.
+ *
+ * Everything here decides what playback does, and all of it travels: into a
+ * Recents entry, a draft, a share link, an exported PNG. Those are read back
+ * through `TimelineSnapshotConfig`, which drops the whole config when any
+ * field is out of range - so a value past the maximum does not degrade, it
+ * disappears, and the flame returns at 30fps over 90 frames having been
+ * reported as saved. Seamless loop mode extends `endFrame` by the length of
+ * the animation, which put a long one past the limit on its own, and the
+ * Frames input has no maximum of its own either.
+ *
+ * So the state clamps here, at the one place every config write goes through,
+ * rather than at each writer.
+ */
+export function clampTimelineConfig(config: TimelineConfig): TimelineConfig {
+  // A field that is not a number at all takes the default rather than the low
+  // end of its range: clearing the Frames or Speed box sends
+  // `Math.round(Number(''))`, which is NaN, and the low end of a speed is a
+  // timeline frozen at zero - indistinguishable from the app hanging.
+  const fallback = defaultConfig()
+  const inRange = (value: number, min: number, max: number, orElse: number) =>
+    Number.isFinite(value) ? clamp(value, min, max) : orElse
+  return {
+    ...config,
+    fps: Math.round(
+      inRange(config.fps, 1, MAX_TIMELINE_PLAYBACK_FPS, fallback.fps),
+    ),
+    timeScale: inRange(
+      config.timeScale,
+      0,
+      MAX_TIMELINE_TIME_SCALE,
+      fallback.timeScale,
+    ),
+    startFrame: Math.round(
+      inRange(config.startFrame, 0, MAX_TIMELINE_FRAME, fallback.startFrame),
+    ),
+    endFrame: Math.round(
+      inRange(config.endFrame, 1, MAX_TIMELINE_FRAME, fallback.endFrame),
+    ),
+  }
 }
 
 export function defaultConfig(): TimelineConfig {
@@ -665,7 +709,14 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     breakUndoCoalescing()
     return setCurrentFrameRaw(value as never)
   }
-  const [config, setConfig] = createSignal<TimelineConfig>(defaultConfig())
+  const [config, setStoredConfig] =
+    createSignal<TimelineConfig>(defaultConfig())
+  /** Every config write, from any of them: the UI, a load, undo, loop mode.
+   *  Clamped so what the workspace holds can always be stored and read back
+   *  (see clampTimelineConfig). */
+  const setConfig = (next: TimelineConfig) => {
+    setStoredConfig(clampTimelineConfig(next))
+  }
   const [tracks, setTracks] = createSignal<TimelineTrack[]>([], {
     equals: false,
   })
@@ -1644,7 +1695,15 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
       const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
       const span = Math.max(1, userEnd - cfg.startFrame)
       const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
-      next = { ...cfg, loopMode: 'seamless', loop: true, endFrame }
+      // Clamped like every other config write: the return tail is part of
+      // the stored document, and a long animation extended past the schema's
+      // maximum on its own.
+      next = clampTimelineConfig({
+        ...cfg,
+        loopMode: 'seamless',
+        loop: true,
+        endFrame,
+      })
     }
     // Idempotent no-op — don't burn an undo entry.
     if (JSON.stringify(next) === JSON.stringify(cfg)) return

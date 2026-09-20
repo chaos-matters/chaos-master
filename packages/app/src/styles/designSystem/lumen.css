@@ -204,6 +204,19 @@
   );
   --la-dock-h: calc(var(--la-rail-h) + var(--la-dock-bottom));
 
+  /* The shell (components.md section 10). The floating iOS pill and the
+     Material bar are different heights on purpose: the pill is chrome over
+     the artwork and the bar is part of the page. */
+  --la-shell-h: 56px;
+  --la-shell-h-material: 64px;
+  --la-capsule: 56px; /* the collapsed shell, docked in the rail's peek row */
+
+  /* The shell is chrome over every destination, so it paints above Home
+     (2000) and above the editor the Arcade covers; below the version pill
+     (9999), the debug panel (10000) and the Arcade hub (10005), and far below
+     the toast region (100000), which stays on top of everything. */
+  --la-z-shell: 2100;
+
   /* Tablet chrome (see components.md section 9) */
   --la-navrail-w: 80px; /* leading navigation rail, both platforms */
   --la-deck-w: 360px; /* trailing inspector deck, portrait */
@@ -262,6 +275,20 @@
 }
 .la-on-art {
   text-shadow: 0 1px 2px rgba(8, 10, 14, 0.45);
+}
+
+/* Crossing the rail-or-deck threshold (a tablet rotating, an iPad resizing a
+   Split View) unmounts one surface and mounts the other. The new one fades
+   in rather than appearing: the layout is the same app, not a new screen.
+   Global on purpose - a CSS module would scope the name, and both
+   EditorRail.module.css and TabletDeck.module.css need this one keyframe. */
+@keyframes la-surface-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* =====================================================================

@@ -133,7 +133,7 @@ describe('createToastStore', () => {
 
   it('does not subscribe a calling effect to the toast list', () => {
     // Regression: showToast reads the list (dedupe/eviction). Without
-    // untrack, a caller like QueryErrorToast — showToast inside a
+    // untrack, a caller like App.tsx's MessageToast — showToast inside a
     // createEffect — gets subscribed, and the timer-driven removal re-runs
     // the effect, which re-shows the toast forever.
     const store = createToastStore()

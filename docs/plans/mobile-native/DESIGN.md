@@ -139,23 +139,37 @@ landscape (1210 pt) and a 13 inch (1366 pt) both fall through to the desktop wor
       900 pt rule for the tablet deck.
 - [x] Consult `IS_NATIVE` (`lib/platform.ts`) and `(pointer: coarse)`; width then chooses only compact or
       regular.
-- [ ] Crossing the threshold is a cross-fade, never a reload, and the rail's detent survives it.
+- [x] Crossing the threshold fades the arriving surface in rather than reloading, and the rail's detent
+      survives it. It is a one-way fade, not a true cross-fade: the leaving surface unmounts, so there is
+      nothing to fade out against.
 
 **Shell.** Nothing in the app has one. `setActiveTab('home')` is reachable only from `components/FloatingActions`,
 which is desktop-only, so **Home is unreachable on a phone or a tablet today**.
 
-- [ ] Three destinations — Create, Library, Play — as the kit's floating glass bar on iOS with a separated
-      More circle, and a four-item Material bar on Android.
-- [ ] In Create the bar collapses to a 56 pt capsule docked at the leading end of the rail, expanding over the
+- [x] Two destinations — Create and Library — as the kit's floating glass bar with a separated More circle,
+      and a Material bar on Android. **Play is reserved, not shown:** five of the six Arcade modes need
+      WebMCP, which a WebView has no agent for, and Play with audio alone is a later phase — an empty
+      destination is worse than none. `ShellDestination` is a union, so adding it is one entry.
+- [x] In Create the bar collapses to a 56 pt capsule docked at the leading end of the rail, expanding over the
       rail for three seconds or while a touch is held. An editor that also shows a tab bar loses 106 pt of
       canvas to navigation nobody is using.
-- [ ] On a tablet the navigation rail is permanent at 80 pt and gains Settings as a fourth item.
-- [ ] `lib/activeTab.ts` already models `home | workspace | arcade` in the fragment; add the third destination
-      name and a touch entry point.
-- [ ] One back registry, popped in this order by the Android back gesture and by a downward drag: system
-      alert, large to medium, medium to peek, an open sheet, an open overlay, Library or Play to Create, then
-      `minimizeApp()` — **never** `history.back()`. iOS gets an interactive edge swipe for the last two steps.
-- [ ] Pause and resume flush autosave and stop the render loop.
+- [x] On a tablet wide enough for the inspector deck (the 900 pt rule) the navigation rail is permanent at
+      80 pt and gains Settings under the destinations, and Library is inset by its column so the rail stays
+      exposed and tappable there. A narrower tablet - portrait, or a Split View pane - gets the phone's
+      rail and its docked capsule instead. It opens the existing HelpModal; phase C redesigns settings.
+- [x] `lib/activeTab.ts` already models `home | workspace | arcade` in the fragment; no new name was needed
+      (Library is the existing Home tab, per section 12's cut list) and both shell surfaces are its touch
+      entry point.
+- [x] One back registry, popped by the Android back gesture and by Home's edge swipe, in the order things
+      opened: a modal, the drawer, a popover, the rail's detents large to medium and medium to peek, then
+      Library to Create, then `minimizeApp()` — **never** `history.back()`. A sheet's downward drag is not
+      one of the poppers: it settles its own detent directly. On iOS the edge swipe is Home's alone, and it
+      is a threshold flick rather than a finger-tracked transition. Still open: the Arcade's own panels (the
+      mode panels, SpotlightTour, DuelStage, ArenaOverlay) register nothing, so back from inside an Arcade
+      mode leaves the Arcade instead of closing the panel first.
+- [x] Pause saves a draft that a cold start offers back. Nothing stops the render loop explicitly: both
+      platforms suspend `requestAnimationFrame` for a hidden WebView, and `finalRenderInterval` already parks
+      the loop when the workspace is covered.
 
 **Acceptance:** an iPad at any orientation and any Split View width lands in a touch layout, not the desktop
 sidebar; a rotated iPhone stays a phone; back from the editor's peek state minimises the app rather than

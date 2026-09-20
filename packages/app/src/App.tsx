@@ -4,6 +4,7 @@ import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/Erro
 import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
 import { NativeSaveToasts } from './components/NativeSaveToasts/NativeSaveToasts'
+import { HomeShellBar } from './components/Shell/HomeShellBar'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { WorkspaceSkeleton } from './components/WorkspaceSkeleton'
@@ -16,7 +17,11 @@ import { IS_DEV } from './defaults'
 import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
 import { activeTab, arcadeMode, setActiveTab, tabFromHash, } from './lib/activeTab'
+import { createBackLayer } from './lib/backStack'
+import { migrateLegacyDraft, reopenTarget, takePauseSaveEviction, takePauseSaveFailure, } from './lib/pauseSave'
+import { IS_NATIVE } from './lib/platform'
 import { Root } from './lib/Root'
+import { createWorkspaceHandoff } from './lib/workspaceHandoff'
 
 const MainWorkspace = lazy(() =>
   import('./MainWorkspace').then((m) => ({ default: m.MainWorkspace })),
@@ -27,21 +32,55 @@ import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryPara
 import { persistentSignal } from './utils/persistentSignal'
 import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
-import type { FlameDescriptor } from './flame/schema/flameSchema'
 import type { HardwareTier } from './utils/hardwareTier'
-import type { TimelineTrack } from './utils/timeline'
 
 export type { ExportImageInfo, ExportImageType } from './flame/exportImageType'
 
-function QueryErrorToast(props: { error: string | null }) {
+/** Shows a message once it is set. Lives inside the ToastProvider, which is
+ *  why it is a component rather than a call in Wrappers' body. */
+function MessageToast(props: { message: string | null }) {
   const { showToast } = useToast()
   createEffect(() => {
-    if (props.error) {
-      showToast(props.error)
+    if (props.message) {
+      showToast(props.message)
     }
   })
   return null
 }
+
+/**
+ * The one thing a launch has to say for itself.
+ *
+ * The native app saves the open document when the OS backgrounds it, and a
+ * refusal there cannot be reported at the time: the process is ending and a
+ * toast nobody sees is the same as silence. So it is carried here
+ * (lib/pauseSave.ts). Nothing is claimed about where the flame is, because it
+ * is nowhere - that is what the message is for.
+ */
+const PAUSE_SAVE_REFUSED =
+  'The flame you had open when the app last closed was not saved: this device refused to store it.'
+
+/**
+ * What a launch says when it puts the last document back on screen.
+ *
+ * Deliberately says nothing about saving. The work reached Recents when the
+ * OS backgrounded the app, so this is only about where the user has landed -
+ * and a launch that reopens nothing says nothing at all, because there is
+ * nothing wrong with it.
+ */
+const REOPENED = 'Reopened the flame you were last working on.'
+
+/**
+ * What a launch says about a flame the last pause write had to replace.
+ *
+ * Recents was full and the open document existed nowhere else, so the write
+ * forced past the cap and the oldest kept flame gave way. That trade is
+ * sanctioned - the process may have been ending - but it is the app deleting
+ * something the user chose to keep, without asking, and an Android pause is
+ * as often a share sheet as a force-stop. So it is named (lib/pauseSave.ts).
+ */
+const evictionNotice = (name: string) =>
+  `Recents was full when the app last closed, so saving the flame you had open replaced the oldest one, "${name}".`
 
 export function Wrappers() {
   // Load persisted ancestry data from IndexedDB on startup.
@@ -69,20 +108,63 @@ export function Wrappers() {
     'hardwareTier',
     null,
   )
-  const [selectedFlame, setSelectedFlame] = createSignal<
-    FlameDescriptor | undefined
-  >()
-  const [selectedWelcomeTracks, setSelectedWelcomeTracks] = createSignal<
-    TimelineTrack[] | undefined
-  >()
-  /**
-   * Set only by Home's "Explore" cards: the capability the chosen flame was
-   * curated to demonstrate. Rides the same one-shot hand-off as the flame and
-   * its tracks — MainWorkspace reads all three in one effect and calls
-   * `resetFlameFromWelcome`, which clears the lot.
-   */
-  const [selectedCapability, setSelectedCapability] = createSignal<string>()
   const [queryError, setQueryError] = createSignal<string | null>(null)
+  const [launchNotice, setLaunchNotice] = createSignal<string | null>(null)
+
+  /**
+   * Everything the workspace is seeded with, in one place: the flame, the
+   * tracks and the timeline it arrives with, and the capability a Home card
+   * asked to open with it (lib/workspaceHandoff.ts). MainWorkspace reads
+   * them in one effect and clears the lot.
+   */
+  const handoff = createWorkspaceHandoff({
+    enterWorkspace: () => {
+      setActiveTab('workspace')
+    },
+  })
+  const seedWorkspace = handoff.seed
+
+  /**
+   * What the launch owes the last session.
+   *
+   * Nothing is restored here, because nothing needs rescuing: the native app
+   * writes the open document straight into Recents when the OS backgrounds
+   * it, so by the time a cold start runs the work is already on the shelf the
+   * Library shows (lib/pauseSave.ts).
+   *
+   * What is left is where to put the user. The pause write recorded which
+   * entry it made, and this opens it - an ordinary seeding, the same one a
+   * Home card or the welcome grid does, over work that is safe either way. It
+   * takes no precedence and holds nothing back: a tap on a starter flame that
+   * gets to the hand-off first wins it, and the flame this would have opened
+   * stays in the Library.
+   *
+   * Plus a one-time move for anyone upgrading with the old crash slot still
+   * populated, and the one thing a pause cannot say at the time it happens.
+   */
+  onMount(() => {
+    migrateLegacyDraft()
+    // Said together in one toast rather than one after another: a launch has
+    // at most a sentence of the user's attention, and a second toast would
+    // evict the first from a column that holds four.
+    const notices: string[] = []
+    if (takePauseSaveFailure()) notices.push(PAUSE_SAVE_REFUSED)
+    const evicted = takePauseSaveEviction()
+    if (evicted !== undefined) notices.push(evictionNotice(evicted))
+    const reopen = reopenTarget(IS_NATIVE)
+    if (reopen) {
+      // No `enterWorkspace`: the editor is already the tab a launch lands on,
+      // and forcing it would drag a `#home` or `#arcade` link out of the
+      // destination it asked for.
+      seedWorkspace({
+        flame: reopen.flame,
+        ...(reopen.tracks ? { tracks: reopen.tracks } : {}),
+        ...(reopen.config ? { config: reopen.config } : {}),
+      })
+      notices.push(REOPENED)
+    }
+    if (notices.length > 0) setLaunchNotice(notices.join(' '))
+  })
 
   const [flameFromQuery] = createResource(async () => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -239,6 +321,25 @@ export function Wrappers() {
     }
   })
 
+  // Home and the Arcade are destinations over the editor, so back returns to
+  // Create before the app minimises (lib/backStack.ts). Escape keeps its own
+  // path through installHomeEscapeBoundary: two keys, one result.
+  createBackLayer(
+    () => activeTab() === 'home' && !showWelcome(),
+    () => {
+      setActiveTab('workspace')
+    },
+    'home',
+  )
+
+  createBackLayer(
+    () => activeTab() === 'arcade',
+    () => {
+      setActiveTab('workspace')
+    },
+    'arcade',
+  )
+
   function handleStartTour(tourId: string) {
     setShowWelcome(false)
     spotlightState.startTour(tourId)
@@ -261,6 +362,14 @@ export function Wrappers() {
           <KeyframeTargetProvider>
             <ToastProvider>
               <NativeSaveToasts />
+              {/* Outside the Suspense below on purpose: an effect inside a
+                  suspended boundary does not run until the boundary resolves,
+                  so this notice waited on the workspace chunk and on the
+                  share-link resource - while the one moment it is needed is
+                  the moment the launch restores something, with the welcome
+                  grid still up and a starter flame one tap away. The toast
+                  column sits above the welcome screen's own layer. */}
+              <MessageToast message={launchNotice()} />
               <Root
                 adapterOptions={{
                   powerPreference: 'high-performance',
@@ -269,13 +378,14 @@ export function Wrappers() {
                 <Modal>
                   <ErrorBoundary fallback={errorHandler}>
                     <Suspense fallback={<WorkspaceSkeleton />}>
-                      <QueryErrorToast error={queryError()} />
+                      <MessageToast message={queryError()} />
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}
                         sharedVariationFromQuery={sharedVariationFromQuery()}
-                        flameFromWelcome={selectedFlame}
-                        welcomeTracks={selectedWelcomeTracks}
-                        capabilityFromHome={selectedCapability}
+                        flameFromWelcome={handoff.flame}
+                        welcomeTracks={handoff.tracks}
+                        welcomeConfig={handoff.config}
+                        capabilityFromHome={handoff.capability}
                         autoOpenBenchmark={benchmarkRequested}
                         autoStartBenchmark={benchmarkAuto}
                         hardwareTier={
@@ -285,9 +395,7 @@ export function Wrappers() {
                         }
                         onHardwareTierChange={setHardwareTier}
                         resetFlameFromWelcome={() => {
-                          setSelectedFlame(undefined)
-                          setSelectedWelcomeTracks(undefined)
-                          setSelectedCapability(undefined)
+                          seedWorkspace()
                         }}
                       />
                       {/* Home overlays the workspace, which stays mounted so
@@ -296,17 +404,24 @@ export function Wrappers() {
                           still has a single entry point. */}
                       <Show when={activeTab() === 'home' && !showWelcome()}>
                         <HomeTab
-                          onOpenFlame={(flame, tracks, capability) => {
-                            // Reuses the welcome screen's hand-off path rather
-                            // than adding a second way to seed the workspace.
-                            batch(() => {
-                              setSelectedFlame(() => flame)
-                              setSelectedWelcomeTracks(() => tracks)
-                              setSelectedCapability(capability)
-                              setActiveTab('workspace')
+                          onOpenFlame={(flame, tracks, config, capability) => {
+                            seedWorkspace({
+                              flame,
+                              ...(tracks ? { tracks } : {}),
+                              // The timeline the row was authored at. Without
+                              // it an animated gallery flame opened at the
+                              // workspace defaults, 30fps over 90 frames.
+                              ...(config ? { config } : {}),
+                              ...(capability !== undefined
+                                ? { capability }
+                                : {}),
+                              enterWorkspace: true,
                             })
                           }}
                         />
+                        {/* Touch has no FloatingActions, so this is the way
+                            back to the editor besides back and Escape. */}
+                        <HomeShellBar />
                       </Show>
                       {/* The Arcade overlays the workspace the same way Home
                           does: the editor stays mounted underneath so a lesson
@@ -341,14 +456,10 @@ export function Wrappers() {
                           })
                         }}
                         onSelectFlame={(flame, tracks) => {
-                          batch(() => {
-                            setSelectedFlame(() => flame)
-                            setSelectedWelcomeTracks(() => tracks)
-                            // Picking a flame means "take me to the editor".
-                            // Force the workspace tab so a stray #home in the
-                            // URL can't leave Home overlaying the flame the
-                            // user just chose.
-                            setActiveTab('workspace')
+                          seedWorkspace({
+                            flame,
+                            ...(tracks ? { tracks } : {}),
+                            enterWorkspace: true,
                           })
                         }}
                         onStartTour={handleStartTour}

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import workspaceSource from '../../MainWorkspace.tsx?raw'
 import { SoftwareVersion } from './SoftwareVersion'
 
 describe('SoftwareVersion component', () => {
@@ -22,7 +23,7 @@ describe('SoftwareVersion component', () => {
       />
     ))
 
-    const trigger = screen.getByRole('button', { name: /chaos master.*menu/i })
+    const trigger = screen.getByRole('button', { name: /lumen apeiron.*menu/i })
     expect(trigger).toBeTruthy()
     expect(screen.queryByRole('menu')).toBeNull()
 
@@ -74,7 +75,7 @@ describe('SoftwareVersion component', () => {
       />
     ))
 
-    const trigger = screen.getByRole('button', { name: /chaos master menu/i })
+    const trigger = screen.getByRole('button', { name: /lumen apeiron menu/i })
     expect(trigger).toBeTruthy()
     expect(screen.queryByRole('menu')).toBeNull()
 
@@ -108,7 +109,7 @@ describe('SoftwareVersion component', () => {
       />
     ))
 
-    const trigger = screen.getByRole('button', { name: /chaos master menu/i })
+    const trigger = screen.getByRole('button', { name: /lumen apeiron menu/i })
 
     // Benchmark
     fireEvent.click(trigger)
@@ -137,11 +138,42 @@ describe('SoftwareVersion component', () => {
       />
     ))
 
-    const trigger = screen.getByRole('button', { name: /chaos master menu/i })
+    const trigger = screen.getByRole('button', { name: /lumen apeiron menu/i })
     fireEvent.click(trigger)
     expect(screen.getByRole('menu')).toBeTruthy()
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
+
+describe('where the version menu is offered', () => {
+  it('renders no trigger at all where the host hides it', () => {
+    // Both branches go, not only the touch one: a host that says it carries
+    // these items elsewhere is answering for the whole component. The debug
+    // panel beside them is unconditional and is not this menu, so the trigger
+    // is looked for by name.
+    render(() => (
+      <SoftwareVersion
+        showHelp={vi.fn()}
+        showDocs={vi.fn()}
+        showBenchmark={vi.fn()}
+        isTouchLayout={() => true}
+        hideTrigger={() => true}
+      />
+    ))
+
+    expect(screen.queryByRole('button', { name: /lumen apeiron/i })).toBeNull()
+  })
+
+  it('is hidden by the editor on every touch layout', () => {
+    // Gated on `railLayout` this hid on the phone and on a narrow tablet, and
+    // showed on the one layout that also mounts the NavRail - a 36px hamburger
+    // at 8,8, directly over the rail's Create and Library, opening a second
+    // copy of the More list the rail already carries. Read out of the source
+    // because mounting the editor is mounting the whole app.
+    expect(workspaceSource.replace(/\s+/g, ' ')).toContain(
+      'hideVersionTrigger={isTouchLayout}',
+    )
   })
 })

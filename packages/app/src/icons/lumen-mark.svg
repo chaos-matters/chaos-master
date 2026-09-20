@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- The "Deep C" mark, inlined as a component (vite-plugin-solid-svg), so
+       its two inks are the brand tokens rather than hex literals and follow a
+       direction switch with everything else. The mark is never tinted, which
+       is why they are the brand pair and not the ink and accent tokens.
+       Two other copies of this geometry exist and cannot read CSS:
+       assets/favicon.svg (with its tile) and packages/mobile/assets/
+       icon-mark.svg, the source for the native icon generator. Keep them in
+       step; that file carries the generator's geometry notes. -->
+  <path d="M 20.69 15.47 A 20.03 20.03 0 1 1 20.69 48.53"
+        fill="none" stroke="var(--la-brand-paper)" stroke-width="9.46" stroke-linecap="butt" />
+  <g fill="var(--la-brand-ember)" stroke="none">
+    <rect x="14.79" y="22.76" width="17.22" height="3.72" rx="1.86" />
+    <rect x="14.79" y="30.14" width="13.05" height="3.72" rx="1.86" />
+    <rect x="7.19" y="30.14" width="5.87" height="3.72" rx="1.86" />
+    <rect x="17.40" y="37.52" width="14.61" height="3.72" rx="1.86" />
+  </g>
+</svg>

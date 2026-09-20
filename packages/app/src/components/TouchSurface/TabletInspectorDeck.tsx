@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { executeCommand } from '@/commands/registry'
 import { CameraIcon, GridIcon, Redo, SidebarPanel, Undo } from '@/icons'
+import { workspaceIsVisible } from '@/lib/activeTab'
 import { haptic } from '@/lib/haptics'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createLongPress } from '@/utils/createLongPress'
@@ -99,6 +100,12 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
   }
 
   return (
+    // Home and the Arcade cover this layout the way they cover the phone's,
+    // and the deck stays mounted underneath them - so the same attribute on
+    // the same condition (EditorRail.tsx). It matters more here: the rail the
+    // phone marks inert is not mounted on this layout at all, and the deck is
+    // expanded under Home with its header, its chips and every variation tile
+    // still in the tab order.
     <Show
       when={!collapsed()}
       fallback={
@@ -106,6 +113,7 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
           type="button"
           class={ui.edgeTab}
           aria-label="Show inspector"
+          inert={!workspaceIsVisible()}
           onClick={toggleCollapsed}
         >
           <SidebarPanel class={ui.iconButtonIcon} />
@@ -115,6 +123,7 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
       <aside
         class={ui.deck}
         aria-label="Tablet Touch Inspector"
+        inert={!workspaceIsVisible()}
         style={{ width: `${width()}px` }}
       >
         <div
