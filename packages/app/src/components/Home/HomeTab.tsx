@@ -4,7 +4,10 @@ import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { ChevronLeft, ChevronRight } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { byCollection, bySection, fetchGallery, fetchGalleryItem, GALLERY_COLLECTIONS, galleryCredit, galleryExternalUrl, galleryResourceItems, isCommunityGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
+import { deckFits, isTouchLayout } from '@/stores/workspaceLayoutStore'
+import { defaultConfig } from '@/utils/timeline'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
+import { createHomeEdgeSwipe } from './edgeSwipe'
 import { installHomeEscapeBoundary } from './homeEscape'
 import { HomeFlame } from './HomeFlame'
 import { createPlaybackCoordinator } from './homePlayback'
@@ -16,7 +19,7 @@ import type { HomeFlamePlacement } from './HomeFlame'
 import type { PlaybackCoordinator } from './homePlayback'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { GalleryListItem, GallerySection } from '@/lib/galleryContent'
-import type { TimelineTrack } from '@/utils/timeline'
+import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 /**
  * Home — Phase 2/3/4.
@@ -57,14 +60,18 @@ type TrackVisibility = (
 
 export interface HomeTabProps {
   /**
-   * Open a flame in the workspace (switches tab). `capability` is the row's
-   * `gallery_items.capability` when the flame came from an Explore card, and
-   * asks the workspace to open the matching tool as well as the flame — see
-   * `openCapability` in MainWorkspace.tsx.
+   * Open a flame in the workspace (switches tab). `config` is the timeline the
+   * row's animation was authored at, beside its `tracks` — without it the
+   * flame opens at the workspace's defaults, 30fps over 90 frames, however
+   * long it actually is. `capability` is the row's `gallery_items.capability`
+   * when the flame came from an Explore card, and asks the workspace to open
+   * the matching tool as well as the flame — see `openCapability` in
+   * MainWorkspace.tsx.
    */
   onOpenFlame: (
     flame: FlameDescriptor,
     tracks?: TimelineTrack[],
+    config?: TimelineConfig,
     capability?: string,
   ) => void
 }
@@ -658,13 +665,23 @@ export function HomeTab(props: HomeTabProps) {
    * Fetch the descriptor on demand — the list deliberately omits it. The row's
    * `capability` travels with it so a card can open the tool it advertises, not
    * just the flame that demonstrates it; a plain gallery plate has none.
+   *
+   * The stored timeline travels too. It is the frame rate, the length and the
+   * loop mode the row was authored at, and dropping it opened every animated
+   * gallery flame at the workspace's defaults instead. What it does not carry
+   * is `timeScale` — the Worker strips it so a row plays at the speed it was
+   * captured at (lib/galleryContent.ts) — so the app's own default fills that
+   * one place in, and an older row with no stored timeline at all still opens
+   * exactly as it did before.
    */
   async function open(slug: string) {
     try {
       const item = await fetchGalleryItem(slug)
+      const stored = item.animation?.config
       props.onOpenFlame(
         item.flame,
         item.animation?.tracks,
+        stored ? { ...defaultConfig(), ...stored } : undefined,
         item.capability ?? undefined,
       )
     } catch (err) {
@@ -672,8 +689,22 @@ export function HomeTab(props: HomeTabProps) {
     }
   }
 
+  // The interactive edge swipe (edgeSwipe.ts): iOS has no back gesture, and
+  // this page is the one full-screen layer with somewhere to go back to.
+  const startEdgeSwipe = createHomeEdgeSwipe()
+
   return (
-    <div class={ui.home}>
+    <div
+      class={ui.home}
+      classList={{ [ui.touch!]: isTouchLayout(), [ui.deck!]: deckFits() }}
+      onPointerDown={(event) => {
+        // Touch layouts only: the desktop reaches Home through
+        // FloatingActions and leaves it the same way. Checked here rather
+        // than by swapping the handler, which Solid binds once.
+        if (!isTouchLayout()) return
+        startEdgeSwipe(event)
+      }}
+    >
       <nav class={ui.rail} aria-label="Home sections">
         <span class={ui.railBrand}>Lumen Apeiron</span>
         <For each={SECTIONS}>

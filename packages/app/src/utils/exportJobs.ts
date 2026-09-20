@@ -39,7 +39,15 @@ type JobResult = {
  *  later edits to the workspace flame don't affect an in-flight job. */
 export type ImageJobSpec = {
   name: string
+  /** What the job renders and embeds: the flame that produced the pixels the
+   *  user was looking at, audio overlay and all. */
   flame: FlameDescriptor
+  /** What Recents files when the job finishes. The document, which the overlay
+   *  above never touched - the artifact and the user's work are different
+   *  things, and only one of them is a frame of a song. Required, so a new
+   *  enqueue site has to answer the question rather than inherit the wrong
+   *  half by leaving an argument out. */
+  authoredFlame: FlameDescriptor
   quality: number
   dimensions: Dimensions
   palette: Palette | undefined

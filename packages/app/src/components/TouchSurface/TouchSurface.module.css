@@ -135,47 +135,8 @@
   position: absolute;
   top: calc(100% + var(--la-s-2));
   right: 0;
-  background: var(--la-glass-strong);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  border-radius: var(--la-r-md);
-  padding: var(--la-s-1);
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-s-1);
-  min-width: 232px;
-  box-shadow: var(--la-e-3);
+  /* Placement only; the list's own look is Shell/MoreMenu.module.css. */
   z-index: 60;
-}
-
-.moreMenuItem {
-  display: flex;
-  align-items: center;
-  gap: var(--la-s-3);
-  min-height: var(--la-tap);
-  padding: 0 var(--la-s-3);
-  background: transparent;
-  border: none;
-  border-radius: var(--la-r-sm);
-  color: var(--la-ink);
-  font: var(--la-t-body-sm);
-  cursor: pointer;
-  text-align: left;
-  transition: background var(--la-dur-press) var(--la-ease);
-  touch-action: manipulation;
-  width: 100%;
-}
-
-.moreMenuItem:active {
-  background: var(--la-surface-3);
-}
-
-.moreMenuIcon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  color: var(--la-accent);
 }
 
 /* Covers the screen under the top bar: the rail (40) and the canvas below it
@@ -191,8 +152,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hudButton,
-  .moreMenuItem {
+  .hudButton {
     transition: none;
   }
 }

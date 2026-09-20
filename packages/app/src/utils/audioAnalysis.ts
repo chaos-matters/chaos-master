@@ -631,28 +631,16 @@ export type MappingSmoothingState = Map<
 const DIRTY_THRESHOLD = 0.005 // 0.5% change threshold
 
 /**
- * Mutates a FlameDescriptor draft in place from audio analysis data.
- *
- * Targets can be render settings, transform affine coefficients, transform
- * scalar properties, variation weights, or final-transform affine params.
- *
- * Supports attack/release envelope smoothing via optional `attackMs` /
- * `releaseMs` on each mapping entry, and skips redundant renders when
- * no mapped value has changed beyond a tiny threshold.
- *
- * @param flame   - Full FlameDescriptor draft (from setFlameDescriptor producer).
- * @param smoothingState - persistent per-target state (smoothed value, last applied).
- * @param deltaTime - seconds since the previous frame (default 1/30).
- */
-/**
  * What each render setting is allowed to be, mirroring flameSchema.
  *
- * Audio modulation writes straight into the live descriptor, so a mapping whose
- * range exceeds the schema does not merely look wrong — it leaves the flame
- * PERMANENTLY INVALID. `validateFlame` then throws for everything downstream:
- * breeding it, exporting it, opening the ancestry tree. Observed in the wild as
- * `palettePhase: Expected <=1 but received 1.589`, after which that flame could
- * not be bred again.
+ * A mapping whose range exceeds the schema does not merely look wrong — a
+ * flame carrying the result is INVALID, and `validateFlame` then throws for
+ * everything downstream: breeding it, exporting it, opening the ancestry tree.
+ * Observed in the wild as `palettePhase: Expected <=1 but received 1.589`,
+ * back when modulation wrote the open document and left that flame unable to
+ * be bred again. The live path is a render-time overlay now, but an export
+ * still embeds the modulated flame in the file it writes, so an out-of-range
+ * value would ship inside it.
  *
  * A range is authored by hand in the wiring editor and shipped in presets, so
  * neither can be trusted to respect a bound it never sees. Clamping happens
@@ -726,13 +714,22 @@ function computeSmoothedEnvelope(
 }
 
 /**
- * Checks if target value has changed beyond DIRTY_THRESHOLD and records state.
+ * Settles one target's value for this frame, and says whether it moved.
+ *
+ * Two answers, not one, because the overlay needs both. The value is written
+ * EVERY frame: the overlay is rebuilt from the authored flame each time, so a
+ * target left out snaps back to what the user authored and the picture
+ * judders between modulated and unmodulated. `changed` is the separate
+ * question of whether this frame is worth publishing at all.
+ *
+ * Holding `lastApplied` below the threshold is what keeps a still target
+ * still — the smoothed value keeps creeping, the written one does not.
  */
-function checkTargetDirty(
+function settleTargetValue(
   smoothed: number,
   targetKey: string,
   smoothingState: MappingSmoothingState | undefined,
-): boolean {
+): { applied: number; changed: boolean } {
   const prevApplied = smoothingState?.get(targetKey)?.lastApplied
   if (
     prevApplied !== undefined &&
@@ -741,13 +738,13 @@ function checkTargetDirty(
     if (smoothingState) {
       smoothingState.set(targetKey, { smoothed, lastApplied: prevApplied })
     }
-    return false
+    return { applied: prevApplied, changed: false }
   }
 
   if (smoothingState) {
     smoothingState.set(targetKey, { smoothed, lastApplied: smoothed })
   }
-  return true
+  return { applied: smoothed, changed: true }
 }
 
 function applyRenderSettingTarget(
@@ -885,18 +882,34 @@ function dispatchAudioTargetMapping(
   }
 }
 
-export function applyAudioMappingsToFlame(
-  flame: Record<string, unknown>,
+/** One mapping's settled value for one frame. */
+export type AudioTargetValue = {
+  target: FlameTarget
+  value: number
+}
+
+/**
+ * Settles every mapping for one audio frame, touching no flame at all.
+ *
+ * Split out of `applyAudioMappingsToFlame` for the live path, which no longer
+ * writes the document: it hands these values to a render-time overlay that
+ * rebuilds them onto a copy of the authored flame. The envelope state stays
+ * here so it advances exactly once per audio frame — an overlay recomputed
+ * because the user edited the flame mid-track must not age the envelopes a
+ * second time.
+ *
+ * `changed` is false when every target held still, so the caller can drop the
+ * frame instead of publishing one nothing would look different for.
+ */
+export function resolveAudioMappingValues(
   frameData: FrameData & { isBeat: boolean },
   mappings: AudioMappingEntry[],
   smoothingState?: MappingSmoothingState,
   deltaTime?: number,
-): void {
-  if (mappings.length === 0) return
+): { values: AudioTargetValue[]; changed: boolean } {
   const dt = deltaTime ?? 1 / 30
-
-  const ctx: AudioMutationContext = {}
-  let anyChanged = false
+  const values: AudioTargetValue[] = []
+  let changed = false
 
   for (const mapping of mappings) {
     const raw = getAudioFeatureNormalized(frameData, mapping.audioFeature)
@@ -910,19 +923,71 @@ export function applyAudioMappingsToFlame(
       smoothingState,
       dt,
     )
-
-    if (!checkTargetDirty(smoothed, targetKey, smoothingState)) {
-      continue
-    }
-
-    anyChanged = true
-    const val = mappingToVal(smoothed, mapping)
-    dispatchAudioTargetMapping(flame, ctx, mapping.target, val)
+    const settled = settleTargetValue(smoothed, targetKey, smoothingState)
+    if (settled.changed) changed = true
+    values.push({
+      target: mapping.target,
+      value: mappingToVal(settled.applied, mapping),
+    })
   }
 
-  if (!anyChanged) return
+  return { values, changed }
+}
+
+/**
+ * Writes settled values into a flame — an export's per-frame clone, or the
+ * live overlay's copy of the authored flame. Never the open document.
+ */
+export function applyAudioTargetValues(
+  flame: Record<string, unknown>,
+  values: readonly AudioTargetValue[],
+): void {
+  if (values.length === 0) return
+  const ctx: AudioMutationContext = {}
+  for (const { target, value } of values) {
+    dispatchAudioTargetMapping(flame, ctx, target, value)
+  }
   if (ctx.rs) {
     if (ctx.camera) ctx.rs.camera = ctx.camera
     flame.renderSettings = ctx.rs
   }
+}
+
+/**
+ * Settles the mappings for one frame and writes them into `flame`.
+ *
+ * Targets can be render settings, transform affine coefficients, transform
+ * scalar properties, variation weights, or final-transform affine params.
+ *
+ * Supports attack/release envelope smoothing via optional `attackMs` /
+ * `releaseMs` on each mapping entry, and leaves the flame untouched when no
+ * mapped value has moved beyond a tiny threshold.
+ *
+ * For callers that own the flame outright — the two export paths, each with a
+ * per-frame clone. The live path settles and applies in two steps instead, so
+ * no part of it can reach the open document.
+ *
+ * @param flame - a flame the caller owns, never the document.
+ * @param smoothingState - persistent per-target state (smoothed value, last applied).
+ * @param deltaTime - seconds since the previous frame (default 1/30).
+ */
+export function applyAudioMappingsToFlame(
+  flame: Record<string, unknown>,
+  frameData: FrameData & { isBeat: boolean },
+  mappings: AudioMappingEntry[],
+  smoothingState?: MappingSmoothingState,
+  deltaTime?: number,
+): void {
+  if (mappings.length === 0) return
+  const { values, changed } = resolveAudioMappingValues(
+    frameData,
+    mappings,
+    smoothingState,
+    deltaTime,
+  )
+  // Nothing moved: leave the flame exactly as it was. The offscreen and
+  // main-canvas exports pass no smoothing state, so every frame is a change
+  // for them and this only ever short-circuits a live caller.
+  if (!changed) return
+  applyAudioTargetValues(flame, values)
 }

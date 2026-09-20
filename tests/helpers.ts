@@ -42,7 +42,7 @@ export async function dismissWelcomeIfPresent(page: Page, timeout = 2000) {
  * a missing pill is a failure, not a reason to report green.
  */
 export async function openWorkspaceMenuItem(page: Page, item: RegExp) {
-  const pill = page.getByRole('button', { name: /^Chaos Master v\S+ menu$/ })
+  const pill = page.getByRole('button', { name: /^Lumen Apeiron v\S+ menu$/ })
   await pill.waitFor({ state: 'visible', timeout: 20_000 })
   // dispatchEvent rather than click(): the welcome backdrop can still be
   // fading and would otherwise intercept the pointer.

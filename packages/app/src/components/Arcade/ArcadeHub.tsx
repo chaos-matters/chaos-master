@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
-import { Book, Film, Lineage, MusicNote, Swords, Zap } from '@/icons'
+import { Book, ChevronLeft, Film, Lineage, MusicNote, Swords, Zap, } from '@/icons'
 import { arcadeMode, setActiveTab } from '@/lib/activeTab'
 import ui from './ArcadeHub.module.css'
 import { ArcadeModePanel } from './ArcadeModePanel'
@@ -93,6 +93,20 @@ export function ArcadeHub(props: {
   })
   return (
     <section class={ui.hub} aria-label="Lumen Arcade">
+      {/* The way out, pinned. The footer carries the same action, but it is
+          below the whole card grid: on a touch device leaving meant scrolling
+          past every card, and the Esc that covers this for a keyboard is not
+          a key a tablet has. */}
+      <button
+        type="button"
+        class={ui.back}
+        data-testid="arcade-back"
+        aria-label="Back to editor"
+        title="Back to editor"
+        onClick={props.onBackToEditor}
+      >
+        <ChevronLeft class={ui.backIcon} aria-hidden="true" />
+      </button>
       <header class={ui.header}>
         <h1 class={ui.wordmark}>Lumen Arcade</h1>
         <p class={ui.promise}>

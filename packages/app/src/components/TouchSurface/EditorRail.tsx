@@ -1,9 +1,11 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { children, createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
 import { CameraIcon, ColourWedge, ShapeTriangle, Shuffle, VariationSpiral, } from '@/icons'
+import { workspaceIsVisible } from '@/lib/activeTab'
+import { createBackLayer } from '@/lib/backStack'
 import { haptic } from '@/lib/haptics'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createLongPress } from '@/utils/createLongPress'
-import { clampSheetHeight, detentHeights, FLICK_MAX_AGE_MS, heightOf, nearestDetent, PEEK_HEIGHT, settleDetent, SHEET_TRANSITION_MS, } from './detents'
+import { clampSheetHeight, detentHeights, FLICK_MAX_AGE_MS, heightOf, nearestDetent, PEEK_HEIGHT, railDetent, setRailDetent, settleDetent, SHEET_TRANSITION_MS, } from './detents'
 import ui from './EditorRail.module.css'
 import { TouchControlSurface } from './TouchControlSurface'
 import type { JSX } from 'solid-js'
@@ -35,7 +37,10 @@ function viewportHeight(): number {
  * is the floor, so the chips and the shutter are always one tap away.
  */
 export function EditorRail(props: EditorRailProps) {
-  const [detent, setDetent] = createSignal<Detent>('peek')
+  // The detent lives in detents.ts so it survives this component (the
+  // threshold between the rail and the tablet deck remounts it).
+  const detent = railDetent
+  const setDetent = setRailDetent
   const [tab, setTab] = createSignal<TouchTab>('variations')
   const [vh, setVh] = createSignal(viewportHeight())
   const [chrome, setChrome] = createSignal(0)
@@ -43,6 +48,14 @@ export function EditorRail(props: EditorRailProps) {
   const heights = createMemo(() => detentHeights(vh(), vh() - chrome()))
   const sheetHeight = () =>
     dragHeight() ?? clampSheetHeight(heightOf(detent(), heights()), heights())
+
+  /**
+   * Resolved once. `leading` is written as a JSX attribute, which compiles to
+   * a getter, so reading it in the Show and again in the body built two shell
+   * bars per mount - the first one left alive, with its signals, effects and
+   * collapse timer, under the Show's memo until the rail disposed.
+   */
+  const leading = children(() => props.leading)
 
   let dockEl: HTMLElement | undefined
   let sheetEl: HTMLDivElement | undefined
@@ -146,6 +159,21 @@ export function EditorRail(props: EditorRailProps) {
     }
   }
 
+  /**
+   * An open sheet is a layer, so back closes it one step at a time: large to
+   * medium, medium to peek (A/screens.md 0.5). The registration keys off
+   * "open or not" rather than off the detent itself, so changing detent does
+   * not re-push the handler above whatever opened over the rail meanwhile.
+   */
+  const railOpen = createMemo(() => detent() !== 'peek')
+  createBackLayer(
+    railOpen,
+    () => {
+      settle(detent() === 'large' ? 'medium' : 'peek')
+    },
+    'rail detent',
+  )
+
   function onChip(next: TouchTab) {
     if (detent() === 'peek') {
       setTab(next)
@@ -243,10 +271,17 @@ export function EditorRail(props: EditorRailProps) {
   const grabHandlers = { onPointerDown: startGrab }
 
   return (
+    // Home and the Arcade cover the editor completely and it stays mounted
+    // underneath them, so everything in here is behind a full-screen layer:
+    // inert takes it out of the tab order and off the screen reader for as
+    // long as that lasts, while every signal, canvas and listener stays
+    // exactly where it was. Unmounting instead is what this branch stopped
+    // doing, and for good reasons (see the Show that mounts this).
     <section
       class={ui.dock}
       role="region"
       aria-label="Editor controls"
+      inert={!workspaceIsVisible()}
       ref={dockEl}
     >
       <div
@@ -269,6 +304,13 @@ export function EditorRail(props: EditorRailProps) {
         </div>
         <div class={ui.peekRow}>
           <div class={ui.dragSurface} {...grabHandlers} />
+          {/* The shell's capsule docks here, so Create keeps the whole band
+              and navigation costs the editor one 56px circle. */}
+          <Show when={leading()}>
+            <div class={ui.leading} data-testid="editor-rail-leading">
+              {leading()}
+            </div>
+          </Show>
           <div class={ui.chips} role="tablist" aria-label="Tools">
             <For each={CHIPS}>
               {(chip) => (

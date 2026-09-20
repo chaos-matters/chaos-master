@@ -8,7 +8,6 @@ import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
-import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
 import { ChevronDown, Cross, GaugeMax, Info } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -18,14 +17,13 @@ import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { EMPTY_DROP_MESSAGE, filesFromDataTransfer, } from '@/utils/dataTransferFiles'
 import { createFileDragState } from '@/utils/fileDragState'
-import { applyFlameImport, MAX_IMPORT_FILE_SIZE, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
-import { extractFlameFromPng } from '@/utils/flameInPng'
+import { applyFlameImport, MAX_IMPORT_FILE_SIZE, readFlameFiles, readSingleFlameFile, summarizeImport, } from '@/utils/flameImport'
 import { useElementIsScrolling } from '@/utils/isScrolling'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { pickFiles } from '@/utils/pickFiles'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
-import { applyTracksToFlame } from '@/utils/timeline'
+import { applyTracksToFlame, defaultConfig as defaultTimelineConfig, } from '@/utils/timeline'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -37,13 +35,21 @@ import type { Accessor, JSX } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 import type { AcceptMap } from '@/utils/pickFiles'
-import type { TimelineTrack } from '@/utils/timeline'
+import type { RecentFlame } from '@/utils/recentFlames'
+import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const { performance } = globalThis
 
 export const CANCEL = 'cancel'
 
-export type AnimationLoad = { flame: FlameDescriptor; tracks: TimelineTrack[] }
+export type AnimationLoad = {
+  flame: FlameDescriptor
+  tracks: TimelineTrack[]
+  /** The timeline the animation was authored at, where the source has one
+   *  (a stored entry, an imported file). Absent loads keep the workspace's
+   *  defaults. */
+  config?: TimelineConfig
+}
 
 /** Keep one malformed stored/generated flame from taking down the whole modal. */
 function StaticVariationPreview(props: {
@@ -241,16 +247,14 @@ function AnimatedPreview(props: {
 
 /** RecentFlameItem -- renders a recent flame, plays animation on hover when tracks exist. */
 function RecentFlameItem(props: {
-  recent: {
-    id: string
-    name: string
-    flame: FlameDescriptor
-    savedAt: number
-    tracks?: TimelineTrack[]
-  }
+  recent: RecentFlame
   trackVisibility: ReturnType<typeof createSharedIntersectionObserver>
   scrolling: Accessor<boolean>
-  onSelect: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
+  onSelect: (
+    flame: FlameDescriptor,
+    tracks?: TimelineTrack[],
+    config?: TimelineConfig,
+  ) => void
   onDelete: (e: MouseEvent | KeyboardEvent, id: string) => void
 }) {
   const hasTracks = () =>
@@ -305,6 +309,9 @@ function RecentFlameItem(props: {
         props.onSelect(
           clone,
           props.recent.tracks ? deepClone(props.recent.tracks) : undefined,
+          // The timeline the entry was stored at. An entry saved at 60fps
+          // over 300 frames came back at 30 over 90 without it.
+          props.recent.config ? deepClone(props.recent.config) : undefined,
         )
       }}
       onMouseEnter={() => {
@@ -772,69 +779,40 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       .slice(0, GALLERY_TAG_LIMIT)
   })
 
+  /**
+   * One file, opened straight into the workspace.
+   *
+   * Read by the importer's own readers (utils/flameImport.ts), which is what
+   * the bulk path uses on the same bytes: .flame XML with its gradient
+   * registered, a JSON descriptor or share envelope, or the flame the app
+   * embeds in every PNG it exports. This had a copy of all three that stopped
+   * at the keyframe tracks, so a timeline written into an exported image was
+   * dropped when that image was opened again.
+   */
   async function processImportFile(file: File) {
     const name = file.name.toLowerCase()
-    const isXml = name.endsWith('.flame') || name.endsWith('.xml')
-
-    if (isXml) {
-      // .flame XML import
-      try {
-        const text = await file.text()
-        if (!isFlameXmlContent(text)) {
-          void showAlert(
-            `'${file.name}' does not appear to be a valid .flame file.`,
-          )
-          return
-        }
-        const flame = parseFlameXml(text)
-        // Save the file's embedded gradient to the user's palette library
-        // (deduped by content) so it can be reapplied / edited later.
-        registerImportedFlamePalette(text)
-        props.respond(flame)
-      } catch (err) {
-        console.warn(err)
-        void showAlert(`Failed to parse '${file.name}' as .flame file.`)
-      }
+    const parsed = await readSingleFlameFile(file)
+    if (!parsed) {
+      const isXml = name.endsWith('.flame') || name.endsWith('.xml')
+      void showAlert(
+        isXml
+          ? `'${file.name}' does not appear to be a valid .flame file.`
+          : `No valid flame found in '${file.name}'.`,
+      )
       return
     }
-
-    if (name.endsWith('.json')) {
-      // JSON descriptor / share payload — same envelopes the backup writes.
-      try {
-        const parsed = parseFlameEnvelope(JSON.parse(await file.text()))
-        if (!parsed) {
-          void showAlert(`No valid flame found in '${file.name}'.`)
-          return
-        }
-        if (parsed.tracks && parsed.tracks.length > 0) {
-          props.respond({ flame: parsed.flame, tracks: parsed.tracks })
-        } else {
-          props.respond(parsed.flame)
-        }
-      } catch (err) {
-        console.warn(err)
-        void showAlert(`Failed to parse '${file.name}' as a flame.`)
-      }
+    // The timeline travels with the flame whether or not there are tracks: a
+    // flame with none still has a frame rate and an end frame, and the
+    // workspace applies what it is handed (MainWorkspace's animation effect).
+    if ((parsed.tracks && parsed.tracks.length > 0) || parsed.config) {
+      props.respond({
+        flame: parsed.flame,
+        tracks: parsed.tracks ?? [],
+        ...(parsed.config ? { config: parsed.config } : {}),
+      })
       return
     }
-
-    // PNG import (existing)
-    try {
-      const arrBuf = new Uint8Array(await file.arrayBuffer())
-      const result = await extractFlameFromPng(arrBuf)
-      if (result.animation && result.animation.tracks.length > 0) {
-        props.respond({
-          flame: result.flame,
-          tracks: result.animation.tracks,
-        })
-      } else {
-        props.respond(result.flame)
-      }
-    } catch (err) {
-      console.warn(err)
-
-      void showAlert(`No valid flame found in '${file.name}'.`)
-    }
+    props.respond(parsed.flame)
   }
 
   /** Bulk path: store every dropped flame in Recent flames and leave the
@@ -905,7 +883,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       if (!confirmed) return
     }
 
-    deleteRecentFlame(id)
+    // The delete is a storage write like any other and can be refused - a
+    // quota, a private window, a locked-down WebView. The answer was dropped
+    // here against the function's own docstring, so the row vanished from the
+    // list, came back on the next read, and the user was left deleting the
+    // same flame over and over to make room they were never going to get.
+    if (!deleteRecentFlame(id)) {
+      showToast(
+        'Could not delete that flame: this device refused the change. It is still in Recents.',
+        8000,
+      )
+    }
     setRecentFlames(loadRecentFlames())
   }
 
@@ -1131,9 +1119,16 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                       recent={recent}
                       trackVisibility={trackTileVisibility}
                       scrolling={galleryScrolling}
-                      onSelect={(flame, tracks) => {
-                        if (tracks && tracks.length > 0) {
-                          props.respond({ flame, tracks })
+                      onSelect={(flame, tracks, config) => {
+                        // A stored timeline is reason enough to take the
+                        // animation path: a flame with no keyframes still
+                        // has a frame rate and an end frame.
+                        if ((tracks && tracks.length > 0) || config) {
+                          props.respond({
+                            flame,
+                            tracks: tracks ?? [],
+                            ...(config ? { config } : {}),
+                          })
                         } else {
                           props.respond(flame)
                         }
@@ -1277,7 +1272,20 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
 }
 
 export function createLoadFlame(
-  history: Pick<ChangeHistory<FlameDescriptor>, 'replace'>,
+  history: Pick<ChangeHistory<FlameDescriptor>, 'replace'> & {
+    /**
+     * Settle whether the open document may be replaced, before anything
+     * here touches it. At the cap that is a question for the user - saving
+     * the outgoing flame means evicting the oldest one they kept - and the
+     * answer can be no (lib/documentLoad.ts).
+     *
+     * Asked here rather than at `history.replace`, because that call sits
+     * inside the batch below with the animation seed: a decision awaited
+     * from in there would let the seed's effect take the load-boundary
+     * baseline while the outgoing flame was still on screen.
+     */
+    prepareReplace?: () => Promise<boolean>
+  },
   currentDimensions?: () => number,
 ) {
   const requestModal = useRequestModal()
@@ -1308,6 +1316,12 @@ export function createLoadFlame(
     if (result === CANCEL) {
       return undefined
     }
+    // The open document's unsaved work has to be somewhere it survives
+    // before the batch below drops it. A no leaves this flame unloaded and
+    // that work on screen, which is the point of asking.
+    if ((await history.prepareReplace?.()) === false) {
+      return undefined
+    }
     // Animation load: flame + keyframe tracks
     if (typeof result === 'object' && 'tracks' in result) {
       if (IS_DEV)
@@ -1324,6 +1338,10 @@ export function createLoadFlame(
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),
           })),
+          // Carried through to the workspace, which applies it whether or
+          // not there are tracks. Dropped here, the stored frame rate and
+          // end frame were read out of the entry and then thrown away.
+          ...(result.config ? { config: result.config } : {}),
         })
       })
       return result.flame
@@ -1339,7 +1357,12 @@ export function createLoadFlame(
         flame.renderSettings.camera3D = deepClone(camera3DDefault)
       }
       history.replace(flame, 'Load flame')
-      setLoadedAnimation({ flame, tracks: [] })
+      // A plain flame carries no animation but still has a timeline, and
+      // the effect that consumes this only applies one when it is handed
+      // one - so without this the flame opened at whatever frame rate and
+      // end frame the document before it was running at, and autosaved
+      // there (utils/timeline.ts).
+      setLoadedAnimation({ flame, tracks: [], config: defaultTimelineConfig() })
     })
     return result
   }

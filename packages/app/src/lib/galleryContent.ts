@@ -1,5 +1,5 @@
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { TimelineTrack } from '@/utils/timeline'
+import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 /**
  * Client for the Home tab's content API (see worker/index.ts). The gallery
@@ -106,7 +106,23 @@ export function isCommunityGalleryItem(item: GalleryListItem): boolean {
 /** A single item, with the descriptor parsed. */
 export interface GalleryItem extends Omit<GalleryListItem, 'has_animation'> {
   flame: FlameDescriptor
-  animation: { tracks: TimelineTrack[] } | null
+  /**
+   * The row's keyframes and, for a community submission, the timeline they
+   * were authored at.
+   *
+   * `config` is what says how fast the animation runs and how long it is, and
+   * a row opened without it plays at the workspace's defaults instead - 30fps
+   * over 90 frames, whatever it was made at. Optional because the editorial
+   * seed writes only tracks (scripts/seed-gallery.mjs), and absent
+   * `timeScale` because the Worker forces it to 1 and drops it when it stages
+   * a submission, so a gallery row always runs at the speed it was captured
+   * at rather than wherever the submitter left the slider
+   * (worker/routes/discord.ts).
+   */
+  animation: {
+    tracks: TimelineTrack[]
+    config?: Omit<TimelineConfig, 'timeScale'>
+  } | null
   /**
    * Extra descriptors this row plays through, in order, or null for the single
    * flame every other row is.

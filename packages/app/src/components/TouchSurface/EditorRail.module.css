@@ -35,6 +35,15 @@
   overflow: hidden;
   contain: layout paint;
   transition: height var(--la-dur-sheet) var(--la-ease);
+  /* The threshold between this and the tablet deck is a cross-fade, never a
+     reload (DESIGN.md section 4); the detent survives it in detents.ts.
+
+     On the sheet and not on the dock around it: an ancestor below full
+     opacity is a backdrop root, so fading the dock would make this glass
+     sample a flat fill for the 180ms and then pop. `global(...)` is what
+     keeps the keyframe in lumen.css reachable - a CSS module renames a bare
+     animation name to one scoped to this file, which no keyframe answers. */
+  animation: global(la-surface-enter) var(--la-dur-fast) var(--la-ease);
 }
 
 /* While the finger is the clock there is no easing between frames. */
@@ -83,12 +92,21 @@
   touch-action: none;
 }
 
+/* The shell's capsule. A fixed box, so the chips keep the same room whether
+   the capsule is collapsed or expanded over the row. */
+.leading {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--la-capsule);
+  height: var(--la-capsule);
+}
+
 .chips {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  gap: 2px;
+  gap: var(--la-s-1);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -100,15 +118,22 @@
 .chip {
   /* Shrink to the row rather than scroll inside it: at 360px the four chips
      wanted 278 of 254, which cut the last one off behind the shutter and made
-     a horizontal swipe scroll the row. The tap token is the floor. */
+     a horizontal swipe scroll the row.
+
+     WIDTH is the one dimension allowed below --la-tap, and it has to be: the
+     token rises to 48px under [data-platform='android'], where four chips
+     beside the capsule and the shutter wanted 198px of a 190px box and the
+     row began scrolling again, clipping "Vary". The tappable box keeps its
+     full --la-tap HEIGHT - 48px on Android, 44 elsewhere - so every chip
+     still clears the 40px floor. */
   flex: 1 1 0;
-  min-width: var(--la-tap);
+  min-width: 40px;
   height: var(--la-tap);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--la-s-1);
   border: 0;
   background: none;
   border-radius: var(--la-r-pill);
@@ -179,5 +204,8 @@
   .chip,
   .shutter {
     transition: none;
+  }
+  .sheet {
+    animation: none;
   }
 }

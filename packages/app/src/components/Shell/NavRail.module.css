@@ -1,0 +1,104 @@
+/* The tablet navigation rail (components.md section 9): 80px on the leading
+   edge, opaque, permanent. Colour, radius, spacing, duration and easing come
+   from the --la-* set only (styles/designSystem/lumen.css). */
+
+.rail {
+  grid-area: navrail;
+  width: var(--la-navrail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-s-2);
+  box-sizing: border-box;
+  padding-top: calc(var(--la-safe-top) + var(--la-s-4));
+  padding-bottom: max(
+    var(--la-s-4),
+    calc(var(--la-safe-bottom) + var(--la-s-2))
+  );
+  /* Landscape on an iPhone-shaped tablet window puts the notch here. */
+  padding-left: var(--la-safe-left);
+  background: var(--la-ground);
+  border-right: 1px solid var(--la-hairline);
+  /* It mounts with the deck, so it arrives the same way (DESIGN.md 4).
+     `global(...)` keeps the keyframe in lumen.css reachable: a CSS module
+     renames a bare animation name to one scoped to this file. */
+  animation: global(la-surface-enter) var(--la-dur-fast) var(--la-ease);
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  margin-bottom: var(--la-s-4);
+}
+
+.item {
+  width: 64px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-1);
+  border: 0;
+  background: none;
+  border-radius: var(--la-r-md);
+  color: var(--la-ink-2);
+  font: var(--la-t-label);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background var(--la-dur-fast) var(--la-ease),
+    color var(--la-dur-fast) var(--la-ease);
+}
+
+.item[aria-current='page'] {
+  color: var(--la-accent);
+  background: var(--la-accent-wash);
+}
+
+.icon {
+  width: 26px;
+  height: 26px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* More opens beside the rail rather than over it: the rail is a page edge
+   and stays legible while its own menu is up. The layer is fixed and
+   portalled, so it sits over Home (--la-z-shell) the way the phone's dock
+   does; the list's own look is Shell/MoreMenu.module.css. */
+.menuLayer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--la-z-shell);
+  /* The layer catches nothing itself; the backdrop inside it does, and that
+     covers the rail as well. So the first tap on Create or Settings while
+     More is open spends itself closing the menu and goes no further - what
+     a menu backdrop is for, and what the phone's bar does. */
+  pointer-events: none;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.menu {
+  position: absolute;
+  left: calc(var(--la-navrail-w) + var(--la-safe-left) + var(--la-s-2));
+  bottom: max(var(--la-s-4), calc(var(--la-safe-bottom) + var(--la-s-2)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+  .rail {
+    animation: none;
+  }
+}

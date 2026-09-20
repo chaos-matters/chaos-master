@@ -11,6 +11,7 @@ import ChevronRight from './chevron-right.svg'
 import CircleHalf from './circle-half.svg'
 import ColourWedge from './colour-wedge.svg'
 import Copy from './copy.svg'
+import Create from './create.svg'
 import Cross from './cross.svg'
 import Discord from './discord.svg'
 import Download from './download.svg'
@@ -30,8 +31,10 @@ import HoverPreview from './hover-preview.svg'
 import Info from './info.svg'
 import Lineage from './lineage.svg'
 import ListIcon from './list.svg'
+import LumenMark from './lumen-mark.svg'
 import Menu from './menu.svg'
 import Minus from './minus.svg'
+import MoreDots from './more-dots.svg'
 import MusicNote from './music-note.svg'
 import Pause from './pause.svg'
 import Pencil from './pencil.svg'
@@ -41,6 +44,7 @@ import Record from './record.svg'
 import Redo from './redo.svg'
 import Reset from './reset.svg'
 import Robot from './robot.svg'
+import Settings from './settings.svg'
 import ShapeTriangle from './shape-triangle.svg'
 import Share from './share.svg'
 import Shuffle from './shuffle.svg'
@@ -73,6 +77,7 @@ export {
   CircleHalf,
   ColourWedge,
   Copy,
+  Create,
   Cross,
   Discord,
   Download,
@@ -92,8 +97,10 @@ export {
   HoverPreview,
   Lineage,
   ListIcon,
+  LumenMark,
   Menu,
   Minus,
+  MoreDots,
   MusicNote,
   Pause,
   Pencil,
@@ -103,6 +110,7 @@ export {
   Redo,
   Reset,
   Robot,
+  Settings,
   Share,
   Shuffle,
   SkipBack,

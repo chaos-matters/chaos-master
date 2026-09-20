@@ -63,7 +63,7 @@ test.describe('Lumen Arcade', () => {
     await expect(page.getByTestId('arcade-card')).toHaveCount(0)
 
     const menuTrigger = page.getByRole('button', {
-      name: /Chaos Master.*menu/i,
+      name: /Lumen Apeiron.*menu/i,
     })
     if (await menuTrigger.isVisible()) {
       await menuTrigger.click()
@@ -73,7 +73,10 @@ test.describe('Lumen Arcade', () => {
     // In place: no reload, so the mock the workspace installed is still there.
     expect(await page.evaluate(() => 'webmcp' in window)).toBe(true)
 
-    await page.getByRole('button', { name: 'Back to editor' }).click()
+    // Two controls now carry this name: the pinned one this PR added and the
+    // footer link below the card grid. Target the pinned one by its test id
+    // rather than widening the role query back into an ambiguous match.
+    await page.getByTestId('arcade-back').click()
     await expect(page.getByTestId('arcade-card')).toHaveCount(0)
     await expect(menuTrigger).toBeVisible()
   })

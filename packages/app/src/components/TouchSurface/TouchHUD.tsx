@@ -1,51 +1,31 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { executeCommand } from '@/commands/registry'
-import { Book, Download, GaugeMax, GridIcon, Info, Menu, Redo, Share, SidebarPanel, Undo, Zap, } from '@/icons'
-import { setActiveTab } from '@/lib/activeTab'
+import { GridIcon, MoreDots, Redo, Undo } from '@/icons'
+import { workspaceIsVisible } from '@/lib/activeTab'
+import { createBackLayer } from '@/lib/backStack'
 import { haptic } from '@/lib/haptics'
+import { MoreMenu } from '../Shell/MoreMenu'
+import { buildMoreMenu } from '../Shell/moreMenuItems'
 import ui from './TouchSurface.module.css'
-import type { Accessor, JSX } from 'solid-js'
+import type { Accessor } from 'solid-js'
+import type { MoreMenuHandlers } from '../Shell/moreMenuItems'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
-export interface TouchHUDProps {
+/**
+ * The More handlers are not restated here. They were, and the copy went out
+ * of step the moment the list grew: Save for later reached the tablet's rail
+ * and not the phone's bar, which is the layout the restore notice is written
+ * for. One name for the list, one for what a host can offer it.
+ */
+export interface TouchHUDProps extends MoreMenuHandlers {
   ctx: CommandContext
   flame: Accessor<FlameDescriptor>
   canUndo?: Accessor<boolean>
   canRedo?: Accessor<boolean>
   onUndo?: () => void
   onRedo?: () => void
-  onOpenExportModal?: () => void
-  onShare?: () => void
-  onOpenDrawer?: () => void
   onPickGallery?: () => void
-  onOpenSettings?: () => void
-  onOpenDocs?: () => void
-  onOpenBenchmark?: () => void
-  /** Web only: the Benchmark Lab is its own page (DESIGN.md, decision 1). */
-  onOpenBenchmarkLab?: () => void
-  onDesktopLayout?: () => void
-}
-
-function MoreDotsIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      class={ui.hudButtonIcon}
-      fill="currentColor"
-      stroke="none"
-    >
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="19" cy="12" r="2" />
-    </svg>
-  )
-}
-
-interface MoreItem {
-  label: string
-  Icon: (props: { class?: string }) => JSX.Element
-  run: () => void
 }
 
 export function TouchHUD(props: TouchHUDProps) {
@@ -60,82 +40,27 @@ export function TouchHUD(props: TouchHUDProps) {
     props.flame().metadata?.name?.trim() || 'Untitled flame'
 
   /**
-   * What the touch layout cannot otherwise reach: the desktop sidebar and the
-   * floating version menu are not drawn here. An item whose handler prop is
-   * absent is not offered — the caller decides what this device can do.
+   * The one More list (components/Shell/moreMenuItems.ts), so every surface that
+   * offers More offers the same items. These props are named after its
+   * handlers, so they go straight in; the Arcade defaults inside it.
    */
-  const moreItems = (): MoreItem[] => {
-    const items: MoreItem[] = []
-    if (props.onOpenExportModal) {
-      items.push({
-        label: 'Export options',
-        Icon: Download,
-        run: () => props.onOpenExportModal?.(),
-      })
-    }
-    if (props.onShare) {
-      items.push({
-        label: 'Share link',
-        Icon: Share,
-        run: () => props.onShare?.(),
-      })
-    }
-    if (props.onOpenDrawer) {
-      items.push({
-        label: 'Advanced tools',
-        Icon: SidebarPanel,
-        run: () => props.onOpenDrawer?.(),
-      })
-    }
-    items.push({
-      label: 'Lumen Arcade',
-      Icon: Zap,
-      run: () => {
-        setActiveTab('arcade')
-      },
-    })
-    if (props.onOpenDocs) {
-      items.push({
-        label: 'Documentation',
-        Icon: Book,
-        run: () => props.onOpenDocs?.(),
-      })
-    }
-    if (props.onOpenBenchmark) {
-      items.push({
-        label: 'Quick GPU benchmark',
-        Icon: Zap,
-        run: () => props.onOpenBenchmark?.(),
-      })
-    }
-    if (props.onOpenBenchmarkLab) {
-      items.push({
-        label: 'Benchmark Lab',
-        Icon: GaugeMax,
-        run: () => props.onOpenBenchmarkLab?.(),
-      })
-    }
-    if (props.onOpenSettings) {
-      items.push({
-        label: 'Settings and more',
-        Icon: Info,
-        run: () => props.onOpenSettings?.(),
-      })
-    }
-    if (props.onDesktopLayout) {
-      items.push({
-        label: 'Desktop layout',
-        Icon: Menu,
-        run: () => props.onDesktopLayout?.(),
-      })
-    }
-    return items
-  }
+  const moreItems = () => buildMoreMenu(props)
 
   const closePopovers = () => {
     setShowTitleTooltip(false)
     setMoreMenuOpen(false)
   }
+
+  // Both popovers are layers: back closes the open one before anything else
+  // answers (lib/backStack.ts), the same as a tap on the backdrop. The More
+  // list registers itself (Shell/MoreMenu.tsx).
+  createBackLayer(
+    showTitleTooltip,
+    () => {
+      setShowTitleTooltip(false)
+    },
+    'flame title',
+  )
 
   return (
     <>
@@ -151,7 +76,15 @@ export function TouchHUD(props: TouchHUDProps) {
           onClick={closePopovers}
         />
       </Show>
-      <header class={ui.topHud} role="banner" aria-label="Touch Navigation HUD">
+      {/* Behind Home and the Arcade while either is up: inert keeps the
+          pill's five controls out of the tab order and off the screen
+          reader without unmounting a thing. */}
+      <header
+        class={ui.topHud}
+        role="banner"
+        aria-label="Touch Navigation HUD"
+        inert={!workspaceIsVisible()}
+      >
         <button
           type="button"
           class={ui.hudButton}
@@ -232,29 +165,17 @@ export function TouchHUD(props: TouchHUDProps) {
             aria-expanded={moreMenuOpen()}
             onClick={() => setMoreMenuOpen((o) => !o)}
           >
-            <MoreDotsIcon />
+            <MoreDots class={ui.hudButtonIcon} />
           </button>
 
-          <Show when={moreMenuOpen()}>
-            <div class={ui.moreMenuPopover} role="menu" aria-label="More">
-              <For each={moreItems()}>
-                {(item) => (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class={ui.moreMenuItem}
-                    onClick={() => {
-                      setMoreMenuOpen(false)
-                      item.run()
-                    }}
-                  >
-                    <item.Icon class={ui.moreMenuIcon} />
-                    <span>{item.label}</span>
-                  </button>
-                )}
-              </For>
-            </div>
-          </Show>
+          <MoreMenu
+            items={moreItems()}
+            open={moreMenuOpen()}
+            onClose={() => {
+              setMoreMenuOpen(false)
+            }}
+            menuClass={ui.moreMenuPopover!}
+          />
         </div>
       </header>
     </>

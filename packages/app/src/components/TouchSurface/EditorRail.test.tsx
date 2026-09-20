@@ -1,27 +1,21 @@
 import '@/commands/builtins'
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setActiveTab } from '@/lib/activeTab'
+import { backDepth, popBack } from '@/lib/backStack'
+import { haptic } from '@/lib/haptics'
 import { createMockCommandContext } from '@/webmcp/testUtils'
-import { PEEK_HEIGHT, SHEET_TRANSITION_MS } from './detents'
+import { PEEK_HEIGHT, setRailDetent, SHEET_TRANSITION_MS } from './detents'
 import { EditorRail } from './EditorRail'
 
-const impactLight = vi.fn()
-const impactMedium = vi.fn()
-const selectionChanged = vi.fn()
-const selectionStart = vi.fn()
-const selectionEnd = vi.fn()
-vi.mock('@/lib/haptics', () => ({
-  haptic: {
-    impactLight: () => impactLight(),
-    impactMedium: () => impactMedium(),
-    selectionChanged: () => selectionChanged(),
-    success: () => undefined,
-    warning: () => undefined,
-    error: () => undefined,
-    selectionStart: () => selectionStart(),
-    selectionEnd: () => selectionEnd(),
-  },
-}))
+// The real module is safe to call here: every method delegates to NO_HAPTICS
+// until the native ports load, which they never do on the web. Restating all
+// eight as a mock only created a second copy to keep in step with the module.
+const impactLight = vi.spyOn(haptic, 'impactLight')
+const impactMedium = vi.spyOn(haptic, 'impactMedium')
+const selectionChanged = vi.spyOn(haptic, 'selectionChanged')
+const selectionStart = vi.spyOn(haptic, 'selectionStart')
+const selectionEnd = vi.spyOn(haptic, 'selectionEnd')
 
 function mount(extra: Partial<Parameters<typeof EditorRail>[0]> = {}) {
   const ctx = createMockCommandContext()
@@ -57,6 +51,9 @@ describe('EditorRail', () => {
   beforeEach(() => {
     window.innerHeight = 852
     window.dispatchEvent(new Event('resize'))
+    // The detent outlives the component (it survives the remount at the
+    // rail-or-deck threshold), so each test starts it back at the floor.
+    setRailDetent('peek')
     impactLight.mockClear()
     impactMedium.mockClear()
     selectionChanged.mockClear()
@@ -64,6 +61,31 @@ describe('EditorRail', () => {
     selectionEnd.mockClear()
   })
   afterEach(cleanup)
+
+  it('builds the leading slot once', () => {
+    // Written as a JSX attribute, `leading` compiles to a getter, so reading
+    // it in the Show and again in the body constructed two shell bars. The
+    // first kept its signals, effects and collapse timer alive under the
+    // Show's memo until the whole rail disposed.
+    let built = 0
+    const Probe = () => {
+      built++
+      return <span />
+    }
+    const ctx = createMockCommandContext()
+    render(() => (
+      <EditorRail
+        ctx={ctx}
+        flame={ctx.flameDescriptor}
+        onRandomize={vi.fn()}
+        onMutate={vi.fn()}
+        onQuickExport={vi.fn()}
+        onOpenExportOptions={vi.fn()}
+        leading={<Probe />}
+      />
+    ))
+    expect(built).toBe(1)
+  })
 
   it('starts at peek with four chips and the shutter', () => {
     mount()
@@ -360,5 +382,68 @@ describe('EditorRail', () => {
     expect(props.onRandomize).toHaveBeenCalledTimes(1)
     expect(props.onMutate).toHaveBeenCalledTimes(1)
     expect(impactMedium).toHaveBeenCalledTimes(1)
+  })
+
+  it('comes back at the detent it had before the layout changed', () => {
+    const first = mount()
+    fireEvent.click(screen.getByRole('tab', { name: 'Shape' }))
+    expect(sheet().style.height).toBe('375px')
+
+    // Crossing the rail-or-deck threshold unmounts this surface and mounts
+    // the other one; the canvas is handed back on the way out.
+    first.unmount()
+    expect(first.onCoveredHeightChange).toHaveBeenLastCalledWith(0)
+
+    const second = mount()
+    expect(sheet().style.height).toBe('375px')
+    expect(second.onCoveredHeightChange).toHaveBeenLastCalledWith(
+      375 - PEEK_HEIGHT,
+    )
+  })
+
+  it('docks the shell in front of the chips', () => {
+    mount({ leading: <button type="button">Create, navigation</button> })
+    const row = screen.getByTestId('editor-rail-leading')
+    const firstChip = screen.getAllByRole('tab')[0]!
+    expect(row.textContent).toBe('Create, navigation')
+    // Leading means leading: the capsule comes before the first chip.
+    expect(
+      row.compareDocumentPosition(firstChip) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('answers back one detent at a time', () => {
+    mount()
+    setRailDetent('large')
+    expect(backDepth()).toBe(1)
+
+    expect(popBack()).toBe(true)
+    expect(sheet().dataset.detent).toBe('medium')
+    expect(popBack()).toBe(true)
+    expect(sheet().dataset.detent).toBe('peek')
+
+    // Peek is the floor: the rail is never dismissed, so back leaves the
+    // registry and the next press is the app's to answer.
+    expect(backDepth()).toBe(0)
+    expect(popBack()).toBe(false)
+  })
+
+  it('leaves the tab order while a destination covers it', () => {
+    mount()
+    const dock = screen.getByRole('region', { name: 'Editor controls' })
+    expect(dock.hasAttribute('inert')).toBe(false)
+
+    // Home overlays the editor and the editor stays mounted, so without this
+    // a keyboard or screen reader walked the rail, the chips and the capsule
+    // behind it - fourteen controls that used to be unmounted here.
+    setActiveTab('home')
+    expect(dock.hasAttribute('inert')).toBe(true)
+    // Out of reach, not gone: the sheet, its detent and the chip row are all
+    // still here, which is the whole reason this stays mounted.
+    expect(sheet().getAttribute('data-detent')).toBe('peek')
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+
+    setActiveTab('workspace')
+    expect(dock.hasAttribute('inert')).toBe(false)
   })
 })
