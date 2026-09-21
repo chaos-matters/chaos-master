@@ -1187,3 +1187,29 @@ describe('resolveKeyframeValue segment ownership', () => {
     expect(resolveKeyframeValue(lerpIntoNext, 5)).toBe(5)
   })
 })
+
+/**
+ * `loadRevision` is how the dope sheet learns that a whole animation arrived —
+ * a file, a drop, a share link, the gallery, a tool — rather than a keyframe
+ * being edited, so it can fit the new sequence into view. Editing must not
+ * look like loading, or the viewer's zoom would be taken away on every change.
+ */
+describe('loadRevision', () => {
+  it('counts whole-animation loads and ignores keyframe edits', () => {
+    const timeline = createTimelineState()
+    expect(timeline.loadRevision()).toBe(0)
+
+    timeline.loadTracks([
+      { parameterPath: 'camera.zoom', keyframes: [{ frame: 0, value: 1 }] },
+    ])
+    expect(timeline.loadRevision()).toBe(1)
+
+    timeline.addKeyframe('camera.zoom', 30, 2)
+    timeline.setKeyframeValue('camera.zoom', 30, 3)
+    timeline.removeKeyframe('camera.zoom', 30)
+    expect(timeline.loadRevision()).toBe(1)
+
+    timeline.loadTracks([])
+    expect(timeline.loadRevision()).toBe(2)
+  })
+})

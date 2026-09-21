@@ -721,6 +721,10 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     equals: false,
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
+  // Bumped by `loadTracks`: one number the view can watch to know that a whole
+  // animation arrived (a file, a drop, a share link, the gallery, a tool) as
+  // opposed to a keyframe being edited. The dope sheet fits itself to it.
+  const [loadRevision, setLoadRevision] = createSignal(0)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
   // Blender-like: once the playhead is moved (seek/scrub/step/play), the canvas
   // keeps showing that frame's animated state on release ("held"), instead of
@@ -1716,6 +1720,7 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
   function loadTracks(incoming: readonly TimelineTrack[]) {
     setPreviewHeld(false)
+    setLoadRevision((n) => n + 1)
     // A track load is a document boundary: without this, Ctrl+Z after
     // loading another flame (or New Flame / 2D-3D switch) restored the
     // PREVIOUS flame's track snapshots onto the new one — orphaned
@@ -1744,6 +1749,7 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     setCurrentFrame,
     config,
     setConfig,
+    loadRevision,
     tracks,
     setTracks,
     lastAddedKeyframe,

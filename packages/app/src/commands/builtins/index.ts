@@ -1,6 +1,7 @@
 import './flame'
 import './audio'
 import './camera'
+import './export'
 import './generate'
 import './history'
 import './lesson'

@@ -87,6 +87,7 @@ export function DopeSheet(props: DopeSheetProps) {
       BASE_FRAME_WIDTH,
       BASE_TRACK_HEIGHT,
       trackNameWidth,
+      timeline.loadRevision,
     )
 
   props.registerViewApi?.({ zoomLevel, setZoomLevel, autoFitZoom })

@@ -10,6 +10,7 @@ import type { SonificationSnapshot } from '@/recorder/sonificationState'
 import type { SessionRecordingStartResult } from '@/recorder/types'
 import type { SeatId } from '@/seats/seatId'
 import type { HistorySetter } from '@/utils/createStoreHistory'
+import type { NormalizedAnimationRender, NormalizedImageRender, } from '@/utils/exportRequests'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
 
@@ -136,6 +137,13 @@ export interface CommandContext {
     /** Detach a held timeline frame when a replayed camera edit takes over. */
     setPreviewHeld?: Setter<boolean>
     play: () => void
+    /**
+     * Stop wall-clock playback. Optional as a group member for the same reason
+     * as `timeline.edit`: a sandbox has no transport. `timeline.playFor`
+     * refuses to start rather than start playback it cannot stop.
+     */
+    pause?: () => void
+    isPlaying?: () => boolean
     setLoop: (loop: boolean) => void
     setFps: (fps: number, coalesceId?: string) => void
     setAutoFps?: (enabled: boolean) => void
@@ -268,6 +276,27 @@ export interface CommandContext {
     openReplay: (session: RecordedSession) => void
     actionCount: () => number
   }
+  /**
+   * Background export as a script drives it, with no modal in the way.
+   *
+   * The commands validate the caller's options; everything else an export job
+   * needs — the palette in force, the blend flame, the timeline's tracks and
+   * config, the recorded session to embed — is ambient workspace state that
+   * only the workspace can supply, which is why this is a seam rather than a
+   * direct `enqueue*Job` call from the command. Optional as a group like
+   * `recorder?`: sandboxes have no export host, and `export.render*` reports
+   * that instead of pretending to queue.
+   */
+  exportJobs?: {
+    /** Queue an offscreen PNG render of the current flame. */
+    renderImage: (request: NormalizedImageRender) => void
+    /**
+     * Queue an offscreen animation render of the current flame and timeline.
+     * An omitted frame range resolves to the one the export modal would have
+     * offered (see `resolveExportFrameRange`).
+     */
+    renderAnimation: (request: NormalizedAnimationRender) => void
+  }
   /** Arcade hub and pilot affordances the tools may drive. */
   arcade?: {
     openHub: (mode?: 'teach' | 'cinema' | 'duel' | 'beats') => void
@@ -350,4 +379,15 @@ export interface FlameCommand {
    */
   focus?: (args: unknown[]) => string | undefined
   execute: (ctx: CommandContext, ...args: unknown[]) => void
+  /**
+   * What the agent surface hands back as `result` after this command ran.
+   *
+   * Runs AFTER `execute`, on the normalized args, and is never recorded and
+   * never replayed: a session file replays writes, and a read has none. It
+   * exists for the commands that only queue work — a script that cannot see
+   * its own export job has to guess when the file is ready, and guessing is
+   * how a poller ends up collecting a half-encoded video. Must not throw and
+   * must stay small: tool results are kept to about 1.5 KB of JSON.
+   */
+  report?: (ctx: CommandContext, ...args: unknown[]) => unknown
 }
