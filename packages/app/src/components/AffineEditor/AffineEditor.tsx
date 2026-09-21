@@ -1002,6 +1002,9 @@ export function AffineEditor(props: {
             eventTarget={div()}
             zoom={[zoom, setZoom]}
             position={[position, setPosition]}
+            /* The grid tab's own view, with its own zoom and position signals.
+               It is not the flame's camera, so it does not turn with one. */
+            rotation={() => 0}
           >
             <Grid isVisible={isVisible} />
             <svg

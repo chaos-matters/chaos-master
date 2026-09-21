@@ -3205,6 +3205,17 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera.zoom
   })
 
+  const effectiveRotation = createMemo(() => {
+    if (animatingCamera()) {
+      const val = timeline.resolveValueAtPath(
+        'camera.rotation',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera.rotation ?? 0
+  })
+
   const effectivePosition = createMemo(() => {
     const base = flameDescriptor.renderSettings.camera.position
     if (animatingCamera()) {
@@ -3959,6 +3970,7 @@ export function MainWorkspace(props: AppProps) {
               hoveredVariationType={hoveredVariationType}
               hoveredCustomVarDef={hoveredCustomVarDef}
               hoveredBlendName={hoveredBlendName}
+              effectiveRotation={effectiveRotation}
             >
               <Show when={!isPhone() && !isTablet()}>
                 <WorkspaceBottomBar

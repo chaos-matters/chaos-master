@@ -108,6 +108,7 @@ export function detectHardwareTier(): Promise<HardwareTier> {
             <Camera2D
               position={vec2f(...benchmarkFlame.renderSettings.camera.position)}
               zoom={benchmarkFlame.renderSettings.camera.zoom}
+              rotation={benchmarkFlame.renderSettings.camera.rotation ?? 0}
             >
               <Flam3
                 quality={0.9}

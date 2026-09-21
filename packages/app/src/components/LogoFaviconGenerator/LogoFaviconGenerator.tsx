@@ -287,6 +287,10 @@ function LogoDialog(props: LogoDialogProps) {
                   <WheelZoomCamera2D
                     zoom={props.cameraZoom}
                     position={props.cameraPosition}
+                    /* The generator frames the mark itself, starting at zoom 1
+                       on the origin rather than at the flame's camera, so it
+                       does not inherit the flame's rotation either. */
+                    rotation={() => 0}
                   >
                     <Flam3
                       quality={props.quality}

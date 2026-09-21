@@ -1035,6 +1035,9 @@ function LiveFlame(props: {
     vec2f(...props.flame.renderSettings.camera.position),
   )
   const cameraZoom = createMemo(() => props.flame.renderSettings.camera.zoom)
+  const cameraRotation = createMemo(
+    () => props.flame.renderSettings.camera.rotation ?? 0,
+  )
   const camera3D = createMemo(() => props.flame.renderSettings.camera3D)
   const edgeFadeColor = createMemo(() => vec4f(0))
 
@@ -1141,12 +1144,20 @@ function LiveFlame(props: {
           <Show
             when={props.engaged}
             fallback={
-              <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
+              <Camera2D
+                position={cameraPosition()}
+                zoom={cameraZoom()}
+                rotation={cameraRotation()}
+              >
                 {flam3()}
               </Camera2D>
             }
           >
-            <WheelZoomCamera2D position={cam2D().position} zoom={cam2D().zoom}>
+            <WheelZoomCamera2D
+              position={cam2D().position}
+              zoom={cam2D().zoom}
+              rotation={cameraRotation}
+            >
               {flam3()}
             </WheelZoomCamera2D>
           </Show>

@@ -108,6 +108,7 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
             ...props.flameDescriptor.renderSettings.camera.position,
           )}
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
+          rotation={props.flameDescriptor.renderSettings.camera.rotation ?? 0}
         >
           <Flam3
             quality={DEFAULT_QUALITY}

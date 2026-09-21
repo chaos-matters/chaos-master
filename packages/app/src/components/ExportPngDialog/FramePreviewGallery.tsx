@@ -250,6 +250,11 @@ export function FramePreviewGallery(props: Props) {
   }
 
   const cameraZoom = () => frameDescriptor().renderSettings.camera.zoom
+  // The strip renders a timeline-baked frame, so it must turn with the same
+  // `camera.rotation` the offline renderer reads out of that frame — otherwise
+  // a flame with a rotation track previews flat and exports turning.
+  const cameraRotation = () =>
+    frameDescriptor().renderSettings.camera.rotation ?? 0
 
   // Hover handlers for thumbnails (debounced, viewport-fixed)
   function onThumbEnter(idx: number, e: MouseEvent) {
@@ -334,7 +339,11 @@ export function FramePreviewGallery(props: Props) {
                       (frameDescriptor()?.renderSettings.dimensions ?? 2) === 3
                     }
                     fallback={
-                      <Camera2D position={cameraPos()} zoom={cameraZoom()}>
+                      <Camera2D
+                        position={cameraPos()}
+                        zoom={cameraZoom()}
+                        rotation={cameraRotation()}
+                      >
                         {flameView()}
                       </Camera2D>
                     }

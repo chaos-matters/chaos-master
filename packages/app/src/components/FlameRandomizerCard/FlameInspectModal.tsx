@@ -46,6 +46,7 @@ export function FlameInspectModal(props: {
                     ...props.flame.renderSettings.camera.position,
                   )}
                   zoom={props.flame.renderSettings.camera.zoom}
+                  rotation={props.flame.renderSettings.camera.rotation ?? 0}
                 >
                   <Flam3
                     animationEnabled={false}

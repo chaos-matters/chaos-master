@@ -168,6 +168,9 @@ function FlameThumbnail(props: {
                         ...displayFlame().renderSettings.camera.position,
                       )}
                       zoom={displayFlame().renderSettings.camera.zoom}
+                      rotation={
+                        displayFlame().renderSettings.camera.rotation ?? 0
+                      }
                     >
                       {flameView()}
                     </Camera2D>

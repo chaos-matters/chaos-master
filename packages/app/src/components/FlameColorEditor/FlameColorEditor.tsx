@@ -327,6 +327,9 @@ export function FlameColorEditor(props: {
           eventTarget={div()}
           zoom={[zoom, setZoom]}
           position={[position, setPosition]}
+          /* The gradient editor's own view, like the affine grid's: its own
+             zoom and position signals, not the flame's camera. */
+          rotation={() => 0}
         >
           <Gradient isVisible={isVisible} />
           <svg
