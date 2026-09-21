@@ -6,6 +6,16 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## Unreleased
+
+### Product Hunt
+
+- The hero carries the Product Hunt badge for the Lumen Apeiron launch, between
+  the two buttons and the tech pills. Their own image, keyed to the launch post
+  id (1252539); `theme=dark` is the variant drawn on `#221D21`, so it sits on
+  the black hero instead of punching a white card through it. Nothing to add to
+  a CSP — this package ships no `_headers`.
+
 ## [0.2.0] — 2026-09-04
 
 ### Lumen Arcade

@@ -4,6 +4,14 @@ import { LAUNCH_ICON } from '../icons'
 
 const appUrl = 'https://lumenapeiron.com'
 const repoUrl = 'https://github.com/chaos-matters/chaos-master'
+// Product Hunt. The badge image is theirs and is keyed to the launch post id
+// (1252539); `theme=dark` is the one drawn on #221D21, so it sits on the black
+// hero instead of punching a white card through it. Built here rather than
+// inline because the query string is full of ampersands.
+const productHuntUrl =
+  'https://www.producthunt.com/products/lumen-apeiron-the-chaos-master?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-lumen-apeiron-the-chaos-master'
+const productHuntBadge =
+  'https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1252539&theme=dark'
 // The hero poster (hero-flame.jpg) sits behind the live GPU flame as the
 // non-WebGPU fallback; HeroFlame is a client-only Solid island that mounts the
 // app's real-time renderer on top once WebGPU is available.
@@ -34,6 +42,22 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
       >
       <a class="btn btn-ghost" href={repoUrl}>View on GitHub</a>
     </div>
+    <a
+      class="ph-badge"
+      href={productHuntUrl}
+      target="_blank"
+      rel="noopener"
+      title="Lumen Apeiron on Product Hunt"
+    >
+      <img
+        src={productHuntBadge}
+        alt="Lumen Apeiron on Product Hunt"
+        width="250"
+        height="54"
+        loading="lazy"
+        decoding="async"
+      />
+    </a>
     <ul class="hero-badges">
       <li>WebGPU</li>
       <li>TypeGPU</li>
@@ -132,6 +156,25 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
   /* Feature badges, moved below the CTA: real pills with a translucent, blurred
      backing so they stay legible over a bright flame (the old single eyebrow line
      above the headline washed out on big screens). */
+  /* Under the two buttons, above the tech pills: read after the thing the
+     page is actually asking you to do, and before the small print. */
+  .ph-badge {
+    display: inline-block;
+    margin-top: 26px;
+    border-radius: 10px;
+    opacity: 0.88;
+    transition: opacity 0.2s;
+  }
+  .ph-badge:hover,
+  .ph-badge:focus-visible {
+    opacity: 1;
+  }
+  .ph-badge img {
+    display: block;
+    width: 250px;
+    height: auto;
+    max-width: 100%;
+  }
   .hero-badges {
     list-style: none;
     margin: 30px 0 0;
