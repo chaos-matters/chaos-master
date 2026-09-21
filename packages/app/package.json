@@ -14,7 +14,7 @@
     "e2e:serve": "VITE_GA_ID= vite build && vite preview --port 4173 --strictPort",
     "start": "vite",
     "test": "vitest",
-    "test:scripts": "node --test scripts/gallery-poster-manifest.test.mjs",
+    "test:scripts": "node --test scripts/gallery-poster-manifest.test.mjs scripts/synthesize-steps.test.mjs",
     "analyze-bundle": "VITE_ANALYZE_BUNDLE=true vite build",
     "deploy:dev": "pnpm run build:dev && pnpm exec wrangler deploy --env dev",
     "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod",

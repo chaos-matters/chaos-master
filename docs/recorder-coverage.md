@@ -377,6 +377,25 @@ the replay and library panels it opens.
   yet” remains outside that detector, and a matching external audio source is
   still required when the take used one.
 
+## Sessions nobody recorded
+
+A session can also be **synthesized** from a finished flame — planned backwards
+from the descriptor rather than logged while someone worked
+(`recorder/synthesize/`, plans/synthesized-creation-replay.md). It is the same
+format, built from the same commands, with the same labels and follow-cam
+hints, so replay, the step list and the video exporters need no special case.
+One optional field, `synthetic: { strategy, seed, snapped, residual }`,
+separates the two, and the Replay panel uses it to say **“A possible way to
+build this”** instead of implying a recording. The field is additive, so the
+format version is unchanged and older sessions still load.
+
+The coverage table above is exactly what such a plan can express. What it
+cannot — symmetry transforms (`_sym__…`, which only `flame.applySymmetry` can
+mint), unregistered or custom variation types, and `edgeFadeColor`, which has
+no `setRenderSetting` path — is carried by a single closing `flame.load` and
+listed in `synthetic.residual`, so a reconstruction never quietly lands on a
+different flame.
+
 ## Housekeeping worth knowing about
 
 Three source files contained a **literal NUL byte** — two of them using one as

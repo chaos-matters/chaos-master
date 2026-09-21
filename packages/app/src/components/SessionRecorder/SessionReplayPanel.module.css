@@ -52,6 +52,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Sits next to the title, not pushed right: it qualifies what "Replay" means
+   here, rather than warning about the recording's fidelity. */
+.synthetic {
+  padding: 0.05rem 0.4rem;
+  border-radius: 10px;
+  border: 1px solid oklch(60% 0.08 240 / 0.6);
+  opacity: 0.85;
+  white-space: nowrap;
+  cursor: help;
+}
+
 .warning {
   margin-left: auto;
   padding: 0.05rem 0.4rem;

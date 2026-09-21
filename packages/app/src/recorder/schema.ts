@@ -110,6 +110,57 @@ const RecordedActionSchema = v.object({
 
 export type RecordedAction = v.InferOutput<typeof RecordedActionSchema>
 
+export const MAX_SYNTHETIC_STRATEGY_CHARS = 32
+export const MAX_SYNTHETIC_RESIDUAL_ENTRIES = 64
+export const MAX_SYNTHETIC_RESIDUAL_CHARS = 256
+const MAX_SYNTHETIC_SEED = 0xffff_ffff
+
+/**
+ * Present only on a session that was SYNTHESIZED from a finished flame rather
+ * than recorded while someone made it (`recorder/synthesize/`).
+ *
+ * The two kinds share this container deliberately — replay, the step list, the
+ * follow-cam, the video exporter and the `FlameSteps` chunk all work on a
+ * session, and a second format would mean a second everything. This field is
+ * what keeps them distinguishable, and the replay UI uses it to avoid claiming
+ * a plausible reconstruction is how a flame was actually made.
+ *
+ * Optional, and additive: a session written before this existed simply lacks
+ * it, and an older build parses a session that has it and ignores it (the
+ * shell schema drops keys it does not know), so the format version is
+ * unchanged.
+ */
+const SyntheticOriginSchema = v.object({
+  /** Which journey produced the order — see `SYNTHESIS_STRATEGIES`. Kept as a
+   *  bounded string rather than a picklist so the strategy list can grow
+   *  without a format change, and so this module stays free of the planner. */
+  strategy: v.pipe(
+    v.string(),
+    v.nonEmpty(),
+    v.maxLength(MAX_SYNTHETIC_STRATEGY_CHARS),
+  ),
+  /** The seed the order was drawn with; the same seed replans identically. */
+  seed: v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(0),
+    v.maxValue(MAX_SYNTHETIC_SEED),
+  ),
+  /** True when the steps did not reach the target on their own and the
+   *  session ends with a single "snap to the finished flame". */
+  snapped: v.optional(v.boolean(), false),
+  /** What that snap had to carry — the descriptor paths no command reached. */
+  residual: v.optional(
+    v.pipe(
+      v.array(v.pipe(v.string(), v.maxLength(MAX_SYNTHETIC_RESIDUAL_CHARS))),
+      v.maxLength(MAX_SYNTHETIC_RESIDUAL_ENTRIES),
+    ),
+    [],
+  ),
+})
+
+export type SyntheticOrigin = v.InferOutput<typeof SyntheticOriginSchema>
+
 /** Structural validation used by the live recorder before retaining an
  * action. Session-level rules (command-id policy and monotonic ordering) stay
  * in {@link validateSession}, where imported and recorded sessions meet. */
@@ -221,6 +272,8 @@ const RecordedSessionShellSchema = v.object({
   initialSonification: v.optional(SonificationSnapshotSchema),
   /** View state at Record. Optional keeps older session files parseable. */
   initialView: v.optional(SessionViewSnapshot),
+  /** Absent on a real recording; present on a plausible reconstruction. */
+  synthetic: v.optional(SyntheticOriginSchema),
   actions: v.pipe(
     v.array(RecordedActionSchema),
     v.maxLength(MAX_SESSION_ACTIONS),
