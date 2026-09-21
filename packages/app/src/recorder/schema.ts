@@ -1,3 +1,4 @@
+import { GLIDE_STEP_HINTS, MAX_GLIDE_MS } from '@/flame/glide/types'
 import { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import { isSafeFlameEntityId, MAX_FLAME_TRANSFORMS, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { TimelineSnapshot, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
@@ -37,6 +38,8 @@ export const MAX_ACTION_LABEL_CHARS = 4096
 export const MAX_ACTION_FOCUS_CHARS = 512
 export const MAX_ACTION_NOTE_CHARS = 16_384
 export const MAX_ACTION_HOLD_MS = 600_000
+
+const GlideStepHintSchema = v.picklist(GLIDE_STEP_HINTS)
 
 // Command ids are dot-separated, but the existing registry deliberately uses
 // camelCase within a segment (`flame.setGamma`, `timeline.loadTimeline`). Keep
@@ -106,6 +109,28 @@ const RecordedActionSchema = v.object({
       v.maxValue(MAX_ACTION_HOLD_MS),
     ),
   ),
+  /**
+   * How long the animated transition INTO this step should take, overriding
+   * both the hint below and the planner's own reading of the change.
+   *
+   * A sibling of `holdMs` and the same kind of data: authored pacing a human
+   * sets in the replay panel, which wins over anything measured or derived.
+   * `0` means this step snaps.
+   */
+  glideMs: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(MAX_GLIDE_MS)),
+  ),
+  /**
+   * What KIND of transition this step is — `cut`, `scalar`, `camera`,
+   * `variation`, `transform` or `whole` — resolved against the duration table
+   * at replay time rather than written as a duration.
+   *
+   * Shaped like `focus`, and for the same reason: a semantic string survives
+   * retuning the pacing, a number in a file does not. A synthesized session
+   * sets it from the change it planned; a real recording usually omits it and
+   * lets the diff speak for itself.
+   */
+  glide: v.optional(GlideStepHintSchema),
 })
 
 export type RecordedAction = v.InferOutput<typeof RecordedActionSchema>

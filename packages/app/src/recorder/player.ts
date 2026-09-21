@@ -1,8 +1,10 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
+import { glideMsForAction } from './glide'
 import { NARRATION_COMMAND_ID } from './narrationMode'
 import { getLiveWorkspaceMutationGeneration, isSessionRecording, withRecordingSuppressed, } from './recorder'
 import { loadSessionStart } from './replay'
+import type { ReplayGlideOptions } from './glide'
 import type { ReplayTarget } from './replay'
 import type { RecordedAction, RecordedSession } from './schema'
 
@@ -169,14 +171,35 @@ export function closingHoldMs(
  * Shared with `createReplayVideoSchedule` so a live replay and an exported
  * video cannot drift — `replayInterfaceVideo` validates its encoder budget
  * from the schedule and then screen-records the live player, so a difference
- * between the two overruns the capture.
+ * between the two overruns the capture. `glideMs` is subtracted here, at the
+ * single owner of cadence, rather than at the call sites, for exactly that
+ * reason: see {@link glideMsForAction} for where the number comes from.
  */
 export function stepGapMs(
   previous: RecordedAction | undefined,
   next: RecordedAction | undefined,
   speed: number,
+  glideMs = 0,
 ): number {
   if (!next) return 0
+  const base = rawStepGapMs(previous, next, speed)
+  if (glideMs <= 0) return base
+  // A glide is presentation spent INSIDE the dwell it precedes, not extra time
+  // on top of it: the transition into a step is part of looking at that step.
+  // Adding it instead would stretch a take past the duration its own schedule
+  // validated the encoder budget against.
+  //
+  // The floor never RAISES a gap — an authored `holdMs: 0` still means zero —
+  // so a take with glides on is the same length or shorter, never longer.
+  const floor = Math.min(base, MIN_STEP_GAP_MS)
+  return Math.max(floor, base - glideMs)
+}
+
+function rawStepGapMs(
+  previous: RecordedAction | undefined,
+  next: RecordedAction,
+  speed: number,
+): number {
   if (previous?.holdMs !== undefined) return previous.holdMs / speed
   const sentence = previous === undefined ? undefined : narrationText(previous)
   if (sentence !== undefined) return narrationHoldMs(sentence) / speed
@@ -221,6 +244,15 @@ export type SessionPlayerOptions = {
   beforeAction?: (action: RecordedAction) => void
   onFinished?: () => void
   onError?: (message: string) => void
+  /**
+   * Whether steps glide into place, read afresh for each step so the panel's
+   * toggle lands on the next one rather than on the next Play.
+   *
+   * Off is the behaviour replay has always had: every step is a cut. The
+   * duration it produces is SUBTRACTED from the dwell that follows, so turning
+   * it on never makes a take longer.
+   */
+  glide?: () => ReplayGlideOptions
 }
 
 export function createSessionPlayer(
@@ -273,6 +305,10 @@ export function createSessionPlayer(
     preservePublishedAction = false,
     preserveBaseline = false,
   ) {
+    // Land the glide before the user's edit is evaluated, so their change is
+    // made to the state the recording reached rather than to a frame of the
+    // animation that happened to be on screen.
+    target.settleGlide?.()
     setIsPlaying(false)
     setIsFinished(false)
     if (!preservePublishedAction) setActionPublished(false)
@@ -375,12 +411,32 @@ export function createSessionPlayer(
     }
   }
 
+  /** How long the transition INTO `index` should take. 0 = a cut. */
+  function glideMsFor(action: RecordedAction | undefined): number {
+    const settings = options.glide?.()
+    if (!settings || !settings.enabled) return 0
+    if (target.glide === undefined) return 0
+    return glideMsForAction(action, settings)
+  }
+
   /** Apply one visible action, including follow-cam preparation/publication. */
   function applyAction(index: number): boolean {
     const action = actions[index]
     if (!action) return false
+    // Settled BEFORE the command runs, whether or not THIS step animates. A
+    // glide is subtracted from the gap that precedes it, so a step can be due
+    // while the previous transition is still moving; a cut applied underneath
+    // one is overwritten frame by frame and then undone by that transition's
+    // own settle, and the viewer sees the step it cut to appear and vanish.
+    const settled = target.settleGlide?.()
+    const durationMs = glideMsFor(action)
+    // What the viewer can currently see, so the animation starts from there
+    // while the step itself lands on the state the recording describes.
+    const from = durationMs > 0 ? (settled ?? target.readFlame?.()) : undefined
+    const start = from === undefined ? undefined : deepClone(from)
     const result = executeAction(action, true)
     if (!result.ok) return rejectAction(index, result.error)
+    if (start !== undefined) target.glide?.(start, durationMs)
     setStepIndex(index)
     setActionPublished(true)
     return true
@@ -433,16 +489,18 @@ export function createSessionPlayer(
   /** Rebuilds are synchronous state reconstruction, not visible playback.
    *  Defer target-owned resources until the destination state is known. */
   function rebuildTo(index: number): boolean {
+    // A rebuild is not something anyone watches, so nothing glides into it —
+    // and a glide still running would write over the state being rebuilt.
+    target.settleGlide?.()
     return withDeferredEffects(() => rebuildToNow(index))
   }
 
   /** How long to wait before applying `index`. See {@link stepGapMs}. */
   function gapBefore(index: number): number {
-    return stepGapMs(
-      index > 0 ? actions[index - 1] : undefined,
-      actions[index],
-      speed(),
-    )
+    const previous = index > 0 ? actions[index - 1] : undefined
+    // The glide subtracted here is the one INTO `previous`: it is spent at the
+    // start of the dwell on that step, not added to it.
+    return stepGapMs(previous, actions[index], speed(), glideMsFor(previous))
   }
 
   function finish() {
@@ -543,6 +601,7 @@ export function createSessionPlayer(
       }
     },
     stop() {
+      target.settleGlide?.()
       setIsPlaying(false)
       setIsFinished(false)
       clearTimer()

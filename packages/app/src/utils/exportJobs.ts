@@ -4,6 +4,7 @@ import type { TimelineConfig, TimelineTrack } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ReplayGlideOptions } from '@/recorder/glide'
 import type { RecordedSession } from '@/recorder/schema'
 
 export type ReplayVideoSpec = {
@@ -11,6 +12,13 @@ export type ReplayVideoSpec = {
   playbackSpeed: number
   leadInMs: number
   tailMs: number
+  /**
+   * Whether steps glide into place, and how long for.
+   *
+   * Optional and additive: a job spec written before this simply lacks it and
+   * every step cuts, which is what replay video has always produced.
+   */
+  glide?: ReplayGlideOptions
 }
 
 /**

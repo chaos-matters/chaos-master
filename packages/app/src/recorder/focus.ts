@@ -246,6 +246,11 @@ const STATIC_COMMAND_HINTS: Readonly<Record<string, string>> = Object.freeze({
   'history.redo': 'ui:undoRedo-controls',
   'export.png': 'ui:export-png',
   'export.animation': 'ui:timeline-section',
+  'glide.setEnabled': 'ui:replay-glide',
+  'glide.setQuality': 'ui:replay-glide',
+  // `glide.toFlame` is deliberately absent, like a whole-flame load: the
+  // change is the whole picture, and there is no one control to spotlight.
+  // Not `ui:canvas` either — see the note above the camera cases.
 })
 
 function resolveRenderSettingHint(

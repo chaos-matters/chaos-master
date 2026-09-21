@@ -89,6 +89,14 @@ async function main(): Promise<void> {
           ? {}
           : { createdAt: options.createdAt }),
       })
+      // One `error`, decided here. Two spreads each carrying that key would
+      // let the later one silently drop the earlier message, and the planner
+      // is free to start reporting both at once.
+      const failure =
+        report.error ??
+        (report.mismatched.length === 0
+          ? undefined
+          : `replay diverged at ${report.mismatched.join(', ')}`)
       results.push({
         input,
         strategy,
@@ -96,11 +104,8 @@ async function main(): Promise<void> {
         snapped: report.snapped,
         steps: report.steps,
         residual: [...report.residual],
-        ...(report.error === undefined ? {} : { error: report.error }),
+        ...(failure === undefined ? {} : { error: failure }),
         ...(report.session === undefined ? {} : { session: report.session }),
-        ...(report.mismatched.length === 0
-          ? {}
-          : { error: `replay diverged at ${report.mismatched.join(', ')}` }),
       })
     }
   }

@@ -43,6 +43,10 @@ const COMMAND_ARG_HINTS: Readonly<Record<string, string>> = {
   'lesson.note': '[text] — prefer the arcade_narrate tool',
   'timeline.setFps': '[fps 1-60]',
   'timeline.setLoopMode': '["off"|"seamless"|"cycle"]',
+  'glide.setEnabled': '[boolean] — animate changes instead of snapping to them',
+  'glide.setQuality':
+    '["auto"|"responsive"|"balanced"|"full"] — quality given up while a glide moves',
+  'glide.toFlame': '[flameDescriptor, durationMs?] — land exactly on the flame',
   'timeline.playFor': '[seconds 0-600] — playback stops itself afterwards',
   'timeline.stop': '[]',
   'export.renderImage':

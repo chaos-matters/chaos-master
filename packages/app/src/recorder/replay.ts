@@ -113,6 +113,31 @@ export type ReplayTarget = {
   loadView?: (view: SessionViewSnapshot) => void
   /** False rejects an untrusted action and aborts the replay. */
   execute: (id: string, args: unknown[]) => unknown
+  /**
+   * The document as it stands, for a glide's starting point.
+   *
+   * Optional like everything else here: a sandbox with no renderer has nothing
+   * to animate, and a target that leaves these unset replays by cutting
+   * between states exactly as replay has always done.
+   */
+  readFlame?: () => FlameDescriptor
+  /**
+   * Animate from `from` to the document as it stands now, over `durationMs`,
+   * and land on the document exactly.
+   *
+   * A glide is an EFFECT, never authorship: it writes through the workspace's
+   * silent path, so it reaches neither the undo stack nor the recorder, and it
+   * is never written into the user's timeline.
+   */
+  glide?: (from: FlameDescriptor, durationMs: number) => void
+  /**
+   * Settle a glide already in flight and hand back what the viewer can see.
+   *
+   * The next action has to be applied to the SETTLED document — applying it to
+   * a half-interpolated one would bake an intermediate into the result — while
+   * the glide that follows should start where the eye already is.
+   */
+  settleGlide?: () => FlameDescriptor | undefined
   /** Validate canonical action args without touching workspace state. */
   preflight?: (id: string, args: readonly unknown[]) => string | undefined
   /**

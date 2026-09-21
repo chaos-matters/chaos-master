@@ -1,3 +1,15 @@
+/**
+ * Undo and redo for a Solid store, kept as patches rather than snapshots.
+ *
+ * Every write to the document passes through here: ordinary edits, gestures
+ * held open as a preview and committed as one entry, replay's owned previews,
+ * and the silent writes that deliberately record nothing. It also tells a host
+ * before the document changes under it, which is how anything presenting the
+ * store as something else gets to land first.
+ *
+ * The types — an entry, the preview lease, the surface consumers hold and the
+ * hooks a host passes in — are in `changeHistoryTypes.ts` and re-exported here.
+ */
 import { batch, createSignal } from 'solid-js'
 import { reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
@@ -5,7 +17,14 @@ import { deepClone } from './clone'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
 import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
 import type { SetStoreFunction, Store } from 'solid-js/store'
-import type { Patch } from 'structurajs'
+import type { ChangeHistory, CreateStoreHistoryOptions, HistoryCommitOptions, HistoryItem, HistoryPreviewOwner, HistorySetter, PreviewHistoryItem, } from './changeHistoryTypes'
+
+export type {
+  ChangeHistory,
+  HistoryCommitOptions,
+  HistoryPreviewOwner,
+  HistorySetter,
+} from './changeHistoryTypes'
 
 // Three "immer"-like libraries were considered
 // immer - freezes objects it touches, doesn't support reference cycles
@@ -15,122 +34,14 @@ import type { Patch } from 'structurajs'
 //               instead of doing a pin-point update.
 enableStandardPatches(true)
 
-type HistoryItem = {
-  description?: string
-  forwardPatches: Patch[]
-  backwardPatches: Patch[]
-  /** Optional workspace state that travels with this entry. Replay uses this
-   *  to keep timeline/audio/view restoration atomic with the flame patches. */
-  undoEffect?: () => void
-  redoEffect?: () => void
-  /** Keep an entry whose flame patches are empty when its side effects still
-   *  represent a real workspace change. */
-  force?: boolean
-  /** Journal stamp for cross-system chronological undo (journaled mode). */
-  seq?: number
-}
-
-/**
- * Opaque lease for a long-lived preview transaction.
- *
- * Ordinary pointer gestures do not need one. Timed replay does: it leaves a
- * preview open while waiting between steps, so an unrelated user gesture must
- * be able to take the document back without accidentally appending its writes
- * to replay's undo entry (or letting later replay steps append to the user's
- * gesture).
- */
-export type HistoryPreviewOwner = symbol
-
-type PreviewHistoryItem = HistoryItem & {
-  owner?: HistoryPreviewOwner
-  onTakeover?: () => void
-}
-
-export type HistoryCommitOptions = Pick<
-  HistoryItem,
-  'undoEffect' | 'redoEffect' | 'force'
->
-
-export type HistorySetter<T extends object> = (
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-  setFn: (draft: T) => T | void,
-  description?: string,
-) => void
-
-export type ChangeHistory<T> = {
-  readonly replace: (value: T, description?: string) => void
-  readonly undo: () => void
-  readonly redo: () => void
-  readonly hasUndo: () => boolean
-  readonly hasRedo: () => boolean
-  readonly startPreview: (description?: string) => void
-  /**
-   * Open a preview that only writes made through `withPreviewOwner` may join.
-   * The first ordinary write or gesture synchronously invokes `onTakeover`;
-   * the owner should stop its producer and commit the preview there.
-   */
-  readonly startOwnedPreview: (
-    description: string | undefined,
-    onTakeover: () => void,
-  ) => HistoryPreviewOwner
-  /** Run one owned producer write. Throws after that owner has relinquished. */
-  readonly withPreviewOwner: <R>(owner: HistoryPreviewOwner, fn: () => R) => R
-  /** Relinquish an owned preview before a non-flame command mutates UI state. */
-  readonly takeOverOwnedPreview: () => boolean
-  /** True for any preview, including one exclusively owned by replay. */
-  readonly hasOpenPreview: () => boolean
-  /** True when the current/ordinary producer owns the open preview. */
-  readonly isPreviewing: () => boolean
-  readonly isUndoingOrRedoing: () => boolean
-  readonly commit: (options?: HistoryCommitOptions) => void
-  /** Commit only when `owner` still owns the active preview. */
-  readonly commitOwnedPreview: (
-    owner: HistoryPreviewOwner,
-    options?: HistoryCommitOptions,
-  ) => boolean
-  /** Journal stamp of the entry the next undo/redo would apply (null: none).
-   *  Used by the cross-system undo router; always null when not journaled. */
-  readonly peekUndoSeq: () => number | null
-  readonly peekRedoSeq: () => number | null
-  /** Mutate the store WITHOUT recording history. For automated writers that
-   *  must never pollute undo: the animation export applying per-frame state
-   *  (one entry per exported frame otherwise) and derived follower effects
-   *  like 3D auto-exposure (whose reactive write after an undo would inject
-   *  a fresh entry and destroy redo). */
-  readonly setSilently: (setFn: (draft: T) => void) => void
-  /** Replace the store WITHOUT recording history. Used by undo side effects
-   *  that must restore writes which were intentionally silent at source. */
-  readonly replaceSilently: (value: T) => void
-}
-
-type CreateStoreHistoryOptions = {
-  /** Join the app-wide undo journal: entries get recency stamps for the
-   *  cross-system undo router, and any journaled push (here or in the
-   *  timeline) invalidates redo everywhere. Leave OFF for throwaway preview
-   *  histories (e.g. the variation browser) so they stay isolated. */
-  journal?: boolean
-  /** Called whenever a NEW entry lands on the stack (set, commit, replace) —
-   *  exactly once per undoable edit, after no-op elision, and never for
-   *  undo/redo/setSilently. `fromPreview` marks the entry a gesture produced,
-   *  whose writes arrived during the preview rather than under the call that
-   *  pushes it. The session recorder hooks the main flame history here to
-   *  detect writes that did not arrive through a registered command (see
-   *  recorder/recorder.ts). */
-  onEntryPushed?: (
-    description: string | undefined,
-    fromPreview: boolean,
-  ) => void
-  /** Called when a gesture opens (`startPreview`). Bounds the window in which
-   *  the recorder coalesces a drag's repeated commands into one action. */
-  onPreviewStarted?: () => void
-}
-
 export function createStoreHistory<T extends object>(
   [store, setStore]: [Store<T>, SetStoreFunction<T>],
   {
     journal = false,
     onEntryPushed,
     onPreviewStarted,
+    onBeforeDocumentWrite,
+    onBeforeTimeTravel,
   }: CreateStoreHistoryOptions = {},
 ) {
   const [stackIndex, setStackIndex] = createSignal(-1)
@@ -227,6 +138,9 @@ export function createStoreHistory<T extends object>(
       console.warn('Nothing to undo')
       return
     }
+    // Before the store is read, never after: the callback may write the very
+    // state this patch is computed against.
+    onBeforeTimeTravel?.()
     const { backwardPatches } = item
     // Apply patches to a plain object copy, then reconcile into the store.
     // Using produce + applyPatchesMutatively doesn't truly remove deleted keys
@@ -255,6 +169,7 @@ export function createStoreHistory<T extends object>(
       console.warn('Nothing to redo')
       return
     }
+    onBeforeTimeTravel?.()
     const { forwardPatches } = item
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, forwardPatches)
@@ -312,6 +227,7 @@ export function createStoreHistory<T extends object>(
   }
 
   const set: HistorySetter<T> = (setFn, description) => {
+    onBeforeDocumentWrite?.()
     relinquishOwnedPreview()
     // Run the mutation callback exactly ONCE. produceWithPatches yields both
     // the resulting state and the patches; the store is then updated by
@@ -440,6 +356,7 @@ export function createStoreHistory<T extends object>(
   }
 
   function replace(value: T, description?: string) {
+    onBeforeDocumentWrite?.()
     relinquishOwnedPreview()
     batch(() => {
       const [_, forwardPatches, backwardPatches] = produceWithPatches(
@@ -449,6 +366,66 @@ export function createStoreHistory<T extends object>(
       setStore(reconcile(value))
       addToStack({ forwardPatches, backwardPatches, description })
     })
+  }
+
+  /**
+   * Rewrite the newest entry so that it ends where the document actually is.
+   *
+   * For a change that was presented as a transition and cut short: the entry
+   * says "before -> target" while the document stopped on an intermediate
+   * frame. Left alone, undo is exact only by luck and redo puts the viewer on
+   * the target — a flame they interrupted precisely because they did not want
+   * it. Amended, both directions land on states that were really on screen.
+   *
+   * Nothing is pushed, so the recorder never sees a transition as an edit, and
+   * the entry keeps its description, its effects and its journal stamp: it is
+   * the same action, it just ended sooner than it meant to.
+   *
+   * `recordedEnd` is the state the entry was recorded as ending on. The stack
+   * holds patches and never snapshots, so it is the only way back to the state
+   * the entry started from — and going back through the entry's own backward
+   * patches is exact, because the pair are inverses by construction.
+   *
+   * Refused unless the newest entry is still the one `mark` was taken from, no
+   * gesture or replay transaction owns the document, and that entry really
+   * does end where the caller says: a transition with no entry behind it must
+   * not rewrite somebody else's.
+   */
+  function amendNewestEntry(mark: number | null, recordedEnd: T): boolean {
+    if (mark === null || preview() !== undefined) return false
+    const i = stackIndex()
+    const item = stack()[i]
+    if (!item || i !== stack().length - 1 || item.seq !== mark) return false
+
+    const end = deepClone(recordedEnd)
+    const before = (applyPatchesMutatively(end, item.backwardPatches) ??
+      end) as T
+    // Does this entry really end where the caller says? Taking it backwards
+    // and forwards again must land back on `recordedEnd`. It is a consistency
+    // check rather than a proof — an entry whose forward values happen to
+    // agree passes it — but it does refuse the case that matters, a
+    // transition with no entry of its own trying to rewrite somebody else's.
+    // A false refusal only leaves the entry as it is, which is where it was.
+    const roundTrip = applyPatchesMutatively(
+      deepClone(before) as object,
+      item.forwardPatches,
+    )
+    if (JSON.stringify(roundTrip) !== JSON.stringify(recordedEnd)) return false
+
+    const [, forwardPatches, backwardPatches] = produceWithPatches(
+      deepClone(before),
+      () => deepClone(unwrap(store)),
+    )
+    const amended: HistoryItem = {
+      ...item,
+      forwardPatches: deepClone(compressPatches(forwardPatches)),
+      backwardPatches: deepClone(compressPatches(backwardPatches)),
+    }
+    setStack((p) => {
+      p.splice(i, 1, amended)
+      return p
+    })
+    return true
   }
 
   function wrapIntoUndoing(fn: () => void) {
@@ -480,6 +457,7 @@ export function createStoreHistory<T extends object>(
       commit,
       commitOwnedPreview,
       replace,
+      amendNewestEntry,
       peekUndoSeq,
       peekRedoSeq,
       setSilently,

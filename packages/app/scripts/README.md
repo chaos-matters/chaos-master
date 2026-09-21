@@ -15,6 +15,7 @@ Node tooling for the app package. Run everything from `packages/app`.
 | `poster-capture.html` + `posterCapture.tsx` | Dev-only render surface the capture script drives.          |
 | `dev-server-checkout.mjs`                   | Proves the dev server at `--base` is serving THIS checkout. |
 | `flam3-compat.mjs`                          | Batch-audits FLAM3/XML packs with the app's real importer.  |
+| `synthesize-steps.mjs`                      | Plans a replayable creation for a flame nobody recorded.    |
 
 ## flam3-compat
 
@@ -32,6 +33,37 @@ The default exit code is non-zero for invalid entries. `--strict` also rejects
 otherwise importable flames that lose an unsupported variation or final
 transform behavior. The JSON output is path-sorted and has no timestamps or
 generated IDs, so two runs are directly diffable.
+
+## synthesize-steps
+
+Every flame PNG the app exports carries its descriptor; almost none carries
+recorded steps, so the Replay panel has nothing to play. This plans a plausible
+creation for one — start from the default flame, add one thing at a time until
+the document equals the target — and writes a `.steps.json` the app's existing
+loader accepts. Drop it on the canvas and press Replay.
+
+```sh
+node scripts/synthesize-steps.mjs flame.png --out-dir ./steps
+node scripts/synthesize-steps.mjs flame.png --strategy layered --seed 3 --out flame.steps.json
+node scripts/synthesize-steps.mjs --manifest selection.json --out-dir ./steps --json
+```
+
+There is no `package.json` script for it on purpose: it writes files wherever
+it is pointed, and `--out-dir` (or `--out`) is the only thing standing between
+a batch run and a pile of `.steps.json` files in somebody's Pictures folder,
+which is where a dropped PNG usually lives. `--strategy` takes a comma list of
+`perTransform`, `layered`, `sculpt` and `surprise` and writes one session per
+input per strategy; `--seed` and `--created-at` make a rerun byte-identical.
+`--help` lists the rest.
+
+What it plans is what the app plays: it bundles the app's own planner and its
+own replay path with esbuild and runs them in plain node, so no command is
+reimplemented here and no browser or GPU is involved. The session is marked
+synthetic, so the Replay panel says "a possible way to build this" rather than
+claiming it is how the flame was made. Whatever the steps cannot reach —
+symmetry transforms above all — arrives in one closing "snap to the finished
+flame", and the report names it, so a reconstruction never quietly lands on a
+different flame.
 
 ## Environments
 

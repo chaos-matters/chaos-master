@@ -2,6 +2,7 @@ import { isSafeFlameEntityId, renderSettingsDefault, } from '@/flame/schema/flam
 import { isVariationTypeFor } from '@/flame/variationRegistry'
 import { canonicallyEqual } from './canonical'
 import type { CanonicalFlame } from './canonical'
+import type { GlideStepHint } from '@/flame/glide/types'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 
@@ -47,6 +48,35 @@ export type AtomGroup =
   | 'render'
   | 'camera'
   | 'final'
+
+/**
+ * What kind of transition this atom deserves on the way in.
+ *
+ * The planner already knows what each step changes, so a synthesized session
+ * can say so rather than making the replay re-derive it from a diff. It stays
+ * a SEMANTIC hint — never a duration — so the pacing table can be retuned
+ * without rewriting a file (see `flame/glide/types.ts`).
+ *
+ * `cut` is the interesting answer, not the boring one: a palette apply moves
+ * nothing a timeline path can carry, so animating it shows a still frame and
+ * then a snap, and clearing the canvas is meant to read as a cut.
+ */
+export function glideHintForAtom(atom: Atom): GlideStepHint {
+  if (atom.id === 'flame.addVariation') return 'variation'
+  switch (atom.group) {
+    case 'stage':
+    case 'palette':
+      return 'cut'
+    case 'structure':
+      return 'transform'
+    case 'variation':
+      return 'variation'
+    case 'camera':
+      return 'camera'
+    default:
+      return 'scalar'
+  }
+}
 
 export function isAtomSatisfied(atom: Atom, flame: FlameDescriptor): boolean {
   return canonicallyEqual(atom.read(flame), atom.expected)
