@@ -85,6 +85,7 @@ import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
 import { initExample } from './flame/examples/initExample'
 import { initExample3D } from './flame/examples/initExample3D'
+import { createGlideRuntime, setGlideRuntime, settleGlideBeforeTimeTravel, yieldGlideToDocumentWrite, } from './flame/glide/runtime'
 import { newDefaultTransform } from './flame/newTransform'
 import { generateRandomFlame, mutateFlame, randomizeAllColors, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, qualityPointCountLimit, setExportQuality, setForceAnimationExportNow, } from './flame/renderStats'
@@ -495,10 +496,23 @@ export function MainWorkspace(props: AppProps) {
     // session recorder listens to every pushed entry to flag edits that
     // bypassed the command registry (its coverage ratchet), and to the
     // gesture boundary so a drag records as one step rather than hundreds.
+    // A glide owns the document while it runs, and hands it back here: both
+    // hooks fire for a write that is not the runtime's own, and the first one
+    // takes the flame off the transition rather than being overwritten by it.
     {
       journal: true,
       onEntryPushed: reportDocumentWrite,
-      onPreviewStarted: notePreviewStarted,
+      onPreviewStarted: () => {
+        yieldGlideToDocumentWrite()
+        notePreviewStarted()
+      },
+      // Before the write, not after it: the transition's own entry is still
+      // the newest one here, and it is the one that has to end where the
+      // document is about to stop.
+      onBeforeDocumentWrite: yieldGlideToDocumentWrite,
+      // Time travel is a change too, and one computed from the entry's own end
+      // state, so it lands the transition instead of taking it off.
+      onBeforeTimeTravel: settleGlideBeforeTimeTravel,
     },
   )
 
@@ -548,6 +562,48 @@ export function MainWorkspace(props: AppProps) {
     showTimeline,
     setShowTimeline,
   })
+
+  /**
+   * The glide driver — construct and provide, nothing else.
+   *
+   * All of the judgement lives in `flame/glide/`, which is pure; this is the
+   * only place the workspace and that module meet. Intermediates go through
+   * `replaceSilently`, the same non-undoable write path the animation export
+   * uses, so a transition lands on neither the undo stack nor the recorder,
+   * and glide tracks are never written into the user's timeline.
+   */
+  const glideRuntime = createGlideRuntime({
+    readFlame: () => deepClone(flameDescriptor),
+    writeFlame: (flame) => {
+      history.replaceSilently(flame)
+    },
+    qualityPreset: () => qualityPreset(),
+    markDocumentEntry: () => history.peekUndoSeq(),
+    amendDocumentEntry: (mark, recordedEnd) => {
+      history.amendNewestEntry(mark, recordedEnd)
+    },
+  })
+  setGlideRuntime(glideRuntime)
+  onCleanup(() => {
+    glideRuntime.dispose()
+    setGlideRuntime(undefined)
+  })
+
+  /**
+   * Render quality for the live canvas, downshifted while a glide moves.
+   *
+   * Every glide frame is a different flame, so accumulation restarts and each
+   * one pays a full convergence. The eye does not resolve detail in motion and
+   * the settled frame is the one people stop on, so the tier's fraction
+   * applies here and full quality returns the moment the glide lands.
+   *
+   * Reactive rather than a `Flam3` change: `qualityPointCountLimit` already
+   * reads `props.quality`, so multiplying it here keeps the render seam
+   * untouched (HM2 in plans/state-morph-transitions.md).
+   */
+  const liveRenderQuality = () =>
+    qualityPresets[qualityPreset()] *
+    (glideRuntime.activeQuality()?.accumulationScale ?? 1)
 
   /**
    * File/gallery loads are document boundaries in the live editor, but a
@@ -4656,7 +4712,7 @@ export function MainWorkspace(props: AppProps) {
               fov: [effectiveFov, setFlameFov],
               roll: [effectiveRoll, setFlameRoll],
             }}
-            quality={qualityPresets[qualityPreset()]}
+            quality={liveRenderQuality()}
             adaptiveFilter={adaptiveFilterEnabled()}
             stochasticFilter={stochasticFilterEnabled()}
             sidebarWidthRem={sidebarWidth}

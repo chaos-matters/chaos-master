@@ -72,6 +72,24 @@ explained rather than offered here as a capability.
 
 No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 
+### Animating a write
+
+`execute_command` takes two optional presentation properties beside
+`commandId`/`args`: `glideMs` (0–5000, clamped rather than refused) and
+`glideQuality` (`auto` | `responsive` | `balanced` | `full`). They animate the
+transition into the change; neither reaches the recorded step, because a
+session says what the person did, not how long it took to appear. An explicit
+`glideMs: 0` turns a glide off for one call even with the workspace's Animate
+Changes setting on, and a duel turns them off outright, because its clock is
+wall-clock and an agent could otherwise buy time with animation.
+
+The call awaits the transition, bounded by the glide's own duration plus a
+small margin (`GLIDE_DEADLINE_SLACK_MS`). If that deadline — rather than the
+animation — is what landed the change, the result carries
+`glide: { completedBy: 'deadline' }`. The document is on exactly the target
+either way; the field says nobody watched it arrive, which is what a tab with
+no `requestAnimationFrame` (a background or hidden window) looks like.
+
 ## The Arcade
 
 `https://lumenapeiron.com/arcade` (the worker sends `/arcade` to the SPA as

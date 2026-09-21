@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording } from '@/recorder/recorder'
-import { SESSION_FORMAT_VERSION } from '@/recorder/schema'
+import { parseSession, serializeSession, SESSION_FORMAT_VERSION, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { setFollowCamEnabled } from './recorderUi'
 import { SessionReplayPanel } from './SessionReplayPanel'
@@ -303,5 +303,49 @@ describe('SessionReplayPanel accessibility', () => {
     expect(badge?.getAttribute('title')).toMatch(/not a recording/)
     expect(badge?.getAttribute('title')).toMatch(/layered, seed 3/)
     second.unmount()
+  })
+
+  it('still says so after the captions are edited and saved again', async () => {
+    // The honesty badge is a stored field, and captioning is the one editor
+    // that rewrites a session after planning. What the panel hands back here
+    // is what the recordings DB keeps and what a `.steps.json` carries, so a
+    // save that dropped the marker would turn a reconstruction into something
+    // the next person opens as a recording of work that never happened.
+    const planned = makeSession()
+    planned.synthetic = {
+      strategy: 'layered',
+      seed: 3,
+      snapped: true,
+      residual: ['transforms._sym__abc'],
+    }
+    const saved: RecordedSession[] = []
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={planned}
+        target={makeTarget()}
+        onClose={() => {}}
+        onSave={(session) => {
+          saved.push(session)
+          return Promise.resolve()
+        }}
+      />
+    ))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit caption for step 1' }),
+    )
+    fireEvent.input(
+      screen.getByRole('textbox', { name: 'Caption for step 1' }),
+      { target: { value: 'A quieter opening' } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save captions' }))
+
+    await waitFor(() => {
+      expect(saved).toHaveLength(1)
+    })
+    const written = parseSession(serializeSession(saved[0]!))
+    expect(written?.actions[0]?.note).toBe('A quieter opening')
+    expect(written?.synthetic).toEqual(planned.synthetic)
+    unmount()
   })
 })

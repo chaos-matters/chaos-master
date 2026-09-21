@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1048         | 176.7k |
+| `packages/app`            | `chaos-master`                 | 1072         | 181.9k |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/core`           | `@chaos-master/core`           | 17           | 1.9k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -70,6 +70,7 @@ file instead of rediscovering the architecture every session.
 | --------------- | ----------------------------------------------------------------------- | ----- | --------------------- |
 | `variations`    | [index.ts](../../packages/app/src/flame/variations/parametric/index.ts) | 33.6k | _(no header comment)_ |
 | `examples`      | [index.ts](../../packages/app/src/flame/examples/index.ts)              | 12.7k | _(no header comment)_ |
+| `glide`         | [index.ts](../../packages/app/src/flame/glide/index.ts)                 | 2.7k  | _(no header comment)_ |
 | `renderDrivers` | [index.ts](../../packages/app/src/flame/renderDrivers/index.ts)         | 400   | _(no header comment)_ |
 | `schema`        | [flameSchema.ts](../../packages/app/src/flame/schema/flameSchema.ts)    | 100   | _(no header comment)_ |
 | `variations3D`  | [index.ts](../../packages/app/src/flame/variations3D/index.ts)          | 50    | _(no header comment)_ |
@@ -172,7 +173,7 @@ file instead of rediscovering the architecture every session.
 
 | Module  | Entry point                                              | LOC  | What it is                                     |
 | ------- | -------------------------------------------------------- | ---- | ---------------------------------------------- |
-| `tools` | [index.ts](../../packages/app/src/webmcp/tools/index.ts) | 5.5k | Barrel export for all WebMCP tool definitions. |
+| `tools` | [index.ts](../../packages/app/src/webmcp/tools/index.ts) | 5.6k | Barrel export for all WebMCP tool definitions. |
 
 #### Core package (`packages/core/src/`) — pure, dependency-free logic
 
@@ -218,14 +219,14 @@ file instead of rediscovering the architecture every session.
 | File                                                                               | LOC  | What it is                                                                                                                                   |
 | ---------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | [recorder.ts](../../packages/app/src/recorder/recorder.ts)                         | 1.2k | The session recorder: turns an editing session into a `.steps.json` log of registered-command invocations (see schema.ts for why intents,... |
-| [replayVideo.ts](../../packages/app/src/recorder/replayVideo.ts)                   | 1.1k | Register every command a session may contain before building the isolated replay world.                                                      |
-| [player.ts](../../packages/app/src/recorder/player.ts)                             | 550  | Timed playback of a recorded session (semantic-recorder-plan, M4).                                                                           |
+| [replayVideo.ts](../../packages/app/src/recorder/replayVideo.ts)                   | 1.2k | Register every command a session may contain before building the isolated replay world.                                                      |
+| [player.ts](../../packages/app/src/recorder/player.ts)                             | 600  | Timed playback of a recorded session (semantic-recorder-plan, M4).                                                                           |
 | [focus.ts](../../packages/app/src/recorder/focus.ts)                               | 500  | Follow-cam hints: **what to look at** while a step runs, never **where**.                                                                    |
 | [focusPreparation.ts](../../packages/app/src/recorder/focusPreparation.ts)         | 500  | UI state that must be ready before the follow-cam resolves an action's DOM target.                                                           |
 | [replayInterfaceVideo.ts](../../packages/app/src/recorder/replayInterfaceVideo.ts) | 450  | Full-interface capture keeps the viewport aspect ratio, but caps the long edge and pixel count so a 4K/5K monitor cannot create an unboun... |
+| [schema.ts](../../packages/app/src/recorder/schema.ts)                             | 450  | The `.steps.json` session format — version 1.                                                                                                |
 | [timelineActions.ts](../../packages/app/src/recorder/timelineActions.ts)           | 450  | A timeline whose compound edits reach the session recorder.                                                                                  |
-| [schema.ts](../../packages/app/src/recorder/schema.ts)                             | 350  | The `.steps.json` session format — version 1.                                                                                                |
-| [replay.ts](../../packages/app/src/recorder/replay.ts)                             | 200  | Whether replay may need browser user activation for generated audio.                                                                         |
+| [replay.ts](../../packages/app/src/recorder/replay.ts)                             | 250  | Whether replay may need browser user activation for generated audio.                                                                         |
 | [snapshotOrigin.ts](../../packages/app/src/recorder/snapshotOrigin.ts)             | 200  | Why a value-pinned snapshot exists.                                                                                                          |
 | [sonificationState.ts](../../packages/app/src/recorder/sonificationState.ts)       | 150  | Sonification is authored output state, but it is not part of the flame document.                                                             |
 | [replaySideState.ts](../../packages/app/src/recorder/replaySideState.ts)           | 100  | Editor-only state that follow-cam may change while revealing a target.                                                                       |
@@ -272,10 +273,10 @@ file instead of rediscovering the architecture every session.
 | [sonification.ts](../../packages/app/src/utils/sonification.ts)             | 800  | _(no header comment)_                                                                                                                        |
 | [flameImport.ts](../../packages/app/src/utils/flameImport.ts)               | 650  | Effectively "all" — every store is capped well below this.                                                                                   |
 | [videoEncoder.ts](../../packages/app/src/utils/videoEncoder.ts)             | 550  | Offline-export default bitrate: ~0.12 bits per pixel per frame, clamped to a sane range.                                                     |
-| [createStoreHistory.ts](../../packages/app/src/utils/createStoreHistory.ts) | 500  | Optional workspace state that travels with this entry.                                                                                       |
 | [animationExport.ts](../../packages/app/src/utils/animationExport.ts)       | 450  | _(no header comment)_                                                                                                                        |
 | [audioExport.ts](../../packages/app/src/utils/audioExport.ts)               | 450  | _(no header comment)_                                                                                                                        |
-| [exportJobs.ts](../../packages/app/src/utils/exportJobs.ts)                 | 400  | Background export jobs.                                                                                                                      |
+| [createStoreHistory.ts](../../packages/app/src/utils/createStoreHistory.ts) | 450  | Undo and redo for a Solid store, kept as patches rather than snapshots.                                                                      |
+| [exportJobs.ts](../../packages/app/src/utils/exportJobs.ts)                 | 400  | Whether steps glide into place, and how long for.                                                                                            |
 | [jsonQueryParam.ts](../../packages/app/src/utils/jsonQueryParam.ts)         | 400  | Decompress and JSON-parse, with no assumption about the shape.                                                                               |
 | [mathToWgsl.ts](../../packages/app/src/utils/mathToWgsl.ts)                 | 400  | Translate a math-notation expression (LaTeX-like) into a WGSL function body.                                                                 |
 | [recentFlames.ts](../../packages/app/src/utils/recentFlames.ts)             | 400  | What a write to Recents did.                                                                                                                 |
@@ -341,8 +342,8 @@ Grep for the symbol and read the surrounding range instead.
 | [packages/app/src/components/Home/HomeFlame.tsx](../../packages/app/src/components/Home/HomeFlame.tsx)                                                       | 1.2k |
 | [packages/app/src/flame/variations/utils.ts](../../packages/app/src/flame/variations/utils.ts)                                                               | 1.2k |
 | [packages/app/src/recorder/recorder.ts](../../packages/app/src/recorder/recorder.ts)                                                                         | 1.2k |
+| [packages/app/src/recorder/replayVideo.ts](../../packages/app/src/recorder/replayVideo.ts)                                                                   | 1.2k |
 | [packages/app/src/components/AudioWiringModal/NodeGraphView.tsx](../../packages/app/src/components/AudioWiringModal/NodeGraphView.tsx)                       | 1.1k |
-| [packages/app/src/recorder/replayVideo.ts](../../packages/app/src/recorder/replayVideo.ts)                                                                   | 1.1k |
 
 <!-- END:GENERATED heavy-files -->
 

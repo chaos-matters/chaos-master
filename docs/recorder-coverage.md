@@ -381,7 +381,8 @@ the replay and library panels it opens.
 
 A session can also be **synthesized** from a finished flame — planned backwards
 from the descriptor rather than logged while someone worked
-(`recorder/synthesize/`, plans/synthesized-creation-replay.md). It is the same
+(`packages/app/src/recorder/synthesize/`, and `packages/app/scripts/README.md`
+for the offline generator that writes one). It is the same
 format, built from the same commands, with the same labels and follow-cam
 hints, so replay, the step list and the video exporters need no special case.
 One optional field, `synthetic: { strategy, seed, snapped, residual }`,

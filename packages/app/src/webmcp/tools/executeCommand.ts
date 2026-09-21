@@ -4,9 +4,15 @@ import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } fro
 import { budgetExhaustedMessage } from '@/arcade/pilotActions'
 import { notePilotFocus } from '@/arcade/pilotFocus'
 import { executeCommand, getCommand, preflightLiveCommand, } from '@/commands/registry'
+import { clampGlideMs } from '@/flame/glide/durations'
+import { isGlideQualityPreference } from '@/flame/glide/quality'
+import { getGlideRuntime, glideEnabled } from '@/flame/glide/runtime'
+import { MAX_GLIDE_MS } from '@/flame/glide/types'
 import { focusForCommand } from '@/recorder/focus'
 import { NARRATION_COMMAND_ID } from '@/recorder/narrationMode'
+import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
+import type { GlideOptions, GlideOutcome } from '@/flame/glide/types'
 import type { WebMcpTool } from '@/webmcp/types'
 
 /**
@@ -63,10 +69,20 @@ export const executeCommandTool: WebMcpTool = {
         items: {},
         description: 'Arguments array for the command',
       },
+      glideMs: {
+        type: 'number',
+        description: `Animate the change instead of snapping to it: how long the transition should take, in milliseconds (0 turns it off, up to ${MAX_GLIDE_MS}). Omit to follow the workspace setting. Presentation only — it is not part of what the command did, so it is never recorded.`,
+      },
+      glideQuality: {
+        type: 'string',
+        enum: ['auto', 'responsive', 'balanced', 'full'],
+        description:
+          'How much render quality the transition gives up while it moves. "responsive" is fastest, "full" does not downshift at all so each frame takes longer, "auto" follows the render quality preset. It always settles at full quality.',
+      },
     },
     required: ['commandId'],
   },
-  execute(input: unknown) {
+  async execute(input: unknown) {
     const ctx = getWebMcpContext()
     if (!ctx) {
       return {
@@ -125,6 +141,26 @@ export const executeCommandTool: WebMcpTool = {
       return { error: preflight.error }
     }
 
+    // A glide is PRESENTATION, so it never enters `args`: the recorder stamps
+    // `{commandId, args}`, and how long the change took to appear is not part
+    // of what the person did.
+    //
+    // Under the duel clock it is switched off outright. The clock is
+    // wall-clock, so a pilot spending five seconds of it on animation would be
+    // buying time rather than flying.
+    const glide = resolveGlideRequest(rawInput, driving !== undefined)
+    const runtime = getGlideRuntime()
+    // Settle anything already in flight FIRST, whether or not THIS call
+    // animates: a scripted command is a change, so the transition before it
+    // belongs to the change before it and must land on its own target rather
+    // than be cancelled halfway. `settleForNextChange` hands back what the
+    // viewer can see, so an animation that follows starts from there.
+    const visible = runtime?.settleForNextChange()
+    const glideFrom =
+      glide === undefined
+        ? undefined
+        : deepClone(visible ?? ctx.flameDescriptor())
+
     try {
       // Live dispatch: recorded by the session recorder, args normalised, and
       // `beforeCommand` hands any paused replay back first. The replay path
@@ -141,6 +177,17 @@ export const executeCommandTool: WebMcpTool = {
     // few that queue work declare one (see `FlameCommand.report`); a report
     // that throws must not turn a step the viewer just watched land into a
     // failed tool call, so it is swallowed exactly like `describe` is.
+    // Awaited, and bounded by MAX_GLIDE_MS, so an agent firing twenty commands
+    // does not stack twenty transitions on top of each other.
+    // Bounded by the runtime's own wall-clock deadline as well as by
+    // MAX_GLIDE_MS: `requestAnimationFrame` does not run in a tab that is not
+    // visible, and an agent driving a hidden tab would otherwise hold this
+    // call until somebody looked at the browser again.
+    const outcome =
+      runtime !== undefined && glideFrom !== undefined
+        ? await runtime.glideFrom(glideFrom, glide ?? {})
+        : undefined
+
     let result: unknown
     try {
       result = getCommand(commandId)?.report?.(ctx, ...preflight.args)
@@ -187,6 +234,47 @@ export const executeCommandTool: WebMcpTool = {
       }
     }
 
-    return { success: true, commandId, ...reported }
+    return { success: true, commandId, ...reported, ...glideReport(outcome) }
   },
+}
+
+/**
+ * What the caller is told about the transition, which is nothing at all in the
+ * ordinary case.
+ *
+ * Only a glide the DEADLINE landed is worth a word. The document is on exactly
+ * the target either way; this says nobody watched it get there, which is what
+ * a tab with no `requestAnimationFrame` looks like and what an agent composing
+ * a demo or a recording needs to know. The Arcade path never reaches it — a
+ * duel turns glides off outright, so there is no outcome to report.
+ */
+function glideReport(outcome: GlideOutcome | undefined) {
+  return outcome?.completedByDeadline === true
+    ? { glide: { completedBy: 'deadline' } }
+    : {}
+}
+
+/**
+ * The glide this call asked for, or `undefined` when nothing should animate.
+ *
+ * An explicit `glideMs` wins in both directions — `0` turns a glide off even
+ * with the workspace setting on — and omitting it follows the setting and
+ * lets the planner read the change itself.
+ */
+function resolveGlideRequest(
+  input: Record<string, unknown>,
+  duelling: boolean,
+): GlideOptions | undefined {
+  if (duelling) return undefined
+  const quality = isGlideQualityPreference(input.glideQuality)
+    ? input.glideQuality
+    : undefined
+  const requested = input.glideMs
+  if (typeof requested === 'number' && Number.isFinite(requested)) {
+    const durationMs = clampGlideMs(requested)
+    if (durationMs <= 0) return undefined
+    return { durationMs, ...(quality === undefined ? {} : { quality }) }
+  }
+  if (!glideEnabled()) return undefined
+  return quality === undefined ? {} : { quality }
 }

@@ -239,6 +239,15 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
   'view.setPixelRatio': signature(
     (value) => value === 1 || value === 0.5 || value === 0.25,
   ),
+  'glide.setEnabled': oneBoolean,
+  'glide.setQuality': signature(
+    (value) =>
+      value === 'auto' ||
+      value === 'responsive' ||
+      value === 'balanced' ||
+      value === 'full',
+  ),
+
   'view.setAdaptiveFilter': oneBoolean,
   'view.setStochasticFilter': oneBoolean,
   'view.setFlyMode': oneBoolean,

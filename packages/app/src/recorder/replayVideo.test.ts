@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { closingHoldMs, NARRATION_MS_PER_WORD } from './player'
-import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_TAIL_MS, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
+import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_TAIL_MS, replayActionIndexAtFrame, replayFramesInStateRun, replayStateAtFrame, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 
@@ -426,5 +426,145 @@ describe('drawReplayVideoOverlay', () => {
     expect(lines.some((line) => line.endsWith('…'))).toBe(false)
     // Every word survives, in order.
     expect(lines.join(' ').split(/\s+/)).toEqual(sentence.split(/\s+/))
+  })
+})
+
+/**
+ * Glides in the offline path.
+ *
+ * The rule that makes this exportable at all: a glide frame is a pure function
+ * of `(step, glideT)`, so the whole video is a pure function of the session
+ * and the schedule. Two exports of one take produce the same frames, and the
+ * renderer can take them one at a time and render each to convergence.
+ */
+describe('replay video glides', () => {
+  const glideSession = makeSession([
+    { t: 0, id: 'flame.setGamma', args: [1.5] },
+    { t: 1500, id: 'flame.setGamma', args: [3] },
+    { t: 3000, id: 'flame.setGamma', args: [4.5] },
+  ])
+
+  it('adds no frames at all when glides are off', () => {
+    const off = createReplayVideoSchedule(glideSession, 1, 10, 600, 1000)
+    const explicit = createReplayVideoSchedule(glideSession, 1, 10, 600, 1000, {
+      enabled: false,
+    })
+    expect(explicit).toEqual(off)
+    expect(off.glideFrames).toEqual([0, 0, 0])
+  })
+
+  it('counts glide frames from the duration and the frame rate', () => {
+    const schedule = createReplayVideoSchedule(glideSession, 1, 20, 600, 1000, {
+      enabled: true,
+      defaultMs: 400,
+    })
+    // 400 ms at 20 fps is eight frames, and each run is long enough for them.
+    expect(schedule.glideFrames.slice(0, 2)).toEqual([8, 8])
+  })
+
+  it('never lets a glide fill its whole run, so the settled state is seen', () => {
+    const schedule = createReplayVideoSchedule(glideSession, 1, 20, 600, 1000, {
+      enabled: true,
+      defaultMs: 5000,
+    })
+    for (let index = 0; index < schedule.actionFrames.length; index++) {
+      const runEnd = schedule.actionFrames[index + 1] ?? schedule.totalFrames
+      const run = runEnd - schedule.actionFrames[index]!
+      expect(schedule.glideFrames[index]!).toBeLessThan(run)
+      expect(replayStateAtFrame(schedule, runEnd - 1).glideT).toBe(1)
+    }
+  })
+
+  it('walks glideT up to 1 and holds it there', () => {
+    const schedule = createReplayVideoSchedule(glideSession, 1, 20, 600, 1000, {
+      enabled: true,
+      defaultMs: 400,
+    })
+    const start = schedule.actionFrames[0]!
+    const count = schedule.glideFrames[0]!
+    const values: number[] = []
+    for (let offset = 0; offset < count + 2; offset++) {
+      values.push(replayStateAtFrame(schedule, start + offset).glideT)
+    }
+    for (let index = 1; index < values.length; index++) {
+      expect(values[index]!).toBeGreaterThanOrEqual(values[index - 1]!)
+    }
+    expect(values[0]!).toBeGreaterThan(0)
+    expect(values[0]!).toBeLessThan(1)
+    expect(values[count]).toBe(1)
+    expect(values.at(-1)).toBe(1)
+  })
+
+  it('keeps replayActionIndexAtFrame answering exactly as before', () => {
+    const schedule = createReplayVideoSchedule(glideSession, 1, 20, 600, 1000, {
+      enabled: true,
+      defaultMs: 400,
+    })
+    for (let frame = 0; frame < schedule.totalFrames; frame++) {
+      expect(replayActionIndexAtFrame(schedule, frame)).toBe(
+        replayStateAtFrame(schedule, frame).actionIndex,
+      )
+    }
+  })
+
+  it('makes each glide frame its own state run', () => {
+    const schedule = createReplayVideoSchedule(glideSession, 1, 20, 600, 1000, {
+      enabled: true,
+      defaultMs: 400,
+    })
+    const start = schedule.actionFrames[0]!
+    expect(replayFramesInStateRun(schedule, start)).toBe(1)
+    const settled = start + schedule.glideFrames[0]!
+    expect(replayFramesInStateRun(schedule, settled)).toBeGreaterThan(1)
+  })
+
+  it('samples a different flame, and a different fingerprint, per glide frame', () => {
+    const settled = createReplayVideoDriver(glideSession).advanceTo(1)
+    const half = createReplayVideoDriver(glideSession).advanceTo(1, 0.5)
+    expect(half.glideT).toBe(0.5)
+    expect(half.flame.renderSettings.gamma).toBeGreaterThan(1.5)
+    expect(half.flame.renderSettings.gamma).toBeLessThan(3)
+    expect(settled.flame.renderSettings.gamma).toBe(3)
+    expect(replayVideoVisualFingerprint(half)).not.toBe(
+      replayVideoVisualFingerprint(settled),
+    )
+  })
+
+  it('lands each step exactly where the un-glided replay lands', () => {
+    for (let index = 0; index < glideSession.actions.length; index++) {
+      const glided = createReplayVideoDriver(glideSession).advanceTo(index, 1)
+      const plain = createReplayVideoDriver(glideSession).advanceTo(index)
+      expect(glided.flame).toEqual(plain.flame)
+    }
+  })
+
+  it('renders identically twice, which is what makes an export reproducible', () => {
+    const frames = (): string[] => {
+      const driver = createReplayVideoDriver(glideSession)
+      const out: string[] = []
+      for (let index = 0; index < glideSession.actions.length; index++) {
+        for (const t of [0.25, 0.5, 0.75, 1]) {
+          out.push(JSON.stringify(driver.advanceTo(index, t).flame))
+        }
+      }
+      return out
+    }
+    expect(frames()).toEqual(frames())
+  })
+
+  it('carries the glide settings into the export job', () => {
+    const job = createReplayVideoJobSpec(glideSession, 1, {
+      enabled: true,
+      defaultMs: 400,
+      tier: 'balanced',
+    })
+    expect(job.replayVideo?.glide).toEqual({
+      enabled: true,
+      defaultMs: 400,
+      tier: 'balanced',
+    })
+    expect(createReplayVideoJobSpec(glideSession, 1).replayVideo?.glide).toBe(
+      undefined,
+    )
   })
 })

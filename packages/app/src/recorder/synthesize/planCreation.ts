@@ -5,13 +5,14 @@ import { deepClone } from '@/utils/clone'
 import { VERSION } from '@/version'
 import { focusForCommand } from '../focus'
 import { MAX_SESSION_ACTIONS, MAX_SYNTHETIC_RESIDUAL_ENTRIES, SESSION_FORMAT_VERSION, validateSession, } from '../schema'
-import { buildAtoms, isAtomSatisfied } from './atoms'
+import { buildAtoms, glideHintForAtom, isAtomSatisfied } from './atoms'
 import { canonicalFlame, diffPaths } from './canonical'
 import { createFlameSandbox } from './sandbox'
 import { orderAtoms } from './strategies'
 import type { RecordedAction, RecordedSession } from '../schema'
 import type { CanonicalFlame } from './canonical'
 import type { SynthesisStrategy } from './strategies'
+import type { GlideStepHint } from '@/flame/glide/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
@@ -117,7 +118,13 @@ export function planCreation(
     // could not, and `residual` will say so.
     if (!sandbox.execute(atom.id, atom.args)) continue
     if (!isAtomSatisfied(atom, sandbox.peek())) continue
-    const action = syntheticAction(atom.id, atom.args, actions.length, holdMs)
+    const action = syntheticAction(
+      atom.id,
+      atom.args,
+      actions.length,
+      holdMs,
+      glideHintForAtom(atom),
+    )
     if (action !== undefined) actions.push(action)
   }
 
@@ -133,6 +140,9 @@ export function planCreation(
       [targetDescriptor(target, canonicalTarget), 'Snap to the finished flame'],
       actions.length,
       holdMs,
+      // A snap is exactly that: the residue lands at once, and calling it a
+      // glide would claim the viewer watched it arrive.
+      'cut',
     )
     if (snap !== undefined) actions.push(snap)
   }
@@ -193,6 +203,7 @@ function syntheticAction(
   args: readonly unknown[],
   index: number,
   holdMs: number,
+  glide: GlideStepHint,
 ): RecordedAction | undefined {
   const cmd = getCommand(id)
   if (cmd === undefined) return undefined
@@ -205,6 +216,7 @@ function syntheticAction(
     label: cmd.describe?.([...recordedArgs]) ?? cmd.label,
     ...(focus === undefined ? {} : { focus }),
     holdMs,
+    glide,
   }
 }
 

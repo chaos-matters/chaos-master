@@ -1,5 +1,6 @@
 import { executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { qualityPresets } from '@/components/Quality/QualityPresets'
+import { getGlideRuntime } from '@/flame/glide/runtime'
 import { applyReplayAudioWiring, sessionMayEnableSonification, } from '@/recorder/replay'
 import { captureReplayInterfaceVideo } from '@/recorder/replayInterfaceVideo'
 import { paletteRestoreColorsAfterReplayCommand } from '@/recorder/replayPaletteState'
@@ -435,6 +436,11 @@ export function useWorkspaceReplay(params: UseWorkspaceReplayParams) {
   }
 
   const replayTarget: ReplayTarget = {
+    readFlame: () => deepClone(flameDescriptor),
+    glide: (from, durationMs) => {
+      void getGlideRuntime()?.glideFrom(from, { durationMs })
+    },
+    settleGlide: () => getGlideRuntime()?.settleForNextChange(),
     primeEffects: (session) => {
       if (sessionMayEnableSonification(session)) {
         sonification.lifecycle.prime()
@@ -570,7 +576,11 @@ export function useWorkspaceReplay(params: UseWorkspaceReplayParams) {
     try {
       if (request.mode === 'artwork') {
         enqueueAnimationJob(
-          createReplayVideoJobSpec(request.session, request.playbackSpeed),
+          createReplayVideoJobSpec(
+            request.session,
+            request.playbackSpeed,
+            request.glide,
+          ),
         )
         showToast('Artwork replay added to Exports', 3500)
         return

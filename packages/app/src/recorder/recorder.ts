@@ -911,6 +911,19 @@ export function withRecordingSuppressed<T>(fn: () => T): T {
   }
 }
 
+/**
+ * True while {@link withRecordingSuppressed} is running something.
+ *
+ * "No user behind it" is the question the recorder already answers for every
+ * document write, so anything else that needs to tell a person's edit from
+ * machinery asks here rather than inventing a second answer. The glide runtime
+ * is the first such caller: a write from a person takes the document off it,
+ * while the replay player committing its own batch must not.
+ */
+export function isRecordingSuppressed(): boolean {
+  return suppressDepth > 0
+}
+
 export type RecordableCommand = Pick<
   FlameCommand,
   | 'id'
