@@ -269,4 +269,39 @@ describe('SessionReplayPanel accessibility', () => {
     expect(incompleteExport.title).toMatch(/clean take/)
     second.unmount()
   })
+
+  // A synthesized session rebuilds a flame plausibly; it is not evidence of
+  // how the flame was made, and the panel must not let it read that way.
+  it('says a synthesized session is only a possible way to build the flame', () => {
+    const recorded = render(() => (
+      <SessionReplayPanel
+        session={makeSession()}
+        target={makeTarget()}
+        onClose={() => {}}
+      />
+    ))
+    expect(document.querySelector('[data-replay-synthetic]')).toBeNull()
+    recorded.unmount()
+
+    const planned = makeSession()
+    planned.synthetic = {
+      strategy: 'layered',
+      seed: 3,
+      snapped: true,
+      residual: ['transforms._sym__abc'],
+    }
+    const second = render(() => (
+      <SessionReplayPanel
+        session={planned}
+        target={makeTarget()}
+        onClose={() => {}}
+      />
+    ))
+
+    const badge = document.querySelector('[data-replay-synthetic]')
+    expect(badge?.textContent).toBe('A possible way to build this')
+    expect(badge?.getAttribute('title')).toMatch(/not a recording/)
+    expect(badge?.getAttribute('title')).toMatch(/layered, seed 3/)
+    second.unmount()
+  })
 })

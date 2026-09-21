@@ -242,6 +242,24 @@ export function SessionReplayPanel(props: {
         <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {replayStatus()}
         </p>
+        {/* A synthesized session was planned from the finished flame, not
+            recorded while someone made it. The panel must not let a viewer
+            read it as "how this was made" — see recorder/synthesize. */}
+        <Show when={session.synthetic}>
+          {(synthetic) => (
+            <span
+              class={styles.synthetic}
+              data-replay-synthetic
+              title={`These steps were planned from the finished flame (${synthetic().strategy}, seed ${synthetic().seed})${
+                synthetic().snapped
+                  ? ', ending with a snap to the parts no command could rebuild'
+                  : ''
+              }. They are not a recording of how it was made.`}
+            >
+              A possible way to build this
+            </span>
+          )}
+        </Show>
         <Show when={session.unnamedWriteCount > 0}>
           <span
             class={styles.warning}
