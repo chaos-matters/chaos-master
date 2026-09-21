@@ -45,6 +45,23 @@ someone made on purpose, in writing, rather than a number quietly drifting.
 Metrics not listed as lower-is-better or higher-is-better in
 `scripts/code-metrics.mjs` are **informational only** and never fail the check.
 
+**Where the ratchet is enforced.** In CI, in the `health` job, on pushes to main
+and on a manual `workflow_dispatch` — **not on pull requests**. Alongside
+`pnpm docs:index:check`, and in a job of its own so a ratchet failure never
+masks a test failure. The choice is deliberate: re-freezing is a decision
+someone makes on purpose, and forcing that decision inside a pull request turns
+it into a merge blocker to be got around rather than a call to be made. Nothing
+runs the ratchet before CI either — the pre-push hook is typecheck and lint —
+so run `pnpm metrics:check` yourself when a change adds files.
+
+The coverage keys are the exception. `--check` only compares keys the current
+run produced, and a CI run has no `coverage-audit/` summary to read, so
+`coverage_*_pct` are ratcheted **locally, after `pnpm test:coverage`, and never
+in CI**. The same asymmetry means `--update` drops those keys entirely unless a
+coverage run precedes it: re-freeze with `pnpm test:coverage && pnpm
+metrics:update`, or the coverage ratchet disappears from the baseline without a
+word.
+
 ---
 
 ## 2. What each metric is worth
@@ -106,8 +123,10 @@ survivors are the to-do list: `flameSchema.ts` (113) and `fdiff.ts` (82) lead.
 coverage _rise_ is weak evidence and should never be the argument that a change
 is well tested.
 
-Baseline at the time of writing: 45.72% lines, 37.61% functions, 43.73%
-branches. Functions sitting ~8 points below lines is the interesting part — it
+Baseline as re-frozen on 2026-09-21: 49.77% lines, 41.37% functions, 47.63%
+branches for the app; 68.86% / 68.25% / 58.59% for core on its own. (It read
+45.72 / 37.61 / 43.73 when this section was written, before the merge train.)
+Functions sitting ~8 points below lines is the interesting part — it
 says a lot of code is reached incidentally through a few entry points rather
 than exercised directly.
 

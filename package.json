@@ -28,6 +28,8 @@
     "verify:webgpu": "node scripts/verify-webgpu-headed.mjs",
     "test:coverage": "pnpm --filter chaos-master exec vitest run --coverage && pnpm --filter @chaos-master/core exec vitest run --coverage",
     "test": "pnpm --filter @chaos-master/core test && pnpm --filter @chaos-master/mobile-runtime test && pnpm --filter chaos-master exec vitest run && pnpm --filter chaos-master test:scripts",
+    "test:changed": "node scripts/test-changed.mjs",
+    "test:pr": "pnpm --filter @chaos-master/core test && pnpm --filter @chaos-master/mobile-runtime test && pnpm test:changed && pnpm --filter chaos-master test:scripts",
     "test:ui": "pnpm --filter chaos-master exec vitest --ui",
     "test:watch": "pnpm --filter chaos-master exec vitest",
     "test:e2e": "playwright test",

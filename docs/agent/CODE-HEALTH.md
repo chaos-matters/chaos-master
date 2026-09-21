@@ -15,6 +15,22 @@ pnpm test:coverage    # coverage summary, feeds the metrics table
 pnpm verify:webgpu    # headed browser pass on real hardware
 ```
 
+**Where they run.** `pnpm docs:index:check` and `pnpm metrics:check` run in CI
+in the `health` job, on pushes to main and on a manual `workflow_dispatch` —
+**not on pull requests**. A pull request that nudges a ratchet is a conversation
+about whether to re-freeze, not a blocked merge, and the merging agent is the
+one who sees main go red. They sit in a job of their own so a ratchet failure
+can never mask a test failure in `build`.
+
+`pnpm arch` is not in CI yet. It is red today on one import cycle
+(`flame/mutationOperators.ts <-> flame/randomize.ts`, §3), and a check that is
+red on the day it lands teaches everyone to ignore it. It joins the `health` job
+once that cycle is broken. `pnpm test:coverage` and `pnpm verify:webgpu` are
+local-only by design — see [METRICS.md](METRICS.md) §3.
+
+Which tests run where, and why a green pull request is not a promise that main
+stays green, is in [packages/app/TESTING.md](../../packages/app/TESTING.md).
+
 ---
 
 ## 1. Gate status
