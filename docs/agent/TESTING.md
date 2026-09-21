@@ -100,8 +100,17 @@ pnpm test:e2e:ci     # the CI-stable smoke subset
 pnpm verify:webgpu   # standalone headed Chrome against a running dev server
 ```
 
-CI runs lint, typecheck, the generated-index check, coverage + the metrics
-ratchet, tests, build, and **only `tests/smoke.spec.ts`** for e2e.
+CI runs lint, typecheck, tests, build, and **only `tests/smoke.spec.ts`** for
+e2e.
+
+> **Update, 2026-09-21.** Two corrections. The generated-index check and the
+> metrics ratchet were never in CI when this was written; they are now, in a
+> `health` job that runs on main and on a manual dispatch only. Coverage is
+> still not in CI at all. And "tests" now means different things in the two
+> places: a pull request runs core and mobile-runtime in full plus the app
+> suite scoped to what it touched, while main runs everything. The full split,
+> and the trade-off it accepts, is in
+> [packages/app/TESTING.md](../../packages/app/TESTING.md).
 
 **A Playwright spec outside the smoke subset is effectively unenforced.** Three
 of the current specs are actively misleading:

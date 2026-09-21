@@ -6,6 +6,9 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  # Lets a branch exercise the main-only jobs (the full suite, and health)
+  # before it is merged, instead of finding out on main.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -26,8 +29,13 @@ jobs:
         node-version: [24.x]
 
     steps:
+    # Full history: the scoped pull-request test run diffs the working tree
+    # against the base commit, and the default shallow clone has neither the
+    # base commit nor the branch history to reach it.
     - name: ⬇️ Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: 🔧 Setup Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
@@ -45,8 +53,21 @@ jobs:
     - name: 🔍 Type check
       run: pnpm typecheck
 
+    # Everything, on main and on a manual run. This is the run that decides
+    # whether main is green.
     - name: 🧪 Run tests
+      if: github.event_name != 'pull_request'
       run: pnpm test
+
+    # On a pull request: core and mobile-runtime in full (a second, together),
+    # and the app suite scoped to what the branch touched plus a list of tests
+    # that read the source tree through the filesystem and so cannot be scoped.
+    # See scripts/test-changed.mjs and packages/app/TESTING.md.
+    - name: Run tests scoped to the pull request
+      if: github.event_name == 'pull_request'
+      run: pnpm test:pr
+      env:
+        TEST_CHANGED_BASE: ${{ github.event.pull_request.base.sha }}
 
     - name: 🛠️ Build project
       run: pnpm --filter chaos-master run build
@@ -73,5 +94,41 @@ jobs:
         name: playwright-report
         path: playwright-report/
         retention-days: 14
+
+  # The code-health ratchets, on main and on a manual run only. A pull request
+  # that moves a ratchet is a conversation, not a blocked merge. They sit in
+  # their own job so that a ratchet failure can never hide a test failure in
+  # `build`, and so the branch that fixes a ratchet is obvious from the job
+  # that went red.
+  health:
+    if: github.event_name != 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    - name: Install all dependencies
+      run: |
+        corepack enable
+        pnpm install
+
+    # Both scripts walk packages/ and read files. Neither builds a TypeScript
+    # program, so the raised heap the build job needs is not needed here.
+    - name: Check the generated agent index is current
+      run: pnpm docs:index:check
+
+    - name: Check the code metrics ratchet
+      run: pnpm metrics:check
+
+    # `pnpm arch` belongs in this job and joins it once the
+    # flame/mutationOperators <-> flame/randomize import cycle is broken. It is
+    # red today, and adding it now would make main red on day one.
 
 
