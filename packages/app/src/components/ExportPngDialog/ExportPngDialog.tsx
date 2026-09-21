@@ -18,6 +18,7 @@ import { downloadBlob } from '@/utils/blob'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
 import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, snapshotExportSession, } from '@/utils/exportPreferences'
+import { defaultExportFrameRange } from '@/utils/exportRequests'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { motionBlurSettings } from '@/utils/motionBlur'
@@ -1153,19 +1154,12 @@ export function createExportPngDialog(
       'export/animation-quality',
       0.9,
     )
-    // Default frame end to the last keyframe across all tracks,
-    // so we only render up to the last meaningful change.
-    const lastKeyframeFrame = tracks.reduce(
-      (max, track) =>
-        track.keyframes.reduce((m, kf) => Math.max(m, kf.frame), max),
-      0,
-    )
     // Compute frame range from the current animation's actual tracks every time
     // the dialog opens, rather than persisting stale values across sessions.
-    const [frameStart, setFrameStart] = createSignal(config.startFrame)
-    const [frameEnd, setFrameEnd] = createSignal(
-      lastKeyframeFrame > 0 ? lastKeyframeFrame : config.endFrame,
-    )
+    // Shared with the scripted exporter so both open on the same range.
+    const defaultRange = defaultExportFrameRange(tracks, config)
+    const [frameStart, setFrameStart] = createSignal(defaultRange.frameStart)
+    const [frameEnd, setFrameEnd] = createSignal(defaultRange.frameEnd)
     const [animFps, setAnimFps] = persistentSignal(
       'export/anim-fps',
       config.fps,

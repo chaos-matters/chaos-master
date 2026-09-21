@@ -292,3 +292,111 @@ export function dismissJob(id: string) {
   }
   setStore('items', (items) => items.filter((j) => j.id !== id))
 }
+
+/** One job, summarised small enough to sit in a tool result. */
+export type ExportJobSummary = {
+  id: string
+  name: string
+  type: 'image' | 'animation'
+  status: ExportJobStatus
+  /** 0..1 over the job's own work: frames for an animation, points for an
+   *  image. 0 before the host has reported anything. */
+  progress: number
+  /** Animation only: frames a full render will encode, from the queued spec. */
+  totalFrames?: number
+}
+
+/** What a finished job left behind, including how to recognise its file. */
+export type FinishedExportJobSummary = ExportJobSummary & {
+  width: number
+  height: number
+  /** Animation only: frames actually encoded (fewer after Stop & Save). */
+  frames?: number
+  /** True once the tracker's Download link has been used. */
+  downloaded: boolean
+}
+
+/**
+ * The export queue as a script sees it.
+ *
+ * A driver that queues a render has no window to look at: it needs to know
+ * that something is still rendering, which job was the last one it queued, and
+ * whether the finished file is the size and length it asked for. That is the
+ * whole of this shape — `export.jobStatus` returns it verbatim.
+ */
+export type ExportQueueState = {
+  total: number
+  /** Queued plus rendering. */
+  pending: number
+  /** `hasPendingExportJobs()`: also true for a finished, undownloaded job. */
+  hasPending: boolean
+  /** The job the host is rendering right now, if any. */
+  active?: ExportJobSummary
+  /** The most recently enqueued job, whatever its status. */
+  latest?: ExportJobSummary
+  /** The most recent job that finished successfully. */
+  lastFinished?: FinishedExportJobSummary
+  /** The most recent failure, so a poller can stop instead of spinning. */
+  error?: { id: string; name: string; message: string }
+}
+
+function summarise(job: ExportJob): ExportJobSummary {
+  const progress =
+    job.type === 'animation'
+      ? job.progress.totalFrames > 0
+        ? job.progress.frame / job.progress.totalFrames
+        : 0
+      : job.progress.target > 0
+        ? job.progress.current / job.progress.target
+        : 0
+  return {
+    id: job.id,
+    name: job.name,
+    type: job.type,
+    status: job.status,
+    progress: Math.min(1, Math.max(0, progress)),
+    ...(job.type === 'animation'
+      ? { totalFrames: job.progress.totalFrames }
+      : {}),
+  }
+}
+
+/** Snapshot of the export queue for scripted exports — see ExportQueueState. */
+export function exportQueueState(): ExportQueueState {
+  const items = store.items
+  const active = items.find((j) => j.status === 'rendering')
+  const latest = items.at(-1)
+  const finished = items.filter((j) => j.status === 'done' && j.result).at(-1)
+  const failed = items.filter((j) => j.status === 'error').at(-1)
+  return {
+    total: items.length,
+    pending: items.filter(
+      (j) => j.status === 'queued' || j.status === 'rendering',
+    ).length,
+    hasPending: hasPendingExportJobs(),
+    ...(active ? { active: summarise(active) } : {}),
+    ...(latest ? { latest: summarise(latest) } : {}),
+    ...(finished?.result
+      ? {
+          lastFinished: {
+            ...summarise(finished),
+            width: finished.result.width,
+            height: finished.result.height,
+            ...(finished.result.frames !== undefined
+              ? { frames: finished.result.frames }
+              : {}),
+            downloaded: finished.downloaded === true,
+          },
+        }
+      : {}),
+    ...(failed
+      ? {
+          error: {
+            id: failed.id,
+            name: failed.name,
+            message: failed.error ?? 'Export failed',
+          },
+        }
+      : {}),
+  }
+}

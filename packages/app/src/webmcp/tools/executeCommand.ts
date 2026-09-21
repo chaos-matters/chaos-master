@@ -137,6 +137,18 @@ export const executeCommandTool: WebMcpTool = {
       }
     }
 
+    // What the command has to say about itself now that it has run. Only the
+    // few that queue work declare one (see `FlameCommand.report`); a report
+    // that throws must not turn a step the viewer just watched land into a
+    // failed tool call, so it is swallowed exactly like `describe` is.
+    let result: unknown
+    try {
+      result = getCommand(commandId)?.report?.(ctx, ...preflight.args)
+    } catch {
+      result = undefined
+    }
+    const reported = result === undefined ? {} : { result }
+
     if (driving) {
       // The NORMALIZED args, which are the ones the recorder describes and
       // logs. A command whose label renders its value reads them back out of
@@ -166,9 +178,15 @@ export const executeCommandTool: WebMcpTool = {
           line,
         )
       }
-      return { success: true, commandId, steps: driving.steps + 1, remaining }
+      return {
+        success: true,
+        commandId,
+        steps: driving.steps + 1,
+        remaining,
+        ...reported,
+      }
     }
 
-    return { success: true, commandId }
+    return { success: true, commandId, ...reported }
   },
 }

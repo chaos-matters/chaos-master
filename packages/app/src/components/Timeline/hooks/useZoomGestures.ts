@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
 import { agentDriving } from '@/arcade/pilot'
 import { createPinchHandler } from '@/utils/createPinchHandler'
+import { autoFitDecision } from './autoFit'
 import type { Accessor } from 'solid-js'
 
 export function useZoomGestures(
@@ -12,9 +13,20 @@ export function useZoomGestures(
   baseFrameWidth: number,
   baseTrackHeight: number,
   trackNameWidth: Accessor<number>,
+  /** Bumped by the timeline whenever a whole animation is loaded. */
+  loadRevision: Accessor<number> = () => 0,
 ) {
   const [containerHeight, setContainerHeight] = createSignal(200)
   const [zoomLevel, setZoomLevel] = createSignal(1)
+  // Set by a zoom or a scroll the person performed. Only their own gestures
+  // count: every scrollLeft this module writes is programmatic, so the flag is
+  // raised from the input events rather than from `scroll`.
+  const [userAdjusted, setUserAdjusted] = createSignal(false)
+  /** The zoom setter the header buttons get: pressing one is an adjustment. */
+  const setZoomLevelByUser = (value: number) => {
+    setUserAdjusted(true)
+    setZoomLevel(value)
+  }
 
   const frameWidth = createMemo(() => {
     const h = containerHeight()
@@ -82,6 +94,7 @@ export function useZoomGestures(
       onPinchMove(event) {
         const ratio = event.distance / prevDistance
         prevDistance = event.distance
+        setUserAdjusted(true)
         setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * ratio)))
       },
     }
@@ -106,6 +119,7 @@ export function useZoomGestures(
       if (!e.altKey) return
       e.preventDefault()
       const factor = Math.exp(-e.deltaY * 0.002)
+      setUserAdjusted(true)
       setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * factor)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -149,31 +163,64 @@ export function useZoomGestures(
     })
   })
 
-  // Fit is a button, and an agent has no pointer to press it with.
-  //
-  // A Cinema take replaces the whole timeline, usually with a longer duration
-  // than whatever was on it — a nine-second take over a preset's ninety frames
-  // is three times the span. The dope sheet kept the zoom it had, so the frames
-  // the agent had just written ran off the right edge of the panel the lock
-  // overlay is pointing at, and the viewer watched a step land somewhere they
-  // could not see. Re-fit whenever the span changes while the agent drives.
-  //
-  // Only while it drives: a zoom a person set by hand is theirs, and the
-  // workspace is locked for the whole time this can fire.
-  let previousTotalFrames: number | undefined
+  // A wheel or a drag on either lane is the person moving the view. Listening
+  // to the input rather than to `scroll` keeps this module's own scrollLeft
+  // writes — the re-anchor effect above, and autoFitZoom — from looking like
+  // a gesture.
   createEffect(() => {
-    const frames = totalFrames()
-    const driving = agentDriving()
-    const changed =
-      previousTotalFrames !== undefined && previousTotalFrames !== frames
-    previousTotalFrames = frames
-    if (!changed || !driving) return
-    // Untracked: autoFitZoom reads containerHeight, and this effect must depend
-    // on the frame span alone or a panel resize would re-run it.
+    const lanes = [tracksScrollRef(), seekLaneRef()].filter(
+      (el): el is HTMLDivElement => el !== undefined,
+    )
+    const note = () => setUserAdjusted(true)
+    for (const el of lanes) {
+      el.addEventListener('wheel', note, { passive: true })
+      el.addEventListener('pointerdown', note, { passive: true })
+    }
+    onCleanup(() => {
+      for (const el of lanes) {
+        el.removeEventListener('wheel', note)
+        el.removeEventListener('pointerdown', note)
+      }
+    })
+  })
+
+  // Fit whatever just arrived.
+  //
+  // Fit is a button, and neither an agent nor a dropped file has a pointer to
+  // press it with. A loaded animation is usually a different length from the
+  // one on the timeline — a twelve-second morph over a preset's ninety frames
+  // is four times the span — and the dope sheet used to keep the zoom it had,
+  // so the frames that had just been loaded ran off the right edge of the
+  // panel. `autoFitDecision` owns the rule; see that module for why a load and
+  // a span change are treated differently.
+  let seen: { loadRevision: number; totalFrames: number } | undefined
+  createEffect(() => {
+    const inputs = {
+      loadRevision: loadRevision(),
+      totalFrames: totalFrames(),
+      userAdjusted: untrack(userAdjusted),
+      agentDriving: agentDriving(),
+    }
+    const decision = autoFitDecision(inputs, seen)
+    seen = {
+      loadRevision: inputs.loadRevision,
+      totalFrames: inputs.totalFrames,
+    }
+    if (decision.resetUserAdjusted) setUserAdjusted(false)
+    if (!decision.fit) return
+    // Untracked: autoFitZoom reads containerHeight, and this effect must
+    // depend on the load and the span alone or a panel resize would re-run it.
     untrack(() => {
       autoFitZoom()
     })
   })
 
-  return { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom }
+  return {
+    zoomLevel,
+    setZoomLevel: setZoomLevelByUser,
+    frameWidth,
+    trackHeight,
+    autoFitZoom,
+    userAdjusted,
+  }
 }

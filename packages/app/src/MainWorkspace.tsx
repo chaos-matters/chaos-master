@@ -109,6 +109,8 @@ import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
 import { enqueueAnimationJob, enqueueImageJob } from './utils/exportJobs'
+import { sessionForExport, snapshotExportSession, } from './utils/exportPreferences'
+import { resolveExportFrameRange } from './utils/exportRequests'
 import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
@@ -118,7 +120,7 @@ import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { storeImportedSession, storeSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
-import { createTimelineState, defaultConfig as defaultTimelineConfig, } from './utils/timeline'
+import { applyTimelineToFlameAtFrame, createTimelineState, defaultConfig as defaultTimelineConfig, } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
 import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
@@ -3401,6 +3403,8 @@ export function MainWorkspace(props: AppProps) {
       },
       setPreviewHeld: timeline.setPreviewHeld,
       play: timeline.play,
+      pause: timeline.pause,
+      isPlaying: timeline.isPlaying,
       setLoop: (loop) => {
         timeline.updateConfigUndoable({ loop })
       },
@@ -3559,6 +3563,74 @@ export function MainWorkspace(props: AppProps) {
         openReplaySession(session)
       },
       actionCount: recordedActionCount,
+    },
+    // Background export with no dialog, for a script or an agent driving
+    // through `execute_command`. Everything ambient an export job snapshots —
+    // palette, blend, timeline, recorded session, audio wiring — is filled in
+    // here exactly as the export modal fills it, so a scripted render and a
+    // clicked one produce the same file. See commands/builtins/export.ts.
+    exportJobs: {
+      renderImage: (request) => {
+        const frame = timeline.currentFrame()
+        const flame = deepClone(flameDescriptor)
+        const tracks = deepClone(timeline.tracks())
+        const config = deepClone(timeline.config())
+        const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
+        // The modal exports the frame you are looking at; a script that seeked
+        // there expects the same, so the timeline is baked in the same way.
+        if (hasAnimation) {
+          applyTimelineToFlameAtFrame(timeline, flame, frame)
+        }
+        enqueueImageJob({
+          name: flame.metadata?.name?.trim() || 'flame',
+          flame,
+          // The document, not the frame: `flame` above may carry the timeline
+          // baked at the current frame, and Recents should file what the user
+          // authored, exactly as the export modal answers it.
+          authoredFlame: deepClone(flameDescriptor),
+          quality: request.quality,
+          dimensions: { width: request.width, height: request.height },
+          palette: selectedPalette(),
+          blendFlame: blendFlame(),
+          blendWeight: resolvedBlendWeight(),
+          embedFlame: request.embedFlame,
+          embedAnimation: hasAnimation,
+          condenseHidden: false,
+          tracks,
+          config,
+          session: snapshotExportSession(sessionForExport()),
+        })
+      },
+      renderAnimation: (request) => {
+        const tracks = deepClone(timeline.tracks())
+        const config = deepClone(timeline.config())
+        const { frameStart, frameEnd } = resolveExportFrameRange(
+          request,
+          tracks,
+          config,
+        )
+        // The RAW flame: the job applies the timeline per frame itself.
+        enqueueAnimationJob({
+          name: flameDescriptor.metadata?.name?.trim() || 'flame',
+          flame: deepClone(flameDescriptor),
+          quality: request.quality,
+          dimensions: { width: request.width, height: request.height },
+          fps: request.fps,
+          frameStart,
+          frameEnd,
+          playCount: 1,
+          codec: request.codec,
+          embedMetadata: true,
+          palette: selectedPalette(),
+          blendFlame: blendFlame(),
+          blendWeight: resolvedBlendWeight(),
+          tracks,
+          config,
+          session: snapshotExportSession(sessionForExport()),
+          audioBuffer: audioBuffer(),
+          audioMapping: audioMapping().mappings,
+        })
+      },
     },
     arcade: {
       openHub: (mode) => {
