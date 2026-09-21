@@ -157,6 +157,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       roll: 0,
     }
   const zoom = readonlySignal(() => cam().zoom)
+  const rotation = () => cam().rotation ?? 0
   const position = readonlySignal<v2f>(() =>
     vec2f(cam().position[0], cam().position[1]),
   )
@@ -488,6 +489,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={rotation}
               interactive={() => false}
             >
               <Flam3

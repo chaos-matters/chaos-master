@@ -656,6 +656,9 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
               <WheelZoomCamera2D
                 zoom={cameraZoom}
                 position={cameraPosition}
+                rotation={() =>
+                  selectedFlame().flame.renderSettings.camera.rotation ?? 0
+                }
                 interactive={() => false}
               >
                 <Flam3

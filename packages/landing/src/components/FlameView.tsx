@@ -216,6 +216,9 @@ export default function FlameView(props: FlameViewProps) {
     vec2f(...props.flame.renderSettings.camera.position)
   const cameraZoom = () =>
     props.cameraZoom?.() ?? props.flame.renderSettings.camera.zoom
+  // There is no override for rotation and no rotate gesture: a landing flame
+  // turns only because its own camera says so, exactly as it does in the app.
+  const cameraRotation = () => props.flame.renderSettings.camera.rotation ?? 0
 
   // Hoist every conditional (`?? `) prop that feeds Flam3 / AutoCanvas into a
   // createMemo owned by this component, and pass the *called* value below. A
@@ -345,12 +348,20 @@ export default function FlameView(props: FlameViewProps) {
           <Show
             when={props.interactive2D}
             fallback={
-              <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
+              <Camera2D
+                position={cameraPosition()}
+                zoom={cameraZoom()}
+                rotation={cameraRotation()}
+              >
                 {flame()}
               </Camera2D>
             }
           >
-            <WheelZoomCamera2D zoom={zoom2D} position={pos2D}>
+            <WheelZoomCamera2D
+              zoom={zoom2D}
+              position={pos2D}
+              rotation={cameraRotation}
+            >
               <TouchPinchGuard />
               {flame()}
             </WheelZoomCamera2D>

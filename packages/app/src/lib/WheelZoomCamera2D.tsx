@@ -17,6 +17,11 @@ const SCROLL_SENSITIVITY = 0.001
 type WheelZoomCamera2DProps = {
   zoom: Signal<number>
   position: Signal<v2f>
+  /**
+   * Radians. Read-only here: there is no rotate gesture, only keyframes.
+   * Required for the reason `Camera2D.rotation` is — see its doc comment.
+   */
+  rotation: () => number
   eventTarget?: HTMLElement
   interactive?: () => boolean
 }
@@ -245,7 +250,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   })
 
   return (
-    <Camera2D position={position()} zoom={zoom()}>
+    <Camera2D position={position()} zoom={zoom()} rotation={props.rotation()}>
       {(() => {
         const { js } = useCamera()
         // steal clipToWorld from the camera

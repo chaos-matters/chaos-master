@@ -121,6 +121,7 @@ export function FlameStill(props: {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={() => camera.rotation ?? 0}
               interactive={() => false}
             >
               <FlameLayer />

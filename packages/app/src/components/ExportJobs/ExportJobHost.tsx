@@ -212,6 +212,7 @@ function OffscreenRender(props: { job: ImageJob }) {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={() => cam.rotation ?? 0}
               interactive={() => false}
             >
               <Flam3

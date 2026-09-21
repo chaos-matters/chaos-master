@@ -134,6 +134,9 @@ function ShareVariationLoadModal(props: {
             <WheelZoomCamera2D
               zoom={[() => 1, () => {}]}
               position={[() => vec2f(), () => undefined]}
+              /* A fixed preview frame, not the flame's camera: zoom 1 at the
+                 origin, so there is no rotation to inherit either. */
+              rotation={() => 0}
             >
               <Flam3
                 animationEnabled={false}

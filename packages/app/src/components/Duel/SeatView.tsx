@@ -99,6 +99,7 @@ export function SeatView(props: {
             <WheelZoomCamera2D
               zoom={props.zoom}
               position={props.position}
+              rotation={() => props.flame().renderSettings.camera.rotation ?? 0}
               interactive={() => props.interactive}
             >
               <FlameLayer />

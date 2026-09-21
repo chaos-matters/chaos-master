@@ -264,6 +264,7 @@ function CaptureStage(props: { job: CaptureJob }) {
             <Camera2D
               position={vec2f(...camera().position)}
               zoom={camera().zoom}
+              rotation={camera().rotation ?? 0}
             >
               {flam3()}
             </Camera2D>

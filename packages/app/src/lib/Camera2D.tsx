@@ -1,8 +1,9 @@
 import { createMemo } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { f32, mat3x3f, mat4x4f, struct, vec2f, vec3f } from 'typegpu/data'
+import { f32, mat3x3f, struct, vec2f, vec3f } from 'typegpu/data'
 import { div, mul } from 'typegpu/std'
-import { mat3, mat4 } from 'wgpu-matrix'
+import { mat3 } from 'wgpu-matrix'
+import { camera2DViewMatrix } from './camera2DView'
 import { CameraContextProvider } from './CameraContext'
 import { useCanvas } from './CanvasContext'
 import { useLiveRootContext } from './RootContext'
@@ -67,6 +68,15 @@ export const camera2DPixelRatio = tgpu.fn(
 type Camera2DProps = {
   position: v2f
   zoom: number
+  /**
+   * Radians. Required, and deliberately not defaulted: rotation reaches the
+   * renderer through this prop and nowhere else, so a mount that omits it
+   * renders the flame un-turned while an export of the same flame turns. A
+   * view of its own — a thumbnail framed by the component, an editor's grid —
+   * passes a literal 0 and says so; a mount that frames a flame with the
+   * flame's own camera passes `camera.rotation ?? 0`.
+   */
+  rotation: number
 }
 
 export function Camera2D(props: ParentProps<Camera2DProps>) {
@@ -85,34 +95,21 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
   const uniforms = createMemo(() => {
     const size = canvasSize()
     const { width, height } = size
-    const { position, zoom } = props
+    const { position, zoom, rotation: rawRotation } = props
     const rawX = position?.x
     const rawY = position?.y
     const x = Number.isFinite(rawX) ? rawX : 0
     const y = Number.isFinite(rawY) ? rawY : 0
     const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
     const aspect = height > 0 ? width / height : 1
-    const viewMatrix4 = mat4x4f()
-    const fovy = 1 / safeZoom
-    // near/far are -1/1 (not 0/0): the projection is 2D, so the z entries are
-    // unused (only the xyw of columns 0/1/3 are read below), but 0/0 makes
-    // ortho write NaN/Inf into those entries, which TypeGPU 0.11 rejects
-    // (Finite Math Assumption).
-    mat4.ortho(
-      x - aspect * fovy,
-      x + aspect * fovy,
-      y - fovy,
-      y + fovy,
-      -1,
-      1,
-      viewMatrix4,
-    )
-    // prettier-ignore
-    const viewMatrix = mat3x3f(
-      viewMatrix4.columns[0].xyw,
-      viewMatrix4.columns[1].xyw,
-      viewMatrix4.columns[3].xyw,
-    )
+    const rotation = Number.isFinite(rawRotation) ? rawRotation : 0
+    const viewMatrix = camera2DViewMatrix({
+      x,
+      y,
+      zoom: safeZoom,
+      rotation,
+      aspect,
+    })
     const viewMatrixInverse = mat3.inverse(viewMatrix, mat3x3f())
     return {
       viewMatrix,

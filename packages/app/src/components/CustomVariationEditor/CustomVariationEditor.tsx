@@ -708,6 +708,9 @@ function ShowCustomVariationEditor(props: {
                   <WheelZoomCamera2D
                     zoom={[() => 1, () => {}]}
                     position={[() => vec2f(), () => undefined]}
+                    /* A fixed preview frame of one variation, not a flame's
+                       camera: zoom 1 at the origin, and no rotation. */
+                    rotation={() => 0}
                   >
                     <Flam3
                       animationEnabled={false}

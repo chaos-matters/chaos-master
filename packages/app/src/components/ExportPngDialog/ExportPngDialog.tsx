@@ -336,6 +336,10 @@ function RenderDialog(props: RenderDialogProps) {
                         setFlameZoom,
                       ]}
                       position={[cameraPos, setFlamePosition]}
+                      rotation={() =>
+                        props.previewDescriptor.renderSettings.camera
+                          .rotation ?? 0
+                      }
                     >
                       <Show
                         when={

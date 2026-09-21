@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1044         | 175.8k |
+| `packages/app`            | `chaos-master`                 | 1048         | 176.7k |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/core`           | `@chaos-master/core`           | 17           | 1.9k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -78,8 +78,8 @@ file instead of rediscovering the architecture every session.
 
 | Module                  | Entry point                                                                                                    | LOC  | What it is                                                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Timeline`              | [TimelineSettings.tsx](../../packages/app/src/components/Timeline/TimelineSettings.tsx)                        | 4.2k | _(no header comment)_                                                                                                                        |
 | `Home`                  | [HomeFlame.tsx](../../packages/app/src/components/Home/HomeFlame.tsx)                                          | 4.1k | _(no header comment)_                                                                                                                        |
-| `Timeline`              | [TimelineSettings.tsx](../../packages/app/src/components/Timeline/TimelineSettings.tsx)                        | 4.1k | _(no header comment)_                                                                                                                        |
 | `AudioWiringModal`      | [AudioWiringModal.tsx](../../packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx)                | 4.0k | _(no header comment)_                                                                                                                        |
 | `Duel`                  | [DuelChips.tsx](../../packages/app/src/components/Duel/DuelChips.tsx)                                          | 3.2k | Pointer intent, so a cursor crossing the top edge does not detonate a panel.                                                                 |
 | `SessionRecorder`       | [SessionRecorderDock.tsx](../../packages/app/src/components/SessionRecorder/SessionRecorderDock.tsx)           | 2.7k | _(no header comment)_                                                                                                                        |
@@ -99,7 +99,7 @@ file instead of rediscovering the architecture every session.
 | `Sliders`               | [AngleEditor.tsx](../../packages/app/src/components/Sliders/ParametricEditors/AngleEditor.tsx)                 | 1.0k | _(no header comment)_                                                                                                                        |
 | `PopulationSimulator`   | [PopulationSimulator.tsx](../../packages/app/src/components/PopulationSimulator/PopulationSimulator.tsx)       | 900  | _(no header comment)_                                                                                                                        |
 | `BenchmarkModal`        | [BenchmarkModal.tsx](../../packages/app/src/components/BenchmarkModal/BenchmarkModal.tsx)                      | 850  | _(no header comment)_                                                                                                                        |
-| `CustomVariationEditor` | [CustomVariationEditor.tsx](../../packages/app/src/components/CustomVariationEditor/CustomVariationEditor.tsx) | 800  | _(no header comment)_                                                                                                                        |
+| `CustomVariationEditor` | [CustomVariationEditor.tsx](../../packages/app/src/components/CustomVariationEditor/CustomVariationEditor.tsx) | 850  | _(no header comment)_                                                                                                                        |
 | `FloatingActions`       | [FloatingActions.tsx](../../packages/app/src/components/FloatingActions/FloatingActions.tsx)                   | 750  | _(no header comment)_                                                                                                                        |
 | `Migration`             | [Migration.tsx](../../packages/app/src/components/Migration/Migration.tsx)                                     | 750  | _(no header comment)_                                                                                                                        |
 | `HelpModal`             | [HelpModal.tsx](../../packages/app/src/components/HelpModal/HelpModal.tsx)                                     | 700  | _(no header comment)_                                                                                                                        |
@@ -196,7 +196,7 @@ file instead of rediscovering the architecture every session.
 | [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts)             | 200 | How a duel is decided.                                                                                                                       |
 | [pilot.ts](../../packages/app/src/arcade/pilot.ts)                     | 200 | "An agent is driving the editor" as one module-global state, the same way `webmcp/contextBridge.ts` holds the command context: the tools,... |
 | [affineControls.ts](../../packages/app/src/arcade/affineControls.ts)   | 150 | An affine as six things a person can reason about.                                                                                           |
-| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)       | 100 | Argument shapes for the commands an Arcade mode allows.                                                                                      |
+| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)       | 150 | Argument shapes for the commands an Arcade mode allows.                                                                                      |
 | [duelHud.ts](../../packages/app/src/arcade/duelHud.ts)                 | 100 | Everything a duel HUD draws, derived once.                                                                                                   |
 | [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts)       | 100 | What to tell an agent that has run out of steps.                                                                                             |
 
@@ -251,7 +251,7 @@ file instead of rediscovering the architecture every session.
 | File                                                       | LOC | What it is                                                                     |
 | ---------------------------------------------------------- | --- | ------------------------------------------------------------------------------ |
 | [registry.ts](../../packages/app/src/commands/registry.ts) | 650 | Explicit signatures for commands whose arguments are small scalar/data shapes. |
-| [types.ts](../../packages/app/src/commands/types.ts)       | 350 | _(no header comment)_                                                          |
+| [types.ts](../../packages/app/src/commands/types.ts)       | 400 | _(no header comment)_                                                          |
 
 #### Stores (`packages/app/src/stores/`) — global reactive state
 
@@ -267,7 +267,7 @@ file instead of rediscovering the architecture every session.
 
 | File                                                                        | LOC  | What it is                                                                                                                                   |
 | --------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [timeline.ts](../../packages/app/src/utils/timeline.ts)                     | 2.1k | Expandable mapping of variation types to their available parameters.                                                                         |
+| [timeline.ts](../../packages/app/src/utils/timeline.ts)                     | 2.2k | Expandable mapping of variation types to their available parameters.                                                                         |
 | [audioAnalysis.ts](../../packages/app/src/utils/audioAnalysis.ts)           | 1.0k | Decode encoded audio bytes -- a fetched or uploaded file -- into a buffer.                                                                   |
 | [sonification.ts](../../packages/app/src/utils/sonification.ts)             | 800  | _(no header comment)_                                                                                                                        |
 | [flameImport.ts](../../packages/app/src/utils/flameImport.ts)               | 650  | Effectively "all" — every store is capped well below this.                                                                                   |
@@ -275,13 +275,14 @@ file instead of rediscovering the architecture every session.
 | [createStoreHistory.ts](../../packages/app/src/utils/createStoreHistory.ts) | 500  | Optional workspace state that travels with this entry.                                                                                       |
 | [animationExport.ts](../../packages/app/src/utils/animationExport.ts)       | 450  | _(no header comment)_                                                                                                                        |
 | [audioExport.ts](../../packages/app/src/utils/audioExport.ts)               | 450  | _(no header comment)_                                                                                                                        |
+| [exportJobs.ts](../../packages/app/src/utils/exportJobs.ts)                 | 400  | Background export jobs.                                                                                                                      |
 | [jsonQueryParam.ts](../../packages/app/src/utils/jsonQueryParam.ts)         | 400  | Decompress and JSON-parse, with no assumption about the shape.                                                                               |
 | [mathToWgsl.ts](../../packages/app/src/utils/mathToWgsl.ts)                 | 400  | Translate a math-notation expression (LaTeX-like) into a WGSL function body.                                                                 |
 | [recentFlames.ts](../../packages/app/src/utils/recentFlames.ts)             | 400  | What a write to Recents did.                                                                                                                 |
 | [useAudioReactive.ts](../../packages/app/src/utils/useAudioReactive.ts)     | 350  | Hand this frame's settled mapping values to the render-time overlay, or `undefined` to take the overlay down.                                |
 | [audioWiringPresets.ts](../../packages/app/src/utils/audioWiringPresets.ts) | 300  | What an audio-reactive preset actually wires.                                                                                                |
-| [exportJobs.ts](../../packages/app/src/utils/exportJobs.ts)                 | 300  | Background export jobs.                                                                                                                      |
 | [serializeLogArgs.ts](../../packages/app/src/utils/serializeLogArgs.ts)     | 300  | Caps applied to every serialized console entry.                                                                                              |
+| [exportRequests.ts](../../packages/app/src/utils/exportRequests.ts)         | 250  | Scripted export requests: the narrow, JSON-shaped options a script or an agent sends to `export.renderImage` / `export.renderAnimation`,...  |
 | [flameInMp4.ts](../../packages/app/src/utils/flameInMp4.ts)                 | 250  | ASCII type tag of the box at `offset` (the 4 bytes after the size field).                                                                    |
 | [flameInPng.ts](../../packages/app/src/utils/flameInPng.ts)                 | 250  | Second zTXt keyword: the recorded session that produced the flame, so a dropped PNG can offer "replay this creation" as well as "load thi... |
 
@@ -299,7 +300,7 @@ file instead of rediscovering the architecture every session.
 
 | File                                                                        | LOC  | What it is                                               |
 | --------------------------------------------------------------------------- | ---- | -------------------------------------------------------- |
-| [MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx)               | 4.6k | _(no header comment)_                                    |
+| [MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx)               | 4.7k | _(no header comment)_                                    |
 | [App.tsx](../../packages/app/src/App.tsx)                                   | 500  | _(no header comment)_                                    |
 | [defaults.ts](../../packages/app/src/defaults.ts)                           | 150  | _(no header comment)_                                    |
 | [App.integration.mock.tsx](../../packages/app/src/App.integration.mock.tsx) | 100  | Mock file for App integration tests.                     |
@@ -322,13 +323,13 @@ Grep for the symbol and read the surrounding range instead.
 | File                                                                                                                                                         | LOC  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
 | [packages/app/src/flame/examples/animations.ts](../../packages/app/src/flame/examples/animations.ts)                                                         | 5.7k |
-| [packages/app/src/MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx)                                                                               | 4.6k |
+| [packages/app/src/MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx)                                                                               | 4.7k |
 | [packages/app/src/pages/Benchmarks/BenchmarksPage.tsx](../../packages/app/src/pages/Benchmarks/BenchmarksPage.tsx)                                           | 2.8k |
-| [packages/app/src/utils/timeline.ts](../../packages/app/src/utils/timeline.ts)                                                                               | 2.1k |
+| [packages/app/src/utils/timeline.ts](../../packages/app/src/utils/timeline.ts)                                                                               | 2.2k |
 | [packages/app/src/flame/variations/docs/content.general.ts](../../packages/app/src/flame/variations/docs/content.general.ts)                                 | 1.9k |
 | [packages/app/src/flame/variations/docs/content.general2.ts](../../packages/app/src/flame/variations/docs/content.general2.ts)                               | 1.8k |
 | [packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx](../../packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx)                 | 1.6k |
-| [packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx](../../packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx)                     | 1.5k |
+| [packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx](../../packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx)                     | 1.4k |
 | [packages/app/src/components/LoadFlameModal/LoadFlameModal.tsx](../../packages/app/src/components/LoadFlameModal/LoadFlameModal.tsx)                         | 1.4k |
 | [packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx](../../packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx)         | 1.3k |
 | [packages/app/src/components/FlameRandomizerCard/FlameRandomizerCard.tsx](../../packages/app/src/components/FlameRandomizerCard/FlameRandomizerCard.tsx)     | 1.3k |
