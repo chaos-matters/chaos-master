@@ -20,7 +20,7 @@ Arcade modes.
 - `packages/app/src/components/DirectorOverlay.tsx` — the modal: rating capture, tag chips, Breed Selected, Mutate Best, Load Candidate
 - `packages/app/src/hooks/useWorkspaceArtDirector.tsx` — session signals, seeding, modal lifecycle, `selectCandidate`
 - `packages/app/src/commands/types.ts:21-42,92-98` — `DirectorCandidate`, `DirectorState`, the optional `director` member of `CommandContext`
-- `packages/app/src/arcade/topics.ts:334-364` — `DIRECTOR_PRESETS` and `directorPromptCard`
+- `packages/app/src/arcade/topics.ts:366-396` — `DIRECTOR_PRESETS` and `directorPromptCard`
 - `packages/app/src/components/Arcade/ArcadeModePanel.tsx:378-419` — the Director tab and its "Launch Art Director Overlay" button
 - `packages/app/src/webmcp/tools/index.ts:99-100,131-132` — registration order
 - `packages/app/src/webmcp/tools/openArtDirector.ts` — a one-line re-export barrel with no importers; behaviourally inert
@@ -59,7 +59,7 @@ prompt card that names `director_get_taste_profile`, `director_propose` and
 `director_get_feedback` in that order, so the agent reads the historical profile
 before proposing and reads feedback before evolving.
 
-_(`arcade/topics.ts:334-364`; `Arcade/ArcadeModePanel.tsx:378-419`. The panel's
+_(`arcade/topics.ts:366-396`; `Arcade/ArcadeModePanel.tsx:378-419`. The panel's
 "Launch Art Director Overlay" button calls `ctx?.director?.setOpen(true)` and
 nothing else — it opens the modal on whatever generation already exists, or on a
 seeded one per REQ-AD-005.)_

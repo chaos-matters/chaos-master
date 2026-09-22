@@ -4,8 +4,9 @@ import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
 import { finishPilot } from '@/arcade/pilotActions'
-import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_STEP_BUDGET, } from '@/arcade/topics'
+import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_STEP_BUDGET, PRESENTATION_SWITCHES, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { captureGlideSwitches } from '@/flame/glide/runtime'
 import { withRecordingSuppressed } from '@/recorder/recorder'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { CatalogEntry } from '@/arcade/animatablePaths'
@@ -50,13 +51,17 @@ export const arcadeStartCinema: WebMcpTool = {
     if (!started.ok) {
       return { error: `Could not start recording: ${started.reason}` }
     }
-    const allowed = [...CINEMA_ALLOWED, ...ALWAYS_ALLOWED]
+    // Enforced, not advertised: the brief is described from `briefed`, and
+    // PRESENTATION_SWITCHES says why the switches stay out of it.
+    const briefed = [...CINEMA_ALLOWED, ...ALWAYS_ALLOWED]
+    const allowed = [...briefed, ...PRESENTATION_SWITCHES]
     const result = startPilot({
       mode: 'cinema',
       title: 'Animating your flame',
       stepBudget: CINEMA_STEP_BUDGET,
       allowed,
       qualityRankAtStart: qualityRank(ctx.arcade.qualityPreset()),
+      glideAtStart: captureGlideSwitches(),
     })
     if (!result.ok) {
       ctx.recorder.cancel()
@@ -73,7 +78,7 @@ export const arcadeStartCinema: WebMcpTool = {
     return {
       ok: true,
       stepBudget: CINEMA_STEP_BUDGET,
-      allowedCommands: describeAllowedCommands(allowed),
+      allowedCommands: describeAllowedCommands(briefed),
       existingTracks: existing,
       tips: [
         ...(existing

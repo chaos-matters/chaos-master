@@ -11,6 +11,38 @@ export const ALWAYS_ALLOWED = [
   'sidebar.close',
 ] as const
 
+/**
+ * How a change is PRESENTED, as against what the change is.
+ *
+ * Teach, Cinema and Beats may flip these. They present to somebody watching,
+ * and an agent that wants every change from here on to flow rather than cut
+ * should not have to remember a duration on each call. The per-call
+ * `glideMs` on `execute_command` is the other half of the same permission
+ * and is gated separately, in `webmcp/tools/executeCommand.ts`. They last
+ * for the take: it holds both as the viewer left them, and `finishPilot`
+ * gives them back once whatever transition is in flight has landed.
+ *
+ * Enforced, never advertised. Each of those modes adds them to the list its
+ * lock enforces and describes its brief from the list without them: a brief
+ * is a tool result held to ~1.5 KB, and the variations brief already sits at
+ * the edge of it. An agent finds them where it already looks for what it may
+ * do: the refusal message prints the enforced list, and `list_commands`
+ * names every command, with its argument shape once the query is narrowed to
+ * a prefix.
+ *
+ * Not a duel, which refuses transitions outright: the switch would be a
+ * setting with no effect, and a duel points the tools at the rival's seat
+ * while the only glide runtime belongs to the player's workspace.
+ *
+ * Not `glide.toFlame`, in any mode. It carries a whole descriptor and
+ * REPLACES the document with it, which is the `flame.load` permission wearing
+ * a glide's name — a different thing from choosing how a change appears.
+ */
+export const PRESENTATION_SWITCHES = [
+  'glide.setEnabled',
+  'glide.setQuality',
+] as const
+
 export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
   variations: {
     id: 'variations',

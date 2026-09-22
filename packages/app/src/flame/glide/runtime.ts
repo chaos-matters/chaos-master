@@ -22,7 +22,7 @@ import { planGlide } from './plan'
 import { resolveGlideQuality } from './quality'
 import { sampleGlide } from './sample'
 import { GLIDE_DEADLINE_SLACK_MS, isGlideRefusal } from './types'
-import type { GlideOptions, GlideOutcome, GlidePlan, GlideQuality, GlideQualityPreference, } from './types'
+import type { GlideOptions, GlideOutcome, GlidePlan, GlideQuality, GlideQualityPreference, GlideSwitches, } from './types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
@@ -332,6 +332,49 @@ export function yieldGlideToDocumentWrite(): void {
  */
 export function settleGlideBeforeTimeTravel(): void {
   current?.finish()
+}
+
+/**
+ * Land a transition when an Arcade session ends.
+ *
+ * Teach, Cinema and Beats animate a scripted change, and `execute_command`
+ * awaits the transition it started. A viewer who presses Stop in the middle of
+ * one leaves nothing to end it but the runtime's own wall-clock deadline, so
+ * the flame would go on moving for up to its remaining duration after the take
+ * was over, at the downshifted tier.
+ *
+ * It settles rather than cancelling in place, for the reason an undo does: the
+ * agent's change was a change, and the document belongs on the flame it asked
+ * for. Cancelling would leave the take ending on a frame that is no state
+ * anyone chose. Settling an already-settled runtime does nothing, so the call
+ * is unconditional, and a duel — which never glides — simply finds nothing in
+ * flight.
+ */
+export function settleGlideOnArcadeEnd(): void {
+  current?.finish()
+}
+
+/**
+ * The two switches as they stand, for a take to hold on to when it starts.
+ *
+ * Teach, Cinema and Beats let the agent flip them for its own presentation
+ * (`PRESENTATION_SWITCHES`), and the lock keeps the viewer off them for the
+ * whole take, so this is exactly the state the viewer left.
+ */
+export function captureGlideSwitches(): GlideSwitches {
+  return { enabled: glideEnabled(), quality: glideQualityPreference() }
+}
+
+/**
+ * Put the switches back the way a take found them.
+ *
+ * `finishPilot` calls it after `settleGlideOnArcadeEnd`, never before: the
+ * transition in flight belongs to the take and lands first, and only the
+ * editor after it goes back to the viewer's settings.
+ */
+export function restoreGlideSwitches(switches: GlideSwitches): void {
+  setGlideEnabled(switches.enabled)
+  setGlideQualityPreference(switches.quality)
 }
 
 /** The tier a caller would get right now, without planning anything. */

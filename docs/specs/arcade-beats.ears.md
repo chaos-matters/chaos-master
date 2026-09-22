@@ -24,7 +24,7 @@ the seam Beats mode touches.
 - `packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx:428-468` — the only writers of the audio buffer and track name
 - `packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx:439-487` — file decode and microphone acquisition, and their failure paths
 - `packages/app/src/utils/useAudioReactive.ts` — what "enabled" actually gates: modulation, not transport
-- `packages/app/src/arcade/topics.ts:270-284`, `:315-326` — `BEATS_ALLOWED`, `BEATS_STEP_BUDGET`, the prompt card
+- `packages/app/src/arcade/topics.ts:302-316`, `:347-358` — `BEATS_ALLOWED`, `BEATS_STEP_BUDGET`, the prompt card
 - `packages/app/src/arcade/guard.ts`, `packages/app/src/arcade/pilot.ts`, `packages/app/src/arcade/pilotActions.ts` — allow-list enforcement, step budget, session teardown
 - `packages/app/src/components/Arcade/ArcadeModePanel.tsx:131`, `:331-377` — the hub's track picker
 - `packages/app/public/audio/` and `packages/app/scripts/generate-tracks.mjs` — the shipped WAV assets and the script that generates them
@@ -33,6 +33,7 @@ the seam Beats mode touches.
 
 - `packages/app/src/webmcp/tools/arcadeBeats.test.ts` — the four tools: refusal with no workspace, start (lock + recorder + `setEnabled(true)` + budget), catalogue shape, mode gating on the mapping tool, one valid mapping, one malformed mapping, end
 - `packages/app/src/arcade/topics.test.ts:132-158` — `BEATS_ALLOWED` membership, the step-budget floor, and the prompt card's track name and tool names
+- `packages/app/src/webmcp/tools/arcadeGlideSwitches.test.ts` — the presentation switches under a real Beats pilot: accepted, named in the refusal's allowed list, left out of the brief; `glide.toFlame` refused
 - `packages/app/src/components/Arcade/ArcadeModePanel.test.tsx:37-55` — both bundled tracks render as chips and the selected one reaches the prompt card
 - `packages/app/src/commands/builtins/audio.test.ts` — `audio.applySnapshot` as a recorded action, and the resource-identity gate on enabling replayed wiring
 - `packages/app/src/recorder/replay.test.ts:19-110` — `canEnableReplayAudio`: name match, missing buffer, missing identity, microphone
@@ -79,7 +80,7 @@ entry, and feed the selected track's name into the copyable prompt card. The
 selection shall reach nothing else: no workspace signal, no command, no tool
 argument.
 
-_(`ArcadeModePanel.tsx:131`, `:336-351`; `beatsPromptCard` at `topics.ts:315-326`)_
+_(`ArcadeModePanel.tsx:131`, `:336-351`; `beatsPromptCard` at `topics.ts:347-358`)_
 
 ### REQ-AB-005 — Beats mode loads the track it advertises
 
@@ -134,7 +135,7 @@ budget of 30, the described allow-list, the resolved `activeTrack` and the four
 workflow tips. The pilot shall be recorded as `mode: 'beats'` with a `'screen'`
 lock on the default seat and the quality preset rank captured at start.
 
-_(`arcadeBeats.ts:124-159`; `BEATS_STEP_BUDGET = 30` at `topics.ts:284`;
+_(`arcadeBeats.ts:124-159`; `BEATS_STEP_BUDGET = 30` at `topics.ts:316`;
 `startPilot` defaults at `pilot.ts:95-121`)_
 
 ### REQ-AB-010 — activeTrack is resolved, then only reported
@@ -295,12 +296,17 @@ _(`arcadeBeats.ts:355-361`)_
 **While** a Beats pilot is driving, `execute_command` shall refuse any command
 id outside `BEATS_ALLOWED` (`lesson.note`, `sidebar.open`, `sidebar.close`, the
 six `audio.*` ids, the two `sonification.*` ids, `camera.center`,
-`camera.zoomTo`), any id under the always-blocked `export.` and `history.`
+`camera.zoomTo`) and the two presentation switches (`glide.setEnabled`,
+`glide.setQuality`), any id under the always-blocked `export.` and `history.`
 prefixes, a quality preset above the rank captured at start, and the locked
 point-count/dimensions/quality render settings — returning the reason and the
-allowed list, and logging it to the pilot rail.
+allowed list, and logging it to the pilot rail. The switches are enforced
+without being described: the brief of REQ-AB-009 lists `BEATS_ALLOWED` alone.
+Ending the session gives both back as they were when it started, after landing
+any transition in flight (`finishPilot`).
 
-_(`guard.ts:29-73`; `topics.ts:270-283`; enforcement at
+_(`guard.ts:29-73`; `topics.ts:302-315`, with `PRESENTATION_SWITCHES` at
+`topics.ts:14-44`; enforcement at
 `webmcp/tools/executeCommand.ts:99-107`. The Beats tools themselves dispatch
 `audio.applySnapshot` and `lesson.note` through `commands/registry`
 directly, bypassing this guard — both are on the list regardless.)_
@@ -448,9 +454,11 @@ Requirements with no test that goes red when they are violated:
 29`; nothing asserts the log line's text or the `lesson.note` dispatch.
 - **REQ-AB-022** — no test drives the budget to zero.
 - **REQ-AB-024, REQ-AB-025** — `topics.test.ts:133-138` asserts membership of
-  three ids in `BEATS_ALLOWED` and a budget floor; nothing runs `guardCommand`
-  with a Beats state, and nothing checks that every advertised id resolves to a
-  registered command (which four do not).
+  three ids in `BEATS_ALLOWED` and a budget floor. `arcadeGlideSwitches.test.ts`
+  runs `guardCommand` under a real Beats pilot, but only for the presentation
+  switches and `glide.toFlame`; nothing checks the rest of the list that way,
+  and nothing checks that every advertised id resolves to a registered command
+  (which four do not).
 - **REQ-AB-028, REQ-AB-029** — `arcadeBeats.test.ts:133` asserts only `ok`, the
   echoed title and that driving stopped. The `Lesson:` library name and the
   save-failure path are unguarded.

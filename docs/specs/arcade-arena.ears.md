@@ -30,7 +30,7 @@ engine itself beyond the tracks the arena writes into it, or `VariationPreview` 
 - `packages/app/src/webmcp/tools/animateClash.ts` — staging the clash flame and its tracks into the timeline
 - `packages/app/src/webmcp/tools/openArena.ts`, `arenaStartClash.ts`, `arenaGetStats.ts`, `arenaCommentate.ts` — the agent surface
 - `packages/app/src/webmcp/tools/index.ts:45-136` — tool registration and read/write ordering
-- `packages/app/src/components/Arcade/ArcadeModePanel.tsx:420-497` and `packages/app/src/arcade/topics.ts:448-460` — the Arcade hub's Arena panel and prompt card
+- `packages/app/src/components/Arcade/ArcadeModePanel.tsx:420-497` and `packages/app/src/arcade/topics.ts:480-492` — the Arcade hub's Arena panel and prompt card
 
 **Tests:**
 

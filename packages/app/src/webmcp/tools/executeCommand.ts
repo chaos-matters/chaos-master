@@ -145,10 +145,12 @@ export const executeCommandTool: WebMcpTool = {
     // `{commandId, args}`, and how long the change took to appear is not part
     // of what the person did.
     //
-    // Under the duel clock it is switched off outright. The clock is
-    // wall-clock, so a pilot spending five seconds of it on animation would be
-    // buying time rather than flying.
-    const glide = resolveGlideRequest(rawInput, driving !== undefined)
+    // Only a duel switches it off. Teach, Cinema and Beats are presentations
+    // with one seat and no clock, and a change the viewer is meant to watch is
+    // what a transition is for. The mode's allow-list, its step budget and the
+    // duel clock have all been answered above, so a transition can only ever
+    // present a change the lock already let through.
+    const glide = resolveGlideRequest(rawInput, driving?.mode === 'duel')
     const runtime = getGlideRuntime()
     // Settle anything already in flight FIRST, whether or not THIS call
     // animates: a scripted command is a change, so the transition before it
@@ -231,6 +233,7 @@ export const executeCommandTool: WebMcpTool = {
         steps: driving.steps + 1,
         remaining,
         ...reported,
+        ...glideReport(outcome),
       }
     }
 
@@ -245,8 +248,9 @@ export const executeCommandTool: WebMcpTool = {
  * Only a glide the DEADLINE landed is worth a word. The document is on exactly
  * the target either way; this says nobody watched it get there, which is what
  * a tab with no `requestAnimationFrame` looks like and what an agent composing
- * a demo or a recording needs to know. The Arcade path never reaches it — a
- * duel turns glides off outright, so there is no outcome to report.
+ * a demo or a recording needs to know. Both return paths carry it: an agent
+ * composing a Cinema take needs it most, and only a duel has no outcome to
+ * report.
  */
 function glideReport(outcome: GlideOutcome | undefined) {
   return outcome?.completedByDeadline === true
@@ -260,6 +264,14 @@ function glideReport(outcome: GlideOutcome | undefined) {
  * An explicit `glideMs` wins in both directions — `0` turns a glide off even
  * with the workspace setting on — and omitting it follows the setting and
  * lets the planner read the change itself.
+ *
+ * `duelling` is the one Arcade mode that refuses, and it refuses for two
+ * reasons rather than one. Its clock is wall-clock, so a pilot spending five
+ * seconds of it on animation would be buying time rather than flying. And a
+ * duel points the tool bridge at the rival's seat (`duelActions.beginDuel`)
+ * while the only glide runtime belongs to the player's workspace, so a
+ * transition asked for here would read and write the viewer's own flame — the
+ * wrong document, not merely a slow one.
  */
 function resolveGlideRequest(
   input: Record<string, unknown>,

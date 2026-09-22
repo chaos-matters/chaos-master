@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1072         | 181.9k |
+| `packages/app`            | `chaos-master`                 | 1072         | 182.0k |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/core`           | `@chaos-master/core`           | 17           | 1.9k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -70,7 +70,7 @@ file instead of rediscovering the architecture every session.
 | --------------- | ----------------------------------------------------------------------- | ----- | --------------------- |
 | `variations`    | [index.ts](../../packages/app/src/flame/variations/parametric/index.ts) | 33.6k | _(no header comment)_ |
 | `examples`      | [index.ts](../../packages/app/src/flame/examples/index.ts)              | 12.7k | _(no header comment)_ |
-| `glide`         | [index.ts](../../packages/app/src/flame/glide/index.ts)                 | 2.7k  | _(no header comment)_ |
+| `glide`         | [index.ts](../../packages/app/src/flame/glide/index.ts)                 | 2.8k  | _(no header comment)_ |
 | `renderDrivers` | [index.ts](../../packages/app/src/flame/renderDrivers/index.ts)         | 400   | _(no header comment)_ |
 | `schema`        | [flameSchema.ts](../../packages/app/src/flame/schema/flameSchema.ts)    | 100   | _(no header comment)_ |
 | `variations3D`  | [index.ts](../../packages/app/src/flame/variations3D/index.ts)          | 50    | _(no header comment)_ |
@@ -189,7 +189,7 @@ file instead of rediscovering the architecture every session.
 
 | File                                                                   | LOC | What it is                                                                                                                                   |
 | ---------------------------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [topics.ts](../../packages/app/src/arcade/topics.ts)                   | 450 | Commands every Arcade mode may use.                                                                                                          |
+| [topics.ts](../../packages/app/src/arcade/topics.ts)                   | 500 | Commands every Arcade mode may use.                                                                                                          |
 | [animatablePaths.ts](../../packages/app/src/arcade/animatablePaths.ts) | 350 | Read the live value behind one `TIMELINE_PARAMETERS` path.                                                                                   |
 | [tasteStore.ts](../../packages/app/src/arcade/tasteStore.ts)           | 350 | Persistent taste profile store and flame feature extraction for Evolutionary Art Director.                                                   |
 | [duel.ts](../../packages/app/src/arcade/duel.ts)                       | 250 | A duel, as one module-global state — the same shape as `arcade/pilot.ts`, and for the same reason: the tools that start it, the stage tha... |
