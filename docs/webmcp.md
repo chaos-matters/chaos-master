@@ -80,15 +80,45 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 transition into the change; neither reaches the recorded step, because a
 session says what the person did, not how long it took to appear. An explicit
 `glideMs: 0` turns a glide off for one call even with the workspace's Animate
-Changes setting on, and a duel turns them off outright, because its clock is
-wall-clock and an agent could otherwise buy time with animation.
+Changes setting on.
+
+**In the Arcade, only a duel turns them off.** Teach, Cinema and Beats animate
+like anywhere else — they are presentations, and a change the viewer is meant
+to watch is what a transition is for. A duel refuses for two reasons: its clock
+is wall-clock, so an agent could buy time with animation, and it points the
+tool bridge at the rival's seat while the only glide runtime belongs to the
+player's workspace, so a transition asked for there would move the viewer's own
+flame. A mode's allow-list, its step budget and the duel clock are all answered
+before the glide is resolved, so a transition can only ever present a change
+the lock already let through; and ending a session lands whatever is in flight,
+so a take never stops part-way through one.
+
+**The switches themselves are allowed in Teach, Cinema and Beats.**
+`glide.setEnabled` and `glide.setQuality` (`PRESENTATION_SWITCHES` in
+`packages/app/src/arcade/topics.ts`) let an agent make every later change flow
+without naming a duration each time. They are enforced but printed in no brief,
+which is held to the ~1.5 KB result budget; the refusal message's list of what
+a mode allows names them, and so does `list_commands`. A duel refuses both, and
+`glide.toFlame` is on no mode's list: it replaces the document with a flame
+carried in its arguments, which is `flame.load`'s permission, not a
+presentation one. Turning Glide off mid-transition lands that transition on its
+target first, as any command does; because the switch is read before it flips,
+that one call is still presented, and changes cut from the next one.
+
+The switches last for the take. It holds both as the viewer left them, and
+ending it — its end tool, or Stop — lands whatever transition is in flight and
+then gives them back (`finishPilot`); the lock keeps the viewer off them for
+the whole take, so what comes back is exactly what they left. A replay of the
+take is not covered: the switch steps are recorded like any command, and
+replaying them sets the viewer's own switches and leaves them set.
 
 The call awaits the transition, bounded by the glide's own duration plus a
 small margin (`GLIDE_DEADLINE_SLACK_MS`). If that deadline — rather than the
 animation — is what landed the change, the result carries
-`glide: { completedBy: 'deadline' }`. The document is on exactly the target
-either way; the field says nobody watched it arrive, which is what a tab with
-no `requestAnimationFrame` (a background or hidden window) looks like.
+`glide: { completedBy: 'deadline' }`, on the Arcade's return path as well as
+the ordinary one. The document is on exactly the target either way; the field
+says nobody watched it arrive, which is what a tab with no
+`requestAnimationFrame` (a background or hidden window) looks like.
 
 ## The Arcade
 
@@ -97,8 +127,9 @@ no `requestAnimationFrame` (a background or hidden window) looks like.
 
 - **Teach** — pick one of seven topics (`variations`, `affine`, `color`,
   `camera`, `genetics`, `sonification`, `render`). The agent gets a brief with
-  the goal, the allowed commands and their exact argument shapes, and a step
-  budget. It narrates through
+  the goal, the topic's commands and their exact argument shapes, and a step
+  budget; the two Glide switches are allowed on top of that list without being
+  printed in it (see Animating a write, above). It narrates through
   `arcade_narrate` (a real `lesson.note` command, so the sentence replays as a
   caption between the edits it describes) and builds the example with
   `execute_command`. The recording is saved as `Lesson: <Topic> — <title>`.

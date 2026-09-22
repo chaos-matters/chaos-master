@@ -134,8 +134,13 @@ function ShareVariationLoadModal(props: {
             <WheelZoomCamera2D
               zoom={[() => 1, () => {}]}
               position={[() => vec2f(), () => undefined]}
-              /* A fixed preview frame, not the flame's camera: zoom 1 at the
-                 origin, so there is no rotation to inherit either. */
+              /* A shared custom VARIATION, not a picture of anybody's flame.
+                 The subject is the synthetic one-transform flame minted for
+                 this preview, framed at zoom 1 on the origin, so there is no
+                 camera here to inherit a rotation from. Nothing captures this
+                 canvas either; the picture a link unfurls to comes off the
+                 workspace canvas and turns with it (components/CanvasViewport/
+                 shareCapture.test.ts). */
               rotation={() => 0}
             >
               <Flam3

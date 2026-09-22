@@ -1,3 +1,4 @@
+import { restoreGlideSwitches, settleGlideOnArcadeEnd, } from '@/flame/glide/runtime'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { setWebMcpTarget } from '@/webmcp/contextBridge'
 import { clearNarration } from './narration'
@@ -64,6 +65,12 @@ export async function finishPilot(
 ): Promise<PilotEnded | { error: string }> {
   const state = drivingState()
   if (!state) return { error: 'No active Arcade session.' }
+  // Before the recorder stops, so a take cannot end part-way through a
+  // transition a presentation mode started and nothing else would land.
+  settleGlideOnArcadeEnd()
+  // Then the switches, and only then: the transition in flight belongs to the
+  // take, and the editor after it is the viewer's again, set as they left it.
+  if (state.glideAtStart) restoreGlideSwitches(state.glideAtStart)
   const title =
     (opts.title ?? '').trim().slice(0, 80) || defaultPilotTitle(state)
   const session = ctx.recorder?.stop()

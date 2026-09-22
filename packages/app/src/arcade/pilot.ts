@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { clearPilotFocus } from './pilotFocus'
+import type { GlideSwitches } from '@/flame/glide/types'
 import type { RecordedSession } from '@/recorder/schema'
 import type { SeatId } from '@/seats/seatId'
 
@@ -39,6 +40,11 @@ export type PilotDriving = {
   lock: 'screen' | 'seat'
   /** Index into guard.QUALITY_ORDER when the session started. */
   qualityRankAtStart: number
+  /**
+   * The Glide switches as the viewer left them, for `finishPilot` to give
+   * back. Only the presentation modes hold them; a duel cannot change them.
+   */
+  glideAtStart?: GlideSwitches
 }
 
 export type PilotEnded = {
@@ -122,6 +128,7 @@ export function startPilot(
     seatId: input.seatId ?? DEFAULT_SEAT,
     lock: input.lock ?? 'screen',
     qualityRankAtStart: input.qualityRankAtStart,
+    glideAtStart: input.glideAtStart,
   })
   appendPilotLog('system', `${input.title} started`)
   return { ok: true }

@@ -107,6 +107,15 @@ export type GlideQualityTier = 'responsive' | 'balanced' | 'full'
 /** `auto` derives the tier from the workspace's own quality preset. */
 export type GlideQualityPreference = 'auto' | GlideQualityTier
 
+/**
+ * Both presentation switches as one value: what an Arcade take holds on to
+ * when it starts, and gives back when it ends.
+ */
+export type GlideSwitches = {
+  enabled: boolean
+  quality: GlideQualityPreference
+}
+
 export type GlideQuality = {
   tier: GlideQualityTier
   /** Multiplies the render quality of every frame except the settle. */

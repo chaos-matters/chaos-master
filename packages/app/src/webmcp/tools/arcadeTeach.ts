@@ -4,8 +4,9 @@ import { qualityRank } from '@/arcade/guard'
 import { clearNarration, narration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
 import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
-import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, TOPIC_IDS, } from '@/arcade/topics'
+import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, PRESENTATION_SWITCHES, TOPIC_IDS, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { captureGlideSwitches } from '@/flame/glide/runtime'
 import { variationTypes as registeredVariationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { anySessionRecording } from '@/recorder/recorder'
@@ -137,7 +138,10 @@ export const arcadeStartLesson: WebMcpTool = {
     if (!started.ok) {
       return { error: `Could not start recording: ${started.reason}` }
     }
-    const allowed = [...topic.allowed, ...ALWAYS_ALLOWED]
+    // Enforced, not advertised: the brief is described from `briefed`, and
+    // PRESENTATION_SWITCHES says why the switches stay out of it.
+    const briefed = [...topic.allowed, ...ALWAYS_ALLOWED]
+    const allowed = [...briefed, ...PRESENTATION_SWITCHES]
     const pilotResult = startPilot({
       mode: 'teach',
       topic: topic.id,
@@ -145,6 +149,7 @@ export const arcadeStartLesson: WebMcpTool = {
       stepBudget: topic.stepBudget,
       allowed,
       qualityRankAtStart: qualityRank(ctx.arcade.qualityPreset()),
+      glideAtStart: captureGlideSwitches(),
     })
     if (!pilotResult.ok) {
       ctx.recorder.cancel()
@@ -166,7 +171,7 @@ export const arcadeStartLesson: WebMcpTool = {
       topic: topic.id,
       goal: topic.goal,
       startFrom,
-      allowedCommands: describeAllowedCommands(allowed),
+      allowedCommands: describeAllowedCommands(briefed),
       stepBudget: topic.stepBudget,
       tips: [
         // A short sample list used to sit here, and it read as the whole
