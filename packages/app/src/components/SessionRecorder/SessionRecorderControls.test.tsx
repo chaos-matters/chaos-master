@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
+import { createStore } from 'solid-js/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
-import { cancelSessionRecording, isSessionRecording, reportDocumentWrite, } from '@/recorder/recorder'
+import { cancelSessionRecording, isSessionRecording, reportDocumentWrite, stopSessionRecording, } from '@/recorder/recorder'
 import { serializeSession, SESSION_FORMAT_VERSION } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { SessionRecorderControls } from './SessionRecorderControls'
@@ -178,6 +179,35 @@ describe('SessionRecorderControls start feedback', () => {
     expect(warn).toHaveBeenCalledWith(
       '[recorder] could not store imported session',
       storageError,
+    )
+    unmount()
+  })
+
+  // The workspace ends a gallery hover preview in `startExtras`
+  // (MainWorkspace's captureRecorderStartExtras), so a take has to read the
+  // document after it, not before.
+  it('starts the take from the document as startExtras leaves it', () => {
+    const [flame, setFlame] = createStore(deepClone(examples.example1))
+    setFlame('renderSettings', 'blendFlame', deepClone(examples.example2))
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={flame}
+          startExtras={() => {
+            setFlame('renderSettings', 'blendFlame', undefined)
+            return {}
+          }}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record steps' }))
+
+    expect(stopSessionRecording()?.initial.renderSettings.blendFlame).toBe(
+      undefined,
     )
     unmount()
   })

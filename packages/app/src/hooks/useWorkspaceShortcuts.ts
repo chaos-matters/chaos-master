@@ -1,3 +1,4 @@
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { executeCommand } from '@/commands/registry'
 import { animationExportRunning } from '@/flame/renderStats'
 import { useShortcutManager } from '@/shortcuts'
@@ -52,7 +53,12 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
         return true
       }
     },
-    KeyF: () => {
+    KeyF: (ev) => {
+      // Only a bare F is the sidebar's. With a modifier the key belongs to the
+      // browser, and claiming it took Ctrl/Cmd+F, find, away from the page.
+      if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return false
+      // The layout is the agent's while it owns the screen.
+      if (pilotOwnsKeyboard()) return false
       if ('startViewTransition' in document) {
         document.startViewTransition(toggleSidebarAsAuthoredAction)
       } else {
@@ -61,6 +67,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       return true
     },
     KeyZ: (ev) => {
+      // Undo would rewind the take the agent is making, and record the
+      // rewind into it as a step of its own.
+      if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
         if (ev.shiftKey ? !undoRouter.canRedo() : !undoRouter.canUndo()) {
@@ -74,6 +83,7 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       }
     },
     KeyY: (ev) => {
+      if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
         if (!undoRouter.canRedo()) return false
@@ -95,21 +105,32 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       return true
     },
     KeyI: (ev) => {
+      // Ctrl/Cmd+I is the browser's, as Ctrl/Cmd+F is. Alt+I removes a key.
+      if (ev.ctrlKey || ev.metaKey) return false
+      // A keyframe is an edit of the take the agent is making.
+      if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
+      // Claimed only when there is something to keyframe: with no parameter
+      // targeted the key did nothing and still swallowed the press.
+      const path = targetedParameter()
+      if (!path) return false
       if (ev.altKey) {
-        const path = targetedParameter()
-        if (path) {
-          recorderTimeline.removeKeyframe(path, timeline.currentFrame())
-        }
+        recorderTimeline.removeKeyframe(path, timeline.currentFrame())
       } else {
-        const path = targetedParameter()
-        if (path) {
-          recorderTimeline.addKeyframeAtCurrentFrame(path)
-        }
+        recorderTimeline.addKeyframeAtCurrentFrame(path)
       }
       return true
     },
-    Space: () => {
+    Space: (ev) => {
+      // The playback is the agent's while it owns the screen: Space started
+      // and stopped the animation of the take the viewer was only watching.
+      // Nothing after this hears it either (the audio panel toggles its track
+      // on Space), but the default stays, so a focused Stop button still
+      // gets its Space.
+      if (pilotOwnsKeyboard()) {
+        ev.stopImmediatePropagation()
+        return false
+      }
       if (animationExportRunning()) return false
       if (!showTimeline()) return
       if (!animationEnabled()) {

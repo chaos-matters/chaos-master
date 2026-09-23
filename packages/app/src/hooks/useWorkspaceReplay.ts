@@ -436,6 +436,18 @@ export function useWorkspaceReplay(params: UseWorkspaceReplayParams) {
     }
   }
 
+  /**
+   * The workspace's commands as a replay runs them, with a modal that opens
+   * nothing. A take records opening the export dialog (`export.png`,
+   * `export.animation`), and replayed live it opened over the replay and
+   * over a full-interface export's video. The step still runs, spotlight and
+   * all, like the no-op modals of replayVideo.ts and synthesize/sandbox.ts.
+   */
+  const replayContext = (): CommandContext => ({
+    ...cmdContext,
+    modal: { open: () => {} },
+  })
+
   const replayTarget: ReplayTarget = {
     // The replay moves the playhead through a take's play windows at the pace
     // they were recorded at, rather than on the timeline's own clock.
@@ -506,7 +518,7 @@ export function useWorkspaceReplay(params: UseWorkspaceReplayParams) {
         flameDescriptor,
         currentPaletteColors,
       )
-      const accepted = executeReplayCommand(id, cmdContext, ...args)
+      const accepted = executeReplayCommand(id, replayContext(), ...args)
       if (accepted && nextPaletteColors !== currentPaletteColors) {
         view.setPrePaletteColors(nextPaletteColors)
       }

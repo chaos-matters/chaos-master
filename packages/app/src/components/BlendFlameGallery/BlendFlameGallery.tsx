@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, } from '@/defaults'
 import { examples } from '@/flame/examples'
@@ -32,6 +32,12 @@ type BlendFlameGalleryProps = {
    * Defaults to 2 so existing callers keep the behaviour they had.
    */
   dimensions?: number
+  /**
+   * Whether the gallery can be seen at all; true when omitted. Home and the
+   * Arcade cover the workspace without unmounting it, so a switch to one of
+   * them leaves the gallery mounted under a pointer that never moved.
+   */
+  visible?: () => boolean
 }
 
 const INITIAL_VISIBLE = 10
@@ -141,28 +147,56 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
     visibleExamplesCount() >= filteredExamples().length
 
   let clearTimer: ReturnType<typeof setTimeout> | undefined
+  /** A hovered tile's preview is showing, so there is one to end. */
+  let previewing = false
 
   function handleMouseEnter(flame: FlameDescriptor, name: string) {
     clearTimeout(clearTimer)
+    previewing = true
     props.onPreviewBlend?.(flame)
     props.onPreviewName?.(name)
   }
 
+  function endPreview() {
+    clearTimeout(clearTimer)
+    if (!previewing) return
+    previewing = false
+    props.onPreviewBlend?.(null)
+    props.onPreviewName?.(null)
+  }
+
   function handleMouseLeave() {
-    clearTimer = setTimeout(() => {
-      props.onPreviewBlend?.(null)
-      props.onPreviewName?.(null)
-    }, PREVIEW_CLEAR_DELAY)
+    clearTimer = setTimeout(endPreview, PREVIEW_CLEAR_DELAY)
   }
 
   function handleKey(e: KeyboardEvent) {
     if (e.key === 'Escape') props.onClose()
   }
 
+  /*
+   * A preview lasts while a tile is hovered in a gallery someone can see, and
+   * the pointer leaving is only one of the ways that stops being true. The
+   * gallery goes away under a still pointer when the sidebar closes (F,
+   * Ctrl+S), when another panel or the Home hand-off takes its place, or when
+   * the layout drops the sidebar; a tab switch fires no pointer event at all.
+   * Each of them left the preview written into the document, where no undo
+   * reaches it and autosave keeps it. So the gallery ends what it started,
+   * whichever way it is left, and so do a page going to the background and
+   * another surface covering the gallery.
+   */
+  const endWhenHidden = () => {
+    if (document.visibilityState === 'hidden') endPreview()
+  }
+  createEffect(() => {
+    if (props.visible?.() === false) endPreview()
+  })
+
   window.addEventListener('keydown', handleKey)
+  document.addEventListener('visibilitychange', endWhenHidden)
   onCleanup(() => {
     window.removeEventListener('keydown', handleKey)
-    clearTimeout(clearTimer)
+    document.removeEventListener('visibilitychange', endWhenHidden)
+    endPreview()
   })
 
   return (

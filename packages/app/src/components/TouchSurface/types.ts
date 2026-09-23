@@ -22,7 +22,6 @@ export interface TouchControlSurfaceProps {
   onRedo?: () => void
   canUndo?: Accessor<boolean>
   canRedo?: Accessor<boolean>
-  onSnapshot?: () => void
   onPickGallery?: () => void
 }
 

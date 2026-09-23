@@ -43,7 +43,10 @@ registerCommand({
 /**
  * Queueing a render is not an edit of the document, so none of the three is
  * recorded: a creation session describes how a flame was made, and "and then
- * I exported it at 2560x1440" is not part of that. They stay replay-validated
+ * I exported it at 2560x1440" is not part of that. Nor is one a step the take
+ * failed to capture: with `preservesFinishedSession` they change nothing a
+ * replay reproduces, so a take counts none of them as uncaptured (recorder.ts
+ * `recordCommandExecutionIn`). They stay replay-validated
  * all the same, because that is the gate `execute_command` applies — and the
  * options are bounded (4096 px, 3600 frames) so a hand-written session file
  * can queue no more work than a person with the dialog open could.

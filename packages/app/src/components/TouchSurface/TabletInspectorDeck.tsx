@@ -22,7 +22,9 @@ export interface TabletInspectorDeckProps {
   onRedo?: () => void
   canUndo?: Accessor<boolean>
   canRedo?: Accessor<boolean>
-  onSnapshot?: () => void
+  /** The save button's tap. Required: its fallback dispatched
+   *  `flame.quickExport`, a command no one ever registered. */
+  onSnapshot: () => void
   /** Offered on a long press of the save button, as on the phone's shutter. */
   onOpenExportOptions?: () => void
   onPickGallery?: () => void
@@ -87,8 +89,7 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
       haptic.impactLight()
     },
     onTap: () => {
-      if (props.onSnapshot) props.onSnapshot()
-      else dispatch('flame.quickExport')
+      props.onSnapshot()
     },
     onLongPress:
       props.onOpenExportOptions && (() => props.onOpenExportOptions?.()),
@@ -205,7 +206,6 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
             onRedo={props.onRedo}
             canUndo={props.canUndo}
             canRedo={props.canRedo}
-            onSnapshot={props.onSnapshot}
             onPickGallery={props.onPickGallery}
           />
         </div>

@@ -1,11 +1,12 @@
 import '@/commands/builtins'
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi, } from 'vitest'
 import { setActiveTab } from '@/lib/activeTab'
 import { backDepth, popBack } from '@/lib/backStack'
 import { safeRemoveItem } from '@/utils/storage'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { AdvancedToolsDrawer, TabletInspectorDeck, TouchControlSurface, TouchHUD, } from './index'
+import type { TouchControlSurfaceProps } from './types'
 import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
 import type * as StorageUtils from '@/utils/storage'
 
@@ -255,6 +256,12 @@ describe('TouchSurface Components', () => {
   })
 
   describe('TouchControlSurface', () => {
+    // The tablet deck's save button calls its own `onSnapshot`; the surface
+    // was handed one too and never read it. Checked by `pnpm typecheck`.
+    it('takes no save handler of its own', () => {
+      expectTypeOf<TouchControlSurfaceProps>().not.toHaveProperty('onSnapshot')
+    })
+
     it('renders transform pills, tabs, and switches views', () => {
       const ctx = createMockCommandContext()
 
@@ -328,6 +335,7 @@ describe('TouchSurface Components', () => {
         <TabletInspectorDeck
           ctx={ctx}
           flame={ctx.flameDescriptor}
+          onSnapshot={() => {}}
           onPickGallery={onPickGallery}
         />
       ))
@@ -347,7 +355,11 @@ describe('TouchSurface Components', () => {
     it('collapses to an edge tab on a double tap and reopens', () => {
       const ctx = createMockCommandContext()
       render(() => (
-        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+        <TabletInspectorDeck
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onSnapshot={() => {}}
+        />
       ))
 
       fireEvent.dblClick(screen.getByTestId('deck-divider'))
@@ -362,7 +374,11 @@ describe('TouchSurface Components', () => {
     it('leaves the tab order while a destination covers it', () => {
       const ctx = createMockCommandContext()
       render(() => (
-        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+        <TabletInspectorDeck
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onSnapshot={() => {}}
+        />
       ))
 
       expect(deck().hasAttribute('inert')).toBe(false)
@@ -424,7 +440,11 @@ describe('TouchSurface Components', () => {
     it('resizes by dragging the divider', () => {
       const ctx = createMockCommandContext()
       render(() => (
-        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+        <TabletInspectorDeck
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onSnapshot={() => {}}
+        />
       ))
 
       const divider = screen.getByTestId('deck-divider')
@@ -438,7 +458,11 @@ describe('TouchSurface Components', () => {
     it('stores the width once the divider is let go', () => {
       const ctx = createMockCommandContext()
       render(() => (
-        <TabletInspectorDeck ctx={ctx} flame={ctx.flameDescriptor} />
+        <TabletInspectorDeck
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          onSnapshot={() => {}}
+        />
       ))
 
       const divider = screen.getByTestId('deck-divider')

@@ -8,6 +8,7 @@ import { QuickVariationPicker } from '@/components/QuickVariationPicker/QuickVar
 import { SonificationPanel } from '@/components/SonificationPanel/SonificationPanel'
 import { isVariationType } from '@/flame/variations'
 import { getVariationDefault } from '@/flame/variations/utils'
+import { workspaceIsVisible } from '@/lib/activeTab'
 import { snapshotOrigin } from '@/recorder/snapshotOrigin'
 import { deepClone } from '@/utils/clone'
 import { AffineEditorSection } from './AffineEditorSection'
@@ -511,6 +512,17 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                             : 'Pick Blend Flame'
                     }
                     onSelect={(flame) => {
+                      // Evolve and Diff open a view of the document instead of
+                      // committing a partner, so the hover preview comes off
+                      // before anything reads it: the view is handed the flame
+                      // the user has, and the document keeps no blend nobody
+                      // picked. Blend and morph end it inside their commit.
+                      if (
+                        props.blendIntent() === 'evolve' ||
+                        props.blendIntent() === 'diff'
+                      ) {
+                        props.handlePreviewBlend(null)
+                      }
                       if (props.blendIntent() === 'morph') {
                         props.setupMorph(flame)
                       } else if (props.blendIntent() === 'breed') {
@@ -607,6 +619,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                       props.setShowBlendGallery(false)
                     }}
                     onPreviewBlend={props.handlePreviewBlend}
+                    visible={workspaceIsVisible}
                     onPreviewName={(name) => {
                       props.setHoveredBlendName(name)
                     }}

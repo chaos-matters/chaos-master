@@ -164,6 +164,9 @@ export function createLazyShareLinkModal(
   getTracks: () => TimelineTrack[],
   getConfig: () => TimelineConfig,
   captureOgImage?: () => Promise<Blob | null>,
+  /** Ends the gallery's hover preview, before the modal reads the document
+   *  and captures the canvas for the link's preview card. */
+  endPreview?: () => void,
 ) {
   const owner = getOwner()
   let instancePromise: Promise<ReturnType<typeof createShareLinkModal>> | null =
@@ -171,6 +174,7 @@ export function createLazyShareLinkModal(
 
   return {
     showShareLinkModal: async () => {
+      endPreview?.()
       if (!instancePromise) {
         instancePromise =
           import('@/components/ShareLinkModal/ShareLinkModal').then(

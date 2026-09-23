@@ -473,7 +473,7 @@ Also note the memo body at 116-117 is dead: `if (touchLayoutPreference() === 'to
 
 **Repro.** Start a Beats session and read `allowedCommands` from the arcade_start_beats result — the four phantom ids are present. Then `execute_command({commandId: 'audio.addMapping', args: [...]})`: it fails in preflightLiveCommand with an unknown-command error, and `pilotStepsRemaining()` is unchanged. Deterministic unit check: `expect(describeAllowedCommands([...BEATS_ALLOWED]).map(s => s.split(' ')[0]).filter(id => !getAllCommands().some(c => c.id === id))).toEqual([])` fails with the four ids.
 
-**Suggested fix.** Either register the four commands, or delete them from BEATS_ALLOWED. Independently, make describeAllowedCommands drop (or throw in dev on) ids that getAllCommands() does not contain, so an allow-list typo can never be advertised to an agent again — the same class of bug would silently hit every future mode.
+**Suggested fix.** Either register the four commands, or delete them from BEATS_ALLOWED. Independently, make describeAllowedCommands drop (or throw in dev on) ids that getAllCommands() does not contain, so an allow-list typo can never be advertised to an agent again — the same class of bug would silently hit every future mode. Fixed in PR #113: the four ids are removed, and a test holds every Arcade allow-list to the registered commands.
 
 ### arena_start_clash documents and accepts a `rounds` parameter that the only implementation of startClash discards
 

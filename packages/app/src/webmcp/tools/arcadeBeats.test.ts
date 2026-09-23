@@ -4,6 +4,7 @@ import { agentDriving, drivingState, resetPilot } from '@/arcade/pilot'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { arcadeEndBeats, arcadeGetAudioCatalog, arcadeSetAudioMapping, arcadeStartBeats, } from './arcadeBeats'
+import { executeCommandTool } from './executeCommand'
 import type { WebMcpTool } from '@/webmcp/types'
 
 const run = async (tool: WebMcpTool, input: unknown) =>
@@ -38,6 +39,20 @@ describe('arcade beats tools', () => {
     expect(ctx.recorder?.start).toHaveBeenCalled()
     expect(ctx.arcade?.closeHub).toHaveBeenCalled()
     expect(ctx.audio?.setEnabled).toHaveBeenCalledWith(true)
+  })
+
+  // ALWAYS_ALLOWED used to be spread into BEATS_ALLOWED and then added again
+  // by the tool, so a refusal named lesson.note and the sidebar twice.
+  it('names each allowed command once when it refuses one', async () => {
+    setWebMcpContext(createMockCommandContext())
+    await run(arcadeStartBeats, {})
+    const refusal = await run(executeCommandTool, {
+      commandId: 'flame.setGamma',
+      args: [2],
+    })
+    const listed = String(refusal.error).split('Allowed: ')[1]?.split(', ')
+    expect(listed).toContain('lesson.note')
+    expect(listed?.filter((id, i) => listed.indexOf(id) !== i)).toEqual([])
   })
 
   it('provides audio catalog with features, presets and flame targets', async () => {

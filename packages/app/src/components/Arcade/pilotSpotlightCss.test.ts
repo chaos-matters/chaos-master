@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 /**
  * Two properties of the ring are load-bearing and invisible in review.
  *
- * It sits ABOVE the lock, because it points at the editor the lock covers —
- * and being above the lock is exactly what makes `pointer-events: none`
- * mandatory. A ring that swallowed clicks would sit over the Stop button and
+ * It sits ABOVE the lock's own banner and rail, because it points at the
+ * editor the lock covers — and being above the lock is exactly what makes
+ * `pointer-events: none` mandatory. A ring that swallowed clicks would sit over the Stop button and
  * the banner and quietly take the take away from the person watching.
  */
 describe('PilotSpotlight stylesheet', () => {
@@ -33,15 +33,14 @@ describe('PilotSpotlight stylesheet', () => {
     expect(/pointer-events:\s*none/.test(ring ?? '')).toBe(true)
   })
 
-  it('stacks above the lock it points through', () => {
+  it('stacks above everything it shares the lock with', () => {
+    // It is drawn inside the lock's dialog (PilotOverlay.topLayer.test.tsx),
+    // in the top layer with the banner and the rail.
+    const shared = [
+      ...overlay.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/z-index:\s*(\d+)/g),
+    ].map((match) => Number(match[1]))
     expect(
       zIndexOf(/\.ring\s*\{[^{}]*\}/.exec(declarations)?.[0]),
-    ).toBeGreaterThan(
-      zIndexOf(
-        /\.shield\s*\{[^{}]*\}/.exec(
-          overlay.replace(/\/\*[\s\S]*?\*\//g, ''),
-        )?.[0],
-      ),
-    )
+    ).toBeGreaterThan(Math.max(0, ...shared))
   })
 })

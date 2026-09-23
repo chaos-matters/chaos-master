@@ -17,7 +17,6 @@ registerCommand({
   },
   label: 'Set Skip Iters',
   description: 'Set the number of initial skip iterations',
-  shortcut: 'Shift+I',
   execute(ctx, iters?: unknown) {
     const value = typeof iters === 'number' ? iters : 1
     ctx.setFlameDescriptor((draft) => {

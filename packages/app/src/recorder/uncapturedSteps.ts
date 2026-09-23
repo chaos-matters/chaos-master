@@ -122,7 +122,9 @@ export function describeUnroutedEdit(description: string | undefined): string {
   return `${named}, made outside the recorded commands`
 }
 
-/** A command that runs but is not a step (`recordable: false`). */
+/** A command that runs but is not a step (`recordable: false`), and that
+ *  changes something a replay reproduces: one that does not, an export, is
+ *  not an uncaptured step at all (`preservesFinishedSession`). */
 export function describeUnrecordedCommand(label: string): string {
   return `${label}, a command a recording does not replay`
 }

@@ -603,9 +603,16 @@ function recordCommandExecutionIn(
   }
   if (rec && isTopLevel) {
     if (cmd.recordable === false) {
-      s.coalesceAnchors = new Map()
-      s.gestureClaimed = false
-      noteUnnamedWrite(s, rec, describeUnrecordedCommand(cmd.label))
+      // Not a step, and a gap in the take only when it changes something a
+      // replay reproduces. A command that cannot (`preservesFinishedSession`,
+      // the promise the finished session above already relies on) is no event
+      // here at all: an export, or a read of the export queue, leaves the
+      // count and any drag it ran in the middle of as they were.
+      if (cmd.preservesFinishedSession !== true) {
+        s.coalesceAnchors = new Map()
+        s.gestureClaimed = false
+        noteUnnamedWrite(s, rec, describeUnrecordedCommand(cmd.label))
+      }
     } else if (cmd.id === NARRATION_COMMAND_ID && !narrationAsStep()) {
       // The sentence still runs (the live rail shows it); it just waits to
       // caption the step it introduces instead of standing as a step itself.

@@ -1007,12 +1007,20 @@ export function createExportPngDialog(
   getBlendWeight?: () => number,
   getAudioBuffer?: () => AudioBuffer | undefined,
   getAudioMapping?: () => AudioMappingEntry[],
+  /**
+   * Ends the partner gallery's hover preview (useWorkspaceBlendPick). Both
+   * exports call it before anything reads the canvas, so a press inside the
+   * gallery's leave delay exports the document and not a partner nobody
+   * picked: the pixels, the flame they carry and Recents all agree.
+   */
+  endPreview: () => void = () => {},
 ) {
   const requestModal = useRequestModal()
   const { showToast } = useToast()
   const [exportModalIsOpen, setExportModalIsOpen] = createSignal(false)
 
   function quickExport() {
+    endPreview()
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
@@ -1111,6 +1119,7 @@ export function createExportPngDialog(
   }
 
   async function showExportPngDialog(initialTab?: 'image' | 'animation') {
+    endPreview()
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()

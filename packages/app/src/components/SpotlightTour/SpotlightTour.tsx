@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { useSpotlightTour } from '@/contexts/SpotlightTourContext'
 import { clamp } from '@/utils/easing'
 import ui from './SpotlightTour.module.css'
@@ -242,7 +243,8 @@ export function SpotlightTour(props: SpotlightTourProps) {
     window.addEventListener('scroll', onResize, { capture: true })
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // The viewer's keys stand down while the agent owns the screen.
+      if (e.key === 'Escape' && !pilotOwnsKeyboard()) {
         tour.endTour()
       }
     }
