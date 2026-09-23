@@ -1,4 +1,4 @@
-import { cleanup, render } from '@solidjs/testing-library'
+import { cleanup, render, within } from '@solidjs/testing-library'
 import { vec2f } from 'typegpu/data'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TimelineProvider } from '@/contexts/TimelineContext'
@@ -36,22 +36,30 @@ describe('ViewControls Component', () => {
       </TimelineProvider>
     ))
 
-    const controlsEl = container.querySelector(
+    // querySelector answers null, not undefined, when nothing matches, so a
+    // toBeDefined() here could not fail.
+    const controlsEl = container.querySelector<HTMLElement>(
       '[class*="viewControls"]',
-    ) as HTMLElement
-    expect(controlsEl).toBeDefined()
+    )
+    expect(controlsEl).toBeInstanceOf(HTMLElement)
+    const bar = within(controlsEl!)
+    for (const name of ['Zoom out', 'Zoom in', 'Undo', 'Redo']) {
+      expect(bar.getByRole('button', { name })).toBeInstanceOf(
+        HTMLButtonElement,
+      )
+    }
 
     // Test horizontal wheel scrolling on the container
-    controlsEl.scrollLeft = 0
+    controlsEl!.scrollLeft = 0
     const wheelEvent = new WheelEvent('wheel', {
       deltaY: 150,
       deltaX: 0,
       cancelable: true,
       bubbles: true,
     })
-    controlsEl.dispatchEvent(wheelEvent)
+    controlsEl!.dispatchEvent(wheelEvent)
 
-    expect(controlsEl.scrollLeft).toBe(150)
+    expect(controlsEl!.scrollLeft).toBe(150)
     expect(wheelEvent.defaultPrevented).toBe(true)
   })
 })

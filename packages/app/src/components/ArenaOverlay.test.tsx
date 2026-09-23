@@ -3,6 +3,7 @@ import { createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TimelineProvider } from '@/contexts/TimelineContext'
 import { createTestFlame } from '@/webmcp/testUtils'
+import { ARENA_ARCHETYPES } from '@/webmcp/tools/arenaArchetypes'
 import { ArenaOverlay } from './ArenaOverlay'
 import type { ArenaOverlayProps } from './ArenaOverlay'
 import type { ArenaFighterStats } from '@/commands/types'
@@ -146,13 +147,24 @@ describe('ArenaOverlay Component', () => {
 
   it('rerolling opponent updates opponent stats and triggers new archetype', () => {
     const { p2 } = mountArenaOverlay()
+    const before = p2()!
 
     const rerollBtn = screen.getByRole('button', { name: /Reroll Opponent/i })
     fireEvent.click(rerollBtn)
 
-    // The name and stats should be regenerated from procedural archetypes
-    expect(p2()?.name).toBeDefined()
-    expect(p2()?.flame).toBeDefined()
+    // The mounted opponent is not an archetype, so every roll replaces it
+    // with one. Asserting only that a name and a flame exist passed without
+    // the click: the mounted fighter already had both.
+    const after = p2()!
+    const archetype = Object.values(ARENA_ARCHETYPES).find(
+      (candidate) => candidate.name === after.name,
+    )
+    expect(archetype?.name).toBe(after.name)
+    expect(after.name).not.toBe(before.name)
+    expect(after.type).toBe(archetype!.className)
+    expect(after.flame).not.toBe(before.flame)
+    expect(after.flame?.metadata?.name).toBe(after.name)
+    expect(screen.getByText(archetype!.lore)).toBeInstanceOf(HTMLElement)
   })
 
   it('renders modal container without isClashing class when idle', () => {

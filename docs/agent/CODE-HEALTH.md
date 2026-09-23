@@ -25,9 +25,9 @@ can never mask a test failure in `build`.
 `pnpm arch` is not in CI yet. It was red on two import cycles
 (`flame/mutationOperators.ts <-> flame/randomize.ts` and
 `commands/types.ts <-> recorder/types.ts`), and a check that is red on the day
-it lands teaches everyone to ignore it. Both are broken, so it exits 0 (the 8
-orphan warnings in §3 do not fail it), and it joins the `health` job as a
-change of its own. `pnpm test:coverage` and `pnpm verify:webgpu` are
+it lands teaches everyone to ignore it. Both are broken and the 8 orphans in
+§3 are deleted, so it reports no violations at all, and it joins the `health`
+job as a change of its own. `pnpm test:coverage` and `pnpm verify:webgpu` are
 local-only by design — see [METRICS.md](METRICS.md) §3.
 
 Which tests run where, and why a green pull request is not a promise that main
@@ -92,20 +92,22 @@ but it is the honest frame for "we decomposed things".
 
 `pnpm arch` on a correctly resolved graph — 1,195 modules, 4,999 dependencies:
 
-| Rule              | Result           |
-| ----------------- | ---------------- |
-| `no-circular`     | **0 violations** |
-| `core-stays-pure` | **0 violations** |
-| `no-orphans`      | 8 warnings       |
+| Rule              | Result                               |
+| ----------------- | ------------------------------------ |
+| `no-circular`     | **0 violations**                     |
+| `core-stays-pure` | **0 violations**                     |
+| `no-orphans`      | 8 warnings (0 since WP2, 2026-09-23) |
 
 **Both of PR #73's headline architectural claims hold up.** There are genuinely
 no import cycles, and `@chaos-master/core` genuinely contains no DOM, WebGPU or
 Solid imports. This is the strongest part of the range.
 
-The 8 orphans are `utils/{usePointer,range,randomVec4u,isDefined,getPreferredColorScheme,enumerate}.ts`,
-`contexts/MobileContext.tsx` and `App.integration.mock.tsx` (a test mock, a false
-positive). **None of them were touched in this range** — they are pre-existing
-dead code, not something the refactor introduced.
+The 8 orphans were `utils/{usePointer,range,randomVec4u,isDefined,getPreferredColorScheme,enumerate}.ts`,
+`contexts/MobileContext.tsx` and `App.integration.mock.tsx`. **None of them were
+touched in this range** — they were pre-existing dead code, not something the
+refactor introduced. All 8 had zero importers and were deleted on 2026-09-23
+(WP2); `App.integration.mock.tsx` was dead too, not the false positive it was
+once taken for: no test imported it.
 
 > Read the `arch` caveat in [MISTAKES.md](MISTAKES.md) before trusting a future
 > run: configured against the wrong tsconfig, this tool reports zero cycles on a

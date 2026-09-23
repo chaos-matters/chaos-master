@@ -13,7 +13,6 @@ import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { replaceOpenDocument } from '@/lib/documentLoad'
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { trackAppInit } from '@/lib/telemetry'
-import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { duelShowing, duelSidebarOpen } from './arcade/duel'
@@ -413,7 +412,6 @@ export function MainWorkspace(props: AppProps) {
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
   const [isRandomizing, setIsRandomizing] = createSignal(false)
   const { showToast } = useToast()
-  const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
   const _requestModal = useRequestModal()
 
@@ -421,8 +419,6 @@ export function MainWorkspace(props: AppProps) {
     flameA: FlameDescriptor
     flameB: FlameDescriptor
   } | null>(null)
-  const setSidebarWidth = () => {} // Drag resize disabled
-  let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
   let randomizerCardRef: HTMLDivElement | undefined
   createEffect(() => {
@@ -3796,17 +3792,6 @@ export function MainWorkspace(props: AppProps) {
     },
   }
 
-  const startSidebarDrag = createDragHandler((_initEvent) => {
-    const sidebar = sidebarRef
-    if (!sidebar) return
-
-    return {
-      onPointerMove() {
-        setSidebarWidth()
-      },
-    }
-  })
-
   return (
     <ChangeHistoryContextProvider value={history}>
       <TimelineContextProvider value={recorderTimeline}>
@@ -4116,8 +4101,6 @@ export function MainWorkspace(props: AppProps) {
               duelShowing={duelShowing}
               duelSidebarOpen={duelSidebarOpen}
               sidebarWidth={sidebarWidth}
-              sideBarResizable={SIDEBAR_RESIZABLE}
-              startSidebarDrag={startSidebarDrag}
               animationExportRunning={animationExportRunning}
               onTogglePlay={() => {
                 recorderTimeline.togglePlay()

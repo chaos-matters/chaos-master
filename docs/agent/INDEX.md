@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1087         | 184.3k |
+| `packages/app`            | `chaos-master`                 | 1076         | 183.9k |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/core`           | `@chaos-master/core`           | 17           | 1.9k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -306,16 +306,15 @@ file instead of rediscovering the architecture every session.
 
 #### Application root (`packages/app/src/*.tsx`)
 
-| File                                                                        | LOC  | What it is                                               |
-| --------------------------------------------------------------------------- | ---- | -------------------------------------------------------- |
-| [MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx)               | 4.6k | _(no header comment)_                                    |
-| [App.tsx](../../packages/app/src/App.tsx)                                   | 500  | _(no header comment)_                                    |
-| [defaults.ts](../../packages/app/src/defaults.ts)                           | 150  | _(no header comment)_                                    |
-| [App.integration.mock.tsx](../../packages/app/src/App.integration.mock.tsx) | 100  | Mock file for App integration tests.                     |
-| [index.tsx](../../packages/app/src/index.tsx)                               | 50   | @refresh reload \*/                                      |
-| [valibot.ts](../../packages/app/src/valibot.ts)                             | 50   | We re-export only things we use to keep the bundle small |
-| [version.ts](../../packages/app/src/version.ts)                             | 50   | _(no header comment)_                                    |
-| [vitest.setup.ts](../../packages/app/src/vitest.setup.ts)                   | 50   | Vitest test setup file.                                  |
+| File                                                          | LOC  | What it is                                               |
+| ------------------------------------------------------------- | ---- | -------------------------------------------------------- |
+| [MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx) | 4.6k | _(no header comment)_                                    |
+| [App.tsx](../../packages/app/src/App.tsx)                     | 500  | _(no header comment)_                                    |
+| [defaults.ts](../../packages/app/src/defaults.ts)             | 150  | _(no header comment)_                                    |
+| [index.tsx](../../packages/app/src/index.tsx)                 | 50   | @refresh reload \*/                                      |
+| [valibot.ts](../../packages/app/src/valibot.ts)               | 50   | We re-export only things we use to keep the bundle small |
+| [version.ts](../../packages/app/src/version.ts)               | 50   | _(no header comment)_                                    |
+| [vitest.setup.ts](../../packages/app/src/vitest.setup.ts)     | 50   | Vitest test setup file.                                  |
 
 <!-- END:GENERATED module-map -->
 

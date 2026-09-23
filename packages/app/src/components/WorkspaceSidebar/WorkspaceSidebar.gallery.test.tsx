@@ -111,7 +111,6 @@ function renderSidebar(workspace: Workspace, intent: Intent) {
     duelShowing: () => false,
     duelSidebarOpen: () => false,
     sidebarWidth: () => 20,
-    sideBarResizable: false,
     animationExportRunning: () => false,
     animationExportCancel: () => undefined,
     isMobile: () => false,

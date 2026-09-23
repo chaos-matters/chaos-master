@@ -23,8 +23,8 @@ export interface MutateFlameOptions {
   /**
    * How affine coefficients are mutated when `mutateAffine` is on. `'smart'`
    * composes the affine with random rotate/scale/translate operations (see
-   * {@link smartMutateAffine2D}); `'full'` perturbs every coefficient
-   * independently (`randomizeAffineCoef`).
+   * `smartMutateAffine2D` in randomPrimitives.ts); `'full'` perturbs every
+   * coefficient independently (`randomizeAffineCoef`).
    */
   affineMode: 'smart' | 'full'
   /** 0–1, how strongly affine coefficients drift (default 0.5). */

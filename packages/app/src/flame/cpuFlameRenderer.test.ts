@@ -114,7 +114,9 @@ describe('CPU Flame Renderer', () => {
         pointCountPerBatch: 10,
       })
 
-      expect(result.passed).toBeDefined()
+      // testCPURenderer catches every throw and reports it as passed: false,
+      // so asserting that `passed` is defined could not fail.
+      expect(result).toEqual({ passed: true, gpuResults: { bucketCount: 100 } })
     })
   })
 
@@ -215,8 +217,11 @@ describe('CPU Flame Renderer', () => {
         pointCountPerBatch: 100,
       })
 
-      expect(invalidResult).toBeDefined()
-      expect(invalidResult.buckets.length).toBeGreaterThanOrEqual(0)
+      // An empty render with the negative side clamped to zero. A length is
+      // never negative, so the old `>= 0` bound could not fail.
+      expect(invalidResult.canvas).toEqual({ width: 0, height: 10 })
+      expect(invalidResult.buckets).toHaveLength(0)
+      expect(invalidResult.bucketsData).toEqual([])
     })
 
     it('should handle zero point count', () => {

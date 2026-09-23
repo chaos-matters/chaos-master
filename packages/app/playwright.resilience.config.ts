@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Headed-GPU e2e config (separate from the legacy console-errors config). Drives
+ * Headed-GPU e2e config, and the only config that runs packages/app/e2e/ (the
+ * repo-root playwright.config.ts runs tests/ on a software adapter). Drives
  * the HTTPS dev server (basic-ssl) and exercises WebGPU-dependent behaviour:
  * graceful fallback (webgpu-resilience) and gallery preview perf
  * (variation-gallery). Add future GPU/feature specs to e2e/ and list them in
