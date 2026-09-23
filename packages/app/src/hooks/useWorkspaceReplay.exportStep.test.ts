@@ -18,13 +18,18 @@ import { executeCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
 import { createSessionPlayer } from '@/recorder/player'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
+import { createReplayVideoDriver } from '@/recorder/replayVideo'
 import { SESSION_FORMAT_VERSION } from '@/recorder/schema'
+import { replaySessionHeadless } from '@/recorder/synthesize/replaySandbox'
 import { deepClone } from '@/utils/clone'
+import { dismissJob, enqueueAnimationJob, enqueueImageJob, exportJobs, } from '@/utils/exportJobs'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { useWorkspaceReplay } from './useWorkspaceReplay'
 import type { UseWorkspaceReplayParams } from './useWorkspaceReplay'
+import type { CommandContext } from '@/commands/types'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
+import type { AnimationJobSpec, ImageJobSpec } from '@/utils/exportJobs'
 
 /** The live replay's target over a workspace whose context can open the
  *  export dialog. Only what a step's `execute` reads is real. */
@@ -136,5 +141,89 @@ describe('an export step in the live replay', () => {
     expect(replayTarget.execute('camera.center', [])).toBe(true)
 
     expect(cmdContext.setZoom).toHaveBeenCalledWith(1)
+  })
+})
+
+/** The two render steps a hand-written take can carry. */
+const RENDERS = [
+  ['export.renderImage', { width: 64, height: 64 }],
+  ['export.renderAnimation', { width: 64, height: 64, fps: 30 }],
+] as const
+
+function renderTake(): RecordedSession {
+  return {
+    ...take('export.png'),
+    actions: [
+      { t: 0, id: 'camera.center', args: [] },
+      ...RENDERS.map(([id, options], index) => ({
+        t: 1000 * (index + 1),
+        id,
+        args: [options],
+      })),
+      { t: 3000, id: 'camera.center', args: [] },
+    ],
+  }
+}
+
+/** The workspace's export host, queueing into the real job store. */
+function withExportHost(cmdContext: CommandContext) {
+  const host = {
+    renderImage: vi.fn(() => {
+      enqueueImageJob({ name: 'live' } as ImageJobSpec)
+    }),
+    renderAnimation: vi.fn(() => {
+      enqueueAnimationJob({ name: 'live' } as AnimationJobSpec)
+    }),
+  }
+  cmdContext.exportJobs = host
+  return host
+}
+
+describe('a render step in a replay', () => {
+  afterEach(() => {
+    for (const job of [...exportJobs()]) dismissJob(job.id)
+  })
+
+  it('queues nothing when the live replay plays it, and keeps its place', () => {
+    const { replayTarget, cmdContext } = liveReplay()
+    const host = withExportHost(cmdContext)
+    const player = createSessionPlayer(renderTake(), driven(replayTarget))
+
+    player.play()
+    vi.advanceTimersByTime(0)
+    const shown: (string | undefined)[] = []
+    for (let step = 1; step <= RENDERS.length; step++) {
+      vi.advanceTimersByTime(1000)
+      shown.push(player.currentAction()?.id)
+    }
+    vi.runAllTimers()
+
+    expect(shown).toEqual(RENDERS.map(([id]) => id))
+    expect(player.isFinished()).toBe(true)
+    expect(player.lastError()).toBeUndefined()
+    expect(host.renderImage).not.toHaveBeenCalled()
+    expect(host.renderAnimation).not.toHaveBeenCalled()
+    expect(exportJobs()).toEqual([])
+  })
+
+  it('still renders when an agent runs it live, outside a replay', () => {
+    const { cmdContext } = liveReplay()
+    const host = withExportHost(cmdContext)
+
+    for (const [id, options] of RENDERS) executeCommand(id, cmdContext, options)
+
+    expect(host.renderImage).toHaveBeenCalledOnce()
+    expect(host.renderAnimation).toHaveBeenCalledOnce()
+    expect(exportJobs()).toHaveLength(2)
+  })
+
+  it('cannot render in the artwork export or the synthesize sandbox', () => {
+    const session = renderTake()
+    const driver = createReplayVideoDriver(session)
+
+    driver.advanceTo(session.actions.length - 1)
+    expect(replaySessionHeadless(session)).toBeDefined()
+
+    expect(exportJobs()).toEqual([])
   })
 })

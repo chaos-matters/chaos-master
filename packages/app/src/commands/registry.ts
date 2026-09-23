@@ -537,9 +537,10 @@ export function executeCommand(
   }
   // Timed replay can own a long-lived undo preview while it waits between
   // steps. Every live command — including timeline/audio/view-only commands
-  // that never touch flame history — takes the workspace back before it runs.
+  // that never touch flame history — takes the workspace back before it runs,
+  // except a switch that only shapes later changes (`presentationSwitch`).
   // `executeReplayCommand` intentionally skips this live-dispatch hook.
-  ctx.beforeCommand?.()
+  if (!cmd.presentationSwitch) ctx.beforeCommand?.()
   if (IS_DEV) console.info('[cmd:execute]', id, 'args:', ...args)
   runCommand(cmd, ctx, args)
 }

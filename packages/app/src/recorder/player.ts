@@ -9,6 +9,7 @@ import { createReplayGlideLease } from './replayGlideLease'
 import type { ReplayGlideOptions } from './glide'
 import type { ReplayTarget } from './replay'
 import type { RecordedAction, RecordedSession } from './schema'
+import type { GlideSwitches } from '@/flame/glide/types'
 
 /**
  * Timed playback of a recorded session (semantic-recorder-plan, M4).
@@ -238,6 +239,8 @@ export type SessionPlayer = {
   readonly isFinished: () => boolean
   /** Human-readable reason the last action was rejected, if any. */
   readonly lastError: () => string | undefined
+  /** The viewer's Glide switches, whatever the take has switched meanwhile. */
+  readonly viewerGlideSwitches: () => GlideSwitches
   readonly total: number
 }
 
@@ -484,14 +487,17 @@ export function createSessionPlayer(
     // one is overwritten frame by frame and then undone by that transition's
     // own settle, and the viewer sees the step it cut to appear and vanish.
     const settled = target.settleGlide?.()
-    const durationMs = glideMsFor(action)
     // What the viewer can currently see, so the animation starts from there
     // while the step itself lands on the state the recording describes.
-    const from = durationMs > 0 ? (settled ?? target.readFlame?.()) : undefined
+    const from = options.glide?.().enabled
+      ? (settled ?? target.readFlame?.())
+      : undefined
     const start = from === undefined ? undefined : deepClone(from)
     const result = runStep(index, true)
     if (!result.ok) return rejectAction(index, result.error)
-    if (start !== undefined) target.glide?.(start, durationMs)
+    // Timed once the step ran, at its tier: the one the dwell and render use.
+    const durationMs = start === undefined ? 0 : glideMsFor(action)
+    if (start !== undefined && durationMs > 0) target.glide?.(start, durationMs)
     setStepIndex(index)
     setActionPublished(true)
     return true
@@ -699,6 +705,7 @@ export function createSessionPlayer(
     isPlaying,
     isFinished,
     lastError,
+    viewerGlideSwitches: glideLease.viewer,
     total: actions.length,
   }
 }

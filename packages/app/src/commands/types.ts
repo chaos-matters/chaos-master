@@ -345,13 +345,18 @@ export interface FlameCommand {
    * This command changes nothing a replay reproduces: not the document, the
    * timeline, the audio wiring or the view a take's snapshot holds. The
    * export commands are the case: two open the export dialog, two queue a
-   * background render of a snapshot, and one reads the queue. So it does not
-   * detach the most recently recorded steps from the document they describe,
-   * and when it is also `recordable: false`, a take does not count it as a
-   * step it could not capture. All other commands are conservatively treated
-   * as replay-state changes.
+   * background render of a snapshot, and one reads the queue; the two Glide
+   * switches only choose how later changes appear. None detaches the latest
+   * recorded steps from their document or is, to a paused replay, the viewer
+   * taking over; one also `recordable: false` is no step a take missed. All
+   * other commands are conservatively treated as replay-state changes.
    */
   preservesFinishedSession?: boolean
+  /** A switch that shapes only LATER changes (the two Glide switches). A live
+   *  run skips `beforeCommand`, so a playing replay plays on at the new
+   *  setting, and `execute_command` lets a glide in flight finish. Any other
+   *  live command, the export ones included, hands a playing replay back. */
+  presentationSwitch?: true
   shortcut?: string
   /**
    * Resolve args to their canonical, replayable form BEFORE recording and

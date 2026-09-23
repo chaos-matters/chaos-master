@@ -7,6 +7,7 @@ import { createSignal } from 'solid-js'
 import { createStore, produce, reconcile } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { executeReplayCommand } from '@/commands/registry'
+import { APART_FROM_LIVE_GLIDE } from '@/flame/glide/runtime'
 import { deepClone } from '@/utils/clone'
 import { withRecordingSuppressed } from '../recorder'
 import type { CommandContext } from '@/commands/types'
@@ -123,8 +124,7 @@ export function createFlameSandbox(initial: FlameDescriptor): FlameSandbox {
     modal: { open: () => {} },
     // Nothing here glides, and a take's Glide steps must not reach the
     // viewer's editor while the sandbox checks a plan.
-    glideSwitches: { setEnabled: () => {}, setQuality: () => {} },
-    glideRuntime: () => undefined,
+    ...APART_FROM_LIVE_GLIDE,
   }
 
   return {

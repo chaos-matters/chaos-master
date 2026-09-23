@@ -2,12 +2,11 @@ import { batch, createResource, createSignal, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { glideFrameQuality, resolveGlideQuality } from '@/flame/glide/quality'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
-import { assertReplayVideoStatePortable, createReplayVideoDriver, createReplayVideoSchedule, drawReplayVideoOverlay, replayFramesInStateRun, replayStateAtFrame, replayVideoVisualFingerprint, } from '@/recorder/replayVideo'
+import { assertReplayVideoStatePortable, createReplayVideoDriver, createReplayVideoSchedule, drawReplayVideoOverlay, replayFrameQuality, replayFramesInStateRun, replayStateAtFrame, replayVideoVisualFingerprint, } from '@/recorder/replayVideo'
 import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAnalysis'
 import { createAudioVideoEncoder } from '@/utils/audioExport'
 import { deepClone } from '@/utils/clone'
@@ -54,7 +53,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       : undefined
   const replayDriver =
     replaySchedule && job.session
-      ? createReplayVideoDriver(job.session)
+      ? createReplayVideoDriver(job.session, replaySchedule)
       : undefined
   const initialReplayState: ReplayVideoStateAt = replaySchedule
     ? replayStateAtFrame(replaySchedule, 0)
@@ -74,12 +73,15 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
    * each one costs a full convergence: an 800 ms transition at 24 fps is
    * nineteen extra converged renders per step. The eye does not resolve detail
    * in motion and the settled frame is the one people screenshot, so the
-   * intermediates render at a fraction of the job's quality and the settled
-   * frame at all of it.
+   * intermediates render at a fraction of the job's quality, at the tier the
+   * take has in force for that step, and the settled frame at all of it.
    */
-  const glideQuality = resolveGlideQuality(job.replayVideo?.glide?.tier)
+  const frameQuality = (at: ReplayVideoStateAt) =>
+    replaySchedule
+      ? replayFrameQuality(replaySchedule, at, job.quality)
+      : job.quality
   const [perFrameQuality, setPerFrameQuality] = createSignal(
-    glideFrameQuality(job.quality, glideQuality, initialReplayState.glideT),
+    frameQuality(initialReplayState),
   )
 
   const totalFrames = job.frameEnd - job.frameStart + 1
@@ -324,7 +326,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     // playhead advances as the in-app replay moves it.
     const next = replayDriver.advanceTo(at.actionIndex, at.glideT, at.takeMs)
     assertReplayVideoStatePortable(next, at.actionIndex)
-    setPerFrameQuality(glideFrameQuality(job.quality, glideQuality, at.glideT))
+    setPerFrameQuality(frameQuality(at))
     const nextVisualKey = replayVideoVisualFingerprint(next)
     const visualChanged = nextVisualKey !== replayVisualKey
     replayState = next
