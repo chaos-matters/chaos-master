@@ -159,8 +159,11 @@ export function createRecorderAwareTimeline(
     },
 
     togglePlay() {
+      const playing = raw.isPlaying()
       beforeMutation?.()
-      raw.togglePlay()
+      // A replay handed back inside a play window pauses there: a press that
+      // meant Pause is then done, and toggling would play it again.
+      if (raw.isPlaying() === playing) raw.togglePlay()
     },
 
     setAnimationEnabled(value) {

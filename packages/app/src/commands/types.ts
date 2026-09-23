@@ -1,6 +1,7 @@
 import type { Accessor, Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { BundledTrack } from '@/arcade/bundledTracks'
+import type { GlideDriver, GlideQualityPreference } from '@/flame/glide/types'
 import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
@@ -304,6 +305,15 @@ export interface CommandContext {
     toast: (text: string) => void
     qualityPreset: () => string
   }
+  /** A replay world's own Glide switches (the artwork export, the synthesize
+   *  sandbox), so a take's never reach the viewer's. Absent: the viewer's. */
+  glideSwitches?: {
+    setEnabled: (enabled: boolean) => void
+    setQuality: (quality: GlideQualityPreference) => void
+  }
+  /** Its own glide runtime, for `glide.toFlame`: none, so a take's glide
+   *  never animates the live canvas. Absent: the workspace's. */
+  glideRuntime?: () => GlideDriver | undefined
 }
 
 export type ReplayArgsValidator = (
@@ -316,6 +326,14 @@ export interface FlameCommand {
   description: string
   /** False for wall-clock/device transport that cannot be serialized. */
   recordable?: boolean
+  /**
+   * False for a step only a recording writes: a session may replay it, but
+   * `execute_command` refuses it live. `timeline.setPlaying` is the case — as
+   * a step it runs between two recorded moments and ends where the take
+   * ended, but a script calling it would start playback nothing stops, which
+   * is why `timeline.play` is refused and `timeline.playFor` exists.
+   */
+  agentCallable?: boolean
   /**
    * False when a command must never be accepted from an untrusted session.
    * Every other command is still denied unless it declares

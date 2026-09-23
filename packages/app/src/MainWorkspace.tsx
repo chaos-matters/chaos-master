@@ -33,7 +33,7 @@ import { AdvancedToolsDrawer, EditorRail, TabletInspectorDeck, TouchHUD, } from 
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
-import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
+import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceBlendPick, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 import { deckFits, isTouchDevice } from './stores/workspaceLayoutStore'
 import type { MoreMenuHandlers } from './components/Shell/moreMenuItems'
@@ -1327,8 +1327,11 @@ export function MainWorkspace(props: AppProps) {
    * cross-dissolves A into B. Combine with "Seamless Loop" for an A→B→A cycle.
    */
   function setupMorph(endFlame: FlameDescriptor) {
-    // One flame-history entry for the composition (blend flame + weight)...
-    executeCommand('flame.setupMorph', cmdContext, endFlame)
+    // One flame-history entry for the composition (blend flame + weight),
+    // taken after the hover preview is put back so undo returns to before it...
+    blendPick.commit(() => {
+      executeCommand('flame.setupMorph', cmdContext, endFlame)
+    })
     const cfg = timeline.config()
     // ...and one timeline undo step for the keyframes (remove + both adds).
     runTimelineSnapshotMutation(
@@ -1356,11 +1359,13 @@ export function MainWorkspace(props: AppProps) {
    */
   const BREED_PREVIEW_DELAY_MS = 220
 
-  // Hover preview: temporarily set blend flame at 40% weight. Silent writes —
-  // a transient hover must not create history entries or clobber redo.
-  let prevBlendFlame: FlameDescriptor | undefined
-  let prevBlendWeight = 0
-  let blendPreviewActive = false
+  const blendPick = useWorkspaceBlendPick({
+    flame: () => flameDescriptor,
+    setSilently: history.setSilently,
+    execute: (id, ...args) => {
+      executeCommand(id, cmdContext, ...args)
+    },
+  })
 
   /**
    * The child generated for whichever candidate is hovered, so clicking opens
@@ -1437,35 +1442,7 @@ export function MainWorkspace(props: AppProps) {
       }
       return
     }
-    // The hover preview IS the blend mechanism, and blending is 2D-only:
-    // `ifsPipeline3D.update()` takes a single flame — it has no blend input at
-    // all, so `renderSettings.blendFlame` is silently ignored in 3D. Writing it
-    // anyway changed the hovered NAME while the picture stayed put, which reads
-    // as a broken preview rather than an unsupported one. Skip it instead.
-    if (flame && (flame.renderSettings.dimensions ?? 2) === 3) {
-      return
-    }
-    if (flame) {
-      if (!blendPreviewActive) {
-        prevBlendFlame = blendFlame()
-        prevBlendWeight = blendWeight()
-        blendPreviewActive = true
-      }
-      history.setSilently((draft) => {
-        draft.renderSettings.blendFlame = deepClone(flame)
-        draft.renderSettings.blendWeight = 0.4
-      })
-    } else if (blendPreviewActive) {
-      const restore = prevBlendFlame
-      const restoreWeight = prevBlendWeight
-      history.setSilently((draft) => {
-        if (restore === undefined) delete draft.renderSettings.blendFlame
-        else draft.renderSettings.blendFlame = deepClone(restore)
-        draft.renderSettings.blendWeight = restoreWeight
-      })
-      prevBlendFlame = undefined
-      blendPreviewActive = false
-    }
+    blendPick.preview(flame)
   }
 
   /*
@@ -1638,7 +1615,7 @@ export function MainWorkspace(props: AppProps) {
     // say so instead of letting the log claim fidelity it lost.
     if (isSessionRecording()) {
       reportUnreplayable(
-        'Workspace remounted — the recording started against a different document',
+        'The workspace reloaded, so later steps apply to a different document than this take started from',
       )
     }
     trackAppInit(Boolean(window.navigator?.gpu))
@@ -2884,7 +2861,7 @@ export function MainWorkspace(props: AppProps) {
 
     if (anim.tracks.length > 0) {
       reportTimelineTransport(
-        'Loaded animation autoplay is wall-clock transport and is not replayed',
+        'Autoplay of a loaded animation, which a recording does not replay',
       )
     }
 
@@ -4334,7 +4311,7 @@ export function MainWorkspace(props: AppProps) {
               pickEvolveFlame={pickEvolveFlame}
               openDiffAsModal={openDiffAsModal}
               openDiffView={openDiffView}
-              setBlendFlame={setBlendFlame}
+              commitBlendPick={blendPick.pick}
               blendFlame={blendFlame}
               handlePreviewBlend={handlePreviewBlend}
               setHoveredBlendName={setHoveredBlendName}

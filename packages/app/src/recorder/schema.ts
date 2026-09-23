@@ -38,6 +38,10 @@ export const MAX_ACTION_LABEL_CHARS = 4096
 export const MAX_ACTION_FOCUS_CHARS = 512
 export const MAX_ACTION_NOTE_CHARS = 16_384
 export const MAX_ACTION_HOLD_MS = 600_000
+/** A take names at most as many uncaptured steps as it can hold steps; the
+ * count past that stays exact, it is only the names that stop. */
+export const MAX_UNCAPTURED_STEPS = MAX_SESSION_ACTIONS
+export const MAX_UNCAPTURED_REASON_CHARS = 256
 
 const GlideStepHintSchema = v.picklist(GLIDE_STEP_HINTS)
 
@@ -264,6 +268,23 @@ export const SessionViewSnapshot = v.object({
 })
 export type SessionViewSnapshot = v.InferOutput<typeof SessionViewSnapshot>
 
+/** One step a take could not record: when, and why, in words for a person
+ * (see recorder/uncapturedSteps.ts). */
+const UncapturedStepSchema = v.object({
+  t: v.pipe(
+    v.number(),
+    v.finite(),
+    v.minValue(0),
+    v.maxValue(MAX_ACTION_TIMESTAMP_MS),
+  ),
+  reason: v.pipe(
+    v.string(),
+    v.nonEmpty(),
+    v.maxLength(MAX_UNCAPTURED_REASON_CHARS),
+  ),
+})
+export type UncapturedStep = v.InferOutput<typeof UncapturedStepSchema>
+
 // `initial` is validated separately through tryValidateFlame: it dispatches
 // 2D vs 3D and migrates old saves, which a plain schema reference would not.
 const RecordedSessionShellSchema = v.object({
@@ -308,6 +329,15 @@ const RecordedSessionShellSchema = v.object({
    *  replay cannot reproduce the session faithfully (the coverage ratchet —
    *  see docs/plans/semantic-recorder-plan.md). */
   unnamedWriteCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  /**
+   * The steps that count names, in the order they happened. Optional twice
+   * over: a take recorded before names were saved has only the count, and a
+   * clean take has nothing to name. Readers that predate it still have the
+   * count, which is why the count stays.
+   */
+  uncapturedSteps: v.optional(
+    v.pipe(v.array(UncapturedStepSchema), v.maxLength(MAX_UNCAPTURED_STEPS)),
+  ),
 })
 
 export type RecordedSession = Omit<
@@ -402,6 +432,13 @@ export function validateSession(data: unknown): RecordedSession | undefined {
   }
   const shell = v.safeParse(RecordedSessionShellSchema, data)
   if (!shell.success) return undefined
+  // A list can fall short of the count (the names stop at a cap) but never
+  // name steps the count says did not happen.
+  if (
+    (shell.output.uncapturedSteps?.length ?? 0) > shell.output.unnamedWriteCount
+  ) {
+    return undefined
+  }
   if (
     shell.output.initialTimeline !== undefined &&
     tryValidateTimelineSnapshot(shell.output.initialTimeline) === undefined

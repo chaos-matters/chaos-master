@@ -109,6 +109,9 @@ type RecordedSession = {
   initialView?: SessionViewSnapshot
   actions: RecordedAction[]
   unnamedWriteCount: number
+  // Each counted step by name: `t` in take time and a reason a person can
+  // read. Absent on a clean take and on takes saved before names existed.
+  uncapturedSteps?: { t: number; reason: string }[]
 }
 
 type RecordedAction = {
@@ -155,7 +158,7 @@ Decisions baked into this shape:
 
 A third path exists for things the log cannot reproduce even though no
 anonymous write happened — an undo reverting an edit made before recording
-started, wall-clock transport, live audio modulation, or a workspace remount
+started, a raw timeline seek, live audio modulation, or a workspace remount
 that swapped the document underneath an active recording. These retract the action
 just logged (if any) and count an unnamed write instead, so the marker rises
 rather than the log asserting a fidelity it lost.

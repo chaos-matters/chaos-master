@@ -1,3 +1,4 @@
+import { DEFAULT_BLEND_WEIGHT } from '@/flame/blend'
 import { examples } from '@/flame/examples'
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
@@ -32,20 +33,41 @@ registerCommand({
   },
 })
 
+/**
+ * The partner and, when the caller names one, the weight, as one history
+ * entry. A weight the caller names always wins. Without one, a document that
+ * already has a weight keeps it, whether or not it had a partner, so a weight
+ * set first survives the partner that follows. Only a document with no weight
+ * at all gets the default: the weight the gallery previews a partner at, so a
+ * take recorded before picks carried their weight replays to what its viewer
+ * saw.
+ */
 registerCommand({
   id: 'flame.setBlendFlame',
   label: 'Set Blend Flame',
-  description: 'Set or clear the flame being blended with (null clears)',
-  execute(ctx, flame?: unknown) {
+  description: `Set or clear the flame being blended with (null clears). An optional second argument sets the weight (0-1); without it, the document keeps the weight it has, and one with no weight yet gets ${DEFAULT_BLEND_WEIGHT}`,
+  execute(ctx, flame?: unknown, weight?: unknown) {
     const next = isAbsentRef(flame) ? undefined : tryValidateFlame(flame)
     if (!isAbsentRef(flame) && !next) {
       console.warn('[cmd] flame.setBlendFlame: not a valid flame', flame)
       return
     }
+    const named =
+      typeof weight === 'number' && Number.isFinite(weight)
+        ? Math.max(0, Math.min(1, weight))
+        : undefined
     ctx.setFlameDescriptor(
       (draft) => {
         if (next === undefined) delete draft.renderSettings.blendFlame
         else draft.renderSettings.blendFlame = next
+        if (named !== undefined) {
+          draft.renderSettings.blendWeight = named
+        } else if (
+          next !== undefined &&
+          draft.renderSettings.blendWeight === undefined
+        ) {
+          draft.renderSettings.blendWeight = DEFAULT_BLEND_WEIGHT
+        }
       },
       next ? 'Set Blend Flame' : 'Remove Blend Flame',
     )

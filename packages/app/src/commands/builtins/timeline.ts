@@ -1,6 +1,7 @@
 import { createReaction, createRoot } from 'solid-js'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, MAX_TIMELINE_TRACKS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
+import { describeTimelinePlayback, isAdvanceCount, TIMELINE_PLAYBACK_COMMAND_ID, } from '@/recorder/transportStep'
 import { registerCommand } from '../registry'
 import { num, str } from './describeArgs'
 
@@ -401,10 +402,11 @@ registerCommand({
  * an end, and the caller knows when — so the pair below starts playback with
  * the stop already scheduled, and `timeline.stop` ends it early.
  *
- * Both are `recordable: false` like the toggle: wall-clock transport is not a
- * step in a creation session. They are replay-validated only because that is
- * the gate `execute_command` applies; the worst a hand-written session file
- * gets out of them is ten minutes of playback the viewer can stop.
+ * Both are `recordable: false` like the toggle: an agent's transport is not a
+ * step (a person's Play and Pause record as `timeline.setPlaying`). They are
+ * replay-validated only because that is the gate `execute_command` applies;
+ * the worst a hand-written session file gets out of them is ten minutes of
+ * playback the viewer can stop.
  */
 
 const MAX_PLAY_FOR_SECONDS = 600
@@ -495,6 +497,37 @@ registerCommand({
       timer,
       release: watchPlaybackEnd(isPlaying, cancelPendingStop),
     }
+  },
+})
+
+/**
+ * Play or Pause as a take records it: recorder.ts `reportTimelinePlaybackIn`
+ * writes it for every change of playing state, whichever control made it. The
+ * frame is the point: the Pause must put the playhead where the take paused.
+ * A stop's optional count of frames advanced paces the replay's window
+ * (recorder/playWindows.ts); running the step ignores it. Called live it would
+ * be the unbounded play `timeline.play` is refused for: `agentCallable: false`.
+ */
+registerCommand({
+  id: TIMELINE_PLAYBACK_COMMAND_ID,
+  describe: ([playing, frame, advanced]) =>
+    isBoolean(playing) && isFrame(frame)
+      ? describeTimelinePlayback(playing, frame, isAdvanceCount(advanced))
+      : 'Play or pause the timeline',
+  label: 'Play or Pause',
+  description:
+    'Start or stop playback at an exact frame. A recording writes this step for every Play and Pause; a script uses timeline.playFor and timeline.stop instead.',
+  agentCallable: false,
+  validateReplayArgs: (args) =>
+    exactReplayArgs(
+      args,
+      [isBoolean, isFrame, isAdvanceCount].slice(0, Math.max(2, args.length)),
+    ),
+  execute(ctx, playing?: unknown, frame?: unknown) {
+    if (!isBoolean(playing) || !isFrame(frame)) return
+    ctx.timeline.setCurrentFrame(frame)
+    if (playing) ctx.timeline.play()
+    else ctx.timeline.pause?.()
   },
 })
 

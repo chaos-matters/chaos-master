@@ -10,6 +10,11 @@
  * Glide tracks are an EFFECT. None of these writes a keyframe into the user's
  * timeline — the runtime holds the plan and the exporter takes it as data, so
  * the dope sheet someone is authoring in is never disturbed.
+ *
+ * The two switches write to the context's own `glideSwitches` when it has
+ * them, and `glide.toFlame` animates through its own `glideRuntime`: a replay
+ * world apart from the workspace keeps a private pair and no runtime, so
+ * exporting or checking a take never changes the viewer's switches or canvas.
  */
 
 import { isGlideQualityPreference } from '@/flame/glide/quality'
@@ -36,9 +41,9 @@ registerCommand({
         ? 'Animate changes'
         : 'Stop animating changes'
       : undefined,
-  execute(_ctx, on?: unknown) {
+  execute(ctx, on?: unknown) {
     if (typeof on !== 'boolean') return
-    setGlideEnabled(on)
+    ;(ctx.glideSwitches?.setEnabled ?? setGlideEnabled)(on)
   },
 })
 
@@ -49,9 +54,9 @@ registerCommand({
     'Choose how much render quality a glide gives up while it moves: "responsive" (fastest), "balanced", "full" (no downshift, so each frame takes longer), or "auto" to follow the render quality preset. A glide always settles at full quality whichever tier is chosen.',
   describe: ([tier]) =>
     typeof tier === 'string' ? `Glide quality: ${tier}` : undefined,
-  execute(_ctx, tier?: unknown) {
+  execute(ctx, tier?: unknown) {
     if (!isGlideQualityPreference(tier)) return
-    setGlideQualityPreference(tier)
+    ;(ctx.glideSwitches?.setQuality ?? setGlideQualityPreference)(tier)
   },
 })
 
@@ -84,7 +89,7 @@ registerCommand({
       console.warn('[cmd] glide.toFlame: not a valid flame', descriptor)
       return
     }
-    const runtime = getGlideRuntime()
+    const runtime = (ctx.glideRuntime ?? getGlideRuntime)()
     const ms = glideMsArg(durationMs)
     // Settle anything already in flight FIRST, so this edit lands on a settled
     // document rather than baking a half-interpolated one in — and keep what

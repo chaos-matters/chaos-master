@@ -205,6 +205,7 @@ const STATIC_COMMAND_HINTS: Readonly<Record<string, string>> = Object.freeze({
 
   // ---- timeline -------------------------------------------------------
   'timeline.play': 'ui:play-button',
+  'timeline.setPlaying': 'ui:play-button',
   'timeline.setCurrentFrame': 'ui:seek-ruler',
   'timeline.goToFrame': 'ui:seek-ruler',
   'timeline.addKeyframe': 'ui:dope-sheet',

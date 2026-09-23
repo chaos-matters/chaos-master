@@ -122,7 +122,13 @@ export function describeAllowedCommands(allowed: readonly string[]): string[] {
       continue
     }
     for (const cmd of getAllCommands()) {
-      if (cmd.id.startsWith(entry) && cmd.replayable !== false) ids.push(cmd.id)
+      if (
+        cmd.id.startsWith(entry) &&
+        cmd.replayable !== false &&
+        cmd.agentCallable !== false
+      ) {
+        ids.push(cmd.id)
+      }
     }
   }
   return [...new Set(ids)].map((id) => {

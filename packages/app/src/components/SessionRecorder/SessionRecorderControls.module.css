@@ -85,13 +85,6 @@
   animation: recorder-pulse 1.2s ease-in-out infinite;
 }
 
-.unnamed {
-  padding: 0.1rem 0.45rem;
-  border-radius: 12px;
-  background: oklch(60% 0.18 60 / 0.35);
-  cursor: help;
-}
-
 @keyframes recorder-pulse {
   0%,
   100% {

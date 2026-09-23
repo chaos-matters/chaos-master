@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
-import { cancelSessionRecording, isSessionRecording } from '@/recorder/recorder'
+import { cancelSessionRecording, isSessionRecording, reportDocumentWrite, } from '@/recorder/recorder'
 import { serializeSession, SESSION_FORMAT_VERSION } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { SessionRecorderControls } from './SessionRecorderControls'
@@ -271,6 +271,34 @@ describe('SessionRecorderControls start feedback', () => {
     expect(status.getAttribute('aria-live')).toBe('polite')
     expect(status.getAttribute('aria-atomic')).toBe('true')
     expect(status.textContent).toContain('0 replayable steps')
+    unmount()
+  })
+
+  it('names each uncaptured step while the take records', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(0)
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record steps' }))
+    expect(screen.queryByText(/not captured/)).toBeNull()
+    clock.mockReturnValue(43_000)
+    reportDocumentWrite('Exposure')
+
+    expect(screen.getByText('1 not captured')).toBeTruthy()
+    expect(
+      screen.getByText('Exposure, made outside the recorded commands, at 0:43'),
+    ).toBeTruthy()
+    // The count still reaches a screen reader through the live status.
+    expect(screen.getByRole('status').textContent).toContain('1 not captured')
     unmount()
   })
 })

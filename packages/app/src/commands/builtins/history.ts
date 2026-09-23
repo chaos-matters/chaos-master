@@ -5,6 +5,7 @@ import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
+import type { UndoTarget } from '@/utils/undoRouting'
 
 /** Internal, data-only command used for timeline undo/redo in a recording. */
 registerCommand({
@@ -70,6 +71,26 @@ function replaceRecordedHistoryAction(
   replaceCurrentRecordedAction('flame.load', args, label)
 }
 
+/**
+ * Why an undo or redo cannot be replayed from the take, in the words the
+ * recorder panels show. The target says which case it is: nothing to act on
+ * (on replay that would revert the replayer's own load of the initial flame),
+ * a history with no journal stamps to place the entry by (a seat's), or an
+ * entry older than the recording.
+ */
+function unreplayableHistoryReason(
+  kind: 'Undo' | 'Redo',
+  target: UndoTarget | undefined,
+): string {
+  if (target === undefined) {
+    return `${kind} with nothing left to ${kind.toLowerCase()}`
+  }
+  if (target.seq === null) {
+    return `${kind} in a history the recording does not follow`
+  }
+  return `${kind} of a change made before recording started`
+}
+
 // Undo/redo move the history stacks without pushing new entries, so they are
 // invisible to the session recorder's unnamed-write detector — routing them
 // through the registry is the only way a recording captures them, and a log
@@ -94,9 +115,8 @@ registerCommand({
   execute(ctx) {
     const target = ctx.history?.peekUndoTarget?.()
     const replayable = isUndoTargetWithinRecording(target)
-    if (!replayable) {
-      reportUnreplayable('Undo reaching outside the recorded session')
-    }
+    if (!replayable)
+      reportUnreplayable(unreplayableHistoryReason('Undo', target))
     ctx.history?.undo()
     if (replayable && target) {
       replaceRecordedHistoryAction(ctx, target.system, 'Undo')
@@ -112,9 +132,8 @@ registerCommand({
   execute(ctx) {
     const target = ctx.history?.peekRedoTarget?.()
     const replayable = isUndoTargetWithinRecording(target)
-    if (!replayable) {
-      reportUnreplayable('Redo reaching outside the recorded session')
-    }
+    if (!replayable)
+      reportUnreplayable(unreplayableHistoryReason('Redo', target))
     ctx.history?.redo()
     if (replayable && target) {
       replaceRecordedHistoryAction(ctx, target.system, 'Redo')

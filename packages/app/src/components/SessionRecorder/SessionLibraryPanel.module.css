@@ -139,11 +139,6 @@
   font-size: 0.66rem;
 }
 
-.warning {
-  color: oklch(75% 0.15 60);
-  cursor: help;
-}
-
 .entry-actions {
   display: flex;
   gap: 0.25rem;
