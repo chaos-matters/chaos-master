@@ -297,16 +297,14 @@ ${WEBMCP_FALLBACK_NOTE}`
 }
 
 /**
- * Commands an agent may use in Beats mode.
+ * Commands an agent may use in Beats mode, ALWAYS_ALLOWED aside: the tool
+ * adds those, as every mode's does. `audio.setMapping` replaces the preset
+ * and the rows in one step, which is what a preset change or a row added,
+ * removed or cleared comes to.
  */
 export const BEATS_ALLOWED = [
-  ...ALWAYS_ALLOWED,
   'audio.applySnapshot',
-  'audio.setPreset',
   'audio.setMapping',
-  'audio.addMapping',
-  'audio.removeMapping',
-  'audio.clearMappings',
   'sonification.setConfig',
   'sonification.setEnabled',
   'camera.center',

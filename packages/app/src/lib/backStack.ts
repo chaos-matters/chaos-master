@@ -53,8 +53,20 @@ export function createBackLayer(
   })
 }
 
+const holds = new Set<object>()
+
+/** Back does nothing until the returned release: nothing closes and the app
+ *  does not minimise. The Arcade's screen lock holds it while the agent
+ *  drives, over layers opened before it and during the take alike. */
+export function holdBack(): () => void {
+  const hold = {}
+  holds.add(hold)
+  return () => holds.delete(hold)
+}
+
 /** Runs the top handler. False when there was nothing to pop. */
 export function popBack(): boolean {
+  if (holds.size > 0) return true
   const top = entries().at(-1)
   if (!top) return false
   top.handler()

@@ -91,6 +91,18 @@ export function drivingSeat(): SeatId | undefined {
   return drivingState()?.seatId
 }
 
+/**
+ * Does the agent own the keyboard as well as the screen?
+ *
+ * Only under the screen lock, where the viewer is watching a take being made:
+ * a key they press must not edit, rewind or play it. A seat lock is a duel,
+ * and the viewer playing the other seat keeps their keyboard. Both keyboard
+ * dispatchers ask this one question, so the two cannot drift apart.
+ */
+export function pilotOwnsKeyboard(): boolean {
+  return drivingState()?.lock === 'screen'
+}
+
 export function appendPilotLog(kind: PilotLogKind, text: string): void {
   setPilotLog((log) => [
     ...log.slice(-(MAX_PILOT_LOG - 1)),

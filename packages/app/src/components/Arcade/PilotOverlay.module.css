@@ -3,14 +3,13 @@
    handles and the flame itself are the lesson. A heavy scrim plus a
    full-viewport backdrop blur hid exactly the thing the viewer is supposed to
    be learning from, so both are gone. What enforces the lock is
-   `pointer-events`, not opacity — nothing here is load-bearing for safety, it
-   only has to SAY "these controls are not yours right now". A ring around the
-   viewport says that without costing a single pixel of legibility. */
+   the modal dialog it is (topLayer.ts), not opacity — nothing here is
+   load-bearing for safety, it only has to SAY "these controls are not yours
+   right now". A ring around the viewport says that without costing a single
+   pixel of legibility. */
 .shield {
   position: fixed;
   inset: 0;
-  /* Topmost layer: version pills 9999 < Arcade hub 10005/10006 < pilot lock 10010. */
-  z-index: 10010;
   pointer-events: all;
   background: rgba(4, 6, 12, 0.08);
   box-shadow:
@@ -19,6 +18,34 @@
   display: grid;
   grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 320px;
+}
+
+/* Both are modal dialogs, in the browser's top layer over everything, so no
+   z-index. This undoes the dialog's own box: a centred, content-sized frame
+   with a border, padding, an opaque canvas colour and a dimming backdrop. */
+.shield,
+.endBackdrop {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  overflow: visible;
+}
+
+.shield::backdrop,
+.endBackdrop::backdrop {
+  background: transparent;
+}
+
+/* The shield takes focus when the lock starts, so that nothing behind it keeps
+   the keyboard. Its own frame already marks the whole screen; an outline on
+   top of it would only draw a second border around the viewport. */
+.shield:focus {
+  outline: none;
 }
 
 /* A centred pill, not a full-width strip.
@@ -191,11 +218,14 @@
 .endBackdrop {
   position: fixed;
   inset: 0;
-  /* Topmost layer: version pills 9999 < Arcade hub 10005/10006 < pilot lock 10010. */
-  z-index: 10010;
   display: grid;
   place-items: center;
   background: rgba(4, 6, 12, 0.6);
+}
+
+/* Takes focus as the lock hands over, for the same reason as the shield. */
+.endBackdrop:focus {
+  outline: none;
 }
 
 .endCard {

@@ -37,6 +37,7 @@ drive a recording, or the PNG/MP4 chunk formats (`utils/flameInPng.ts`,
 - `packages/app/src/commands/builtins/glide.ts`, `packages/app/src/flame/glide/runtime.ts` — the Glide switches, a replay world's own pair and its missing glide runtime, and the capture and restore every replay uses
 - `packages/app/src/hooks/useWorkspaceReplay.ts` — the live workspace's `ReplayTarget`, side-state capture/restore and video-export dispatch
 - `packages/app/src/hooks/useWorkspaceBlendPick.ts`, `packages/app/src/flame/blend.ts` — the blend gallery's hover preview, the pick it commits, and the default weight both use
+- `packages/app/src/components/BlendFlameGallery/BlendFlameGallery.tsx`, `packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx` — every way the gallery is left ending the preview, and the Evolve and Diff picks
 - `packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx` — the export dialog, its two animation paths and the motion-blur control
 - `packages/app/src/components/ExportPngDialog/metadataCommit.ts` — metadata written back through semantic commands
 - `packages/app/src/components/ExportJobs/OffscreenAnimationRender.tsx` — the offscreen/background video render driver
@@ -70,6 +71,7 @@ drive a recording, or the PNG/MP4 chunk formats (`utils/flameInPng.ts`,
 - `packages/app/src/utils/exportPreferences.test.ts` — the export-time session snapshot
 - `packages/app/src/utils/flameInPng.test.ts`, `flameInMp4.test.ts` — the session chunk round-trips out of an exported file
 - `packages/app/src/components/ExportPngDialog/metadataCommit.test.ts` — only changed metadata is committed
+- `packages/app/src/hooks/useWorkspaceBlendPick.test.tsx`, `packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.gallery.test.tsx` — the blend gallery's picks and every way out of its hover preview
 - _Gap:_ `hooks/useWorkspaceReplay.ts`, `components/ExportPngDialog/ExportPngDialog.tsx` (beyond `metadataCommit`), `components/ExportJobs/OffscreenAnimationRender.tsx`, `components/ExportJobs/ExportJobHost.tsx`, `utils/animationExport.ts` and `utils/exportJobs.ts` have **no** test of their own. See [Coverage gaps](#coverage-gaps) for the requirement IDs this leaves unguarded.
 - _Gap:_ `packages/app/src/utils/motionBlur.test.ts` is named for motion blur but imports nothing from `animationExport.ts` — it re-derives the sub-frame arithmetic inline. It cannot go red for any change to the export driver, so it is cited nowhere below.
 
@@ -676,7 +678,10 @@ happened (take time, held to the session's timestamp range) and why, in words a
 person can read: the history entry's own description for an edit made outside
 the commands, the command's label for a command that is not a step, and which
 case an unreplayable undo or redo is (an edit from before recording started,
-nothing left to undo, a history with no journal stamps). A finished session
+nothing left to undo, a history with no journal stamps). A command that changes
+nothing a replay reproduces (`preservesFinishedSession`: every `export.*`
+command) shall count as no uncaptured step and end no coalescing run, while
+one that does, such as `timeline.play`, still counts. A finished session
 shall carry them as `uncapturedSteps`, in order, next to the count, which stays
 for readers that predate the list. The list shall name at most as many steps
 as a take can hold actions and shall never name more steps than the count;
@@ -695,7 +700,8 @@ _(`recorder/uncapturedSteps.ts:20-74`, `:94-148`, `recorder/recorder.ts:213`,
 `components/SessionRecorder/UncapturedSteps.tsx:18-45`; guarded by
 `recorder.test.ts:2073`, `:2107`, `:2121`, `:2134`, `:2153`, `:2182`, `:2194`,
 `uncapturedSteps.test.ts`, `SessionRecorderControls.test.tsx:277`,
-`SessionLibraryPanel.test.tsx:54`, `SessionReplayPanel.test.tsx:255`, `:282`.)_
+`SessionLibraryPanel.test.tsx:54`, `SessionReplayPanel.test.tsx:255`, `:282`,
+and `recorder.test.ts` "an export during a take".)_
 
 ### REQ-RR-042 — An export skips uncaptured steps, and says so before it starts
 
@@ -728,8 +734,14 @@ returns to exactly that, partner and weight. A pick made without a hover (a
 touch, or Enter on a tile) shall record the same step. A morph set up from a
 hovered partner shall put the preview back the same way before
 `flame.setupMorph` runs, and a hover on a later visit to the gallery shall put
-back the pick rather than the document from before it. **When**
-`flame.setBlendFlame` runs without a weight, as an older take or an agent may,
+back the pick rather than the document from before it. **When** the gallery
+is left any other way while a preview shows, the workspace shall put back the
+same, so the document and its undo stack are as they were before the hover and
+a take across it has nothing uncaptured and replays to that document: an
+Evolve or Diff pick, which shall end the preview before the view it opens reads
+the document; the gallery going away under a still pointer, as when the sidebar
+closes or another panel or the Home hand-off takes its place; Home or the
+Arcade covering the workspace; and the page being hidden. **When** `flame.setBlendFlame` runs without a weight, as an older take or an agent may,
 a document that already has a weight shall keep it, whether or not it had a
 partner, and only a document with no weight shall start at the default; a
 weight it is given shall be held to 0..1 and win. The replay policy shall
@@ -742,7 +754,9 @@ the edited flame's share of the blend: 0 draws the partner alone.
 _(`flame/blend.ts:17`, `hooks/useWorkspaceBlendPick.ts:43-99`,
 `commands/builtins/flame/coreCommands.ts:36-75`, `commands/registry.ts:288-296`,
 `recorder/synthesize/atoms.ts:523-556`, `canonical.ts:19-56`,
-`MainWorkspace.tsx:1329-1334`; guarded by `useWorkspaceBlendPick.test.tsx:117`,
+`MainWorkspace.tsx:1329-1334`, `components/BlendFlameGallery/BlendFlameGallery.tsx`,
+`components/WorkspaceSidebar/WorkspaceSidebar.tsx` `onSelect`; guarded by
+`WorkspaceSidebar.gallery.test.tsx`, `useWorkspaceBlendPick.test.tsx:117`,
 `:155`, `:177`, `:196`, `:208`, `commands/builtins/flame/blend.test.ts:52`,
 `:68`, `:79`, `:88`, `:116`, `:143` and `planCreation.test.ts:209`, `:230`,
 `:252`.)_

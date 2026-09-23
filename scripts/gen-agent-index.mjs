@@ -67,21 +67,6 @@ function cap(text) {
   return text.length > 140 ? `${text.slice(0, 137).trim()}...` : text.trim()
 }
 
-/** A `/** ... *\/` block sitting directly above the first export. */
-function jsdocAboveExport(src) {
-  const m = src.match(
-    /\/\*\*([\s\S]*?)\*\/\s*\n\s*export\s+(?:default\s+)?(?:async\s+)?(?:function|const|class|interface|type)\b/,
-  )
-  if (!m) return ''
-  const text = m[1]
-    .split('\n')
-    .map((l) => l.replace(/^\s*\*?\s?/, '').trim())
-    .filter((l) => l && !l.startsWith('@'))
-    .join(' ')
-    .replace(/\s+/g, ' ')
-  return cap(text)
-}
-
 /** The banner/comment block at the very top of the file, before any code. */
 function leadingComment(src) {
   const lines = src.split('\n')
@@ -113,11 +98,14 @@ function leadingComment(src) {
 /**
  * Pull the first meaningful sentence out of a file's leading comment block.
  * Returns '' when the file has no header comment -- an empty blurb is an
- * honest signal that the file needs one, not something to paper over.
+ * honest signal that the file needs one, not something to paper over. So no
+ * fallback to a declaration's doc comment: it described a file by one export,
+ * and its pattern could start at any earlier doc block, a type's field
+ * included (utils/exportJobs.ts read as "Whether steps glide into place").
+ * The same rule as the header count in scripts/code-metrics.mjs.
  */
 function blurb(file) {
-  const src = readFileSync(file, 'utf8')
-  return leadingComment(src) || jsdocAboveExport(src)
+  return leadingComment(readFileSync(file, 'utf8'))
 }
 
 /** Best entry point for a module dir: index, a name match, else the biggest. */

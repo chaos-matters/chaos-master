@@ -53,10 +53,11 @@ describe('the share captures', () => {
 
 describe('the writes that keep a document', () => {
   it('files the document in Recents, never a modulated frame', () => {
-    // Save for Later is the user's own save.
-    expect(code).toContain(
-      'saveRecentFlame(flameDescriptor, undefined, tracks, force, config)',
-    )
+    // Save for Later is the user's own save. The autosave hook makes it, from
+    // the flame it is handed to save: the document, less the partner
+    // gallery's hover preview (useWorkspaceAutosave.test.ts).
+    expect(code).toContain('savedFlame: blendPick.withoutPreview,')
+    expect(code).toContain('saveForLater: saveFlameForLater,')
   })
 
   it('autosaves and writes the pause save from the document', () => {

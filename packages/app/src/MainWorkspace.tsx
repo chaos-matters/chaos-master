@@ -1,6 +1,6 @@
 import '@/commands/builtins'
 import { batch, createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
-import { createStore, unwrap } from 'solid-js/store'
+import { createStore } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { fetchBundledTrackBuffer } from '@/arcade/bundledTracks'
 import { agentDriving } from '@/arcade/pilot'
@@ -80,7 +80,6 @@ import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEFAULT_RENDER_INTERVAL_MS, IS_DEV } from './defaults'
-import { breedFlames } from './flame/breedFlame'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
 import { initExample } from './flame/examples/initExample'
@@ -117,7 +116,7 @@ import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
-import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
+import { getOldestRecentFlame } from './utils/recentFlames'
 import { storeImportedSession, storeSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
@@ -511,8 +510,12 @@ export function MainWorkspace(props: AppProps) {
       // document is about to stop.
       onBeforeDocumentWrite: yieldGlideToDocumentWrite,
       // Time travel is a change too, and one computed from the entry's own end
-      // state, so it lands the transition instead of taking it off.
-      onBeforeTimeTravel: settleGlideBeforeTimeTravel,
+      // state, so it lands the transition instead of taking it off. The
+      // gallery's hover preview comes off first for the same reason.
+      onBeforeTimeTravel: () => {
+        settleGlideBeforeTimeTravel()
+        blendPick.end()
+      },
     },
   )
 
@@ -1349,122 +1352,14 @@ export function MainWorkspace(props: AppProps) {
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
-  /**
-   * How long a candidate must stay hovered before its child is rendered.
-   *
-   * Slightly longer than the gallery's own 120ms clear delay: a child has a
-   * different transform structure from its parent, so showing one rebuilds the
-   * IFS pipeline, and sweeping the pointer down a list must not do that once
-   * per tile.
-   */
-  const BREED_PREVIEW_DELAY_MS = 220
-
   const blendPick = useWorkspaceBlendPick({
     flame: () => flameDescriptor,
     setSilently: history.setSilently,
     execute: (id, ...args) => {
       executeCommand(id, cmdContext, ...args)
     },
+    intent: blendIntent,
   })
-
-  /**
-   * The child generated for whichever candidate is hovered, so clicking opens
-   * the gallery on the flame you were actually looking at rather than nine
-   * unrelated ones.
-   */
-  const [breedPreviewChild, setBreedPreviewChild] = createSignal<
-    FlameDescriptor | undefined
-  >(undefined)
-  /** The workspace flame as it was before a breed preview replaced it. */
-  let breedPreviewRestore: FlameDescriptor | undefined
-  let breedPreviewTimer: ReturnType<typeof setTimeout> | undefined
-
-  function writeDescriptor(next: FlameDescriptor) {
-    const value = deepClone(next)
-    history.setSilently((draft) => {
-      draft.version = value.version
-      draft.metadata = value.metadata
-      draft.renderSettings = value.renderSettings
-      draft.transforms = value.transforms
-    })
-  }
-
-  function endBreedPreview() {
-    clearTimeout(breedPreviewTimer)
-    breedPreviewTimer = undefined
-    setBreedPreviewChild(undefined)
-    if (breedPreviewRestore !== undefined) {
-      writeDescriptor(breedPreviewRestore)
-      breedPreviewRestore = undefined
-    }
-  }
-
-  /**
-   * Hovering a candidate while breeding shows an actual CHILD of the two
-   * flames, not a 40% blend of them.
-   *
-   * A blend is the wrong thing to show here twice over: it is not what
-   * breeding produces, and it cannot render at all in 3D — `ifsPipeline3D`
-   * has no blend input, so the old preview changed the hovered NAME while the
-   * picture sat still. A real child works in both dimensions, because
-   * `breedFlames` carries `variations3D`.
-   *
-   * Debounced, and this matters: a child has a different transform STRUCTURE
-   * from its parent, so applying one rebuilds the IFS pipeline. Sweeping the
-   * pointer across a list must not rebuild once per tile.
-   */
-  function previewBreedChild(flame: FlameDescriptor) {
-    clearTimeout(breedPreviewTimer)
-    breedPreviewTimer = setTimeout(() => {
-      const parentA = breedPreviewRestore ?? unwrap(flameDescriptor)
-      const [child] = breedFlames(parentA, flame, {
-        count: 1,
-        crossoverMode: 'uniform',
-        mutationStrength: 0.1,
-      })
-      if (child === undefined) {
-        return
-      }
-      // Snapshot once per hover run, not per tile: the restore target is the
-      // flame the user arrived with, never a previously previewed child.
-      breedPreviewRestore ??= deepClone(unwrap(flameDescriptor))
-      setBreedPreviewChild(child)
-      writeDescriptor(child)
-    }, BREED_PREVIEW_DELAY_MS)
-  }
-
-  function handlePreviewBlend(flame: FlameDescriptor | null) {
-    if (blendIntent() === 'breed') {
-      if (flame) {
-        previewBreedChild(flame)
-      } else {
-        endBreedPreview()
-      }
-      return
-    }
-    blendPick.preview(flame)
-  }
-
-  /*
-   * The catch-all for the breed preview.
-   *
-   * A preview replaces the workspace flame with a child, so every route out of
-   * the picker has to put it back. The gallery's own `onClose` does, but it is
-   * not the only way out — the hand-off reset, Escape and the sidebar toggles
-   * all clear `showBlendGallery` directly, and any of them would otherwise
-   * leave the child installed as the user's flame with no history entry
-   * explaining where it came from. Keying off the visibility itself covers
-   * every path, present and future.
-   */
-  createEffect(() => {
-    if (!showBlendGallery()) {
-      endBreedPreview()
-    }
-  })
-
-  const [hoveredBlendName, setHoveredBlendName] = createSignal<string | null>(
-    null,
-  )
 
   const { showVariationSelector, varSelectorModalIsOpen } =
     createVariationSelector(history, props.hardwareTier)
@@ -1921,6 +1816,7 @@ export function MainWorkspace(props: AppProps) {
     () => timeline.tracks(),
     () => timeline.config(),
     captureOgImageBlob,
+    blendPick.end,
   )
 
   const { showDiscordShareModal } = createLazyDiscordShareModal()
@@ -2041,9 +1937,11 @@ export function MainWorkspace(props: AppProps) {
       () => resolvedBlendWeight(),
       () => audioBuffer(),
       () => audioMapping().mappings,
+      blendPick.end,
     )
 
   async function shareToDiscord() {
+    blendPick.end()
     // Freeze one authored document for the entire flow. The capture callback,
     // share-link shortener and consent modal all resolve asynchronously; using
     // the live store again later could pair flame B with flame A's PNG. What
@@ -2937,13 +2835,14 @@ export function MainWorkspace(props: AppProps) {
 
   // ── Autosave & save-awareness ──────────────────────────────────────────
   const {
-    markSavedBaseline,
     markLoadedBaseline,
     flushDirtyToRecents,
     prepareDocumentReplacement,
+    saveForLater: saveFlameForLater,
     saveOnPause,
   } = useWorkspaceAutosave({
     flameDescriptor,
+    savedFlame: blendPick.withoutPreview,
     getTracks: () => timeline.tracks(),
     // The timeline is part of the document: a change to the frame rate or
     // the end frame alone is unsaved work like any other.
@@ -2953,49 +2852,6 @@ export function MainWorkspace(props: AppProps) {
     confirmOverwriteOldest,
     confirmDiscardUnsaved,
   })
-
-  /**
-   * The user's own save: the one write allowed to replace a flame they kept,
-   * because it is the one that asks first.
-   *
-   * Named and declared here rather than inline on the desktop button, so the
-   * touch layouts can offer the same action - the restore notice tells the
-   * user to save the flame for later, and on the device that notice is
-   * written for there was nothing to tap (components/Shell/moreMenuItems.ts).
-   *
-   * Nothing here claims more than happened: `full` is the only outcome worth
-   * asking about, anything else means the write did not land and the
-   * workspace stays dirty so the next boundary tries again.
-   */
-  const saveFlameForLater = async () => {
-    const tracks = timeline.tracks()
-    const config = timeline.config()
-    const saved = (force: boolean) =>
-      saveRecentFlame(flameDescriptor, undefined, tracks, force, config)
-    const announce = (replacedOldest: boolean) => {
-      markSavedBaseline()
-      showToast(
-        tracks.length > 0
-          ? `Flame + animation saved${replacedOldest ? ' (replaced oldest)' : ' for later'}`
-          : `Flame saved${replacedOldest ? ' (replaced oldest)' : ' for later'}`,
-      )
-    }
-    const outcome = saved(false)
-    if (outcome === 'saved') {
-      announce(false)
-      return
-    }
-    if (outcome === 'refused') {
-      showToast('Could not save the flame to Recents', 5000)
-      return
-    }
-    if (!(await confirmOverwriteOldest())) return
-    if (saved(true) === 'saved') {
-      announce(true)
-    } else {
-      showToast('Could not save the flame to Recents', 5000)
-    }
-  }
 
   /**
    * Start again from the starter flame. A document replacement like any
@@ -3052,10 +2908,10 @@ export function MainWorkspace(props: AppProps) {
         // dimension; restore the target dimension's own pair so 2D and 3D
         // each keep independent animations.
         if (current === 3) {
-          stashedFlame3D = deepClone(flameDescriptor)
+          stashedFlame3D = deepClone(blendPick.withoutPreview())
           stashedTracks3D = deepClone(timeline.tracks())
         } else {
-          stashedFlame2D = deepClone(flameDescriptor)
+          stashedFlame2D = deepClone(blendPick.withoutPreview())
           stashedTracks2D = deepClone(timeline.tracks())
         }
         // Fly mode only makes sense in 3D.
@@ -3276,12 +3132,13 @@ export function MainWorkspace(props: AppProps) {
   }
 
   /**
-   * The same snapshot the recorder dock passes as `startExtras`, shared with
-   * the `ctx.recorder.start` seam so an agent-started take records the same
-   * side state as a human-started one. Wall-clock playback is not authored
-   * session state and is deliberately absent.
+   * The same snapshot for the dock's Record and the `ctx.recorder.start` seam
+   * every Arcade take starts through. A gallery hover preview ends first, so
+   * a take starts from the document the canvas then shows. Wall-clock
+   * playback is not authored session state and is deliberately absent.
    */
   function captureRecorderStartExtras(): SessionStartExtras {
+    blendPick.end()
     return {
       timeline: cmdContext.timeline.edit?.snapshot(),
       audio: cmdContext.audio?.snapshot(),
@@ -3615,6 +3472,7 @@ export function MainWorkspace(props: AppProps) {
     // clicked one produce the same file. See commands/builtins/export.ts.
     exportJobs: {
       renderImage: (request) => {
+        blendPick.end()
         const frame = timeline.currentFrame()
         const flame = deepClone(flameDescriptor)
         const tracks = deepClone(timeline.tracks())
@@ -3646,6 +3504,7 @@ export function MainWorkspace(props: AppProps) {
         })
       },
       renderAnimation: (request) => {
+        blendPick.end()
         const tracks = deepClone(timeline.tracks())
         const config = deepClone(timeline.config())
         const { frameStart, frameEnd } = resolveExportFrameRange(
@@ -3879,8 +3738,8 @@ export function MainWorkspace(props: AppProps) {
       },
       revealSidebar,
       openRandomizerCard,
-      handlePreviewBlend,
-      setHoveredBlendName,
+      handlePreviewBlend: blendPick.preview,
+      setHoveredBlendName: blendPick.name,
       showToast,
       withReplayDeferredEffects,
       withRecordingSuppressed,
@@ -4002,7 +3861,8 @@ export function MainWorkspace(props: AppProps) {
               flySpeed={flySpeed}
               hoveredVariationType={hoveredVariationType}
               hoveredCustomVarDef={hoveredCustomVarDef}
-              hoveredBlendName={hoveredBlendName}
+              hoveredBlendName={blendPick.badge}
+              blendIntent={blendIntent}
               effectiveRotation={effectiveRotation}
             >
               <Show when={!isPhone() && !isTablet()}>
@@ -4302,8 +4162,8 @@ export function MainWorkspace(props: AppProps) {
               transformInfos={transformInfos}
               blendIntent={blendIntent}
               setupMorph={setupMorph}
-              breedPreviewChild={breedPreviewChild}
-              endBreedPreview={endBreedPreview}
+              breedPreviewChild={blendPick.breedChild}
+              endBreedPreview={blendPick.end}
               _requestModal={_requestModal}
               showToast={showToast}
               executeFlameLoad={executeFlameLoad}
@@ -4313,8 +4173,8 @@ export function MainWorkspace(props: AppProps) {
               openDiffView={openDiffView}
               commitBlendPick={blendPick.pick}
               blendFlame={blendFlame}
-              handlePreviewBlend={handlePreviewBlend}
-              setHoveredBlendName={setHoveredBlendName}
+              handlePreviewBlend={blendPick.preview}
+              setHoveredBlendName={blendPick.name}
               history={history}
               hardwareTier={props.hardwareTier}
               quickPickState={quickPickState}

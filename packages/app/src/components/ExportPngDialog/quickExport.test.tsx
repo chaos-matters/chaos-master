@@ -77,11 +77,15 @@ const requestModal = (() => Promise.resolve(undefined)) as RequestModalFn
 function mountQuickExport(
   authored: FlameDescriptor,
   rendered: FlameDescriptor,
+  endPreview?: () => void,
 ) {
   const [onExportImage, setOnExportImage] = createSignal<
     ExportImageType | undefined
   >(undefined)
   let quickExport: () => void = () => undefined
+  let showExportPngDialog: () => Promise<void> = () => Promise.resolve()
+  /** Every read of the canvas flame, as it was at that moment. */
+  const renderedReads: FlameDescriptor[] = []
 
   render(() => (
     <ModalContext.Provider value={requestModal}>
@@ -89,7 +93,10 @@ function mountQuickExport(
         {(() => {
           const dialog = createExportPngDialog(
             authored,
-            () => rendered,
+            () => {
+              renderedReads.push(deepClone(rendered))
+              return rendered
+            },
             () => undefined,
             () => 1,
             () => undefined,
@@ -99,15 +106,22 @@ function mountQuickExport(
             () => 1,
             () => undefined,
             () => undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            endPreview,
           )
           quickExport = dialog.quickExport
+          showExportPngDialog = () => dialog.showExportPngDialog()
           return null
         })()}
       </ToastProvider>
     </ModalContext.Provider>
   ))
 
-  return { quickExport, onExportImage }
+  return { quickExport, showExportPngDialog, onExportImage, renderedReads }
 }
 
 beforeEach(() => {
@@ -155,5 +169,59 @@ describe('the flash export', () => {
     // here is the corruption the render-time overlay removed: one frame of a
     // song would become the flame they come back to.
     expect(captured.recents[0]?.renderSettings.exposure).toBe(1)
+  })
+})
+
+/**
+ * The partner gallery writes its hover preview into the document, and the
+ * canvas draws it. An export pressed inside the gallery's 120 ms leave delay,
+ * or Ctrl+E with the pointer resting on a tile, captured a partner nobody
+ * picked, and filed it in Recents. The export ends the preview first, so the
+ * pixels, the flame inside them and Recents all show the document.
+ */
+describe('an export over the gallery hover preview', () => {
+  /** A document with a hovered partner in it, and the end that takes it off. */
+  function hovered() {
+    const doc = authoredFlame()
+    doc.renderSettings.blendFlame = deepClone(examples.example2)
+    const endPreview = vi.fn(() => {
+      delete doc.renderSettings.blendFlame
+    })
+    return { doc, endPreview }
+  }
+
+  it('ends the preview before the flash export captures anything', async () => {
+    const { doc, endPreview } = hovered()
+    const { quickExport, onExportImage } = mountQuickExport(
+      doc,
+      doc,
+      endPreview,
+    )
+
+    quickExport()
+    onExportImage()?.(stubCanvas(), { finalImageReady: true })
+    await vi.waitFor(() => {
+      expect(captured.recents.length).toBe(1)
+    })
+
+    const payload = captured.payloads[0] as FlameDescriptor
+    expect(payload.renderSettings.blendFlame).toBeUndefined()
+    expect(captured.recents[0]?.renderSettings.blendFlame).toBeUndefined()
+    expect(endPreview).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the preview before the export dialog snapshots the canvas', async () => {
+    const { doc, endPreview } = hovered()
+    const { showExportPngDialog, renderedReads } = mountQuickExport(
+      doc,
+      doc,
+      endPreview,
+    )
+
+    await showExportPngDialog()
+
+    expect(renderedReads.length).toBeGreaterThan(0)
+    expect(renderedReads[0]?.renderSettings.blendFlame).toBeUndefined()
+    expect(endPreview).toHaveBeenCalledTimes(1)
   })
 })

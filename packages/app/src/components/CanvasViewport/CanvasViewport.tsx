@@ -25,7 +25,18 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
 import type { CustomVariationDef } from '@/flame/variations/custom/types'
 import type { TransformVariationType3D } from '@/flame/variations3D'
+import type { BlendIntent } from '@/hooks/useWorkspaceBlendPick'
 import type { ExportDimensions } from '@/utils/exportDimensions'
+
+/** The badge over a hovered partner tile, by what the gallery is picking
+ *  for. Evolve and Diff preview nothing, so theirs says what a click does. */
+const HOVER_BADGE: Record<BlendIntent, string> = {
+  blend: 'Blending with',
+  morph: 'Morphing into',
+  breed: 'Breeding with',
+  evolve: 'Evolve with',
+  diff: 'Compare with',
+}
 
 export const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 0.7),
@@ -92,6 +103,8 @@ export interface CanvasViewportProps {
   >
   hoveredCustomVarDef: Accessor<CustomVariationDef | null | undefined>
   hoveredBlendName: Accessor<string | null | undefined>
+  /** What the partner gallery is picking for, which the badge above says. */
+  blendIntent: Accessor<BlendIntent>
 
   // Children (such as BottomBar)
   children?: JSXElement
@@ -289,7 +302,11 @@ export function CanvasViewport(props: CanvasViewportProps) {
         )}
       </Show>
       <Show when={props.hoveredBlendName()} keyed>
-        {(name) => <div class={ui.hoverPreviewBadge}>Blending with {name}</div>}
+        {(name) => (
+          <div class={ui.hoverPreviewBadge}>
+            {HOVER_BADGE[props.blendIntent()]} {name}
+          </div>
+        )}
       </Show>
       <ProgressBar />
       <ExportJobHost />

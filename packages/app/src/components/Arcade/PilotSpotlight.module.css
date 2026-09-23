@@ -1,6 +1,6 @@
-/* Above the pilot lock (10010), because it points AT the locked editor. It
-   never swallows input: the lock below it is what does that, and a ring that
-   ate clicks would change what Stop and Esc can reach. */
+/* Drawn inside the pilot lock's dialog, above its banner and rail, because it
+   points AT the locked editor. It never swallows input: the lock is what does
+   that, and a ring that ate clicks would change what Stop and Esc can reach. */
 .ring {
   position: fixed;
   z-index: 10011;

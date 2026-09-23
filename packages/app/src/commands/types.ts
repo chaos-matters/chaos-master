@@ -341,9 +341,16 @@ export interface FlameCommand {
    * its id.
    */
   replayable?: boolean
-  /** This command only opens export UI and must not detach the most recently
-   *  recorded steps from the document they describe. All other commands are
-   *  conservatively treated as replay-state changes. */
+  /**
+   * This command changes nothing a replay reproduces: not the document, the
+   * timeline, the audio wiring or the view a take's snapshot holds. The
+   * export commands are the case: two open the export dialog, two queue a
+   * background render of a snapshot, and one reads the queue. So it does not
+   * detach the most recently recorded steps from the document they describe,
+   * and when it is also `recordable: false`, a take does not count it as a
+   * step it could not capture. All other commands are conservatively treated
+   * as replay-state changes.
+   */
   preservesFinishedSession?: boolean
   shortcut?: string
   /**

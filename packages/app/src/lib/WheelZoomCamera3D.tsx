@@ -1,5 +1,6 @@
 import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
 import { vec3 } from 'wgpu-matrix'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS } from '@/flame/schema/flameSchema'
 import { Camera3D } from '@/lib/Camera3D'
@@ -281,6 +282,12 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   function onMouseMove(ev: MouseEvent) {
     if (!isPointerLocked()) return
+    // A pointer captured before the agent took the screen would keep turning
+    // the camera under it, as edits no recorded command made. Hand it back.
+    if (pilotOwnsKeyboard()) {
+      document.exitPointerLock()
+      return
+    }
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera look')
     }
@@ -516,6 +523,13 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   }
 
   function onKeyDown(ev: KeyboardEvent) {
+    // The camera is the agent's while it owns the screen: a pan here became a
+    // history entry no recorded command made. Nothing is claimed, and a key
+    // already held stops at its next repeat.
+    if (pilotOwnsKeyboard()) {
+      activeKeys.clear()
+      return
+    }
     if (keyBelongsToTarget(ev.target)) return
 
     const key = ev.key.toLowerCase()

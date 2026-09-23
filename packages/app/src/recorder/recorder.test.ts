@@ -1924,6 +1924,75 @@ describe('session start state beyond the flame', () => {
   })
 })
 
+describe('an export during a take', () => {
+  // Every export command there is. None of them changes the document, the
+  // timeline, the audio wiring or the view: two open the export dialog, two
+  // queue a background render of a snapshot, and one reads the queue.
+  const exports: [string, unknown[]][] = [
+    ['export.png', []],
+    ['export.animation', []],
+    ['export.renderImage', [{ width: 64, height: 64 }]],
+    ['export.renderAnimation', [{ width: 64, height: 64, fps: 30 }]],
+    ['export.jobStatus', []],
+  ]
+
+  it.each(exports)('%s leaves the take with nothing uncaptured', (id, args) => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand(id, world.ctx, ...args)
+      const session = stopOrThrow()
+
+      expect(session.unnamedWriteCount).toBe(0)
+      expect(session.uncapturedSteps).toBeUndefined()
+      // And a replay of it lands where the take did.
+      const replay = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, replay)
+      expect(deepClone(replay.flame)).toEqual(deepClone(world.flame))
+      dispose()
+    })
+  })
+
+  it('keeps a drag it ran in the middle of as the one step the drag is', () => {
+    // An agent polling its render while the viewer drags a slider: the poll
+    // is not a boundary, so the drag still folds into one step, and its
+    // commit is still the drag's rather than an anonymous write.
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      world.history.startPreview('Edit gamma')
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 1.5)
+      executeCommand('export.jobStatus', world.ctx)
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 2.25)
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions.map(({ id, args }) => [id, ...args])).toEqual([
+        ['flame.setRenderSetting', 'gamma', 2.25],
+      ])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('still counts a command a replay cannot reproduce', () => {
+    // Playback started by the unbounded toggle is timeline state no step
+    // puts back, which is what an uncaptured step is for.
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand('timeline.play', world.ctx)
+      const session = stopOrThrow()
+
+      expect(session.unnamedWriteCount).toBe(1)
+      expect(session.uncapturedSteps?.map(({ reason }) => reason)).toEqual([
+        'Play Timeline, a command a recording does not replay',
+      ])
+      dispose()
+    })
+  })
+})
+
 describe('finished-session export association', () => {
   const finishSession = () => {
     startSessionRecording(examples.example1)

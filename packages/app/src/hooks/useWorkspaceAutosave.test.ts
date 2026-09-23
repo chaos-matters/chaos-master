@@ -1,10 +1,14 @@
-import { createRoot } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createRoot, createSignal } from 'solid-js'
+import { createStore, unwrap } from 'solid-js/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { examples } from '@/flame/examples'
 import { parseFlameXml } from '@/flame/flameXml'
 import { setAutosaveRecents, setSaveReminderDismissed, } from '@/utils/autosaveSettings'
+import { createStoreHistory } from '@/utils/createStoreHistory'
 import { clearRecentFlames, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, } from '@/utils/recentFlames'
 import { useWorkspaceAutosave } from './useWorkspaceAutosave'
+import { BREED_PREVIEW_DELAY_MS, useWorkspaceBlendPick, } from './useWorkspaceBlendPick'
+import type { BlendIntent } from './useWorkspaceBlendPick'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 // Same reason as draft.test.ts: localStorage is not usable in this runtime, so
@@ -397,5 +401,175 @@ describe('the flames on the shelf, when the shelf is full', () => {
       expect(toasts).toEqual([])
       dispose()
     })
+  })
+})
+
+/**
+ * A workspace with the partner gallery's hover preview in it, wired the way
+ * MainWorkspace wires the two: autosave reads the document with the preview
+ * taken off (galleryPreviewWiring.test.ts holds MainWorkspace to that).
+ */
+/** Disposed after each test, pass or fail, so a failed assertion cannot
+ *  leave a pagehide listener behind to write into the next test's shelf. */
+const previewRoots: (() => void)[] = []
+afterEach(() => {
+  for (const dispose of previewRoots.splice(0)) dispose()
+})
+
+const previewWorkspace = () =>
+  createRoot((dispose) => {
+    previewRoots.push(dispose)
+    return buildPreviewWorkspace()
+  })
+
+const buildPreviewWorkspace = () => {
+  const [open, setOpen, history] = createStoreHistory(
+    createStore<FlameDescriptor>(JSON.parse(JSON.stringify(flame))),
+  )
+  const [intent, setIntent] = createSignal<BlendIntent>('blend')
+  const blendPick = useWorkspaceBlendPick({
+    flame: () => open,
+    setSilently: history.setSilently,
+    execute: () => {},
+    intent,
+  })
+  const autosave = useWorkspaceAutosave({
+    flameDescriptor: open,
+    savedFlame: blendPick.withoutPreview,
+    getTracks: () => [],
+    getConfig: () => undefined,
+    agentDriving: () => false,
+    showToast: () => 1,
+    confirmOverwriteOldest: declineOverwrite,
+    confirmDiscardUnsaved: keepUnsaved,
+  })
+  const hover = () => {
+    blendPick.preview(JSON.parse(JSON.stringify(examples.example2)))
+  }
+  return { autosave, setOpen, blendPick, setIntent, hover, open }
+}
+
+/** The flame the one Recents entry holds, as stored. */
+const stored = () => {
+  const entries = loadRecentFlamesForRewrite()
+  expect(entries).toHaveLength(1)
+  return entries[0]!.flame
+}
+
+describe('the gallery hover preview, and every write of the document', () => {
+  it('is not stored by the pagehide flush', () => {
+    {
+      const { autosave, setOpen, hover } = previewWorkspace()
+      autosave.markLoadedBaseline()
+      setOpen((draft) => {
+        draft.metadata = { ...draft.metadata, name: 'Edited' }
+      })
+      hover()
+
+      window.dispatchEvent(new Event('pagehide'))
+
+      expect(stored().metadata?.name).toBe('Edited')
+      expect(stored().renderSettings.blendFlame).toBeUndefined()
+      expect(stored().renderSettings.blendWeight).toBeUndefined()
+    }
+  })
+
+  it('is not stored by the 30-second autosave', () => {
+    vi.useFakeTimers()
+    setAutosaveRecents('on')
+    {
+      const { autosave, setOpen, hover } = previewWorkspace()
+      autosave.markLoadedBaseline()
+      setOpen((draft) => {
+        draft.metadata = { ...draft.metadata, name: 'Edited' }
+      })
+      hover()
+
+      vi.advanceTimersByTime(30_000)
+
+      expect(stored().metadata?.name).toBe('Edited')
+      expect(stored().renderSettings.blendFlame).toBeUndefined()
+    }
+  })
+
+  it('is not stored by the flush before a document replacement', async () => {
+    const { autosave, setOpen, hover } = previewWorkspace()
+    autosave.markLoadedBaseline()
+    setOpen((draft) => {
+      draft.metadata = { ...draft.metadata, name: 'Edited' }
+    })
+    hover()
+
+    expect(await autosave.prepareDocumentReplacement()).toBe(true)
+
+    expect(stored().metadata?.name).toBe('Edited')
+    expect(stored().renderSettings.blendFlame).toBeUndefined()
+  })
+
+  it('is not stored by the save a native app makes when it is paused', () => {
+    {
+      const { autosave, setOpen, hover } = previewWorkspace()
+      autosave.markLoadedBaseline()
+      setOpen((draft) => {
+        draft.metadata = { ...draft.metadata, name: 'Edited' }
+      })
+      hover()
+
+      expect(autosave.saveOnPause().outcome).toBe('saved')
+
+      expect(stored().renderSettings.blendFlame).toBeUndefined()
+    }
+  })
+
+  it('is not stored by Save for Later', async () => {
+    const { autosave, setOpen, hover } = previewWorkspace()
+    autosave.markLoadedBaseline()
+    setOpen((draft) => {
+      draft.metadata = { ...draft.metadata, name: 'Edited' }
+    })
+    hover()
+
+    await autosave.saveForLater()
+
+    expect(stored().metadata?.name).toBe('Edited')
+    expect(stored().renderSettings.blendFlame).toBeUndefined()
+    expect(autosave.isFlameDirty()).toBe(false)
+  })
+
+  it('is not unsaved work on its own', () => {
+    {
+      const { autosave, hover, open } = previewWorkspace()
+      autosave.markLoadedBaseline()
+
+      hover()
+
+      expect(open.renderSettings.blendFlame).toBeDefined()
+      expect(autosave.isFlameDirty()).toBe(false)
+      window.dispatchEvent(new Event('pagehide'))
+      expect(loadRecentFlamesForRewrite()).toEqual([])
+    }
+  })
+
+  it('stores the flame a breed preview replaced, not the child it shows', () => {
+    vi.useFakeTimers()
+    {
+      const { autosave, setOpen, setIntent, hover, open } = previewWorkspace()
+      autosave.markLoadedBaseline()
+      setOpen((draft) => {
+        draft.metadata = { ...draft.metadata, name: 'Edited' }
+      })
+      const edited = JSON.parse(JSON.stringify(unwrap(open))) as FlameDescriptor
+      setIntent('breed')
+      hover()
+      vi.advanceTimersByTime(BREED_PREVIEW_DELAY_MS)
+      expect(JSON.stringify(unwrap(open).transforms)).not.toBe(
+        JSON.stringify(edited.transforms),
+      )
+
+      window.dispatchEvent(new Event('pagehide'))
+
+      expect(stored().metadata?.name).toBe('Edited')
+      expect(stored().transforms).toEqual(edited.transforms)
+    }
   })
 })

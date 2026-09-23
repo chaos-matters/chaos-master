@@ -3,13 +3,17 @@
  *
  * Home overlays a still-mounted workspace, so the key is claimed in capture
  * phase: leaving Home must not also trigger a hidden editor shortcut. Native
- * dialogs remain the nearer layer and therefore keep first refusal.
+ * dialogs remain the nearer layer and therefore keep first refusal. Under the
+ * Arcade's screen lock, Escape is the pilot's Esc-twice, which Home leaves be.
  */
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
+
 export function installHomeEscapeBoundary(
   onExit: () => void,
   eventRoot: Document = document,
 ): () => void {
   const onKeyDown = (event: KeyboardEvent) => {
+    if (pilotOwnsKeyboard()) return
     if (event.key !== 'Escape' || event.defaultPrevented) {
       return
     }

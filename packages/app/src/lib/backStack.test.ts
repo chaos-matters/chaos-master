@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { backDepth, backLabels, popBack, pushBackHandler } from './backStack'
+import { backDepth, backLabels, holdBack, popBack, pushBackHandler, } from './backStack'
 
 describe('backStack', () => {
   it('pops the most recently pushed handler first, once', () => {
@@ -17,6 +17,27 @@ describe('backStack', () => {
     expect(calls).toEqual(['menu', 'sheet'])
     disposeSheet()
     expect(backDepth()).toBe(0)
+  })
+
+  // The Arcade's screen lock holds back while the agent drives: popBack says
+  // it was handled, so lib/lifecycle.ts does not minimise, and closes nothing.
+  it('does nothing while held, until every hold is released', () => {
+    const close = vi.fn()
+    const layer = pushBackHandler(close, 'layer')
+    const first = holdBack()
+    const second = holdBack()
+
+    expect(popBack()).toBe(true)
+    first()
+    first()
+    expect(popBack()).toBe(true)
+    expect(close).not.toHaveBeenCalled()
+
+    second()
+    expect(popBack()).toBe(true)
+    expect(close).toHaveBeenCalledTimes(1)
+    layer()
+    expect(popBack()).toBe(false)
   })
 
   it('returns false when nothing is registered, and never touches history', () => {
