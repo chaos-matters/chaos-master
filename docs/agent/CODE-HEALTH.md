@@ -22,10 +22,12 @@ about whether to re-freeze, not a blocked merge, and the merging agent is the
 one who sees main go red. They sit in a job of their own so a ratchet failure
 can never mask a test failure in `build`.
 
-`pnpm arch` is not in CI yet. It is red today on one import cycle
-(`flame/mutationOperators.ts <-> flame/randomize.ts`, §3), and a check that is
-red on the day it lands teaches everyone to ignore it. It joins the `health` job
-once that cycle is broken. `pnpm test:coverage` and `pnpm verify:webgpu` are
+`pnpm arch` is not in CI yet. It was red on two import cycles
+(`flame/mutationOperators.ts <-> flame/randomize.ts` and
+`commands/types.ts <-> recorder/types.ts`), and a check that is red on the day
+it lands teaches everyone to ignore it. Both are broken, so it exits 0 (the 8
+orphan warnings in §3 do not fail it), and it joins the `health` job as a
+change of its own. `pnpm test:coverage` and `pnpm verify:webgpu` are
 local-only by design — see [METRICS.md](METRICS.md) §3.
 
 Which tests run where, and why a green pull request is not a promise that main
