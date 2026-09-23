@@ -7,6 +7,7 @@
 
 import type { RecordedSession, SessionViewSnapshot, UncapturedStep, } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
+import type { SessionRecordingStartFailureReason, SessionRecordingStartResult, } from './startResult'
 import type { FlameCommand } from '@/commands/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -14,14 +15,10 @@ import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { SeatId } from '@/seats/seatId'
 import type { UndoTarget } from '@/utils/undoRouting'
 
-export type SessionRecordingStartFailureReason =
-  | 'already-recording'
-  | 'workspace-not-serializable'
-  | 'workspace-not-recordable'
-
-export type SessionRecordingStartResult =
-  | { ok: true }
-  | { ok: false; reason: SessionRecordingStartFailureReason }
+// The start result lives in its own leaf, startResult.ts, and is re-exported
+// here. commands/types.ts needs it, and this module imports FlameCommand from
+// commands/types.ts, so defining it here again would close an import cycle.
+export type { SessionRecordingStartFailureReason, SessionRecordingStartResult }
 
 /**
  * The editing state around the flame that a recording also starts from.

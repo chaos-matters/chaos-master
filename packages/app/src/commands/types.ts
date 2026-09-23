@@ -1,3 +1,10 @@
+/**
+ * The command system's types: `FlameCommand`, what every registered command
+ * declares, and `CommandContext`, the workspace surface a command runs
+ * against (document, history, timeline, recorder, export and the rest), plus
+ * the director and arena state shapes that context carries.
+ */
+
 import type { Accessor, Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { BundledTrack } from '@/arcade/bundledTracks'
@@ -8,7 +15,7 @@ import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { FlameSchool, GroundedFlameStats } from '@/flame/stats'
 import type { RecordedSession, TransformColorSnapshot } from '@/recorder/schema'
 import type { SonificationSnapshot } from '@/recorder/sonificationState'
-import type { SessionRecordingStartResult } from '@/recorder/types'
+import type { SessionRecordingStartResult } from '@/recorder/startResult'
 import type { SeatId } from '@/seats/seatId'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { NormalizedAnimationRender, NormalizedImageRender, } from '@/utils/exportRequests'

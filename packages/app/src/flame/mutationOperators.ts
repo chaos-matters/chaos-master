@@ -1,10 +1,20 @@
+/**
+ * The per-transform steps of `mutateFlame`: resolving the effective rates,
+ * structural removal and addition, and mutating one transform's affine,
+ * color and variations. Every draw comes from the ambient source in
+ * randomSource.ts, directly or through randomPrimitives.ts.
+ */
+
 import { recordEntries } from '@/utils/record'
-import { buildRandomVariation, MUTATION_RATE_DEFAULTS, normalizeVariationWeights, perturbVariationInPlace, pickRandomVariationType, random01, randomizeAffineCoef, randomizeVariationParams, randomPerturbation, randomRange, smartMutateAffine2D, smartMutateAffine3D, } from './randomize'
+import { MUTATION_RATE_DEFAULTS } from './mutationRates'
+import { buildRandomVariation, normalizeVariationWeights, perturbVariationInPlace, pickRandomVariationType, randomizeAffineCoef, randomizeVariationParams, smartMutateAffine2D, smartMutateAffine3D, } from './randomPrimitives'
+import { random01, randomPerturbation, randomRange } from './randomSource'
 import { generateVariationId } from './transformFunction'
 import { isParametricVariationType, variationTypes } from './variations'
 import { getVariationDefault } from './variations/utils'
 import { isParametricVariationType3D, isVariationType3D, variationTypes3D, } from './variations3D'
-import type { GenerateRandomFlameConfig, MutateFlameOptions, RandomVariationLike, } from './randomize'
+import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './mutationRates'
+import type { RandomVariationLike } from './randomPrimitives'
 import type { TransformVariationType } from './variations'
 import type { TransformVariationType3D } from './variations3D'
 
