@@ -12,7 +12,10 @@
 //   node scripts/code-metrics.mjs              # today's numbers
 //   node scripts/code-metrics.mjs --json       # same, machine-readable
 //   node scripts/code-metrics.mjs --check      # ratchet: fail on regression
-//   node scripts/code-metrics.mjs --update     # re-freeze the baseline
+//   node scripts/code-metrics.mjs --update     # re-freeze the baseline; refuses
+//                                              # to drop a key the baseline has
+//   node scripts/code-metrics.mjs --update --drop=<key>[,<key>]
+//                                              # ...unless the key is named
 //   node scripts/code-metrics.mjs --with-lint  # include eslint warning counts
 //                                              # (slow: runs the full lint)
 //
@@ -22,6 +25,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, } from 'node:fs'
 import { extname, join, relative } from 'node:path'
+import ts from 'typescript'
 
 const ROOT = process.cwd()
 const BASELINE = join(ROOT, 'docs/agent/code-metrics.baseline.json')
@@ -59,6 +63,86 @@ const sorted = [...src]
   .map((f) => ({ f: relative(ROOT, f), n: lines(f) }))
   .sort((a, b) => b.n - a.n)
 
+// A DATA file is literal payload, not logic: at least DATA_LITERAL_SHARE of
+// its lines belong to top-level `const`/`let` declarations whose initializer
+// (through `as`, `satisfies` and parentheses) is an object or array literal
+// holding no function. A table of handlers is logic, so any arrow, function
+// expression or method inside disqualifies the declaration. Measured with the
+// TypeScript parser, not a path list, so a new data file needs no config and
+// a logic file cannot be excluded by moving it into a data directory.
+//
+// The threshold sits in a gap. On 2026-09-23 the data files measure 90-100%
+// (the six flame/variations/docs/content*.ts files, flame/examples/animations.ts
+// at 92%, flame/palettes.ts at 90%) and the most literal logic file measures
+// 58% (arcade/topics.ts).
+const DATA_LITERAL_SHARE = 0.8
+
+function literalShare(file) {
+  const text = readFileSync(file, 'utf8')
+  const ast = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  )
+  const lineOf = (pos) => ast.getLineAndCharacterOfPosition(pos).line + 1
+  let literal = 0
+  for (const statement of ast.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    const span =
+      lineOf(statement.getEnd()) - lineOf(statement.getStart(ast)) + 1
+    const allLiteral = statement.declarationList.declarations.every((d) => {
+      let init = d.initializer
+      while (
+        init &&
+        (ts.isAsExpression(init) ||
+          ts.isSatisfiesExpression(init) ||
+          ts.isParenthesizedExpression(init))
+      )
+        init = init.expression
+      if (
+        !init ||
+        !(
+          ts.isObjectLiteralExpression(init) ||
+          ts.isArrayLiteralExpression(init)
+        )
+      )
+        return false
+      let fns = 0
+      const walk = (n) => {
+        if (
+          ts.isArrowFunction(n) ||
+          ts.isFunctionExpression(n) ||
+          ts.isMethodDeclaration(n) ||
+          ts.isGetAccessorDeclaration(n) ||
+          ts.isSetAccessorDeclaration(n)
+        )
+          fns++
+        ts.forEachChild(n, walk)
+      }
+      walk(init)
+      return fns === 0
+    })
+    if (allLiteral) literal += span
+  }
+  return literal / text.split('\n').length
+}
+
+// The largest file that is not data. Walk down from the largest file and stop
+// at the first logic file, so only the handful of files above it are parsed.
+const dataFilesAbove = []
+let largestLogic = { f: '', n: 0 }
+for (const r of sorted) {
+  const share = literalShare(join(ROOT, r.f))
+  if (share >= DATA_LITERAL_SHARE) {
+    dataFilesAbove.push({ ...r, share })
+    continue
+  }
+  largestLogic = r
+  break
+}
+
 // Test cases counted statically. Not as good as running the suite, but it does
 // not need a 25-second vitest run to answer "did we add tests this week".
 let cases = 0
@@ -94,6 +178,7 @@ const m = {
   files_over_800: srcLoc.filter((n) => n > 800).length,
   files_over_1200: srcLoc.filter((n) => n > 1200).length,
   largest_file_loc: sorted[0] ? sorted[0].n : 0,
+  largest_logic_file_loc: largestLogic.n,
   test_files: tests.length,
   test_cases: cases,
   test_file_ratio: Number((tests.length / src.length).toFixed(3)),
@@ -151,7 +236,12 @@ const LOWER_IS_BETTER = new Set([
   'files_over_800',
   'files_over_1200',
   'largest_file_loc',
-  'mean_file_loc',
+  'largest_logic_file_loc',
+  // Not `mean_file_loc`: reported, never gated (WP3, 2026-09-23). The check
+  // compared a rounded mean that deleting a small dead file RAISES, and it
+  // sat half a line from its edge, so changes were shaving comments to fit.
+  // The tail carries the signal: files_over_* and largest_logic_file_loc.
+  // docs/agent/METRICS.md says more.
   'missing_header_comment',
   'todo_markers',
   'eslint_errors',
@@ -176,6 +266,34 @@ if (has('--json')) {
 }
 
 if (has('--update')) {
+  // Refuse to drop a key the baseline tracks. A key this run did not produce
+  // is usually not a metric that went away but one that needs another run
+  // first -- the six coverage keys after no coverage run, the eslint keys
+  // without --with-lint -- and writing the baseline anyway silently deletes
+  // that ratchet. Removing a metric on purpose names it: --drop=<key>.
+  const drop = new Set(
+    argv
+      .filter((a) => a.startsWith('--drop='))
+      .flatMap((a) => a.slice('--drop='.length).split(','))
+      .filter(Boolean),
+  )
+  const base = existsSync(BASELINE)
+    ? JSON.parse(readFileSync(BASELINE, 'utf8'))
+    : {}
+  const missing = Object.keys(base).filter((k) => !(k in m) && !drop.has(k))
+  if (missing.length) {
+    console.error(
+      `\nRefusing to re-freeze: this run did not produce ${missing.length} ` +
+        `key(s) the baseline tracks, and writing it would drop them:\n`,
+    )
+    for (const k of missing) console.error(`  ${k}`)
+    console.error(
+      '\ncoverage_*: run `pnpm test:coverage` first. eslint_*: add ' +
+        '--with-lint.\nA metric removed on purpose: --drop=<key>[,<key>], ' +
+        'and say why in the commit message.',
+    )
+    process.exit(1)
+  }
   writeFileSync(BASELINE, `${JSON.stringify(m, null, 2)}\n`)
   console.log(`Baseline re-frozen at ${relative(ROOT, BASELINE)}.`)
   console.log('Say why in the commit message.')
@@ -188,6 +306,14 @@ for (const [k, v] of Object.entries(m)) console.log(`  ${pad(k, 30)}${v}`)
 
 console.log('\nLargest files\n')
 for (const r of sorted.slice(0, 10)) console.log(`  ${pad(r.n, 8)}${r.f}`)
+
+console.log('\nLargest logic file (largest_logic_file_loc)\n')
+console.log(`  ${pad(largestLogic.n, 8)}${largestLogic.f}`)
+console.log(
+  `\n  Skipped above it as data (>= ${DATA_LITERAL_SHARE * 100}% literal lines):`,
+)
+for (const r of dataFilesAbove)
+  console.log(`  ${pad(r.n, 8)}${r.f} (${Math.round(r.share * 100)}%)`)
 
 if (has('--check')) {
   if (!existsSync(BASELINE)) {

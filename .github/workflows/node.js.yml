@@ -127,8 +127,12 @@ jobs:
     - name: Check the code metrics ratchet
       run: pnpm metrics:check
 
-    # `pnpm arch` belongs in this job and joins it once the
-    # flame/mutationOperators <-> flame/randomize import cycle is broken. It is
-    # red today, and adding it now would make main red on day one.
+    # dependency-cruiser over packages/app/src and packages/core/src
+    # (.dependency-cruiser.cjs): import cycles, orphan modules and core's
+    # purity are errors. It needs Node 22, 24 or 26+, which this job pins, and
+    # it resolves `@/` through tsconfig.depcruise.json; without that file the
+    # graph loses most of its edges and the cycle rule passes vacuously.
+    - name: Check the module graph for cycles and orphans
+      run: pnpm arch
 
 

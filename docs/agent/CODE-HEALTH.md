@@ -15,20 +15,21 @@ pnpm test:coverage    # coverage summary, feeds the metrics table
 pnpm verify:webgpu    # headed browser pass on real hardware
 ```
 
-**Where they run.** `pnpm docs:index:check` and `pnpm metrics:check` run in CI
-in the `health` job, on pushes to main and on a manual `workflow_dispatch` —
+**Where they run.** `pnpm docs:index:check`, `pnpm metrics:check` and
+`pnpm arch` run in CI in the `health` job, on pushes to main and on a manual `workflow_dispatch` —
 **not on pull requests**. A pull request that nudges a ratchet is a conversation
 about whether to re-freeze, not a blocked merge, and the merging agent is the
 one who sees main go red. They sit in a job of their own so a ratchet failure
 can never mask a test failure in `build`.
 
-`pnpm arch` is not in CI yet. It was red on two import cycles
-(`flame/mutationOperators.ts <-> flame/randomize.ts` and
-`commands/types.ts <-> recorder/types.ts`), and a check that is red on the day
-it lands teaches everyone to ignore it. Both are broken and the 8 orphans in
-§3 are deleted, so it reports no violations at all, and it joins the `health`
-job as a change of its own. `pnpm test:coverage` and `pnpm verify:webgpu` are
-local-only by design — see [METRICS.md](METRICS.md) §3.
+`pnpm arch` joined the `health` job in WP3 (2026-09-23). It stayed out while it
+was red on two import cycles (`flame/mutationOperators.ts <-> flame/randomize.ts`
+and `commands/types.ts <-> recorder/types.ts`), because a check that is red on
+the day it lands teaches everyone to ignore it. Both are broken and the 8
+orphans in §3 are deleted, so it reports no violations at all, and `no-orphans`
+is now an error rather than a warning: a new orphan fails the job. It needs
+Node 22, 24 or 26+ (the job pins 24). `pnpm test:coverage` and
+`pnpm verify:webgpu` are local-only by design — see [METRICS.md](METRICS.md) §3.
 
 Which tests run where, and why a green pull request is not a promise that main
 stays green, is in [packages/app/TESTING.md](../../packages/app/TESTING.md).
@@ -92,11 +93,11 @@ but it is the honest frame for "we decomposed things".
 
 `pnpm arch` on a correctly resolved graph — 1,195 modules, 4,999 dependencies:
 
-| Rule              | Result                               |
-| ----------------- | ------------------------------------ |
-| `no-circular`     | **0 violations**                     |
-| `core-stays-pure` | **0 violations**                     |
-| `no-orphans`      | 8 warnings (0 since WP2, 2026-09-23) |
+| Rule              | Result                                                   |
+| ----------------- | -------------------------------------------------------- |
+| `no-circular`     | **0 violations**                                         |
+| `core-stays-pure` | **0 violations**                                         |
+| `no-orphans`      | 8 warnings (0 since WP2, 2026-09-23; an error since WP3) |
 
 **Both of PR #73's headline architectural claims hold up.** There are genuinely
 no import cycles, and `@chaos-master/core` genuinely contains no DOM, WebGPU or

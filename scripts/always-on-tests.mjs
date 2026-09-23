@@ -38,12 +38,17 @@ export const ALWAYS_ON = [
   // module graph connects them to none of it.
   {
     file: 'src/eagerComputationOrder.test.ts',
-    why: 'walks all of src/ with the TypeScript AST for eager-memo temporal dead zones',
+    why: 'walks all of src/ with the TypeScript AST for eager-memo temporal dead zones, in one file and across the useWorkspace* hook boundary',
     genre: 'filesystem',
   },
   {
     file: 'src/moduleScopeComputations.test.ts',
     why: 'walks all of src/ for module-scope Solid computations',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/lazyBoundaries.test.ts',
+    why: 'walks all of src/ for import() targets that a static import chain from the entry also reaches',
     genre: 'filesystem',
   },
   {
@@ -67,6 +72,11 @@ export const ALWAYS_ON = [
   // Read a sibling .css or .tsx through the filesystem. Editing the
   // stylesheet alone leaves the test unselected, which is the whole point of
   // the test.
+  {
+    file: 'src/mainWorkspaceSize.test.ts',
+    why: 'reads MainWorkspace.tsx to hold its line count to a shrink-only ratchet',
+    genre: 'filesystem',
+  },
   {
     file: 'src/launchNotice.test.ts',
     why: 'reads App.tsx and App.module.css',
