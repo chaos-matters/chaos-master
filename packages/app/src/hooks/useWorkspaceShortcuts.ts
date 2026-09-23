@@ -1,3 +1,4 @@
+import { isThemeChord } from '@/arcade/lockKeyGate'
 import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { executeCommand } from '@/commands/registry'
 import { animationExportRunning } from '@/flame/renderStats'
@@ -59,6 +60,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       // browser, and claiming it took Ctrl/Cmd+F, find, away from the page.
       if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return false
       // The layout is the agent's while it owns the screen.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) return false
       startViewTransition(toggleSidebarAsAuthoredAction)
       return true
@@ -66,6 +70,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
     KeyZ: (ev) => {
       // Undo would rewind the take the agent is making, and record the
       // rewind into it as a step of its own.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
@@ -80,6 +87,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       }
     },
     KeyY: (ev) => {
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
@@ -89,7 +99,8 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       }
     },
     KeyD: (ev) => {
-      if (!(ev.ctrlKey || ev.metaKey)) return false
+      // The one key the screen lock lets through, by the same test.
+      if (!isThemeChord(ev)) return false
       if (animationExportRunning()) return false
       const toggleTheme = () => {
         setTheme(theme() === 'dark' ? 'light' : 'dark')
@@ -101,6 +112,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       // Ctrl/Cmd+I is the browser's, as Ctrl/Cmd+F is. Alt+I removes a key.
       if (ev.ctrlKey || ev.metaKey) return false
       // A keyframe is an edit of the take the agent is making.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) return false
       if (animationExportRunning()) return false
       // Claimed only when there is something to keyframe: with no parameter
@@ -120,6 +134,9 @@ export function useWorkspaceShortcuts(params: UseWorkspaceShortcutsParams) {
       // Nothing after this hears it either (the audio panel toggles its track
       // on Space), but the default stays, so a focused Stop button still
       // gets its Space.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) {
         ev.stopImmediatePropagation()
         return false

@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1104         | 188.2k |
+| `packages/app`            | `chaos-master`                 | 1105         | 188.4k |
 | `packages/core`           | `@chaos-master/core`           | 26           | 3.6k   |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -190,19 +190,20 @@ file instead of rediscovering the architecture every session.
 
 #### Arcade (`packages/app/src/arcade/`) — arena, director and beats modes
 
-| File                                                                   | LOC | What it is                                                                                 |
-| ---------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------ |
-| [topics.ts](../../packages/app/src/arcade/topics.ts)                   | 500 | _(no header comment)_                                                                      |
-| [animatablePaths.ts](../../packages/app/src/arcade/animatablePaths.ts) | 350 | _(no header comment)_                                                                      |
-| [tasteStore.ts](../../packages/app/src/arcade/tasteStore.ts)           | 350 | Persistent taste profile store and flame feature extraction for Evolutionary Art Director. |
-| [duel.ts](../../packages/app/src/arcade/duel.ts)                       | 250 | _(no header comment)_                                                                      |
-| [duelActions.ts](../../packages/app/src/arcade/duelActions.ts)         | 250 | _(no header comment)_                                                                      |
-| [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts)             | 200 | _(no header comment)_                                                                      |
-| [pilot.ts](../../packages/app/src/arcade/pilot.ts)                     | 200 | _(no header comment)_                                                                      |
-| [affineControls.ts](../../packages/app/src/arcade/affineControls.ts)   | 150 | _(no header comment)_                                                                      |
-| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)       | 150 | _(no header comment)_                                                                      |
-| [duelHud.ts](../../packages/app/src/arcade/duelHud.ts)                 | 100 | _(no header comment)_                                                                      |
-| [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts)       | 100 | _(no header comment)_                                                                      |
+| File                                                                   | LOC | What it is                                                                                              |
+| ---------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------- |
+| [topics.ts](../../packages/app/src/arcade/topics.ts)                   | 500 | _(no header comment)_                                                                                   |
+| [animatablePaths.ts](../../packages/app/src/arcade/animatablePaths.ts) | 350 | _(no header comment)_                                                                                   |
+| [tasteStore.ts](../../packages/app/src/arcade/tasteStore.ts)           | 350 | Persistent taste profile store and flame feature extraction for Evolutionary Art Director.              |
+| [duel.ts](../../packages/app/src/arcade/duel.ts)                       | 250 | _(no header comment)_                                                                                   |
+| [duelActions.ts](../../packages/app/src/arcade/duelActions.ts)         | 250 | _(no header comment)_                                                                                   |
+| [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts)             | 200 | _(no header comment)_                                                                                   |
+| [pilot.ts](../../packages/app/src/arcade/pilot.ts)                     | 200 | _(no header comment)_                                                                                   |
+| [affineControls.ts](../../packages/app/src/arcade/affineControls.ts)   | 150 | _(no header comment)_                                                                                   |
+| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)       | 150 | _(no header comment)_                                                                                   |
+| [lockKeyGate.ts](../../packages/app/src/arcade/lockKeyGate.ts)         | 150 | The screen lock's key gate: while the pilot owns the keyboard, no key listener of the page hears a key. |
+| [duelHud.ts](../../packages/app/src/arcade/duelHud.ts)                 | 100 | _(no header comment)_                                                                                   |
+| [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts)       | 100 | _(no header comment)_                                                                                   |
 
 #### Workspace hooks (`packages/app/src/hooks/`)
 
@@ -315,7 +316,7 @@ file instead of rediscovering the architecture every session.
 | [MainWorkspace.tsx](../../packages/app/src/MainWorkspace.tsx) | 4.5k | _(no header comment)_                                    |
 | [App.tsx](../../packages/app/src/App.tsx)                     | 500  | _(no header comment)_                                    |
 | [defaults.ts](../../packages/app/src/defaults.ts)             | 150  | _(no header comment)_                                    |
-| [index.tsx](../../packages/app/src/index.tsx)                 | 50   | @refresh reload \*/                                      |
+| [index.tsx](../../packages/app/src/index.tsx)                 | 100  | @refresh reload \*/                                      |
 | [valibot.ts](../../packages/app/src/valibot.ts)               | 50   | We re-export only things we use to keep the bundle small |
 | [version.ts](../../packages/app/src/version.ts)               | 50   | _(no header comment)_                                    |
 | [vitest.setup.ts](../../packages/app/src/vitest.setup.ts)     | 50   | Vitest test setup file.                                  |

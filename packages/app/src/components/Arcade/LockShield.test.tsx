@@ -7,8 +7,9 @@
  * whether the pilot owned the keyboard. So the keys stop at the shield, one
  * catch-all rather than a guard in every listener, and what the shield's own
  * controls handle, Solid's delegated handlers included, still reaches them.
- * The pilot's Esc-twice listens in the capture phase, above the shield, and
- * keeps working; the theme chord stays the viewer's (maff's call).
+ * The pilot's Esc-twice hears Escape through the key gate, ahead of the
+ * shield, and keeps working; the theme chord stays the viewer's (maff's
+ * call).
  *
  * Back (the Android button, or the iOS edge swipe on Home) pops the app's
  * back registry, which closed panels and layers under the lock, and with
@@ -19,7 +20,8 @@
  * every key and back.
  */
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi, } from 'vitest'
+import { installLockKeyGate } from '@/arcade/lockKeyGate'
 import { endPilot, notePilotStep, pilot, resetPilot, startPilot, } from '@/arcade/pilot'
 import { popBack, pushBackHandler } from '@/lib/backStack'
 import { useLifecyclePorts } from '@/lib/lifecycle'
@@ -27,6 +29,16 @@ import { createMockCommandContext } from '@/webmcp/testUtils'
 import { LockShield } from './LockShield'
 import { PilotOverlay } from './PilotOverlay'
 import type { LifecyclePorts } from '@chaos-master/mobile-runtime/lifecycle'
+
+// The app adds the key gate at boot, first; the pilot's Esc-twice hears
+// Escape through it.
+let removeGate: () => void
+beforeAll(() => {
+  removeGate = installLockKeyGate()
+})
+afterAll(() => {
+  removeGate()
+})
 
 vi.mock('./PilotSpotlight', () => ({ PilotSpotlight: () => null }))
 

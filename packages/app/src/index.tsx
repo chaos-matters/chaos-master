@@ -1,10 +1,15 @@
 /* @refresh reload */
 import './styles/index.css'
 import { render } from 'solid-js/web'
+import { installLockKeyGate } from './arcade/lockKeyGate'
 import { loadHaptics } from './lib/haptics'
 import { loadLifecycle } from './lib/lifecycle'
 import { IS_NATIVE, nativePlatform } from './lib/platform'
 import { isBenchmarksPath, isExplorerPath } from './routing/appPath'
+
+// First, before any other key listener exists, so it hears every key before
+// they do: under the Arcade's screen lock, no key reaches the page.
+installLockKeyGate()
 
 // Solid Devtools is opt-in: it instruments every component (a real dev-startup
 // cost) and must never ship to production. Enable with `VITE_DEVTOOLS=1 pnpm dev`.
