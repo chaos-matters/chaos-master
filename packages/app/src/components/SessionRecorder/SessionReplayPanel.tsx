@@ -94,8 +94,8 @@ export function SessionReplayPanel(props: {
    * toggle lands on the next one rather than on the next Play.
    *
    * The tier comes from the workspace's own glide quality, so a replay
-   * downshifts exactly as an edit does — and it travels with an export request
-   * so the queued job renders what the panel was showing.
+   * downshifts exactly as an edit does. An export request carries it with the
+   * viewer's switch, and the take's steps switch the tier from there.
    */
   const glideOptions = (): ReplayGlideOptions => {
     const quality = getGlideRuntime()?.quality()

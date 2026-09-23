@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lumen Apeiron is a browser-native fractal flame generator, animator, and benchmark laboratory powered by WebGPU, TypeGPU, and SolidJS. The codebase combines deep mathematical foundations (140+ 2D/3D variations), real-time WebGPU compute pipelines, Web Audio FFT reactivity, spatial sonification, WebCodecs video export, deterministic session recording/replay, and a suite of 39 WebMCP agent tools.
+Lumen Apeiron is a browser-native fractal flame generator, animator, and benchmark laboratory powered by WebGPU, TypeGPU, and SolidJS. The codebase combines deep mathematical foundations (140+ 2D/3D variations), real-time WebGPU compute pipelines, Web Audio FFT reactivity, spatial sonification, WebCodecs video export, deterministic session recording/replay, and a suite of WebMCP agent tools (34 at `v0.9.11`, 44 at `9fc08078`).
 
 This document establishes a technical roadmap to address accumulated technical debt, eliminate god components, optimize critical-path startup latency, enforce clean monorepo boundaries, and prepare the platform for future capabilities (such as multi-layer compositing, temporal motion blur, and HDR export) while strictly respecting the hackathon freeze (no remote git pushes, no opened PRs, zero destructive actions).
 
@@ -12,16 +12,27 @@ This document establishes a technical roadmap to address accumulated technical d
 
 ### Quantitative Metrics
 
-| Metric                   | Measurement                       | Context                                                       |
-| :----------------------- | :-------------------------------- | :------------------------------------------------------------ |
-| **Total Source Code**    | 193,873 lines                     | 1,305 files (1,132 TypeScript, 110 CSS, 60 SVG)               |
-| **Test Suite**           | 219 test files                    | Vitest unit/integration suite                                 |
-| **Variations Catalogue** | 148 variation modules             | 140+ documented 2D and 3D TypeGPU shaders                     |
-| **WebMCP Agent Tools**   | 39 registered tools               | LLM control of camera, variations, arena, scoring             |
-| **TypeScript Health**    | 0 errors at `HEAD` (`v0.9.11`)    | Strict typing enabled, Node 8GB heap allocation               |
-| **ESLint Health**        | 0 errors, 4 security warnings     | Security warnings relate to timing attacks and regex literals |
-| **Formatting Status**    | 2 files require formatting        | Cleanable via `pnpm fmt:fix`                                  |
-| **Largest File**         | `MainWorkspace.tsx` (7,928 lines) | Represents 4% of the entire app's codebase in one file        |
+The table this strategy was written against, re-measured on 2026-09-23 (WP4).
+Two of its numbers were wrong at `v0.9.11`, the tag it describes: the tool
+count and the test-file count. The corrected values are below, with the tree
+at `9fc08078` (main after #108) beside them. Every value names how it was
+counted, so it can be counted again.
+
+| Metric                   | Originally stated                 | `v0.9.11`, re-measured                        | `9fc08078`                                                               | How it is counted                                                                      |
+| :----------------------- | :-------------------------------- | :-------------------------------------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| **Source files**         | 1,305 (1,132 TS, 110 CSS, 60 SVG) | 1,163 TS/TSX, 111 CSS, 61 SVG                 | 1,513 TS/TSX, 122 CSS, 69 SVG                                            | `git ls-tree -r --name-only <rev> packages`, by extension; tests included              |
+| **TypeScript lines**     | 193,873 (all source)              | 163,963 excluding tests, 198,307 including    | 193,585 excluding tests                                                  | `git grep -c '' <rev>` over every `.ts`/`.tsx` under `packages/` (as `wc -l` counts)   |
+| **Test suite**           | 219 test files                    | **201** vitest files, plus 4 Playwright specs | 353 vitest files, 4,029 tests; 21 Playwright specs                       | `*.test.ts(x)` under `packages/`; `pnpm test`                                          |
+| **Variations catalogue** | 148 variation modules             | 403 2D and 43 3D variation types              | 403 2D and 43 3D variation types                                         | `variationTypes` and `variationTypes3D`, read from the registry in a vitest run        |
+| **WebMCP agent tools**   | 39 registered tools               | **34**                                        | 44                                                                       | `allTools` in `webmcp/tools/index.ts`, held to `docs/webmcp.md` by `toolCount.test.ts` |
+| **TypeScript health**    | 0 errors at `v0.9.11`             | not re-run                                    | 0 errors (`pnpm typecheck`)                                              |                                                                                        |
+| **ESLint health**        | 0 errors, 4 security warnings     | not re-run                                    | 0 errors, 79 warnings (46 complexity, 33 security)                       | `pnpm lint`                                                                            |
+| **Formatting status**    | 2 files require formatting        | not re-run                                    | clean (`pnpm fmt`)                                                       |                                                                                        |
+| **Largest file**         | `MainWorkspace.tsx` (7,928 lines) | `MainWorkspace.tsx`, 7,928 lines              | `flame/examples/animations.ts`, 5,713 (data); `MainWorkspace.tsx`, 4,546 | `pnpm metrics`                                                                         |
+
+The "148 variation modules" could not be reproduced by any count of files or
+registry entries; the registry has held the same 446 types since the tag.
+[docs/agent/CODE-HEALTH.md](agent/CODE-HEALTH.md) keeps the current numbers.
 
 ---
 

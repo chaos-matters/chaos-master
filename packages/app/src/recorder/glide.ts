@@ -39,10 +39,10 @@ export type ReplayGlideOptions = {
   /** The quality tier's duration multiplier. */
   durationScale?: number
   /**
-   * Which tier the glide frames render at. Travels with an export job, with
-   * `preference`, so a background render downshifts the same way the live one
-   * does, and so the tier a demo was captured at is recorded in the job rather
-   * than read from whatever the workspace happened to be set to when it ran.
+   * The tier the viewer's own switch gives. It is what every step glides at
+   * only under `auto` with no quality preset in the take, or for an export
+   * queued before jobs carried `preference`; otherwise each step's tier is
+   * resolved by {@link glideOptionsByStep} from `preference` and the take.
    */
   tier?: GlideQualityTier
   /** The viewer's quality switch a replay starts from, `auto` included; the

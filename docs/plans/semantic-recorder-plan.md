@@ -177,7 +177,7 @@ What recording explicitly ignores:
   3D auto-exposure uses it for derived follower writes. These are not user
   intent. The silent path stays invisible to the recorder — which falls out
   naturally from hooking the entry-push path rather than the setter itself.
-- **Timeline playback.** `setFlameValue` (`MainWorkspace.tsx:3029`) also
+- **Timeline playback.** `setFlameValue` (`useWorkspaceTimelineBinding.ts:413`) also
   writes silently during scrubbing/playback; recorded sessions capture
   timeline _edits_ (already commands: `timeline.addKeyframe`,
   `timeline.setCurrentFrame`, …), never playback frames.

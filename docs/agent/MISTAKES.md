@@ -29,21 +29,23 @@ cost the next person the same. One entry, newest at the bottom of its section.
 
 ### Module-scope `createMemo` is never disposed
 
-**What happened.** `src/stores/workspaceLayoutStore.ts` exports `isPhone`,
-`isTablet` and `isTouchLayout` as `createMemo` calls at module scope (lines
-114, 120, 126). They run at import time, outside any `createRoot`, so Solid
-emits `computations created outside a 'createRoot' or 'render' will never be
+**What happened.** Until #90, `src/stores/workspaceLayoutStore.ts` exported
+`isPhone`, `isTablet` and `isTouchLayout` as `createMemo` calls at module
+scope. They ran at import time, outside any `createRoot`, so Solid emitted
+`computations created outside a 'createRoot' or 'render' will never be
 disposed` — three times, on every page load, on every route, at every viewport.
 
-**Why it was not obvious.** Nothing fails. There are zero console _errors_, the
-app renders correctly, all 2,529 unit tests pass, and the warning is easy to
-scroll past. It surfaced only when a headed browser run captured `console.warn`
-with a stack trace.
+**Why it was not obvious.** Nothing failed. There were zero console _errors_,
+the app rendered correctly, all 2,529 unit tests of the day passed, and the
+warning is easy to scroll past. The production build does not print it at all,
+so no e2e run against a production bundle could see it. It surfaced only when
+a headed browser run captured `console.warn` with a stack trace.
 
 **The rule.** A global memo must be wrapped in an explicit `createRoot`, or
 moved inside the store factory / component that owns it. If you genuinely want
 a process-lifetime computation, say so in code with `createRoot` rather than
-letting it happen by accident at module scope.
+letting it happen by accident at module scope. `moduleScopeComputations.test.ts`
+now fails on one ([CONVENTIONS.md](CONVENTIONS.md) §3).
 
 ### An inline conditional as a JSX prop, read inside a rAF loop
 
@@ -68,11 +70,12 @@ at setup and the component stops updating.
 
 ### A lazy import is defeated by any static import of the same module
 
-**What happened.** `MainWorkspace.tsx:38` loads `DiffViewModal` with
-`lazy(() => import(...))`, but `WorkspaceSidebar.tsx:5` imports
-`DiffViewContent` from that same module statically. Vite says so at build time:
-`dynamic import will not move module into another chunk`. The modal ships in the
-main chunk regardless of the `lazy()`.
+**What happened.** At a5c2f26f `MainWorkspace.tsx:38` loaded `DiffViewModal`
+with `lazy(() => import(...))`, but a5c2f26f `WorkspaceSidebar.tsx:5` imported
+`DiffViewContent` from that same module statically. Vite said so at build time:
+`dynamic import will not move module into another chunk`. The modal shipped in
+the `MainWorkspace` chunk regardless of the `lazy()`, and `AudioWiringModal`
+had the same problem. #90 fixed both (`2efd73fc`).
 
 **Why it was not obvious.** Both files are correct in isolation, and the
 `lazy()` call still _looks_ like it is doing something. The warning is one line
@@ -80,11 +83,12 @@ in a long build log. It was introduced by the same commit (`5d35f893`) that
 created `WorkspaceSidebar` while decomposing `MainWorkspace` — the refactor
 defeated its own code-splitting goal.
 
-**The rule.** After adding or moving a `lazy()` boundary, grep for other
-importers of that module, and read the build output for
-`dynamic import will not move module into another chunk`. If a sibling needs a
-piece of the module, extract that piece into its own file so the heavy part
-stays splittable.
+**The rule.** If a sibling needs a piece of a lazily loaded module, extract
+that piece into its own file so the heavy part stays splittable.
+`lazyBoundaries.test.ts` now fails when a lazy target is also reachable
+through static imports, from the entry or from the module that lazy-loads it
+([CONVENTIONS.md](CONVENTIONS.md) §4); the build warning is still worth
+reading.
 
 ---
 
@@ -104,10 +108,36 @@ count. A vacuous pass looks exactly like a real pass.
 **The rule.** After changing anything about the `arch` config, check that the
 module count and the orphan count both look sane. `tsconfig.depcruise.json`
 exists solely to give the resolver the `@/*` mapping from the repo root; do not
-point `tsConfig` at the root `tsconfig.json`. Correctly resolved, the graph was
-1,195 modules with 8 orphans and genuinely zero cycles on 2026-09-10, and is
-1,270 modules with no violations at all since 2026-09-23 (WP2 deleted the 8
-orphans). A run that reports dozens of orphans is resolving wrongly.
+point `tsConfig` at the root `tsconfig.json`. A run that reports dozens of
+orphans is resolving wrongly.
+
+To check it yourself: `pnpm arch` from the repo root under Node 22, 24 or 26+
+(for example with `~/.nvm/versions/node/v24.4.1/bin` first on `PATH`). It reads
+`.dependency-cruiser.cjs`, which points at `tsconfig.depcruise.json`, and
+prints the module and dependency counts on its last line. Correctly resolved,
+the graph was 1,195 modules with 8 orphans and zero cycles on 2026-09-10. Two
+cycles arrived afterwards while the check was not in CI (#86 and #105); WP1
+(#114) broke both and WP2 (#115) deleted the orphans, and at `9fc08078` it is
+1,309 modules and 5,537 dependencies with **zero cycles and no violations**.
+Since WP3 (#116) CI enforces it: the `health` job runs `pnpm arch` on every
+push to main, and a cycle or an orphan fails it.
+
+### dependency-cruiser drops npm packages before its rules see them
+
+**What happened.** `.dependency-cruiser.cjs` excludes every path matching
+`node_modules` from the graph. Its `core-stays-pure` rule forbids
+`solid-js|typegpu|@webgpu`, but an excluded module never reaches a rule, so the
+rule can only ever fire on an import of `packages/app`. `@chaos-master/core`
+imports `typegpu` in three files and `pnpm arch` reports no violation; with
+the exclude narrowed in a probe config it reports 5.
+
+**Why it was not obvious.** The rule is written correctly and the run is green.
+Nothing says a whole class of targets was removed first.
+
+**The rule.** A rule about third-party imports only works while those modules
+stay in the graph: `doNotFollow` keeps them as leaves, `exclude` removes them.
+Prove a new rule red on a planted violation before trusting its green. (The
+config is unchanged as of `9fc08078`; the fix is its own change.)
 
 ### dependency-cruiser will not run on odd-numbered Node
 

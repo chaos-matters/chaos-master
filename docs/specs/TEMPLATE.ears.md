@@ -20,7 +20,7 @@ missing requirement is a gap or out of bounds.
 **Tests:**
 
 - `packages/app/src/lib/activeTab.test.ts` — visibility gating that the poster gate depends on
-- `tests/smoke.spec.ts` — end-to-end: the app boots to a rendered canvas on a real GPU
+- `tests/smoke.ci.spec.ts` — end-to-end: the app boots to a rendered canvas
 - _Gap:_ `gpuStatus.ts` and `WebgpuAdapter.ts` have no unit test. REQ-GPU-002 and
   REQ-GPU-003 below are unguarded — a change to either can only be caught by hand.
 
@@ -40,7 +40,7 @@ The WebGPU adapter shall coalesce concurrent device-initialisation requests into
 a single in-flight promise, so that a page mounting several `Root` components on
 one frame acquires exactly one `GPUAdapter` and one `GPUDevice`.
 
-_(`WebgpuAdapter.ts:196`, `:214-220`)_
+_(`WebgpuAdapter.ts:196` (`initInFlight`), `:214-220` (`initInFlight`))_
 
 ### REQ-GPU-002 — Device loss is terminal for the session
 
@@ -49,21 +49,21 @@ _(`WebgpuAdapter.ts:196`, `:214-220`)_
 device handles, set the session status to `unavailable`, and shall not attempt
 to re-acquire a device.
 
-_(`WebgpuAdapter.ts:168-186`; recovery is by page reload only.)_
+_(`WebgpuAdapter.ts:168-186` (`lost`); recovery is by page reload only.)_
 
 ### REQ-GPU-003 — Our own teardown is not a crash
 
 **If** the loss reason is `'destroyed'` — the adapter's own `onCleanup` or an HMR
 swap — **then** the status signal shall be left unchanged.
 
-_(`WebgpuAdapter.ts:180-183`)_
+_(`WebgpuAdapter.ts:180-183` (`destroyed`))_
 
 ### REQ-GPU-004 — Previews never draw on a dead device
 
 **While** the session status is anything other than `ready`, `AutoCanvas` shall
 render `PreviewPoster` for that status in place of the canvas.
 
-_(`AutoCanvas.tsx:120-124`)_
+_(`AutoCanvas.tsx:120-124` (`PreviewPoster`))_
 
 ---
 
@@ -97,7 +97,7 @@ audio reactivity, then replace the mapping and source, and shall re-enable
 reactivity only if `canEnable` accepts the incoming snapshot — so a mapping swap
 can never transiently drive an unrelated resource.
 
-_(`packages/app/src/commands/builtins/audio.ts:69-83`)_
+_(`packages/app/src/commands/builtins/audio.ts:69-83` (`applySnapshot`))_
 
 The trigger is an event, not a state: a command dispatch, a decoded audio
 buffer, a pointerup, a keyframe write. "When the user is scrubbing" is a state —
@@ -112,9 +112,9 @@ that is the next pattern.
 `sidebarLocked` presentation, so parameter edits cannot race the animated
 values the timeline is writing.
 
-_(`packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx:185` —
+_(`packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx:187` (`sidebarLocked`) —
 note the lock keys off `isPlaying()` alone, which is narrower than
-`isDrivingView()` at `packages/app/src/utils/timeline.ts:703`.)_
+`isDrivingView()` at `packages/app/src/utils/timeline.ts:774`.)_
 
 Where a state has a precise definition in code, name it and cite it. "While the
 timeline is driving the view" means `animationEnabled() && (isPlaying() ||
@@ -130,7 +130,7 @@ rest of the spec can use the short name.
 `'destroyed'`, **then** the adapter shall null both cached handles, set the
 session status to `unavailable`, and shall not attempt to re-acquire a device.
 
-_(`packages/app/src/lib/WebgpuAdapter.ts:168-186`)_
+_(`packages/app/src/lib/WebgpuAdapter.ts:168-186` (`lost`))_
 
 This is the pattern for errors, degraded hardware, malformed input, and hostile
 agent arguments. It is also where specs earn their keep, so be concrete about
@@ -149,7 +149,7 @@ the Arcade status pill shall report `detected`; **where** neither exists but the
 dev mock is installed on `window.webmcp`, it shall report `mock`; otherwise it
 shall report `none`.
 
-_(`packages/app/src/arcade/webmcpDetect.ts:11-17`, guarded by
+_(`packages/app/src/arcade/webmcpDetect.ts:11-17` (`detectWebMcp`), guarded by
 `packages/app/src/arcade/webmcpDetect.test.ts`)_
 
 Use **Where** for anything that is not present in every build or every runtime:
@@ -190,6 +190,12 @@ and decode that track into the audio buffer and set the audio track name to the
 selected track, so that the snapshot dispatched by `arcade_set_audio_mapping`
 passes `canEnable` and the flame actually reacts to the audio.
 
+This example is the Beats defect as it stood at commit `a5c2f26f`. #90 fixed
+it, so the blockquote's citations are pinned to that commit: the markers around
+it are how a note about old code stays checkable (see **Citations** below).
+
+<!-- cite-check: pinned a5c2f26f -->
+
 > **Known deviation:** `packages/app/src/webmcp/tools/arcadeBeats.ts:333-349` —
 > nothing loads a bundled track. `fetchBundledTrackBuffer`
 > (`packages/app/src/arcade/bundledTracks.ts:42`) has zero call sites in
@@ -200,9 +206,28 @@ passes `canEnable` and the flame actually reacts to the audio.
 > reactivity **disabled** while the tool still returns `{ ok: true }`. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
 
+<!-- cite-check: live -->
+
 One blockquote per requirement, immediately under it. If a single defect breaks
 three requirements, each one gets its own blockquote — a reader fixing one
 requirement should not have to find the note attached to another.
+
+When a PR fixes a deviation, it either deletes the blockquote or, where the
+history is worth keeping, relabels it **Fixed deviation**, names the PR and
+commit that fixed it and the revision the note describes, and pins it to that
+revision with the markers shown above, as the specs in this directory do.
+Either one is the receipt; leaving it labelled **Known** is not.
+
+## Citations
+
+Every `file:line` citation names the symbol it points at, in a code span right
+beside it: `WebgpuAdapter.ts:196` (`initInFlight`). A test citation may name the
+test's title instead: `webmcpDetect.test.ts:8` "reports the browser API, the dev mock, or nothing". `pnpm docs:cite` checks every citation in every tracked
+Markdown file: the file must exist, the lines must exist, and the symbol or the
+title must sit within five lines of them. It runs in PR CI, so a PR that moves
+the code a spec cites fails until the citation follows it. A note about code as
+it used to be is pinned to that revision instead, as above. The full rules are
+in [docs/agent/CONVENTIONS.md](../agent/CONVENTIONS.md), section 9.
 
 ---
 
@@ -212,7 +237,8 @@ requirement should not have to find the note attached to another.
 by even one merge is worse than no spec: it reads as authoritative and is wrong.
 If a PR changes what a requirement says the system does, the PR edits the
 requirement. If it fixes a known deviation, the PR deletes the deviation
-blockquote — that deletion is the receipt.
+blockquote or relabels and pins it (see **Known deviations**) — that edit is the
+receipt.
 
 **Bump `Version:` and `Date:` when you touch it**, so a reader can tell at a
 glance how far behind `main` the file might be.
@@ -230,7 +256,8 @@ citing a test as the guard for a requirement, be able to say which assertion
 goes red when the requirement is violated — and if the honest answer is "none of
 them", cite it as a gap instead.
 
-**Cite lines, accept that they drift.** File-and-line references are how a
-reader gets from prose to code, and they are worth the maintenance. When a
-citation no longer lands where it says, that is a signal to re-read the code and
-re-check the requirement, not to strip the citations out.
+**Cite lines with their symbol, and let the checker hold them.** File-and-line
+references are how a reader gets from prose to code, and they are worth the
+maintenance. When `pnpm docs:cite` says a citation no longer lands where it
+says, that is a signal to re-read the code and re-check the requirement, not to
+strip the citations out.
