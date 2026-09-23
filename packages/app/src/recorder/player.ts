@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
-import { glideMsForAction } from './glide'
+import { glideMsForAction, selfGlideOf } from './glide'
 import { NARRATION_COMMAND_ID } from './narrationMode'
 import { createPlayerPlayWindows } from './playerPlayWindows'
 import { getLiveWorkspaceMutationGeneration, isSessionRecording, withRecordingSuppressed, } from './recorder'
@@ -451,9 +451,22 @@ export function createSessionPlayer(
   }
 
   /** Run step `index` on the frame the take ran it on, then follow the
-   *  window the gap after it is in. */
-  function runStep(index: number, prepareUi: boolean): ActionExecution {
-    const action = actions[index]!
+   *  window the gap after it is in. A step whose command glides itself is
+   *  run with the glide `glideMs` asks for, not the one it recorded. */
+  function runStep(
+    index: number,
+    prepareUi: boolean,
+    glideMs?: number,
+  ): ActionExecution {
+    const recorded = actions[index]!
+    const selfGlide = selfGlideOf(recorded.id)
+    const action =
+      selfGlide === undefined || glideMs === undefined
+        ? recorded
+        : {
+            ...recorded,
+            args: selfGlide.withDurationMs(recorded.args, glideMs),
+          }
     windows.holdAt(action.t, true)
     const result = glideLease.step(() => executeAction(action, prepareUi))
     if (result.ok) windows.afterStep(index)
@@ -481,6 +494,22 @@ export function createSessionPlayer(
   function applyAction(index: number): boolean {
     const action = actions[index]
     if (!action) return false
+    // A step that glides itself is the one glide of its change: the player
+    // hands it the duration it would have glided for (its own recorded one
+    // first) and neither settles nor glides around it. The command settles
+    // what is in flight itself, keeping the frame the viewer could see.
+    if (selfGlideOf(action.id) !== undefined) {
+      const glides = options.glide?.().enabled === true
+      const result = runStep(
+        index,
+        true,
+        glides ? glideMsFor(action) : undefined,
+      )
+      if (!result.ok) return rejectAction(index, result.error)
+      setStepIndex(index)
+      setActionPublished(true)
+      return true
+    }
     // Settled BEFORE the command runs, whether or not THIS step animates. A
     // glide is subtracted from the gap that precedes it, so a step can be due
     // while the previous transition is still moving; a cut applied underneath
@@ -528,9 +557,11 @@ export function createSessionPlayer(
     // times and re-render the transport N times, even though only the state at
     // the destination is visible. If a prefix action fails, publish the last
     // state that did apply before reporting the exact attempted step.
+    // Nothing glides into a rebuild, a step that glides itself included: its
+    // glide would write its frames over the steps rebuilt after it.
     for (let i = 0; i < index; i++) {
       if (!actions[i]) return false
-      const result = runStep(i, false)
+      const result = runStep(i, false, 0)
       if (!result.ok) {
         setStepIndex(i - 1)
         return rejectAction(i, result.error)
@@ -541,7 +572,7 @@ export function createSessionPlayer(
     // receives follow-cam preparation and becomes the published current step.
     if (index < 0) return true
     if (!actions[index]) return false
-    const result = runStep(index, true)
+    const result = runStep(index, true, 0)
     if (!result.ok) {
       setStepIndex(index - 1)
       return rejectAction(index, result.error)

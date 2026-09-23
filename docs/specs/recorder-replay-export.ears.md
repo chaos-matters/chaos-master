@@ -1,7 +1,7 @@
 # Session recording, replay and export — EARS requirements
 
-**Version:** 0.9.11 (`packages/app/package.json`) — the version whose shipped behaviour this describes
-**Date:** 2026-09-10
+**Version:** 0.9.12 (`packages/app/package.json`) — the version whose shipped behaviour this describes
+**Date:** 2026-09-23
 **Scope:** The `.steps.json` session lifecycle end to end: what an editing session
 captures and what it deliberately refuses to capture, how a session file is
 validated when it comes back in from a file or a PNG/MP4 chunk, what replay
@@ -477,7 +477,7 @@ when the caller asks for no tail.
 
 _(`recorder/replayVideo.ts:424-539`, `recorder/player.ts:140-221`; guarded by
 `replayVideo.test.ts:21`, `:56`, `:70`, `:306`, `replayVideoPlayWindows.test.ts:77`
-and `playWindowReplay.test.ts:590` "gives the interface capture the same window
+and `playWindowReplay.test.ts:591` "gives the interface capture the same window
 the player plays".)_
 
 ### REQ-RR-029 — Video export refuses takes it cannot reproduce or afford
@@ -672,7 +672,7 @@ by `timelineActions.test.ts:613` "records Space pressed twice as two steps and
 replays to the paused frame", `:659` "pins the frame a playback stops on when
 it reaches the end by itself", `:694` "records a pause that a workspace flow
 makes on the raw timeline", `:721` "leaves the playback of the seat an Arcade
-agent drives out of its take", `playWindowReplay.test.ts:508` "ends a take
+agent drives out of its take", `playWindowReplay.test.ts:509` "ends a take
 stopped while playing on the frame the playback had, still playing", and
 `commands/builtins/timeline.test.ts` "timeline.setPlaying".)_
 
@@ -811,15 +811,15 @@ window is not waited for.
 
 _(`recorder/playWindows.ts:83-150`, `recorder/playWindowPace.ts:18-178`,
 `recorder/playerPlayWindows.ts:34-138`, `recorder/player.ts:185-193`,
-`:294-305`, `:339-346`, `:385-408`, `:455-470`, `:519-524`, `:577-621`,
-`:649-650`, `:686-688`, `:695-702`, `recorder/timelineActions.ts:161-167`,
+`:294-305`, `:339-346`, `:385-408`, `:452-484`, `:548-553`, `:608-652`,
+`:680-681`, `:717-719`, `:726-733`, `recorder/timelineActions.ts:161-167`,
 `recorder/replayPlayback.ts:13-35`, `recorder/replay.ts:171-184`,
 `hooks/useWorkspaceReplay.ts:456-459`, `flame/Flam3.tsx:591-600`, `:1246-1253`,
 `utils/timeline.ts:729-731`; guarded by `playWindows.test.ts`,
-`playWindowPace.test.ts`, and `playWindowReplay.test.ts:210` "plays five seconds
-as five seconds and lands on the Pause frame with no jump", `:254`, `:290`,
-`:326`, `:362`, `:398`, `:431`, `:454`, `:482`, `:508`, `:547`, `:629` "pauses
-on the frame it had when the replay is closed", `:643`, `:658`, `:687`, and
+`playWindowPace.test.ts`, and `playWindowReplay.test.ts:211` "plays five seconds
+as five seconds and lands on the Pause frame with no jump", `:255`, `:291`,
+`:327`, `:363`, `:399`, `:432`, `:455`, `:483`, `:509`, `:548`, `:630` "pauses
+on the frame it had when the replay is closed", `:644`, `:659`, `:688`, and
 `SessionReplayPanelGlide.test.tsx:212`, `:232`.)_
 
 ### REQ-RR-045 — The artwork video plays a play window frame by frame
@@ -882,16 +882,16 @@ their own but no glide of their own: a duel refuses transitions, and the
 portal's tours animate through their own `animateValue`.
 
 _(`recorder/replayGlideLease.ts`, `recorder/player.ts:306-308`, `:361-367`,
-`:455-470`, `:519-524`, `:577-584`, `:695-702`,
-`commands/builtins/glide.ts:14-17`, `:44-47`, `:50`, `:61-62`, `:65`, `:98`,
-`commands/types.ts:308-316`, `:344-354`, `:355-359`,
-`commands/registry.ts:537-543`, `webmcp/tools/executeCommand.ts:153-164`,
-`flame/glide/types.ts:181-188`,
+`:452-484`, `:548-553`, `:608-615`, `:726-733`,
+`commands/builtins/glide.ts:14-17`, `:44-47`, `:50`, `:61-62`, `:65`, `:115`,
+`commands/types.ts:308-316`, `:352-362`, `:363-367`,
+`commands/registry.ts:537-543`, `webmcp/tools/executeCommand.ts:286-295`,
+`flame/glide/types.ts:181-194`,
 `recorder/recorder.ts:597-603`,
 `recorder/replayVideo.ts:932-934`, `recorder/synthesize/sandbox.ts:125-127`,
 `seats/seat.ts:279-280`, `components/Home/portalScript.ts:219-220`,
 `components/SessionRecorder/SessionReplayPanel.tsx:185-190`, `:714-729`,
-`flame/glide/runtime.ts:364-387`; guarded by `replayGlideSwitches.test.ts:98`,
+`flame/glide/runtime.ts:410-433`; guarded by `replayGlideSwitches.test.ts:98`,
 `:111`, `:122`, `:136`, `:149`, `:166` "keeps a switch the viewer flips while
 paused, though the take flips it again", `:187` "resumes a paused replay where
 it paused after a live glide.setQuality", `:212`, `:230`, `:261`, `:281`, `:301`,
@@ -925,11 +925,11 @@ schedule (`glideMs`, `glideTiers`), so both replays straighten, frame and
 downshift a glide alike. Two exports of one request shall produce the same job and
 schedule.
 
-_(`recorder/glide.ts:46-48`, `:71-98`, `recorder/replayVideo.ts:84-86`,
+_(`recorder/glide.ts:48-50`, `:82-109`, `recorder/replayVideo.ts:84-86`,
 `:453-459`, `:527-528`, `:569-577`, `:612-615`, `:1058-1075`,
-`flame/glide/runtime.ts:199-203`,
+`flame/glide/runtime.ts:232-236`,
 `components/ExportJobs/OffscreenAnimationRender.tsx:56`, `:69-85`, `:329`,
-`recorder/player.ts:489-500`, `:243`, `:708`, `recorder/replayGlideLease.ts:22-24`,
+`recorder/player.ts:513-529`, `:243`, `:739`, `recorder/replayGlideLease.ts:22-24`,
 `:66-69`, `components/SessionRecorder/SessionReplayPanel.tsx:705-711`; guarded
 by `replayGlideQuality.test.ts:175`, `:196` "gives the same glide lengths and
 step times as the live replay", `:207` "plans each glide with the inputs the
@@ -952,6 +952,63 @@ _(`hooks/useWorkspaceReplay.ts:184-186`, `:443-454`,
 `:109-113`, `commands/types.ts:280-300`; guarded by
 `useWorkspaceReplay.exportStep.test.ts:187` "queues nothing when the live
 replay plays it, and keeps its place", `:209`, `:220`.)_
+
+### REQ-RR-049 — A change that glides itself glides once
+
+A command may animate its own change through the glide runtime whatever the
+Glide switch says, and declares it (`glidesItself`); `glide.toFlame` is the
+one that does. **When** such a command runs, exactly one glide shall present
+its change, the command's own, and it shall land on the command's target:
+
+- `execute_command` shall neither settle nor glide around it. The command
+  settles the glide in flight itself, keeping the frame the viewer could see.
+  Its duration shall be the command's own duration argument; else the call's
+  `glideMs` (clamped; `0` or less is no glide), passed down as that argument;
+  else the planner's duration for the change at the viewer's Glide quality
+  tier, whether the Glide switch is on or off. The call shall await that glide
+  and report a deadline landing as it does for any glide.
+- A live run shall record the duration its glide takes as the command's
+  argument, so the take replays the same glide for the same time.
+- **While** a replay's Glide switch is on, the player shall pass the duration it
+  would have glided for down to the step (`glideMsForAction`, where the step's
+  own recorded duration comes first, ahead of an authored `glideMs`, a hint and
+  the default) and glide nothing itself; the artwork export's schedule shall
+  time the step from the same number. **While** it is off, the step shall run
+  as recorded.
+- A rebuild (a seek) glides nothing, so it shall run such a step with no glide:
+  a glide left running there wrote its frames over the steps rebuilt after it.
+
+**When** a glide starts while another is in flight, the runtime shall first land
+the one in flight on its settle, which resolves the promise its caller awaits
+and clears its wall-clock deadline, and only then read the document for the new
+glide, so no deadline is left to land a later glide early and no glide takes
+another's frame for its target.
+
+_(`flame/glide/runtime.ts:220-225`, `:280-301`, `flame/glide/types.ts:188-193`,
+`commands/types.ts:326-332`, `:375-388`, `commands/builtins/glide.ts:78-94`,
+`webmcp/tools/executeCommand.ts:137-162`, `:236-306`, `recorder/glide.ts:53-75`,
+`recorder/player.ts:452-472`, `:497-512`, `:560-575`; guarded by
+`runtime.test.ts:260` "finishes the replaced glide, so its caller hears back",
+`:275`, `:289`, `:304` "leaves no deadline armed to cut the next glide short",
+`runtimeReplaceExamples.test.ts:48`, `executeCommandSelfGlide.test.ts:71`
+"Glide on: one glide, at the planner duration, landing on the target", `:90`,
+`:107`, `:123`, `:145`, `:160`, `:176`, and `playerSelfGlide.test.ts:90`
+"Glide on: one glide, for the duration the step recorded", `:100`, `:111`,
+`:119`, `:132` "a seek rebuilds through it without a glide, keeping the steps
+after it".)_
+
+### REQ-RR-050 — A plain-flame load while playing records its Pause
+
+**When** a flame with no animation is loaded while the timeline plays, the load
+shall stop playback through the timeline's `pause()`, before the block that keeps
+the load's own writes out of the take, so the take records the Pause (REQ-RR-040)
+ahead of the load's timeline snapshot, and its replay shall stop the timeline
+there and run the rest of the take on the stopped playhead, as the viewer saw it.
+
+_(`MainWorkspace.tsx:2709-2712`; guarded by `MainWorkspace.plainLoad.test.ts:17`
+"stops playback through pause(), before the unrecorded block", `:23`, and
+`playWindowReplay.test.ts:793` "records the Pause, so the replay stops where the
+take did", `:818`.)_
 
 ---
 

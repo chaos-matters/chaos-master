@@ -280,7 +280,7 @@ it). This is unlike the generic `execute_command` tool, which refuses at zero
 budget with `budgetExhaustedMessage`.
 
 _(`arcadeBeats.ts:345-359`; `pilot.ts:134`; contrast
-`webmcp/tools/executeCommand.ts:105-107`)_
+`webmcp/tools/executeCommand.ts:106-108`)_
 
 ### REQ-AB-023 — The result reports what landed
 
@@ -309,7 +309,7 @@ landing any transition in flight (`finishPilot`).
 _(`guard.ts:29-73`; `topics.ts:299-313`, with `ALWAYS_ALLOWED` at
 `topics.ts:8-12` and `PRESENTATION_SWITCHES` at `topics.ts:14-44`; the list is
 assembled at `arcadeBeats.ts:178-181`; enforcement at
-`webmcp/tools/executeCommand.ts:99-107`. The Beats tools themselves dispatch
+`webmcp/tools/executeCommand.ts:100-108`. The Beats tools themselves dispatch
 `audio.applySnapshot` and `lesson.note` through `commands/registry`
 directly, bypassing this guard — both are on the list regardless.)_
 

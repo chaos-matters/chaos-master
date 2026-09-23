@@ -2706,15 +2706,15 @@ export function MainWorkspace(props: AppProps) {
     const beforeShowTimeline = showTimeline()
     const showTimelineAfterLoad = anim.tracks.length > 0
 
-    // Keep live load-boundary semantics, then log one deterministic result
-    // snapshot instead of the raw setter sequence (and instead of rerunning
-    // any generator that may have produced these tracks).
+    // A plain flame stops playback through `pause()`, which a take records.
+    // Then keep load-boundary semantics and log one deterministic snapshot,
+    // not the raw setter sequence (or a rerun of the tracks' generator).
+    if (anim.tracks.length === 0) timeline.pause()
     withRecordingSuppressed(() => {
       if (anim.tracks.length === 0) {
         // Plain flame loaded — clear animation state
         if (IS_DEV) console.info('[anim] clearing tracks — plain flame loaded')
         timeline.loadTracks([])
-        timeline.setIsPlaying(false)
         timeline.setAnimationEnabled(false)
         setAnimationEnabled(false)
         setShowTimeline(false)

@@ -75,6 +75,23 @@ registerCommand({
     typeof ms === 'number'
       ? `Glide into another flame over ${Math.round(ms)}ms`
       : 'Glide into another flame',
+  // The one glide of this change is this command's own. A caller that glides
+  // what it runs hands its duration down here instead of gliding again.
+  glidesItself: {
+    durationMs: (args) => glideMsArg(args[1]),
+    withDurationMs: ([descriptor], durationMs) => [descriptor, durationMs],
+  },
+  // A live run records the duration its glide will take, however it was
+  // chosen, so a replay glides the same change for the same time: with no
+  // duration named, the planner's for this change at the viewer's tier. The
+  // replay's own default (`DEFAULT_REPLAY_GLIDE_MS`) is not that number.
+  normalizeArgs(ctx, args) {
+    if (args.length !== 1) return args
+    const runtime = (ctx.glideRuntime ?? getGlideRuntime)()
+    const target = tryValidateFlame(deepClone(args[0]))
+    if (!runtime || !target) return args
+    return [args[0], runtime.plannedDurationMs(target)]
+  },
   // Carries the descriptor itself, like `flame.load`, so the log never depends
   // on what happened to be on disk.
   validateReplayArgs(args) {

@@ -241,6 +241,96 @@ describe('createGlideRuntime', () => {
   })
 })
 
+/**
+ * A second start while one glide is still in flight.
+ *
+ * Only one glide can run, so the one already running has to be FINISHED, not
+ * dropped: its caller is awaiting it, its wall-clock deadline is armed, and
+ * the document holds one of its frames rather than the state it was heading
+ * for. Dropping it left all three behind (code audit 2026-09-23, F1): the
+ * promise never resolved, the deadline later landed whatever glide was running
+ * at that moment, and the new glide read its target off the old one's frame.
+ */
+describe('a glide that replaces one in flight', () => {
+  const C = makeFlame({
+    transforms: { one: { probability: 1, preAffine: { c: -3 } } },
+    renderSettings: { gamma: 1 },
+  })
+
+  it('finishes the replaced glide, so its caller hears back', async () => {
+    const world = harness(A)
+    world.set(B)
+    let firstOutcome: unknown = 'pending'
+    void world.runtime
+      .glideFrom(A, { durationMs: 400 })
+      .then((outcome) => (firstOutcome = outcome))
+    world.advance(100)
+    const second = world.runtime.glideFrom(C, { durationMs: 400 })
+    await Promise.resolve()
+    expect(firstOutcome).toMatchObject({ completedByDeadline: false })
+    world.advance(400)
+    await second
+  })
+
+  it('reads its target from the settled document, not from a frame', async () => {
+    const world = harness(A)
+    world.set(B)
+    void world.runtime.glideFrom(A, { durationMs: 400 })
+    // The document holds the first glide's frame 0, which is A. The change
+    // the first glide was presenting is B, and that is where the second one
+    // has to land.
+    const second = world.runtime.glideFrom(C, { durationMs: 400 })
+    world.advance(400)
+    await second
+    expect(world.runtime.isGliding()).toBe(false)
+    expect(world.read()).toEqual(B)
+  })
+
+  it('glideTo also lands the replaced glide before reading its start', async () => {
+    const world = harness(A)
+    world.set(B)
+    let firstOutcome: unknown = 'pending'
+    void world.runtime
+      .glideFrom(A, { durationMs: 400 })
+      .then((outcome) => (firstOutcome = outcome))
+    const second = world.runtime.glideTo(C, { durationMs: 400 })
+    await Promise.resolve()
+    expect(firstOutcome).toMatchObject({ completedByDeadline: false })
+    world.advance(400)
+    await second
+    expect(world.read()).toEqual(C)
+  })
+
+  it('leaves no deadline armed to cut the next glide short', async () => {
+    vi.useFakeTimers()
+    try {
+      const world = harness(A)
+      world.set(B)
+      void world.runtime.glideFrom(A, { durationMs: 400 })
+      const second = world.runtime.glideFrom(C, { durationMs: 2000 })
+      let secondOutcome: { completedByDeadline: boolean } | undefined
+      void second.then((outcome) => (secondOutcome = outcome))
+      // A healthy animation clock, ticking well past where the replaced
+      // glide's own deadline (400 ms + slack) would have fired.
+      for (let t = 0; t < 400 + GLIDE_DEADLINE_SLACK_MS + 200; t += 16) {
+        vi.advanceTimersByTime(16)
+        world.advance(16)
+      }
+      await Promise.resolve()
+      expect(world.runtime.isGliding()).toBe(true)
+      expect(secondOutcome).toBeUndefined()
+      for (let t = 0; t < 2000; t += 16) {
+        vi.advanceTimersByTime(16)
+        world.advance(16)
+      }
+      await second
+      expect(secondOutcome?.completedByDeadline).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('the global mode switches', () => {
   it('starts off, which is how the editor has always behaved', () => {
     expect(glideEnabled()).toBe(false)

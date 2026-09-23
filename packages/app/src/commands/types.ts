@@ -323,6 +323,14 @@ export interface CommandContext {
   glideRuntime?: () => GlideDriver | undefined
 }
 
+/** Where a command that glides itself keeps its glide's duration. */
+export type SelfGlide = {
+  /** The duration the args name, or `undefined` when they name none. */
+  durationMs: (args: readonly unknown[]) => number | undefined
+  /** The args, naming `durationMs` in place of any duration they named. */
+  withDurationMs: (args: readonly unknown[], durationMs: number) => unknown[]
+}
+
 export type ReplayArgsValidator = (
   args: readonly unknown[],
 ) => string | undefined
@@ -364,6 +372,20 @@ export interface FlameCommand {
    *  setting, and `execute_command` lets a glide in flight finish. Any other
    *  live command, the export ones included, hands a playing replay back. */
   presentationSwitch?: true
+  /**
+   * This command animates its own change through the glide runtime
+   * (`glide.toFlame`), whatever the Glide switch says.
+   *
+   * A caller that glides the changes it runs (`execute_command` with Glide on
+   * or `glideMs`, a replay with its Glide switch on) must not glide this one
+   * again. It used to, and two glides of one change left the runtime with the
+   * second, which settled on the flame the change started from (code audit
+   * 2026-09-23, F1). Such a caller neither settles nor glides around this
+   * command: it passes the duration it would have used down through the
+   * command's own arguments, and only where they name none, so the command's
+   * glide is the one glide and the take records its length.
+   */
+  glidesItself?: SelfGlide
   shortcut?: string
   /**
    * Resolve args to their canonical, replayable form BEFORE recording and
