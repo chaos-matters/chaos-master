@@ -57,10 +57,19 @@ so run `pnpm metrics:check` yourself when a change adds files.
 The coverage keys are the exception. `--check` only compares keys the current
 run produced, and a CI run has no `coverage-audit/` summary to read, so
 `coverage_*_pct` are ratcheted **locally, after `pnpm test:coverage`, and never
-in CI**. The same asymmetry means `--update` drops those keys entirely unless a
-coverage run precedes it: re-freeze with `pnpm test:coverage && pnpm
-metrics:update`, or the coverage ratchet disappears from the baseline without a
-word.
+in CI**. The same asymmetry once meant `--update` dropped those keys without a
+word unless a coverage run preceded it. Since WP3 (2026-09-23) `--update`
+refuses to write a baseline that would lose a key the old one has: without a
+coverage run it stops and names the six `coverage_*` keys, and without
+`--with-lint` it names the `eslint_*` ones if the baseline carries them.
+Re-freeze with `pnpm test:coverage && pnpm metrics:update`. A metric removed on
+purpose is named explicitly, `pnpm metrics:update --drop=<key>[,<key>]`, and
+the commit message says why.
+
+**One ratchet lives outside this script.** `MainWorkspace.tsx` is held to its
+exact line count by `packages/app/src/mainWorkspaceSize.test.ts`, which runs on
+every pull request rather than on main only: more lines fail, and fewer lines
+fail until the pinned count is lowered in the same change.
 
 ---
 
@@ -69,9 +78,10 @@ word.
 | Metric                             | Believe it?                   | What it is actually telling you                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `source_loc`, `source_files`       | Context, not quality          | Size of the thing. Useful only as a denominator. A refactor that grows LOC is not automatically bad — extracting a function costs a signature and an import.                                                                                                                                                |
-| `mean_file_loc`                    | Weakly                        | Moves too slowly to guide a single change. Useful across a release.                                                                                                                                                                                                                                         |
+| `mean_file_loc`                    | Weakly, and **not gated**     | Moves too slowly to guide a single change. Useful across a release. Reported only since 2026-09-23; see below the table for why.                                                                                                                                                                            |
 | `files_over_500` / `800` / `1200`  | **Yes**                       | The god-file count. This is the metric the 2026-07 refactor strategy was written to move. Buckets rather than a mean because the tail is what hurts: one 4,000-line file costs more than fifty 300-line files.                                                                                              |
-| `largest_file_loc`                 | **Yes**                       | A single number for "how bad is the worst case". Hard to game without genuinely splitting something.                                                                                                                                                                                                        |
+| `largest_file_loc`                 | Weakly                        | The largest file of any kind. Since 2026-09 that is `flame/examples/animations.ts`, 5,713 lines of literal animation presets, so it ratchets a data file and says nothing about code. Still gated; `largest_logic_file_loc` is the one to read.                                                             |
+| `largest_logic_file_loc`           | **Yes**                       | The largest file that is not data: a single number for "how bad is the worst case". Hard to game without genuinely splitting something. Data files are excluded by measurement, not by path; see below the table.                                                                                           |
 | `test_files`, `test_cases`         | Directionally                 | `test_cases` is counted **statically** by matching `it(` / `test(` at line start. It undercounts parameterized suites — the real vitest total is meaningfully higher. That is fine for a ratchet, where consistency matters more than absolute accuracy, but do not quote it as "the number of tests".      |
 | `test_file_ratio`                  | Weakly                        | Test files per source file. Catches a burst of new source with no new tests, which is the failure this repo actually had.                                                                                                                                                                                   |
 | `coverage_*_pct`                   | **With care**                 | Only present when a coverage run has written `coverage-audit/coverage-summary.json`. Coverage proves a line _executed_, never that anything _asserted_ on it. Treat a drop as a real signal and a rise as a weak one. See §3.                                                                               |
@@ -79,6 +89,38 @@ word.
 | `missing_header_comment`           | **Yes, and it is actionable** | Files whose first non-blank line is not a comment. This is the ceiling on how useful the generated index can be: a file with no header comment shows as `(no header comment)` in [INDEX.md](INDEX.md), so the map cannot describe it. Unlike most metrics, the fix is mechanical and always an improvement. |
 | `todo_markers`                     | Weakly                        | `TODO`, `FIXME`, `XXX`, `HACK`. A rising count is worth a glance; the absolute number means little.                                                                                                                                                                                                         |
 | `eslint_*` (opt-in, `--with-lint`) | **Yes**                       | Errors must stay zero. Warnings are almost all `complexity`, which is the honest measure of "would a reviewer be able to hold this function in their head". Off by default because a full type-aware lint takes over a minute.                                                                              |
+
+**Why `mean_file_loc` is reported but not gated** (WP3, 2026-09-23). The
+ratchet compared the ROUNDED mean, total lines over files. Two things made it
+worse than useless:
+
+- **It punished deleting dead code.** Removing a small file raises the mean:
+  taking out one 17-line file moves main from 168 to 169 and fails the check.
+  WP2 deleted nine files of about 23 lines each, exactly the change the plan
+  wanted, and the gate would have failed it.
+- **It taught the wrong fix.** Main sat at 168.47 with the failing edge at
+  168.5, half a line away, so pull requests shortened comments to fit (#111
+  did). A comment is not the cost this metric exists to catch.
+
+The thing it was meant to catch, files growing too big, is what the tail
+already measures: `files_over_500` / `800` / `1200` and
+`largest_logic_file_loc`, all still gated. The mean stays in the table, and in
+the baseline, as context.
+
+**What counts as a data file** (for `largest_logic_file_loc`). A file where
+at least 80% of the lines belong to top-level `const`/`let` declarations whose
+initializer (through `as`, `satisfies` and parentheses) is an object or array
+literal holding no function: no arrow, function expression, method or
+accessor, because a table of handlers is logic. The script measures it with
+the TypeScript parser, walking down from the largest file and stopping at the
+first one under the line, and prints the files it skipped. No path list: a new
+data file needs no configuration, and moving a logic file into a data
+directory does not exclude it. The 80% line sits in a measured gap: on
+2026-09-23 the data files are 90-100% literal (the six
+`flame/variations/docs/content*.ts`, `flame/examples/animations.ts` at 92%,
+`flame/palettes.ts` at 90%) and the most literal logic file is 58%
+(`arcade/topics.ts`). A helper function added to a data file can push it under
+the line, at which point it counts as logic, which is the right answer.
 
 ---
 

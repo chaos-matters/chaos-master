@@ -25,9 +25,19 @@ module.exports = {
       to: { path: '(^packages/app|solid-js|typegpu|@webgpu)' },
     },
     {
+      // An error, not a warning, since WP2 deleted the last eight orphans
+      // (2026-09-23): the count is zero, so a new one is a regression the day
+      // it lands. `--output-type err` exits non-zero on errors only, which is
+      // what makes the `health` job fail on it.
+      //
+      // dependency-cruiser's orphan is a module with NO edges at all, neither
+      // imports nor importers. A dead file that still imports something is
+      // not an orphan by this definition and passes.
       name: 'no-orphans',
-      severity: 'warn',
-      comment: 'A module nothing imports is either dead or a missing wiring.',
+      severity: 'error',
+      comment:
+        'A module that imports nothing and that nothing imports is either ' +
+        'dead or a missing wiring. Delete it, or import it where it belongs.',
       from: {
         orphan: true,
         pathNot: [

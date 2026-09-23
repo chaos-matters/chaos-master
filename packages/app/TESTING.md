@@ -6,13 +6,13 @@ This document describes the testing setup created to catch runtime errors in the
 
 A pull request runs smoke plus what the branch touched. Main runs everything.
 
-| Check                                                   | Pull request           | Push to main, or manual dispatch |
-| ------------------------------------------------------- | ---------------------- | -------------------------------- |
-| `pnpm lint`, `pnpm typecheck`                           | yes                    | yes                              |
-| `@chaos-master/core` and `@chaos-master/mobile-runtime` | in full                | in full                          |
-| The app suite (`packages/app`, ~2,500 tests)            | **scoped** (see below) | in full                          |
-| App build, landing build, `pnpm test:e2e:ci`            | yes                    | yes                              |
-| `pnpm docs:index:check`, `pnpm metrics:check`           | no                     | yes, in the `health` job         |
+| Check                                                      | Pull request           | Push to main, or manual dispatch |
+| ---------------------------------------------------------- | ---------------------- | -------------------------------- |
+| `pnpm lint`, `pnpm typecheck`                              | yes                    | yes                              |
+| `@chaos-master/core` and `@chaos-master/mobile-runtime`    | in full                | in full                          |
+| The app suite (`packages/app`, ~2,500 tests)               | **scoped** (see below) | in full                          |
+| App build, landing build, `pnpm test:e2e:ci`               | yes                    | yes                              |
+| `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch` | no                     | yes, in the `health` job         |
 
 The scoped run is `pnpm test:pr`, which calls `pnpm test:changed`
 (`scripts/test-changed.mjs`). It runs core and mobile-runtime in full — ~118
