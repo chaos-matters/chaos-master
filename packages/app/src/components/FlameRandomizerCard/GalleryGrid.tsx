@@ -77,6 +77,9 @@ export function GalleryGrid(props: {
   // document it took the Enter of every focused control, a cell's own buttons
   // included. The agent owns the keyboard under the Arcade's screen lock.
   const applyOnEnter = (e: KeyboardEvent & { currentTarget: HTMLElement }) => {
+    // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+    // under the screen lock before any listener runs; kept until WP9 takes
+    // these checks out one at a time, each with its own test.
     if (props.applyOnClick || e.key !== 'Enter' || pilotOwnsKeyboard()) return
     const target = e.target as Element
     if (target !== e.currentTarget && target.parentElement !== e.currentTarget)

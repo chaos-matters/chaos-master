@@ -244,6 +244,9 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
     const onKeyDown = (e: KeyboardEvent) => {
       // The viewer's keys stand down while the agent owns the screen.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
       if (e.key === 'Escape' && !pilotOwnsKeyboard()) {
         tour.endTour()
       }

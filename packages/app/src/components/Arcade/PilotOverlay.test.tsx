@@ -1,10 +1,21 @@
 import { cleanup, render, screen } from '@solidjs/testing-library'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, } from 'vitest'
+import { installLockKeyGate } from '@/arcade/lockKeyGate'
 import { endPilot, notePilotSaveResult, resetPilot, startPilot, } from '@/arcade/pilot'
 import { clearPilotFocus, notePilotFocus } from '@/arcade/pilotFocus'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { PilotOverlay } from './PilotOverlay'
 import type { RecordedAction, RecordedSession } from '@/recorder/schema'
+
+// The app adds the key gate at boot, first; the pilot's Esc-twice hears
+// Escape through it.
+let removeGate: () => void
+beforeAll(() => {
+  removeGate = installLockKeyGate()
+})
+afterAll(() => {
+  removeGate()
+})
 
 const take = {
   version: 1,

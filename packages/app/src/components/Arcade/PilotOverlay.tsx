@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack, } from 'solid-js'
 import { duelActive } from '@/arcade/duel'
 import { finishDuel } from '@/arcade/duelActions'
+import { hearLockedKeys } from '@/arcade/lockKeyGate'
 import { agentDriving, drivingState, lastPilotSession, pilot, pilotElapsedMs, pilotLog, pilotOwnsKeyboard, resetPilot, } from '@/arcade/pilot'
 import { finishPilot } from '@/arcade/pilotActions'
 import { Robot, Stop } from '@/icons'
@@ -59,9 +60,9 @@ export function PilotOverlay(props: {
     // dialog in the app with nothing on screen to explain why — and two of
     // them within 1500 ms silently ended the take.
     if (!ownsKeyboard()) return
-    // Captured on the way down so nothing else can claim Escape first: while
-    // the agent drives, Escape means "give me the controls back", never "close
-    // this panel".
+    // Heard from the key gate, ahead of every listener of the page, so
+    // nothing else can claim Escape first: while the agent drives, Escape
+    // means "give me the controls back", never "close this panel".
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape') return
       ev.preventDefault()
@@ -75,10 +76,10 @@ export function PilotOverlay(props: {
       window.clearTimeout(escTimer)
       escTimer = window.setTimeout(() => setEscArmed(false), ESC_ARM_MS)
     }
-    document.addEventListener('keydown', onKey, true)
+    const release = hearLockedKeys(onKey)
     onCleanup(() => {
       window.clearTimeout(escTimer)
-      document.removeEventListener('keydown', onKey, true)
+      release()
       setEscArmed(false)
     })
   })

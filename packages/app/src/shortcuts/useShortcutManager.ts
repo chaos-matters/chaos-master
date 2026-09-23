@@ -26,6 +26,10 @@ export function useShortcutManager(ctx: CommandContext) {
       // the take. A seat lock is the opposite case — the viewer is editing
       // their own half of a duel, and taking Ctrl+Z away from them for three
       // minutes would be the app fighting the person using it.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs, but for the theme
+      // chord's copy, which binds no command; kept until WP9 takes these
+      // checks out one at a time, each with its own test.
       if (pilotOwnsKeyboard()) return
       if (letBrowserHandleActiveInput(document.activeElement, ev)) {
         return

@@ -284,6 +284,8 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     if (!isPointerLocked()) return
     // A pointer captured before the agent took the screen would keep turning
     // the camera under it, as edits no recorded command made. Hand it back.
+    // Not the key gate's (arcade/lockKeyGate.ts): this is the pointer, and
+    // stays when WP9 takes the per-listener key checks out.
     if (pilotOwnsKeyboard()) {
       document.exitPointerLock()
       return
@@ -524,8 +526,11 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   function onKeyDown(ev: KeyboardEvent) {
     // The camera is the agent's while it owns the screen: a pan here became a
-    // history entry no recorded command made. Nothing is claimed, and a key
-    // already held stops at its next repeat.
+    // history entry no recorded command made. Nothing is claimed.
+    // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+    // under the screen lock before any listener runs, and hands this listener
+    // the keyup of a key held as the lock starts; kept until WP9 takes these
+    // checks out one at a time, each with its own test.
     if (pilotOwnsKeyboard()) {
       activeKeys.clear()
       return

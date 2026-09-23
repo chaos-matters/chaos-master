@@ -12,6 +12,7 @@
  * is the viewer's again when the shield goes.
  */
 import { clearDelegatedEvents, delegateEvents } from 'solid-js/web'
+import { isThemeChord } from '@/arcade/lockKeyGate'
 
 /**
  * Show `dialog` as the topmost modal and keep it there: over a modal opened
@@ -53,13 +54,16 @@ const KEYS = ['keydown', 'keyup']
 
 /**
  * Keep every key that starts in `portal` (the shield's) inside it. The focus
- * is always in the shield, so no window or document listener, nor a Solid
- * handler outside, hears the viewer's keys. Solid runs its handlers from
- * `document`; the ones inside run from here instead, before the stop (its
- * delegateEvents is typed for a document and only listens on it). A capture
- * listener above hears a key first: the pilot's Esc-twice is one. The theme
- * chord stays the viewer's (maff's call), handed to `document` as a copy so
- * nothing inside hears it twice.
+ * is always in the shield, so no bubbling window or document listener, nor a
+ * Solid handler outside, hears the viewer's keys. Solid runs its handlers
+ * from `document`; the ones inside run from here instead, before the stop
+ * (its delegateEvents is typed for a document and only listens on it).
+ *
+ * A capture listener above hears a key before it gets here. In the app the
+ * key gate (arcade/lockKeyGate.ts) is the first of them and swallows every
+ * key under the screen lock, so what reaches the shield there is the theme
+ * chord alone: it stays the viewer's (maff's call), handed to `document` as a
+ * copy so nothing inside hears it twice.
  */
 export function holdKeys(portal: HTMLElement): () => void {
   const root = portal as unknown as Document
@@ -67,7 +71,7 @@ export function holdKeys(portal: HTMLElement): () => void {
   const stop = (ev: Event) => {
     ev.stopPropagation()
     const key = ev as KeyboardEvent
-    if (key.code !== 'KeyD' || !(key.ctrlKey || key.metaKey)) return
+    if (!isThemeChord(key)) return
     if (!document.dispatchEvent(new KeyboardEvent(ev.type, key)))
       ev.preventDefault()
   }
