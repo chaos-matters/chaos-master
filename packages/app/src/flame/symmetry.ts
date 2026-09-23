@@ -1,4 +1,5 @@
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
+import { defaultLinearType } from '@/flame/variationRegistry'
 import { deepClone } from '@/utils/clone'
 import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
 
@@ -34,7 +35,10 @@ export function applySymmetryToFlame(
   const symWeight = Math.max(totalWeight, 1)
   const identity = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   const is3D = draft.renderSettings?.dimensions === 3
-  const linearVarType = is3D ? 'linear3D' : 'linear'
+  // The registry's own name, as flame.applySymmetry uses: the 2D linear is
+  // 'linearVar'. A bare 'linear' is not registered, so createFlameWgsl
+  // skipped it and every symmetry transform sent its points to the origin.
+  const linearVarType = defaultLinearType(is3D ? 3 : 2)
 
   for (let i = 1; i < folds; i++) {
     const angle = (2 * Math.PI * i) / folds
