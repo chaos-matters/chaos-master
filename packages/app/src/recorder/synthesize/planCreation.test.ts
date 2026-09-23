@@ -206,6 +206,56 @@ describe('planCreation', () => {
     ).toBe(true)
   })
 
+  it('builds a blend at the weight the target has', () => {
+    // A partner named without a weight would give a document with none the
+    // default, so the partner's own step carries the target's weight.
+    const target = {
+      ...twoTransforms,
+      renderSettings: {
+        ...twoTransforms.renderSettings,
+        blendFlame: examples.example2,
+        blendWeight: 0.7,
+      },
+    }
+    for (const strategy of SYNTHESIS_STRATEGIES) {
+      const session = expectRebuilds(target, { strategy })
+      expect(session.synthetic?.snapped).toBe(false)
+      const blendSteps = session.actions.filter((a) => a.id.includes('Blend'))
+      expect(blendSteps.map(({ id, args }) => [id, args])).toEqual([
+        ['flame.setBlendFlame', [examples.example2, 0.7]],
+      ])
+    }
+  })
+
+  it('rebuilds a partner saved without a weight, which draws as weight 0', () => {
+    // A touch pick from before picks named a weight, or an agent's
+    // one-argument setBlendFlame, leaves a partner and no weight. Everything
+    // that draws reads the missing weight as 0, so the partner's step names
+    // 0 rather than leaving a document with no weight to the default.
+    const target = {
+      ...twoTransforms,
+      renderSettings: {
+        ...twoTransforms.renderSettings,
+        blendFlame: examples.example2,
+      },
+    }
+    for (const strategy of SYNTHESIS_STRATEGIES) {
+      const session = expectRebuilds(target, { strategy })
+      expect(session.synthetic?.snapped).toBe(false)
+      const blendSteps = session.actions.filter((a) => a.id.includes('Blend'))
+      expect(blendSteps.map(({ id, args }) => [id, args])).toEqual([
+        ['flame.setBlendFlame', [examples.example2, 0]],
+      ])
+    }
+  })
+
+  it('adds no blend step to a flame without a blend', () => {
+    for (const strategy of SYNTHESIS_STRATEGIES) {
+      const session = expectRebuilds(twoTransforms, { strategy })
+      expect(session.actions.filter((a) => a.id.includes('Blend'))).toEqual([])
+    }
+  })
+
   it('migrates a legacy descriptor before planning it', () => {
     // Short variation names and no schema defaults — a 2023 export.
     const legacy = {

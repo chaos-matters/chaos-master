@@ -4,6 +4,7 @@ import { serializeSession, sessionFilename } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
 import { deleteStoredSession, loadStoredSessions, renameStoredSession, } from '@/utils/sessionsDB'
 import styles from './SessionLibraryPanel.module.css'
+import { UncapturedSteps } from './UncapturedSteps'
 import type { RecordedSession } from '@/recorder/schema'
 import type { StoredSession } from '@/utils/sessionsDB'
 
@@ -289,16 +290,8 @@ export function SessionLibraryPanel(props: {
                       </Show>
                       <span class={styles.entryMeta}>
                         {when(entry.timestamp)} · {entry.actionCount} steps
-                        <Show when={entry.unnamedWriteCount > 0}>
-                          {' '}
-                          <span
-                            class={styles.warning}
-                            title={`${entry.unnamedWriteCount} edit(s) were not captured as commands, so a replay cannot reproduce them.`}
-                          >
-                            · {entry.unnamedWriteCount} not captured
-                          </span>
-                        </Show>
                       </span>
+                      <UncapturedSteps session={entry.session} />
                     </div>
                     <div class={styles.entryActions}>
                       <button

@@ -21,7 +21,7 @@ const RAW_SOURCES = import.meta.glob(
  * Bump this deliberately when an extraction adds a file. The file is covered
  * either way; the count makes the widening visible in review instead of silent.
  */
-const EXPECTED_SOURCE_COUNT = 18
+const EXPECTED_SOURCE_COUNT = 19
 
 const sources = Object.entries(RAW_SOURCES).map(([relative, text]) => ({
   path: relative.replace(/^\.\.\//, 'src/'),
@@ -290,7 +290,7 @@ describe('real UI recorder coverage ratchet', () => {
       'data-focus-id={transformColorRandomizeFocusId(',
     )
     expect(allSources).toContain(
-      'Loaded animation autoplay is wall-clock transport and is not replayed',
+      'Autoplay of a loaded animation, which a recording does not replay',
     )
     expect(allSources).toContain(
       'Stop or discard the recording before opening a Home flame',

@@ -10,10 +10,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  * claims to rebuild the PICTURE, and a name, an author or a schema stamp is
  * not part of it. Everything that reaches the renderer is here.
  */
-export type CanonicalFlame = Pick<
-  FlameDescriptor,
-  'transforms' | 'renderSettings'
-> & {
+export type CanonicalFlame = Pick<FlameDescriptor, 'transforms'> & {
+  /** Always carries a blend weight: a missing one is 0 (see canonicalFlame). */
+  renderSettings: FlameDescriptor['renderSettings'] & { blendWeight: number }
   finalTransform?: FlameDescriptor['finalTransform']
 }
 
@@ -26,6 +25,8 @@ export type CanonicalFlame = Pick<
  * does not know (old exports carry a stray `renderSettings.quality`). Two
  * flames that differ only in those ways are the same flame here — which is
  * what lets a 2023 PNG be compared against something the planner just built.
+ * So are a missing blend weight and a weight of 0: the schema leaves the
+ * weight out, and everything that draws a flame reads a missing one as 0.
  */
 export function canonicalFlame(input: unknown): CanonicalFlame | undefined {
   // Cloned first: `tryValidateFlame` migrates legacy variation names IN PLACE,
@@ -36,7 +37,15 @@ export function canonicalFlame(input: unknown): CanonicalFlame | undefined {
   if (flame === undefined) return undefined
   const canonical: CanonicalFlame = {
     transforms: flame.transforms,
-    renderSettings: flame.renderSettings,
+    renderSettings: {
+      ...flame.renderSettings,
+      // The workspace, the renderer and both exports all read the weight as
+      // `blendWeight ?? 0`, so a partner saved without one (an older touch
+      // pick, an agent's one-argument call) draws at 0. The plan rebuilds it
+      // with a step that names 0, since a partner step naming no weight
+      // would give a document without one the default.
+      blendWeight: flame.renderSettings.blendWeight ?? 0,
+    },
   }
   // Absent and `undefined` are the same flame; keeping the key would make a
   // deep comparison fail against a descriptor that simply omits it.

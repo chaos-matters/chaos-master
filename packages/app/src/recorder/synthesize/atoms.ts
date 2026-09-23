@@ -520,23 +520,16 @@ function renderAtoms(
     })
   }
 
-  const blendWeight = target.renderSettings.blendWeight
-  if (blendWeight !== undefined) {
-    atoms.push({
-      id: 'flame.setBlendWeight',
-      args: [blendWeight],
-      key: 'render:blendWeight',
-      group: 'render',
-      needs: stageKeys,
-      read: (flame) => flame.renderSettings.blendWeight,
-      expected: blendWeight,
-    })
-  }
+  // The partner's own step names the weight, the way a gallery pick records
+  // it, so the plan never leans on what a partner named without one gets (a
+  // document with no weight yet would get the default). The canonical target
+  // always has a weight: a missing one is the 0 it draws at.
   const blendFlame = target.renderSettings.blendFlame
+  const blendWeight = target.renderSettings.blendWeight
   if (blendFlame !== undefined) {
     atoms.push({
       id: 'flame.setBlendFlame',
-      args: [blendFlame],
+      args: [blendFlame, blendWeight],
       key: 'render:blendFlame',
       group: 'render',
       needs: stageKeys,
@@ -544,4 +537,20 @@ function renderAtoms(
       expected: blendFlame,
     })
   }
+  atoms.push({
+    id: 'flame.setBlendWeight',
+    args: [blendWeight],
+    key: 'render:blendWeight',
+    group: 'render',
+    // After the partner: its step has usually set this already, so this one
+    // emits nothing, and it still corrects a weight that step did not set.
+    needs:
+      blendFlame === undefined
+        ? stageKeys
+        : [...stageKeys, 'render:blendFlame'],
+    // Read the way the canonical form reads it, so a document with no weight
+    // already has the 0 a flame without one is given, and no step is added.
+    read: (flame) => flame.renderSettings.blendWeight ?? 0,
+    expected: blendWeight,
+  })
 }

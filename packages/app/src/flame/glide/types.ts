@@ -178,6 +178,15 @@ export type GlideOptions = {
   entry?: 'weight'
 }
 
+/** The half of a glide runtime (runtime.ts) that `glide.toFlame` drives. */
+export type GlideDriver = {
+  settleForNextChange: () => FlameDescriptor | undefined
+  glideFrom: (
+    from: FlameDescriptor,
+    options?: GlideOptions,
+  ) => Promise<GlideOutcome | undefined>
+}
+
 /**
  * What a recorded step says about its own transition.
  *

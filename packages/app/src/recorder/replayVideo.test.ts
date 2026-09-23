@@ -211,13 +211,25 @@ describe('createReplayVideoJobSpec', () => {
     expect(job.session?.actions[0]?.note).toBe('Bring out the glow')
   })
 
-  it('refuses to publish a take with uncaptured edits', () => {
-    const session = makeSession([])
-    session.unnamedWriteCount = 2
+  it('publishes a take with uncaptured steps by skipping them, as replay does', () => {
+    const session = makeSession([
+      { t: 0, id: 'flame.setGamma', args: [1.5] },
+      { t: 2_000, id: 'flame.setGamma', args: [2.25] },
+    ])
+    session.unnamedWriteCount = 1
+    session.uncapturedSteps = [
+      { t: 1_000, reason: 'Exposure, made outside the recorded commands' },
+    ]
 
-    expect(() => createReplayVideoJobSpec(session)).toThrow(
-      /2 uncaptured edits/,
-    )
+    const job = createReplayVideoJobSpec(session)
+    // The embedded take still says what it could not capture, so a video
+    // opened as a replay later is no more honest than the file it came from.
+    expect(job.session?.unnamedWriteCount).toBe(1)
+    expect(job.session?.uncapturedSteps).toEqual(session.uncapturedSteps)
+    // The recorded steps are all there is to apply: the export ends where an
+    // in-app replay of the same take ends.
+    const driver = createReplayVideoDriver(session)
+    expect(driver.advanceTo(1).flame.renderSettings.gamma).toBe(2.25)
   })
 
   it('refuses custom variation code that the portable session cannot package', () => {

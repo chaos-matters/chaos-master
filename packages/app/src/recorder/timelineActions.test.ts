@@ -1,19 +1,23 @@
 import '@/commands/builtins'
-import { createRoot, createSignal } from 'solid-js'
+import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { resetPilot, startPilot } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
+import { createSessionPlayer } from './player'
 import { cancelSessionRecording, reportDocumentWrite, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder'
 import { snapshotOrigin } from './snapshotOrigin'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, snapshotTimeline, } from './timelineActions'
+import type { ReplayTarget } from './replay'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
+import type { TimelineState } from '@/utils/timeline'
 
 function makeTimelineWorld() {
   const [flame, setFlameDescriptor] = createStoreHistory(
@@ -70,6 +74,8 @@ function makeTimelineWorld() {
         return frame
       },
       play: raw.play,
+      pause: raw.pause,
+      isPlaying: raw.isPlaying,
       setLoop: (loop) => {
         raw.updateConfigUndoable({ loop })
       },
@@ -526,5 +532,217 @@ describe('recorder-aware timeline actions', () => {
       expect(target.raw.hasKeyframeAtFrame('gamma', 1)).toBe(false)
       dispose()
     })
+  })
+})
+
+/**
+ * Play and Pause are transport, and they used to be the one thing a take could
+ * not carry: the first press anywhere in a recording counted as "not
+ * captured", and a replay left the playhead wherever its own clock put it. A
+ * press is now a `timeline.setPlaying` step that pins the frame, so a replay
+ * pauses where the recording paused rather than wherever the paced replay
+ * happened to have got to.
+ *
+ * Deliberately NOT wrapped in `createRoot`: the render loop below is an effect
+ * that has to see each Play and Pause as its own update, the way it does in
+ * the app (see `utils/timeline.test.ts` for the same reason).
+ */
+describe('Play and Pause during a recording', () => {
+  afterEach(() => {
+    resetPilot()
+    vi.useRealTimers()
+  })
+
+  /**
+   * The render loop, as `Flam3` runs it with Auto FPS off: while the timeline
+   * plays, advance `timeScale` frames every 1000/fps ms, through the timeline
+   * the workspace context hands the canvas. Fake timers make it a clock the
+   * test owns, which is what lets a replay be checked frame for frame.
+   */
+  function driveRenderLoop(timeline: TimelineState): () => void {
+    return createRoot((dispose) => {
+      createEffect(() => {
+        if (!timeline.isPlaying()) return
+        const config = timeline.config()
+        const interval = setInterval(() => {
+          for (let i = 0; i < config.timeScale; i++) timeline.advanceFrame()
+        }, 1000 / config.fps)
+        onCleanup(() => {
+          clearInterval(interval)
+        })
+      })
+      return dispose
+    })
+  }
+
+  /** The workspace's replay target, reduced to what a timeline take needs. */
+  function replayTargetFor(
+    world: ReturnType<typeof makeTimelineWorld>,
+  ): ReplayTarget {
+    return {
+      loadInitial: (flame) => {
+        // As hooks/useWorkspaceReplay.ts does: a take starts paused, so a
+        // rebuild must not keep playback a later step started.
+        if (world.raw.isPlaying()) world.raw.pause()
+        world.ctx.setFlameDescriptor(() => deepClone(flame))
+      },
+      loadTimeline: (data) => {
+        world.ctx.timeline.edit?.load(data)
+      },
+      execute: (id, args) => executeReplayCommand(id, world.ctx, ...args),
+    }
+  }
+
+  function configure(
+    world: ReturnType<typeof makeTimelineWorld>,
+    config: { startFrame: number; endFrame: number; loop: boolean },
+  ) {
+    world.raw.setConfig({
+      ...world.raw.config(),
+      ...config,
+      fps: 24,
+      timeScale: 1,
+      autoFps: false,
+    })
+    world.raw.setAnimationEnabled(true)
+  }
+
+  const steps = (session: { actions: { id: string; args: unknown[] }[] }) =>
+    session.actions.map(({ id, args }) => [id, ...args])
+
+  it('records Space pressed twice as two steps and replays to the paused frame', () => {
+    vi.useFakeTimers()
+    const live = makeTimelineWorld()
+    configure(live, { startFrame: 0, endFrame: 600, loop: true })
+    const stopLive = driveRenderLoop(live.facade)
+    startSessionRecording(live.flame, {
+      timeline: snapshotTimeline(live.raw),
+    })
+
+    vi.advanceTimersByTime(500)
+    live.facade.togglePlay()
+    // Longer than the replay's longest paced gap, so a replay that only
+    // played for as long as it waits between steps would stop short.
+    vi.advanceTimersByTime(5000)
+    live.facade.togglePlay()
+    const pausedAt = live.raw.currentFrame()
+    const session = stopOrThrow()
+    stopLive()
+
+    expect(session.unnamedWriteCount).toBe(0)
+    expect(pausedAt).toBeGreaterThan(100)
+    // The Pause also counts the frames the playback advanced, which from
+    // frame 0 without a wrap is the frame it paused on.
+    expect(steps(session)).toEqual([
+      ['timeline.setPlaying', true, 0],
+      ['timeline.setPlaying', false, pausedAt, pausedAt],
+    ])
+
+    const replay = makeTimelineWorld()
+    const stopReplay = driveRenderLoop(replay.facade)
+    const player = createSessionPlayer(session, replayTargetFor(replay))
+    player.play()
+    // The replay plays the animation between the two steps, on its own clock...
+    vi.advanceTimersByTime(1200)
+    expect(replay.raw.isPlaying()).toBe(true)
+    expect(replay.raw.currentFrame()).toBeGreaterThan(0)
+    // ...and pauses exactly where the recording paused. This target has no
+    // playback hold, so the clock is the replay's own; the paced replay
+    // (playWindowReplay.test.ts) also moves the frames at the take's pace.
+    vi.advanceTimersByTime(10_000)
+    stopReplay()
+    expect(player.isFinished()).toBe(true)
+    expect(replay.raw.isPlaying()).toBe(false)
+    expect(replay.raw.currentFrame()).toBe(pausedAt)
+  })
+
+  it('pins the frame a playback stops on when it reaches the end by itself', () => {
+    vi.useFakeTimers()
+    const live = makeTimelineWorld()
+    configure(live, { startFrame: 3, endFrame: 15, loop: false })
+    live.raw.goToFrame(5)
+    const stopLive = driveRenderLoop(live.facade)
+    startSessionRecording(live.flame, {
+      timeline: snapshotTimeline(live.raw),
+    })
+
+    live.facade.togglePlay()
+    vi.advanceTimersByTime(2000)
+    const session = stopOrThrow()
+    stopLive()
+
+    // A non-looping playback that runs off the end goes back to the first
+    // frame and stops there. Nobody pressed anything, and it is still a step.
+    expect(live.raw.isPlaying()).toBe(false)
+    expect(live.raw.currentFrame()).toBe(3)
+    expect(session.unnamedWriteCount).toBe(0)
+    // Five to fifteen is ten advances, and the eleventh ran off the end.
+    expect(steps(session)).toEqual([
+      ['timeline.setPlaying', true, 5],
+      ['timeline.setPlaying', false, 3, 11],
+    ])
+
+    const replay = makeTimelineWorld()
+    const stopReplay = driveRenderLoop(replay.facade)
+    createSessionPlayer(session, replayTargetFor(replay)).play()
+    vi.advanceTimersByTime(10_000)
+    stopReplay()
+    expect(replay.raw.isPlaying()).toBe(false)
+    expect(replay.raw.currentFrame()).toBe(3)
+  })
+
+  it('records a pause that a workspace flow makes on the raw timeline', () => {
+    vi.useFakeTimers()
+    const live = makeTimelineWorld()
+    configure(live, { startFrame: 0, endFrame: 600, loop: true })
+    const stopLive = driveRenderLoop(live.facade)
+    startSessionRecording(live.flame, {
+      timeline: snapshotTimeline(live.raw),
+    })
+
+    live.facade.play()
+    vi.advanceTimersByTime(1000)
+    // Opening a modal, loading a flame and starting an export all pause the
+    // raw timeline, not the recorder-aware one.
+    live.raw.pause()
+    const pausedAt = live.raw.currentFrame()
+    // A pause with nothing playing changes nothing, so it is not a step.
+    live.raw.pause()
+    const session = stopOrThrow()
+    stopLive()
+
+    expect(session.unnamedWriteCount).toBe(0)
+    expect(steps(session)).toEqual([
+      ['timeline.setPlaying', true, 0],
+      ['timeline.setPlaying', false, pausedAt, pausedAt],
+    ])
+  })
+
+  it('leaves the playback of the seat an Arcade agent drives out of its take', () => {
+    vi.useFakeTimers()
+    const live = makeTimelineWorld()
+    configure(live, { startFrame: 0, endFrame: 600, loop: true })
+    const stopLive = driveRenderLoop(live.facade)
+    startPilot({
+      mode: 'cinema',
+      title: 'Cinema',
+      stepBudget: 40,
+      allowed: ['timeline.'],
+      qualityRankAtStart: 0,
+    })
+    startSessionRecording(live.flame, {
+      timeline: snapshotTimeline(live.raw),
+    })
+
+    live.facade.togglePlay()
+    vi.advanceTimersByTime(1000)
+    live.facade.togglePlay()
+    const session = stopOrThrow()
+    stopLive()
+
+    // The tool's own preview: a replay applies the keyframes and leaves Play
+    // to the viewer, so the take neither records it nor flags it.
+    expect(session.actions).toEqual([])
+    expect(session.unnamedWriteCount).toBe(0)
   })
 })

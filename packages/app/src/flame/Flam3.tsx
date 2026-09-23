@@ -589,10 +589,12 @@ export function Flam3(props: Flam3Props) {
    * pass `false`, so only the instance that owns the animation drives it.
    */
   createEffect(() => {
+    // A replay pacing a play window moves the playhead itself.
     if (
       !timeline ||
       !props.animationEnabled ||
       !timeline.isPlaying() ||
+      timeline.pacedPlayback() ||
       timeline.config().autoFps
     ) {
       return
@@ -1244,6 +1246,7 @@ export function Flam3(props: Flam3Props) {
       if (
         status.isAutoFpsReady &&
         timeline?.isPlaying() &&
+        !timeline.pacedPlayback() &&
         timeline.config().autoFps
       ) {
         timeline.advanceFrame()

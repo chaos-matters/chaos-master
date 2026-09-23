@@ -159,6 +159,35 @@ describe('full-interface replay video capture', () => {
     expect(result.frames).toBeGreaterThan(0)
   })
 
+  it('records a take with uncaptured steps instead of refusing it', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    const capture = makeRuntime()
+    const session = makeSession()
+    session.unnamedWriteCount = 1
+    session.uncapturedSteps = [
+      { t: 50, reason: 'Undo of a change made before recording started' },
+    ]
+    const played = vi.fn(() => Promise.resolve())
+
+    const resultPromise = captureReplayInterfaceVideo(
+      {
+        mode: 'interface',
+        session,
+        playbackSpeed: 1,
+        prepareReplay: () => {},
+        playReplay: played,
+      },
+      capture.runtime,
+    )
+
+    await vi.advanceTimersByTimeAsync(2_500)
+    const result = await resultPromise
+    expect(capture.runtime.openCapture).toHaveBeenCalledTimes(1)
+    expect(played).toHaveBeenCalledTimes(1)
+    expect(result.frames).toBeGreaterThan(0)
+  })
+
   it('aborts safely when tab sharing stops before replay completion', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(0)

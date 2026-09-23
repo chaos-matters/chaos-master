@@ -234,10 +234,10 @@ describe('SessionReplayPanel accessibility', () => {
     unmount()
   })
 
-  it('disables publishing when the take has no trustworthy creation sequence', () => {
+  it('disables publishing when the take has no authored steps', () => {
     const empty = makeSession()
     empty.actions = []
-    const first = render(() => (
+    const { unmount } = render(() => (
       <SessionReplayPanel
         session={empty}
         target={makeTarget()}
@@ -249,25 +249,130 @@ describe('SessionReplayPanel accessibility', () => {
     const emptyExport = screen.getByRole('button', { name: 'Export artwork' })
     expect((emptyExport as HTMLButtonElement).disabled).toBe(true)
     expect(emptyExport.title).toMatch(/at least one authored step/)
-    first.unmount()
+    unmount()
+  })
 
-    const incomplete = makeSession()
-    incomplete.unnamedWriteCount = 1
-    const second = render(() => (
+  it('names each step the take did not capture', () => {
+    const session = makeSession()
+    session.unnamedWriteCount = 2
+    session.uncapturedSteps = [
+      { t: 43_000, reason: 'Undo of a change made before recording started' },
+      { t: 61_000, reason: 'Exposure, made outside the recorded commands' },
+    ]
+    const { unmount } = render(() => (
       <SessionReplayPanel
-        session={incomplete}
+        session={session}
         target={makeTarget()}
-        onExportVideo={() => {}}
         onClose={() => {}}
       />
     ))
 
-    const incompleteExport = screen.getByRole('button', {
+    expect(screen.getByText('2 not captured')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Undo of a change made before recording started, at 0:43',
+      ),
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Exposure, made outside the recorded commands, at 1:01'),
+    ).toBeTruthy()
+    unmount()
+  })
+
+  it('says when the version that recorded a take did not save which steps it missed', () => {
+    const session = makeSession()
+    session.unnamedWriteCount = 1
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={session}
+        target={makeTarget()}
+        onClose={() => {}}
+      />
+    ))
+
+    expect(screen.getByText('1 not captured')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Details were not saved by the version that recorded it.',
+      ),
+    ).toBeTruthy()
+    unmount()
+  })
+
+  it('lists what an artwork export will skip before it starts', async () => {
+    const exportVideo = vi.fn().mockResolvedValue(undefined)
+    const session = makeSession()
+    session.unnamedWriteCount = 1
+    session.uncapturedSteps = [
+      { t: 50, reason: 'Undo of a change made before recording started' },
+    ]
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={session}
+        target={makeTarget()}
+        onExportVideo={exportVideo}
+        onClose={() => {}}
+      />
+    ))
+
+    const exportButton = screen.getByRole<HTMLButtonElement>('button', {
       name: 'Export artwork',
     })
-    expect((incompleteExport as HTMLButtonElement).disabled).toBe(true)
-    expect(incompleteExport.title).toMatch(/clean take/)
-    second.unmount()
+    expect(exportButton.disabled).toBe(false)
+    fireEvent.click(exportButton)
+    expect(exportVideo).not.toHaveBeenCalled()
+
+    const notice = document.querySelector('[data-replay-export-skips]')
+    expect(notice?.textContent).toContain(
+      'This take has 1 step it did not capture. The video skips it, so from step 2 on it may differ from what was recorded.',
+    )
+    expect(notice?.textContent).toContain(
+      'Undo of a change made before recording started, at 0:00',
+    )
+
+    // Cancel is a real way out: nothing starts, and the next click asks again.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }))
+    expect(document.querySelector('[data-replay-export-skips]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Export artwork' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Export anyway' }))
+
+    await waitFor(() => {
+      expect(exportVideo).toHaveBeenCalledTimes(1)
+    })
+    const [request] = exportVideo.mock.calls[0] as [ReplayVideoExportRequest]
+    expect(request.mode).toBe('artwork')
+    expect(request.session.uncapturedSteps).toEqual(session.uncapturedSteps)
+    unmount()
+  })
+
+  it('starts a full-interface capture on the click that accepts the skipped steps', () => {
+    const exportVideo = vi.fn().mockResolvedValue(undefined)
+    const session = makeSession()
+    session.unnamedWriteCount = 1
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={session}
+        target={makeTarget()}
+        onExportVideo={exportVideo}
+        onClose={() => {}}
+      />
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full interface' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Record full interface' }),
+    )
+    expect(exportVideo).not.toHaveBeenCalled()
+    expect(
+      document.querySelector('[data-replay-export-skips]')?.textContent,
+    ).toContain(
+      'This take has 1 step it did not capture. The video skips it, so it may differ from what was recorded.',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record anyway' }))
+    // Same rule as a clean take: getDisplayMedia needs this very click.
+    expect(exportVideo).toHaveBeenCalledTimes(1)
+    unmount()
   })
 
   // A synthesized session rebuilds a flame plausibly; it is not evidence of

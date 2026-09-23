@@ -17,7 +17,12 @@ reproduces its authored workspace output. An **uncovered document or timeline
 write** still works normally — it writes anonymously, which the recorder
 counts as an _unnamed write_ and reports in the pill and in the saved file's
 `unnamedWriteCount`. A log with a non-zero count is telling you it cannot fully
-reproduce that session.
+reproduce that session. Each one is also saved by name in `uncapturedSteps`
+(when it happened and why it was not captured, for example "Undo of a change
+made before recording started, at 0:43"), and the pill, the library and the
+replay panel open the count into that list. A take saved before the names
+existed says "Details were not saved by the version that recorded it."
+instead.
 
 Some state lives outside both histories, so the unnamed-write detector cannot
 see it. Those gaps are called out explicitly below rather than being hidden
@@ -47,7 +52,7 @@ editor behaves; it only changes whether a session can replay it.
 | Affine editor         | handle drags (translate, rotate, scale), pre/post, 2D and 3D; LIST coefficient scrubs, dice and reset                                                                                                                                                                                                                                          | `flame.setAffine`, `flame.setTransformAffine`                                                                                                                       |
 | Colour editors        | colour wheel drag, colour scrub inputs, dice, reset, randomise ALL colours                                                                                                                                                                                                                                                                     | `flame.setTransformColor`, `flame.setAllTransformColors`                                                                                                            |
 | Palette               | apply, remove; natural-colour restore provenance across load, undo/redo and replay forks                                                                                                                                                                                                                                                       | `flame.applyPalette`, `flame.removePalette`, plus the bounded optional session/history snapshot                                                                     |
-| Blend / morph         | pick partner, clear partner, blend weight, morph setup                                                                                                                                                                                                                                                                                         | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
+| Blend / morph         | pick partner (the step names the 40% weight the preview showed), clear partner, blend weight, morph setup                                                                                                                                                                                                                                      | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
 | Symmetry              | rotational and dihedral, n-fold; per-transform angle, show/hide and remove in the symmetry list                                                                                                                                                                                                                                                | `flame.applySymmetry`, `flame.setTransformAffine`, `flame.setTransformVisible`, `flame.removeTransform`                                                             |
 | Document / generators | new flame; gallery, file, history, FLAM3, migration and logo-generator loads; randomise, mutate and random-gallery apply; chosen breed, evolve, simulator and ancestry results                                                                                                                                                                 | the exact resulting descriptor in `flame.load`                                                                                                                      |
 | Metadata              | flame name, author and description, including the atomic patch committed from Export                                                                                                                                                                                                                                                           | `flame.setMetadata`                                                                                                                                                 |
@@ -106,14 +111,14 @@ The **Signal** column says whether the current recorder can warn about the gap.
 Selecting a Home flame while a take is active is blocked with a toast; the
 handoff is never allowed to replace the document underneath that recording.
 
-| Area              | State / action                                      | Signal                           | Why it is still open                                                                                                                                                                                                                                |
-| ----------------- | --------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Custom variations | committed WGSL/maths code                           | none for the code blob           | A code edit should not decompose into keystrokes. A portable take needs bounded starting definitions as well as semantic committed revisions, preflight compilation, transient registry state, collision handling and replay Undo/Redo restoration. |
-| Startup           | shared-URL apply, backup restore                    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                                                                    |
-| Tours             | `tour:restore` snapshot                             | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                                                              |
-| Audio             | the audio **file** itself                           | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available).                                         |
-| Audio             | playback clock and per-frame modulation             | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                                                           |
-| Timeline          | wall-clock Play/Pause and loaded-animation autoplay | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.                                                     |
+| Area              | State / action                          | Signal                           | Why it is still open                                                                                                                                                                                                                                |
+| ----------------- | --------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom variations | committed WGSL/maths code               | none for the code blob           | A code edit should not decompose into keystrokes. A portable take needs bounded starting definitions as well as semantic committed revisions, preflight compilation, transient registry state, collision handling and replay Undo/Redo restoration. |
+| Startup           | shared-URL apply, backup restore        | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                                                                    |
+| Tours             | `tour:restore` snapshot                 | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                                                              |
+| Audio             | the audio **file** itself               | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available).                                         |
+| Audio             | playback clock and per-frame modulation | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                                                           |
+| Timeline          | loaded-animation autoplay, raw seeks    | unreplayable transport marker    | Autoplay starts under suppression and a raw seek bypasses the commands, so neither is a step. Play and Pause themselves are recorded as `timeline.setPlaying(playing, frame)` steps, including a pause a workspace flow makes on the raw timeline.  |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
@@ -295,8 +300,11 @@ writes the result to the library as a new entry, leaving the raw take alone.
 
 The replay panel offers two deliberately different publication modes. Both use
 the panel's current caption and hold edits at the selected replay speed without
-requiring a separate save, and both refuse takes whose `unnamedWriteCount` says
-the authored result is incomplete.
+requiring a separate save. A take with uncaptured steps exports the way it
+replays: the steps it did not capture were never in its actions, so the video
+skips them. Before such an export starts, the panel lists what will be skipped
+and says from which step on the video may differ from the take; the next press
+of the export button starts it.
 
 **Artwork** queues a 1920 × 1080 landscape MP4 in the normal Exports tracker.
 That frame matches the editor camera's landscape composition: the 2D camera
@@ -372,7 +380,7 @@ the replay and library panels it opens.
   picks up the **last finished** session. To publish the steps themselves as a
   video, open that take in Replay and choose **Artwork** or **Full interface**.
 - `unnamedWriteCount` in the saved file is the honest measure of untracked
-  flame/timeline writes. Zero means every watched document edit was
+  flame/timeline writes, and `uncapturedSteps` names them. Zero means every watched document edit was
   represented; state explicitly listed under “Authored state not represented
   yet” remains outside that detector, and a matching external audio source is
   still required when the take used one.

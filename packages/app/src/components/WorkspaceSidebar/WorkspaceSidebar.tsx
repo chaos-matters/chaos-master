@@ -123,7 +123,8 @@ export interface WorkspaceSidebarProps {
   pickEvolveFlame: () => void
   openDiffAsModal: (flameA: FlameDescriptor, flameB: FlameDescriptor) => void
   openDiffView: (a: FlameDescriptor, b: FlameDescriptor) => void
-  setBlendFlame: (flame: FlameDescriptor | undefined) => void
+  /** Commit a partner picked in the blend gallery (see useWorkspaceBlendPick). */
+  commitBlendPick: (flame: FlameDescriptor) => void
   blendFlame: Accessor<FlameDescriptor | undefined>
   handlePreviewBlend: (flame: FlameDescriptor | null) => void
   setHoveredBlendName: (name: string | null) => void
@@ -601,7 +602,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                           flame,
                         )
                       } else {
-                        props.setBlendFlame(deepClone(flame))
+                        props.commitBlendPick(deepClone(flame))
                       }
                       props.setShowBlendGallery(false)
                     }}

@@ -63,14 +63,6 @@
   cursor: help;
 }
 
-.warning {
-  margin-left: auto;
-  padding: 0.05rem 0.4rem;
-  border-radius: 10px;
-  background: oklch(60% 0.18 60 / 0.35);
-  cursor: help;
-}
-
 .close {
   margin-left: auto;
   padding: 0.1rem 0.45rem;
@@ -80,11 +72,6 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-}
-
-/* When the warning is present it already took the auto margin. */
-.warning + .close {
-  margin-left: 0;
 }
 
 .transport {

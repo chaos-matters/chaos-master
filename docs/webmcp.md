@@ -228,7 +228,15 @@ pnpm test:e2e -- tests/arcade.ci.spec.ts
   resolution, and exports and history are closed while it drives.
 - `timeline.play` is wall-clock transport: it is deliberately not replayable,
   so `execute_command` refuses it and `arcade_set_keyframes` starts playback
-  itself. Scrub with `timeline.setCurrentFrame`.
+  itself. Scrub with `timeline.setCurrentFrame`. `timeline.setPlaying`, the
+  step a recording writes for every Play and Pause, is refused live for the
+  same reason (`agentCallable: false`): use `timeline.playFor` and
+  `timeline.stop`.
+- `flame.setBlendFlame` takes the partner and an optional weight from 0 to 1,
+  the edited flame's share of the blend (0 draws the partner alone). Without
+  the weight, the document keeps the weight it has, whether or not it had a
+  partner, and one with no weight yet gets the default 0.4. A pick in the blend
+  gallery always names 0.4.
 - A page reload during a session ends it and loses the recorder's in-memory
   take: it was never saved, so nothing appears in the library.
 - Cinema playback is started by `arcade_set_keyframes` itself and is
@@ -238,18 +246,24 @@ pnpm test:e2e -- tests/arcade.ci.spec.ts
 
 ## What the agent cannot reach yet
 
-Audited 2026-09-03 against the registry: all 87 registered commands carry an
+Audited 2026-09-23 against the registry: all 96 registered commands carry an
 explicit replay policy, so anything the agent can execute, a session file can
-reproduce. The gaps are elsewhere.
+reproduce. One command goes only the other way: `timeline.setPlaying` replays
+from a session but is refused live. The gaps are elsewhere.
 
 - **Undo and redo run live but do not replay.** `history.undo` / `history.redo`
   are `replayable: false` on purpose — a log replays the writes, and replaying
   a takeback of a write that never happened in this run is meaningless. An
   agent that undoes mid-lesson therefore records a session whose replay
   diverges from what the viewer watched. Prefer setting the value back.
-- **Playback is wall-clock, not a step.** `timeline.play` is neither
-  recordable nor replayable; `arcade_set_keyframes` starts playback itself and
-  a replay leaves the Play button to the viewer.
+- **Agent playback is not a step.** A person's Play and Pause during a take
+  record as `timeline.setPlaying(playing, frame)`, which pins the frame, but
+  the agent cannot call that: `timeline.play` is neither recordable nor
+  replayable, `timeline.playFor` and `timeline.stop` each still count as an
+  uncaptured step in a take (the pause a `playFor` deadline makes is recorded
+  like a person's), and `arcade_set_keyframes` starts Cinema's
+  playback itself, suppressed, so a replay leaves the Play button to the
+  viewer.
 - **3D framing has no first-class commands.** The 2D camera has
   `camera.center/panTo/panBy/zoomTo/zoomBy/frame`; the 3D camera is reachable
   only as `flame.setRenderSetting` on `camera3D.*`, which records and replays

@@ -21,6 +21,7 @@ import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
 import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ReplayVideoStateAt } from '@/recorder/replayVideo'
 import type { AnimationJob } from '@/utils/exportJobs'
 
 const PROGRESS_THROTTLE_MS = 100
@@ -55,12 +56,13 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     replaySchedule && job.session
       ? createReplayVideoDriver(job.session)
       : undefined
-  const initialReplayState = replaySchedule
+  const initialReplayState: ReplayVideoStateAt = replaySchedule
     ? replayStateAtFrame(replaySchedule, 0)
     : { actionIndex: -1, glideT: 1 }
   let replayState = replayDriver?.advanceTo(
     initialReplayState.actionIndex,
     initialReplayState.glideT,
+    initialReplayState.takeMs,
   )
   let replayVisualKey = replayState
     ? replayVideoVisualFingerprint(replayState)
@@ -316,12 +318,11 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     }, 'image/png')
   }
 
-  function updateReplayState(at: {
-    actionIndex: number
-    glideT: number
-  }): boolean {
+  function updateReplayState(at: ReplayVideoStateAt): boolean {
     if (!replayDriver) return false
-    const next = replayDriver.advanceTo(at.actionIndex, at.glideT)
+    // Inside a play window every frame has its own take time, so the
+    // playhead advances as the in-app replay moves it.
+    const next = replayDriver.advanceTo(at.actionIndex, at.glideT, at.takeMs)
     assertReplayVideoStatePortable(next, at.actionIndex)
     setPerFrameQuality(glideFrameQuality(job.quality, glideQuality, at.glideT))
     const nextVisualKey = replayVideoVisualFingerprint(next)

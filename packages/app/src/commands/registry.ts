@@ -285,8 +285,14 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
   'flame.setBlendWeight': signature(
     (value) => isFiniteNumber(value) && value >= 0 && value <= 1,
   ),
-  'flame.setBlendFlame': signature(
-    (value) => value === null || isPlainRecord(value),
+  // The weight is optional: takes recorded before a pick carried one have the
+  // one-argument form, and the command's own rule decides their weight.
+  'flame.setBlendFlame': oneOfSignatures(
+    signature((value) => value === null || isPlainRecord(value)),
+    signature(
+      (value) => value === null || isPlainRecord(value),
+      (value) => isFiniteNumber(value) && value >= 0 && value <= 1,
+    ),
   ),
   'flame.setupMorph': oneRecord,
   'flame.updateRenderSettings': oneOfSignatures(
@@ -580,6 +586,11 @@ export function preflightLiveCommand(
   if (!cmd) return { error: `Unknown command "${id}"` }
   if (cmd.replayable === false)
     return { error: `${cmd.label} is not replayable` }
+  // A step only a recording writes. Its description says what to call
+  // instead, so the refusal carries it rather than a generic "no".
+  if (cmd.agentCallable === false) {
+    return { error: `${cmd.label} is not a live command. ${cmd.description}` }
+  }
   const validator =
     cmd.validateReplayArgs ??
     (Object.hasOwn(REPLAY_ARG_POLICIES, id)

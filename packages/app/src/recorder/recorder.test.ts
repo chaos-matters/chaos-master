@@ -11,11 +11,12 @@ import { MAX_FLAME_TRANSFORMS } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
-import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
+import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, uncapturedSteps, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './replayPaletteState'
-import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, MAX_SONIFICATION_MODEL_TRANSITIONS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
+import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, MAX_SONIFICATION_MODEL_TRANSITIONS, MAX_UNCAPTURED_STEPS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
 import { SONIFICATION_SNAPSHOT_VERSION } from './sonificationState'
+import { summarizeUncapturedSteps } from './uncapturedSteps'
 import type { RecordedSession } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
 import type { CommandContext } from '@/commands/types'
@@ -1967,7 +1968,7 @@ describe('finished-session export association', () => {
     expect(lastFinishedSession()).toBeUndefined()
   })
 
-  it('tracks direct timeline transport without flooding the recording', () => {
+  it('tracks direct timeline seeks without flooding the recording', () => {
     const timeline = createTimelineState()
 
     finishSession()
@@ -1976,13 +1977,38 @@ describe('finished-session export association', () => {
 
     startSessionRecording(examples.example1)
     timeline.goToFrame(20)
-    timeline.togglePlay()
+    timeline.goBackFrame()
     timeline.advanceFrame()
-    timeline.pause()
 
     const session = stopOrThrow()
     expect(session.actions).toEqual([])
     expect(session.unnamedWriteCount).toBe(1)
+  })
+
+  it('records direct Play and Pause as steps that pin the frame', () => {
+    const timeline = createTimelineState()
+
+    finishSession()
+    timeline.togglePlay()
+    timeline.pause()
+    expect(lastFinishedSession()).toBeUndefined()
+
+    timeline.goToFrame(20)
+    startSessionRecording(examples.example1)
+    timeline.togglePlay()
+    // A frame the render loop advances while playing is the playback itself,
+    // not a seek: it is neither a step nor an uncaptured edit.
+    timeline.advanceFrame()
+    timeline.advanceFrame()
+    timeline.pause()
+
+    const session = stopOrThrow()
+    expect(session.unnamedWriteCount).toBe(0)
+    expect(session.actions.map(({ id, args }) => [id, ...args])).toEqual([
+      ['timeline.setPlaying', true, 20],
+      // The Pause counts the two frames the playback advanced.
+      ['timeline.setPlaying', false, 22, 2],
+    ])
   })
 })
 
@@ -2037,5 +2063,145 @@ describe('session action ordering', () => {
     }
     expect(validateSession(withTimes(10, 20))).toBeDefined()
     expect(validateSession(withTimes(20, 10))).toBeUndefined()
+  })
+})
+
+/**
+ * A take has always counted the steps it could not record. These pin that it
+ * also says which steps they were, and when, in the file a person gets back.
+ */
+describe('uncaptured steps are named', () => {
+  it('saves each one with the time it happened and why it was not captured', () => {
+    const clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(1_000)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      // Made before Record, so undoing it cannot be replayed from the take.
+      executeCommand('flame.setGamma', world.ctx, 7)
+      startSessionRecording(world.flame)
+      clock.mockReturnValue(44_000)
+      executeCommand('history.undo', world.ctx)
+      clock.mockReturnValue(46_500)
+      reportDocumentWrite('Exposure')
+      clock.mockReturnValue(47_000)
+      reportTimelineWrite('timeline edit')
+      const session = stopOrThrow()
+
+      expect(session.unnamedWriteCount).toBe(3)
+      expect(session.uncapturedSteps).toEqual([
+        { t: 43_000, reason: 'Undo of a change made before recording started' },
+        { t: 45_500, reason: 'Exposure, made outside the recorded commands' },
+        {
+          t: 46_000,
+          reason: 'Timeline edit, made outside the recorded commands',
+        },
+      ])
+      // The names survive the file a person downloads and opens again.
+      expect(parseSession(serializeSession(session))?.uncapturedSteps).toEqual(
+        session.uncapturedSteps,
+      )
+      dispose()
+    })
+  })
+
+  it('names an undo that has nothing left to undo', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand('history.undo', world.ctx)
+      const session = stopOrThrow()
+      expect(session.uncapturedSteps?.map(({ reason }) => reason)).toEqual([
+        'Undo with nothing left to undo',
+      ])
+      dispose()
+    })
+  })
+
+  it('names each one while the take is still recording', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(0)
+    startSessionRecording(examples.example1)
+    expect(uncapturedSteps()).toEqual([])
+    clock.mockReturnValue(12_000)
+    reportDocumentWrite('Camera pan')
+    expect(uncapturedSteps()).toEqual([
+      { t: 12_000, reason: 'Camera pan, made outside the recorded commands' },
+    ])
+    expect(unnamedWriteCount()).toBe(1)
+  })
+
+  it('logs the named list when the take stops', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const clock = vi.spyOn(globalThis.performance, 'now').mockReturnValue(0)
+    startSessionRecording(examples.example1)
+    stopOrThrow()
+    // A clean take has nothing to say.
+    expect(warn).not.toHaveBeenCalled()
+
+    startSessionRecording(examples.example1)
+    clock.mockReturnValue(43_000)
+    reportDocumentWrite('Exposure')
+    warn.mockClear()
+    stopOrThrow()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]?.[0])).toContain(
+      'Exposure, made outside the recorded commands, at 0:43',
+    )
+  })
+
+  it('lists the first 2,000 of a flood of uncaptured steps and counts the rest', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    startSessionRecording(examples.example1)
+    for (let i = 0; i < MAX_UNCAPTURED_STEPS; i++)
+      reportDocumentWrite('Exposure')
+    const listed = uncapturedSteps()
+    for (let i = 0; i < 500; i++) reportDocumentWrite('Exposure')
+
+    expect(unnamedWriteCount()).toBe(2_500)
+    expect(uncapturedSteps().length).toBe(2_000)
+    // Past the names a file keeps, a write moves the count alone: the list
+    // the recorder controls show is still the same array, not a fresh copy of
+    // 2,000 names for every write.
+    expect(uncapturedSteps() === listed).toBe(true)
+    const live = summarizeUncapturedSteps({
+      unnamedWriteCount: unnamedWriteCount(),
+      uncapturedSteps: uncapturedSteps(),
+    })
+    expect(live.note).toBe('500 more were not listed.')
+
+    const session = stopOrThrow()
+    expect(session.unnamedWriteCount).toBe(2_500)
+    expect(session.uncapturedSteps?.length).toBe(2_000)
+    expect(summarizeUncapturedSteps(session).note).toBe(
+      '500 more were not listed.',
+    )
+    expect(parseSession(serializeSession(session))).toEqual(session)
+  })
+
+  it('refuses a file that names more uncaptured steps than it counts', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    startSessionRecording(examples.example1)
+    reportDocumentWrite('Exposure')
+    const session = stopOrThrow()
+    const forged = JSON.parse(serializeSession(session)) as {
+      unnamedWriteCount: number
+    }
+    forged.unnamedWriteCount = 0
+    expect(validateSession(forged)).toBeUndefined()
+  })
+
+  it('still opens a count-only file from a version that did not name them', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    startSessionRecording(examples.example1)
+    reportDocumentWrite('Exposure')
+    const session = stopOrThrow()
+    const older = JSON.parse(serializeSession(session)) as {
+      uncapturedSteps?: unknown
+    }
+    delete older.uncapturedSteps
+    const opened = validateSession(older)
+    expect(opened?.unnamedWriteCount).toBe(1)
+    expect(opened?.uncapturedSteps).toBeUndefined()
   })
 })

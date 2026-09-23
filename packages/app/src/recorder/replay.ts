@@ -2,6 +2,7 @@ import { batch } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { isSessionRecording, withRecordingSuppressed } from './recorder'
 import { tryValidateSonificationSnapshot } from './sonificationState'
+import type { PlaybackClock } from './playWindows'
 import type { RecordedSession, SessionViewSnapshot } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
@@ -167,6 +168,19 @@ export type ReplayTarget = {
    */
   withDeferredEffects?: <R>(fn: () => R) => R
   endBatch?: () => void
+  /** The timeline's transport, so a replay can pace the stretches a take
+   *  played (recorder/replayPlayback.ts). */
+  playback?: ReplayPlayback
+}
+
+/** How a replay paces the playhead through a play window. */
+export type ReplayPlayback = {
+  /** The playhead, and the loop and fps it plays by, as they stand now. */
+  read: () => PlaybackClock & { frame: number }
+  /** Put the playhead on `frame`, playing on the replay's clock, or paused. */
+  hold: (frame: number, playing: boolean) => void
+  /** Give the timeline its own clock back, playing or not. */
+  release: () => void
 }
 
 /**
