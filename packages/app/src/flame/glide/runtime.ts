@@ -22,7 +22,7 @@ import { planGlide } from './plan'
 import { resolveGlideQuality } from './quality'
 import { sampleGlide } from './sample'
 import { GLIDE_DEADLINE_SLACK_MS, isGlideRefusal } from './types'
-import type { GlideOptions, GlideOutcome, GlidePlan, GlideQuality, GlideQualityPreference, GlideSwitches, } from './types'
+import type { GlideDriver, GlideOptions, GlideOutcome, GlidePlan, GlideQuality, GlideQualityPreference, GlideSwitches, } from './types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
@@ -106,6 +106,16 @@ export type GlideRuntime = {
     options?: GlideOptions,
   ) => Promise<GlideOutcome | undefined>
   /**
+   * The glide in flight, as its starter awaits it, or `undefined` at once
+   * when nothing is moving.
+   *
+   * For a caller that did not start the glide but has to wait for it: a
+   * command that glides itself starts its own (`FlameCommand.glidesItself`),
+   * and `execute_command` still awaits the transition of every step it runs.
+   */
+  settled: () => Promise<GlideOutcome | undefined>
+  plannedDurationMs: GlideDriver['plannedDurationMs']
+  /**
    * A write this runtime did not make has reached the document.
    *
    * Stop where we are and let it win: no settle, no jump to the target. A
@@ -128,6 +138,8 @@ type ActiveGlide = {
   /** The document's newest history entry when this started. */
   mark: number | null
   resolve: (outcome: GlideOutcome | undefined) => void
+  /** What `glideFrom`/`glideTo` handed their caller, for `settled()`. */
+  settled: Promise<GlideOutcome | undefined>
 }
 
 export function createGlideRuntime(deps: GlideRuntimeDeps): GlideRuntime {
@@ -191,6 +203,27 @@ export function createGlideRuntime(deps: GlideRuntimeDeps): GlideRuntime {
     frameHandle = requestFrame(tick)
   }
 
+  /**
+   * Land the glide in flight on its settle and hand back the frame the viewer
+   * could see: `settleForNextChange`, and the first thing a new glide does.
+   *
+   * Only one glide runs, so the one in flight has to END, not be dropped: its
+   * caller is awaiting it, its wall-clock deadline is armed, and the document
+   * holds one of its frames rather than the state it was presenting. Dropping
+   * it left all three behind (code audit 2026-09-23, F1). The promise never
+   * resolved; the deadline later landed whatever glide was running when it
+   * fired, reported as landed by the deadline; and the new glide read its
+   * target off the old one's frame, so a double start of one change settled
+   * back on the flame it started from. Landing it on its settle answers all
+   * three before anything is read.
+   */
+  function landInFlight(): FlameDescriptor | undefined {
+    if (!active()) return undefined
+    const visible = deps.readFlame()
+    release(true)
+    return visible
+  }
+
   function start(
     from: FlameDescriptor,
     to: FlameDescriptor,
@@ -211,27 +244,30 @@ export function createGlideRuntime(deps: GlideRuntimeDeps): GlideRuntime {
       writeFlame(planned.settle)
       return Promise.resolve({ plan: planned, completedByDeadline: false })
     }
-    return new Promise<GlideOutcome | undefined>((resolve) => {
-      setActive({
-        plan: planned,
-        startedAt: now(),
-        mark: deps.markDocumentEntry?.() ?? null,
-        resolve,
-      })
-      deps.onQualityChange?.(planned.quality)
-      writeFlame(sampleGlide(planned, 0))
-      frameHandle = requestFrame(tick)
-      // The wall clock, which a hidden tab still runs. rAF is the animation
-      // clock and Chrome simply stops calling it back when the tab is not
-      // visible, so without this a glide — and any caller awaiting it — waits
-      // for the viewer to come back to the tab. Landing on the settle is the
-      // right answer there: the document must reach the state the change
-      // asked for whether or not anyone watched it arrive.
-      deadlineHandle = setTimeout(() => {
-        deadlineHandle = undefined
-        release(true, true)
-      }, planned.durationMs + GLIDE_DEADLINE_SLACK_MS)
+    const { promise: settled, resolve } = Promise.withResolvers<
+      GlideOutcome | undefined
+    >()
+    setActive({
+      plan: planned,
+      startedAt: now(),
+      mark: deps.markDocumentEntry?.() ?? null,
+      resolve,
+      settled,
     })
+    deps.onQualityChange?.(planned.quality)
+    writeFlame(sampleGlide(planned, 0))
+    frameHandle = requestFrame(tick)
+    // The wall clock, which a hidden tab still runs. rAF is the animation
+    // clock and Chrome simply stops calling it back when the tab is not
+    // visible, so without this a glide — and any caller awaiting it — waits
+    // for the viewer to come back to the tab. Landing on the settle is the
+    // right answer there: the document must reach the state the change
+    // asked for whether or not anyone watched it arrive.
+    deadlineHandle = setTimeout(() => {
+      deadlineHandle = undefined
+      release(true, true)
+    }, planned.durationMs + GLIDE_DEADLINE_SLACK_MS)
+    return settled
   }
 
   return {
@@ -240,18 +276,28 @@ export function createGlideRuntime(deps: GlideRuntimeDeps): GlideRuntime {
       resolveGlideQuality(glideQualityPreference(), deps.qualityPreset?.()),
     activePlan: () => active()?.plan,
     activeQuality: () => active()?.plan.quality,
-    settleForNextChange() {
-      const current = active()
-      if (!current) return undefined
-      const visible = deps.readFlame()
-      release(true)
-      return visible
-    },
+    settleForNextChange: landInFlight,
     glideFrom(from, options = {}) {
+      landInFlight()
       return start(from, deps.readFlame(), options)
     },
     glideTo(target, options = {}) {
-      return start(deps.readFlame(), target, options)
+      const visible = landInFlight()
+      return start(visible ?? deps.readFlame(), target, options)
+    },
+    settled: () => active()?.settled ?? Promise.resolve(undefined),
+    plannedDurationMs(target) {
+      const planned = planGlide(
+        active()?.plan.settle ?? deps.readFlame(),
+        target,
+        {
+          quality: glideQualityPreference(),
+          qualityPreset: deps.qualityPreset?.(),
+        },
+      )
+      return isGlideRefusal(planned) || planned.channels.length === 0
+        ? 0
+        : planned.durationMs
     },
     noteForeignWrite() {
       if (ownWriteDepth > 0) return

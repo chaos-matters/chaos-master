@@ -13,10 +13,12 @@
  * differently is a length they disagree about.
  */
 
+import { getCommand } from '@/commands/registry'
 import { qualityPresets } from '@/components/Quality/QualityPresets'
 import { clampGlideMs, glideMsForHint } from '@/flame/glide/durations'
 import { isGlideQualityPreference, resolveGlideQuality, } from '@/flame/glide/quality'
 import type { RecordedAction, RecordedSession } from './schema'
+import type { SelfGlide } from '@/commands/types'
 import type { GlideQualityPreference, GlideQualityTier, } from '@/flame/glide/types'
 
 /**
@@ -48,19 +50,28 @@ export type ReplayGlideOptions = {
   preference?: GlideQualityPreference
 }
 
+/** How the command of a step glides itself, if it does (`glide.toFlame`). */
+export function selfGlideOf(id: string): SelfGlide | undefined {
+  return getCommand(id)?.glidesItself
+}
+
 /**
  * The glide INTO `action`, in milliseconds. Zero means this step snaps.
  *
- * Precedence: an authored `glideMs` wins and is not second-guessed — pacing is
- * authorial, and `glideMs: 0` means zero. Then the semantic `glide` hint,
- * resolved against the duration table now rather than baked into the file.
- * Then the caller's default.
+ * Precedence: a command that glides itself and names its duration wins, since
+ * that is the one glide the step runs (see `FlameCommand.glidesItself`). Then
+ * an authored `glideMs`, which is not second-guessed — pacing is authorial,
+ * and `glideMs: 0` means zero. Then the semantic `glide` hint, resolved
+ * against the duration table now rather than baked into the file. Then the
+ * caller's default.
  */
 export function glideMsForAction(
   action: RecordedAction | undefined,
   options: ReplayGlideOptions,
 ): number {
   if (!options.enabled || action === undefined) return 0
+  const own = selfGlideOf(action.id)?.durationMs(action.args)
+  if (own !== undefined) return clampGlideMs(own)
   if (action.glideMs !== undefined) return clampGlideMs(action.glideMs)
   const scale = options.durationScale ?? 1
   const hinted = glideMsForHint(action.glide, scale)

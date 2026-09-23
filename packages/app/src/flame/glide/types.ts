@@ -185,6 +185,12 @@ export type GlideDriver = {
     from: FlameDescriptor,
     options?: GlideOptions,
   ) => Promise<GlideOutcome | undefined>
+  /**
+   * How long a glide into `target` would take with no duration named: the
+   * planner's own, for that change at the current quality tier, from the
+   * settled document. 0 when it would not animate at all.
+   */
+  plannedDurationMs: (target: FlameDescriptor) => number
 }
 
 /**

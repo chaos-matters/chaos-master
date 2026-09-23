@@ -9,10 +9,11 @@ import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
 import { createSessionPlayer } from './player'
-import { cancelSessionRecording, reportDocumentWrite, startSessionRecording, stopSessionRecording, } from './recorder'
+import { cancelSessionRecording, recordSyntheticAction, reportDocumentWrite, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder'
 import { timelineReplayPlayback } from './replayPlayback'
 import { createReplayVideoSchedule } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
+import { snapshotOrigin } from './snapshotOrigin'
 import { createRecorderAwareTimeline, snapshotTimeline, } from './timelineActions'
 import type { ReplayTarget } from './replay'
 import type { RecordedSession } from './schema'
@@ -732,3 +733,98 @@ function recordPlayFor(ms: number): RecordedSession {
   stopLive()
   return session
 }
+
+/**
+ * A plain flame loaded while the timeline plays (code audit 2026-09-23, F2).
+ *
+ * The load stops playback. It used to do that through the timeline's raw
+ * `setIsPlaying`, inside the block that keeps the load's own writes out of the
+ * take, so the take held no Pause: its replay read the load's timeline
+ * snapshot as a seek while playing and played on over the rest of the take,
+ * which the viewer had watched with the timeline stopped. `MainWorkspace`
+ * now stops through `pause()` before that block, which the take records.
+ */
+describe('a plain-flame load while playing', () => {
+  /** The timeline half of `MainWorkspace`'s load effect, in its order. */
+  function loadPlainFlame(world: World, stop: 'pause' | 'raw setter') {
+    if (stop === 'pause') world.raw.pause()
+    withRecordingSuppressed(() => {
+      world.raw.loadTracks([])
+      if (stop === 'raw setter') world.raw.setIsPlaying(false)
+      world.raw.setAnimationEnabled(false)
+    })
+    recordSyntheticAction(
+      'timeline.loadTimeline',
+      [snapshotTimeline(world.raw), snapshotOrigin('timeline.clear')],
+      'Clear animation',
+    )
+  }
+
+  function takeWithLoad(stop: 'pause' | 'raw setter') {
+    const [live, dispose] = createRoot(
+      (dispose) => [makeWorld('player'), dispose] as const,
+    )
+    configure(live, {})
+    const stopLive = driveRenderLoop(live.raw)
+    startSessionRecording(live.flame, { timeline: snapshotTimeline(live.raw) })
+    live.facade.togglePlay()
+    vi.advanceTimersByTime(2000)
+    loadPlainFlame(live, stop)
+    const stoppedAt = live.raw.currentFrame()
+    vi.advanceTimersByTime(3000)
+    executeCommand('flame.setExposure', live.ctx, 0.9)
+    const session = stopOrThrow()
+    stopLive()
+    dispose()
+    return { session, stoppedAt }
+  }
+
+  function replay(session: RecordedSession) {
+    const world = makeWorld()
+    const stopReplay = driveRenderLoop(world.raw)
+    const { target, steps: ran } = replayTargetFor(world)
+    const player = createSessionPlayer(session, target)
+    player.play()
+    vi.advanceTimersByTime(10_000)
+    stopReplay()
+    return { world, ran, player }
+  }
+
+  it('records the Pause, so the replay stops where the take did', () => {
+    vi.useFakeTimers()
+    const { session, stoppedAt } = takeWithLoad('pause')
+    expect(steps(session).map(([id]) => id)).toEqual([
+      'timeline.setPlaying',
+      'timeline.setPlaying',
+      'timeline.loadTimeline',
+      'flame.setExposure',
+    ])
+    expect(steps(session)[1]).toEqual([
+      'timeline.setPlaying',
+      false,
+      stoppedAt,
+      stoppedAt,
+    ])
+    const { world, ran, player } = replay(session)
+    expect(player.isFinished()).toBe(true)
+    // The edit after the load runs on the stopped playhead, as it did live.
+    expect(ran.at(-1)).toMatchObject({
+      id: 'flame.setExposure',
+      frame: stoppedAt,
+    })
+    expect(world.raw.isPlaying()).toBe(false)
+  })
+
+  it('the raw setter it replaces left the replay playing (the bug)', () => {
+    vi.useFakeTimers()
+    const { session, stoppedAt } = takeWithLoad('raw setter')
+    expect(steps(session).map(([id]) => id)).toEqual([
+      'timeline.setPlaying',
+      'timeline.loadTimeline',
+      'flame.setExposure',
+    ])
+    const { world, ran } = replay(session)
+    expect(ran.at(-1)!.frame).toBeGreaterThan(stoppedAt)
+    expect(world.raw.isPlaying()).toBe(true)
+  })
+})
