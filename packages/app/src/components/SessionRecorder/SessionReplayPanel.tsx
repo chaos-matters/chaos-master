@@ -702,7 +702,13 @@ export function SessionReplayPanel(props: {
                               mode,
                               session: validated,
                               playbackSpeed: speed(),
-                              glide: glideOptions(),
+                              // Where the take's glides start: its own
+                              // steps switch the tier from there.
+                              glide: {
+                                ...glideOptions(),
+                                preference:
+                                  player.viewerGlideSwitches().quality,
+                              },
                             }
 
                       setExportError(undefined)

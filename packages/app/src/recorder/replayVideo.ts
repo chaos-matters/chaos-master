@@ -6,13 +6,15 @@ import { vec2f } from 'typegpu/data'
 import { executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { qualityPresets } from '@/components/Quality/QualityPresets'
 import { planGlide } from '@/flame/glide/plan'
+import { glideFrameQuality, resolveGlideQuality } from '@/flame/glide/quality'
+import { APART_FROM_LIVE_GLIDE } from '@/flame/glide/runtime'
 import { sampleGlide } from '@/flame/glide/sample'
 import { isGlideRefusal } from '@/flame/glide/types'
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { defaultTimelineConfig } from '@/flame/schema/timeline'
 import { deepClone } from '@/utils/clone'
 import { applyTracksToFlame, getUserEndFrame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
-import { glideMsForAction } from './glide'
+import { glideMsForAction, glideOptionsByStep } from './glide'
 import { closingHoldMs, stepGapMs } from './player'
 import { createPlayheadPacer } from './playWindowPace'
 import { planPlayWindows } from './playWindows'
@@ -23,7 +25,7 @@ import type { RecordedAction, RecordedSession, SessionViewSnapshot, TransformCol
 import type { SonificationSnapshot } from './sonificationState'
 import type { CommandContext } from '@/commands/types'
 import type { Palette } from '@/flame/colorMap'
-import type { GlidePlan } from '@/flame/glide/types'
+import type { GlidePlan, GlideQualityTier } from '@/flame/glide/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
@@ -79,6 +81,9 @@ export type ReplayVideoSchedule = {
    * seen before the next step arrives.
    */
   glideFrames: number[]
+  /** Each glide's length and tier, as the live replay plans it. */
+  glideMs: number[]
+  glideTiers: GlideQualityTier[]
   /** Whether the take played in the run after each step, and each step's
    *  take time: inside a play window every frame shows its own moment. */
   playing: boolean[]
@@ -447,9 +452,10 @@ export function createReplayVideoSchedule(
   }
   const spec = buildScheduleSpec(playbackSpeed, leadInMs, tailMs)
   // The same number the live player uses, from the same function, for the same
-  // reason the gap rule is shared.
-  const glideMs = session.actions.map((action) =>
-    glideMsForAction(action, glide),
+  // reason the gap rule is shared, at the tier the take has in force there.
+  const stepGlides = glideOptionsByStep(session, glide)
+  const glideMs = session.actions.map((action, index) =>
+    glideMsForAction(action, stepGlides[index]!),
   )
   const playing = planPlayWindows(session.actions).after.map(
     (window) => window !== undefined,
@@ -518,6 +524,8 @@ export function createReplayVideoSchedule(
     actionTimesMs,
     actionFrames,
     glideFrames,
+    glideMs,
+    glideTiers: stepGlides.map((options) => options.tier),
     playing,
     stepTakeMs: session.actions.map((action) => action.t),
     playbackSpeed: spec.playbackSpeed,
@@ -558,6 +566,16 @@ export function replayStateAtFrame(
   return { actionIndex, glideT, takeMs }
 }
 
+/** One output frame's quality: a glide frame at its step's tier, else full. */
+export function replayFrameQuality(
+  schedule: ReplayVideoSchedule,
+  at: ReplayVideoStateAt,
+  quality: number,
+): number {
+  const tier = resolveGlideQuality(schedule.glideTiers[at.actionIndex])
+  return glideFrameQuality(quality, tier, at.glideT)
+}
+
 export function replayActionIndexAtFrame(
   schedule: ReplayVideoSchedule,
   frameIndex: number,
@@ -593,6 +611,7 @@ export function replayFramesInStateRun(
 
 export function createReplayVideoDriver(
   inputSession: RecordedSession,
+  glides?: Pick<ReplayVideoSchedule, 'glideMs' | 'glideTiers'>,
 ): ReplayVideoDriver {
   const validatedSession = validateSession(deepClone(inputSession))
   if (!validatedSession) {
@@ -912,8 +931,7 @@ export function createReplayVideoDriver(
     modal: { open: () => {} },
     // This world's glides come from the export request and its own plans: a
     // take's Glide steps change nothing here, and never the viewer's.
-    glideSwitches: { setEnabled: () => {}, setQuality: () => {} },
-    glideRuntime: () => undefined,
+    ...APART_FROM_LIVE_GLIDE,
   }
 
   function frameState(
@@ -1043,8 +1061,13 @@ export function createReplayVideoDriver(
   ): GlidePlan | undefined {
     if (glidePlans.has(index)) return glidePlans.get(index)
     const from = glideSources.get(index)
+    // Planned as the live runtime plans the step (runtime.ts `start`).
     const planned =
-      from === undefined ? undefined : planGlide(from, settledFlame)
+      from &&
+      planGlide(from, settledFlame, {
+        durationMs: glides?.glideMs[index],
+        quality: glides?.glideTiers[index],
+      })
     const usable =
       planned === undefined || isGlideRefusal(planned) ? undefined : planned
     glidePlans.set(index, usable)

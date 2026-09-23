@@ -13,9 +13,11 @@
  * differently is a length they disagree about.
  */
 
+import { qualityPresets } from '@/components/Quality/QualityPresets'
 import { clampGlideMs, glideMsForHint } from '@/flame/glide/durations'
-import type { RecordedAction } from './schema'
-import type { GlideQualityTier } from '@/flame/glide/types'
+import { isGlideQualityPreference, resolveGlideQuality, } from '@/flame/glide/quality'
+import type { RecordedAction, RecordedSession } from './schema'
+import type { GlideQualityPreference, GlideQualityTier, } from '@/flame/glide/types'
 
 /**
  * What a step with nothing to say gets.
@@ -35,12 +37,15 @@ export type ReplayGlideOptions = {
   /** The quality tier's duration multiplier. */
   durationScale?: number
   /**
-   * Which tier the glide frames render at. Travels with an export job so a
-   * background render downshifts the same way the live one does, and so the
-   * tier a demo was captured at is recorded in the job rather than read from
-   * whatever the workspace happened to be set to when it ran.
+   * Which tier the glide frames render at. Travels with an export job, with
+   * `preference`, so a background render downshifts the same way the live one
+   * does, and so the tier a demo was captured at is recorded in the job rather
+   * than read from whatever the workspace happened to be set to when it ran.
    */
   tier?: GlideQualityTier
+  /** The viewer's quality switch a replay starts from, `auto` included; the
+   *  take's own steps switch it from there (see {@link glideOptionsByStep}). */
+  preference?: GlideQualityPreference
 }
 
 /**
@@ -61,4 +66,33 @@ export function glideMsForAction(
   const hinted = glideMsForHint(action.glide, scale)
   if (hinted !== undefined) return hinted
   return clampGlideMs((options.defaultMs ?? DEFAULT_REPLAY_GLIDE_MS) * scale)
+}
+
+const presetOf = (key: unknown) =>
+  typeof key === 'string' && key in qualityPresets ? key : undefined
+
+/**
+ * The options for the glide into each step, at the tier in force once it ran,
+ * as the live replay's glides take it: from the viewer's `preference`, switched
+ * by the take's `glide.setQuality` steps, and under `auto` by the preset of its
+ * view and `view.setQualityPreset` steps. `glide.setEnabled` changes nothing.
+ */
+export function glideOptionsByStep(
+  session: Pick<RecordedSession, 'actions' | 'initialView'>,
+  glide: ReplayGlideOptions,
+): (ReplayGlideOptions & { tier: GlideQualityTier })[] {
+  let preference = glide.preference ?? glide.tier ?? 'auto'
+  let preset = presetOf(session.initialView?.qualityPreset)
+  return session.actions.map(({ id, args: [value] }) => {
+    if (id === 'glide.setQuality' && isGlideQualityPreference(value)) {
+      preference = value
+    }
+    if (id === 'view.setQualityPreset') preset = presetOf(value) ?? preset
+    // `auto` with no preset in the take: the tier the viewer's own gave.
+    const { tier, durationScale } = resolveGlideQuality(
+      preference === 'auto' && preset === undefined ? glide.tier : preference,
+      preset,
+    )
+    return { ...glide, tier, durationScale }
+  })
 }

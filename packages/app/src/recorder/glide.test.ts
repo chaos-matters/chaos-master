@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GLIDE_DURATIONS } from '@/flame/glide/durations'
 import { MAX_GLIDE_MS } from '@/flame/glide/types'
-import { DEFAULT_REPLAY_GLIDE_MS, glideMsForAction } from './glide'
+import { DEFAULT_REPLAY_GLIDE_MS, glideMsForAction, glideOptionsByStep, } from './glide'
 import { MIN_STEP_GAP_MS, stepGapMs } from './player'
-import type { RecordedAction } from './schema'
+import type { ReplayGlideOptions } from './glide'
+import type { RecordedAction, SessionViewSnapshot } from './schema'
 
 const ON = { enabled: true } as const
 
@@ -99,5 +100,58 @@ describe('stepGapMs with a glide', () => {
   it('is unchanged when no glide is asked for', () => {
     expect(stepGapMs(previous, next, 1, 0)).toBe(stepGapMs(previous, next, 1))
     expect(stepGapMs(undefined, next, 1, 0)).toBe(stepGapMs(undefined, next, 1))
+  })
+})
+
+describe('glideOptionsByStep', () => {
+  const steps = (...actions: [string, unknown][]) =>
+    actions.map(([id, value], t) => ({ t, id, args: [value] }))
+  const tiers = (
+    session: Parameters<typeof glideOptionsByStep>[0],
+    glide: ReplayGlideOptions,
+  ) => glideOptionsByStep(session, glide).map((options) => options.tier)
+
+  it("starts from the viewer's switch and follows the take's", () => {
+    const actions = steps(
+      ['flame.setGamma', 2],
+      ['glide.setQuality', 'full'],
+      ['glide.setQuality', 'bogus'],
+      ['glide.setEnabled', false],
+    )
+    expect(tiers({ actions }, { ...ON, preference: 'balanced' })).toEqual([
+      'balanced',
+      'full',
+      'full',
+      'full',
+    ])
+  })
+
+  it("reads `auto` from the take's preset, and the viewer's with none", () => {
+    const actions = steps(
+      ['flame.setGamma', 2],
+      ['view.setQualityPreset', 'ultra'],
+    )
+    const viewer = { ...ON, preference: 'auto', tier: 'balanced' } as const
+    expect(tiers({ actions }, viewer)).toEqual(['balanced', 'full'])
+    const initialView = { qualityPreset: 'low' } as SessionViewSnapshot
+    expect(tiers({ actions, initialView }, viewer)).toEqual([
+      'responsive',
+      'full',
+    ])
+    // A preset the workspace does not know is one the replay never loads.
+    const unknown = { qualityPreset: 'bogus' } as SessionViewSnapshot
+    expect(tiers({ actions, initialView: unknown }, viewer)).toEqual([
+      'balanced',
+      'full',
+    ])
+  })
+
+  it('holds an export queued before the preference was sent to its tier', () => {
+    const actions = steps(['flame.setGamma', 2], ['glide.setQuality', 'auto'])
+    const legacy = { ...ON, tier: 'full', durationScale: 1.5 } as const
+    expect(glideOptionsByStep({ actions }, legacy)).toMatchObject([
+      { tier: 'full', durationScale: 1.5 },
+      { tier: 'full', durationScale: 1.5 },
+    ])
   })
 })

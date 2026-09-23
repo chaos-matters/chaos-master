@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pilotLog, resetPilot, startPilot } from '@/arcade/pilot'
 import { finishPilot } from '@/arcade/pilotActions'
 import { clearPilotFocus, pilotFocus } from '@/arcade/pilotFocus'
-import { createGlideRuntime, setGlideEnabled, setGlideRuntime, } from '@/flame/glide/runtime'
+import { createGlideRuntime, restoreGlideSwitches, setGlideEnabled, setGlideRuntime, } from '@/flame/glide/runtime'
 import { GLIDE_DEADLINE_SLACK_MS } from '@/flame/glide/types'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
@@ -263,7 +263,7 @@ describe('execute_command dispatch', () => {
 describe('execute_command glides', () => {
   afterEach(() => {
     setGlideRuntime(undefined)
-    setGlideEnabled(false)
+    restoreGlideSwitches({ enabled: false, quality: 'auto' })
     cancelSessionRecording()
     clearWebMcpContext()
   })
@@ -448,6 +448,31 @@ describe('execute_command glides', () => {
     expect(world.runtime.isGliding()).toBe(false)
     expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
     expect(ctx.flameDescriptor().renderSettings.exposure).toBe(0.9)
+  })
+
+  // A switch only chooses how later changes appear: flipping one mid-glide
+  // neither lands the glide early nor hands a playing replay back.
+  it.each([
+    ['glide.setQuality', 'full'],
+    ['glide.setEnabled', false],
+  ] as const)('lets a glide in flight finish through %s', async (id, value) => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    const first = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+      {},
+    )
+    world.advance(200)
+    setGlideEnabled(true)
+
+    await executeCommandTool.execute({ commandId: id, args: [value] }, {})
+
+    expect(world.runtime.isGliding()).toBe(true)
+    expect(ctx.beforeCommand).toHaveBeenCalledTimes(1)
+    world.advance(400)
+    await first
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
   })
 
   it('offers the option in its schema so an agent can find it', () => {

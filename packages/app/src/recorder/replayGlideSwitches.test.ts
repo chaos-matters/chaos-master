@@ -2,11 +2,13 @@ import '@/commands/builtins'
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
+import { createPortalDriver } from '@/components/Home/portalScript'
 import { examples } from '@/flame/examples'
 import { createGlideRuntime, glideEnabled, glideQualityPreference, restoreGlideSwitches, setGlideRuntime, } from '@/flame/glide/runtime'
+import { createSeat } from '@/seats/seat'
 import { deepClone } from '@/utils/clone'
 import { createSessionPlayer, MIN_STEP_GAP_MS } from './player'
-import { cancelSessionRecording } from './recorder'
+import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, lastFinishedSession, startSessionRecording, stopSessionRecording, } from './recorder'
 import { createReplayVideoDriver } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import { replaySessionHeadless } from './synthesize/replaySandbox'
@@ -57,8 +59,11 @@ function makeTarget(failOn?: number) {
   const ctx = {} as CommandContext
   let takeover: (() => void) | undefined
   let executed = 0
+  let loaded = 0
   const target: ReplayTarget = {
-    loadInitial: () => {},
+    loadInitial: () => {
+      loaded++
+    },
     execute: (id, args) => {
       if (executed++ === failOn) throw new Error('boom')
       return executeReplayCommand(id, ctx, ...args)
@@ -70,7 +75,7 @@ function makeTarget(failOn?: number) {
       takeover = undefined
     },
   }
-  return { target, takeOver: () => takeover?.() }
+  return { target, takeOver: () => takeover?.(), loaded: () => loaded }
 }
 
 /** Run the replay to the moment step `index` has applied. */
@@ -165,17 +170,110 @@ describe('the replay player and the Glide switches', () => {
       playTo(1)
       player.pause()
       flipAsViewer('glide.setQuality', 'auto')
-      // A live command is an edit, so Resume rebuilds the take from its
-      // start, and its steps switch quality twice more on the way.
+      // A flip is no edit: Resume carries on from the paused step, and the
+      // take's next step switches quality again.
       player.play()
       vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(1)
       expect(switches()).toEqual({ enabled: true, quality: 'auto' })
-      vi.advanceTimersByTime(1000)
-      expect(switches()).toEqual({ enabled: true, quality: 'full' })
       vi.advanceTimersByTime(1000)
       expect(player.isFinished()).toBe(true)
       // Their flip is their setting now; what the take switched goes back.
       expect(switches()).toEqual({ enabled: false, quality: 'auto' })
+      dispose()
+    })
+  })
+
+  it.each([
+    ['glide.setEnabled', true],
+    ['glide.setQuality', 'responsive'],
+  ])('resumes a paused replay where it paused after a live %s', (id, value) => {
+    createRoot((dispose) => {
+      const { target, loaded } = makeTarget()
+      const player = createSessionPlayer(take, target)
+      player.play()
+      playTo(1)
+      player.pause()
+      const edits = getLiveWorkspaceMutationGeneration()
+      flipAsViewer(id, value)
+      // It changes no document, so it is not the viewer taking over.
+      expect(getLiveWorkspaceMutationGeneration()).toBe(edits)
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(loaded()).toBe(1)
+      expect(player.stepIndex()).toBe(1)
+      vi.advanceTimersByTime(1000)
+      expect(player.stepIndex()).toBe(2)
+      expect(player.isFinished()).toBe(true)
+      dispose()
+    })
+  })
+
+  it('seeks forward from a paused replay after a live flip without a rebuild', () => {
+    createRoot((dispose) => {
+      const { target, loaded } = makeTarget()
+      const player = createSessionPlayer(take, target)
+      player.play()
+      playTo(0)
+      player.pause()
+      flipAsViewer('glide.setQuality', 'auto')
+      player.seek(2)
+      expect(loaded()).toBe(1)
+      expect(player.stepIndex()).toBe(2)
+      player.stop()
+      // The take switched quality twice after the flip; the flip is kept.
+      expect(switches()).toEqual({ enabled: false, quality: 'auto' })
+      dispose()
+    })
+  })
+
+  it('keeps the last finished take on the document it describes', () => {
+    startSessionRecording(deepClone(examples.example1))
+    flipAsViewer('glide.setEnabled', true)
+    const recorded = stopSessionRecording()
+    expect(recorded?.actions.map((action) => action.id)).toEqual([
+      'glide.setEnabled',
+    ])
+    flipAsViewer('glide.setQuality', 'full')
+    flipAsViewer('glide.setEnabled', false)
+    expect(lastFinishedSession()).toBe(recorded)
+  })
+
+  it("names the viewer's own switches for an export, whatever the take holds", () => {
+    createRoot((dispose) => {
+      const player = createSessionPlayer(take, makeTarget().target)
+      expect(player.viewerGlideSwitches()).toEqual(VIEWER)
+      player.play()
+      playTo(1)
+      player.pause()
+      expect(switches()).toEqual({ enabled: true, quality: 'full' })
+      expect(player.viewerGlideSwitches()).toEqual(VIEWER)
+      flipAsViewer('glide.setQuality', 'auto')
+      expect(player.viewerGlideSwitches()).toEqual({
+        enabled: false,
+        quality: 'auto',
+      })
+      player.stop()
+      dispose()
+    })
+  })
+
+  it('still rebuilds a paused replay after a live edit', () => {
+    createRoot((dispose) => {
+      const { target, loaded } = makeTarget()
+      const player = createSessionPlayer(take, target)
+      player.play()
+      playTo(1)
+      player.pause()
+      executeCommand(
+        'sidebar.open',
+        { sidebar: { setOpen: () => true } } as never,
+        true,
+      )
+      player.play()
+      expect(loaded()).toBe(2)
+      expect(player.stepIndex()).toBe(-1)
+      player.stop()
       dispose()
     })
   })
@@ -217,20 +315,53 @@ describe('the replay player and the Glide switches', () => {
     })
   })
 
-  it('keeps a flip that takes a playing replay over', () => {
-    createRoot((dispose) => {
-      const { target, takeOver } = makeTarget()
-      const player = createSessionPlayer(take, target)
-      player.play()
-      playTo(1)
-      // A live command hands the replay back before it runs.
-      takeOver()
-      flipAsViewer('glide.setQuality', 'responsive')
-      expect(player.isPlaying()).toBe(false)
-      expect(switches()).toEqual({ enabled: false, quality: 'responsive' })
-      dispose()
-    })
-  })
+  // The viewer's live command, wired to the takeover hook the workspace gives
+  // it: any command but a Glide switch hands a playing replay back first.
+  const liveCtx = (takeOver: () => void) =>
+    ({
+      beforeCommand: takeOver,
+      modal: { open: () => {} },
+    }) as unknown as CommandContext
+
+  it.each([
+    ['glide.setQuality', 'auto', { enabled: false, quality: 'auto' }],
+    ['glide.setEnabled', false, VIEWER],
+  ] as const)(
+    'plays on through a live %s, and keeps the flip',
+    (id, value, after) => {
+      createRoot((dispose) => {
+        const { target, takeOver, loaded } = makeTarget()
+        const player = createSessionPlayer(take, target)
+        player.play()
+        playTo(1)
+        executeCommand(id, liveCtx(takeOver), value)
+        expect(player.isPlaying()).toBe(true)
+        vi.advanceTimersByTime(1000)
+        expect(player.stepIndex()).toBe(2)
+        vi.advanceTimersByTime(5000)
+        expect(player.isFinished()).toBe(true)
+        expect(loaded()).toBe(1)
+        expect(switches()).toEqual(after)
+        dispose()
+      })
+    },
+  )
+
+  it.each(['export.png', 'export.animation'])(
+    'still hands a playing replay back to open %s',
+    (id) => {
+      createRoot((dispose) => {
+        const { target, takeOver } = makeTarget()
+        const player = createSessionPlayer(take, target)
+        player.play()
+        playTo(1)
+        executeCommand(id, liveCtx(takeOver))
+        expect(player.isPlaying()).toBe(false)
+        expect(switches()).toEqual(VIEWER)
+        dispose()
+      })
+    },
+  )
 
   it('sets them as the take had them at the step a seek lands on', () => {
     createRoot((dispose) => {
@@ -311,4 +442,48 @@ describe('replay worlds apart from the workspace', () => {
     expect(replaySessionHeadless(take)).toBeDefined()
     expect(switches()).toEqual(VIEWER)
   })
+
+  /** A command context with a canvas of its own and no Glide of its own. */
+  const apart = {
+    'a duel seat': () => {
+      const seat = createSeat('rival', deepClone(examples.example1))
+      return {
+        run: (id: string, ...args: unknown[]) => {
+          executeCommand(id, seat.ctx, ...args)
+        },
+        flame: () => seat.flame(),
+        dispose: () => {
+          seat.dispose()
+        },
+      }
+    },
+    'the Home portal': () =>
+      createRoot((dispose) => {
+        const driver = createPortalDriver(examples.example1)
+        return {
+          run: driver.ctx.executeCommand,
+          flame: () => driver.flame,
+          dispose,
+        }
+      }),
+  }
+
+  it.each(Object.keys(apart) as (keyof typeof apart)[])(
+    'never reaches the live glide or switches through %s',
+    (name) => {
+      const live = watchLiveGlide()
+      const world = apart[name]()
+      world.run('glide.setEnabled', true)
+      world.run('glide.setQuality', 'full')
+      world.run('glide.toFlame', deepClone(examples.example2), 1200)
+      live.dispose()
+      expect(live.calls()).toEqual({ settle: 0, glideFrom: 0, writes: 0 })
+      expect(switches()).toEqual(VIEWER)
+      // The step still lands on its flame, in one move.
+      expect(Object.keys(world.flame().transforms)).toEqual(
+        Object.keys(examples.example2.transforms),
+      )
+      world.dispose()
+    },
+  )
 })

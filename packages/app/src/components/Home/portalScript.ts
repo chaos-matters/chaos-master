@@ -8,6 +8,7 @@ import { createStore, produce, reconcile } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { executeCommand } from '@/commands/registry'
 import { DEFAULT_ANIMATION_DURATION_MS } from '@/components/SpotlightTour/tourTypes'
+import { APART_FROM_LIVE_GLIDE } from '@/flame/glide/runtime'
 import { withRecordingSuppressed } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import type { CommandContext } from '@/commands/types'
@@ -215,6 +216,8 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
       },
     },
     modal: { open: () => {} },
+    // Tours animate through `animateValue`; no Glide step reaches the editor.
+    ...APART_FROM_LIVE_GLIDE,
   }
 
   /** Running `animateValue` loops — each entry snaps to its end value. */

@@ -150,14 +150,19 @@ export const executeCommandTool: WebMcpTool = {
     // what a transition is for. The mode's allow-list, its step budget and the
     // duel clock have all been answered above, so a transition can only ever
     // present a change the lock already let through.
-    const glide = resolveGlideRequest(rawInput, driving?.mode === 'duel')
+    // A Glide switch changes nothing to present, and the glide in flight
+    // (a playing replay's, say) is not a change before it: it runs on.
+    const change = getCommand(commandId)?.presentationSwitch !== true
+    const glide = change
+      ? resolveGlideRequest(rawInput, driving?.mode === 'duel')
+      : undefined
     const runtime = getGlideRuntime()
     // Settle anything already in flight FIRST, whether or not THIS call
     // animates: a scripted command is a change, so the transition before it
     // belongs to the change before it and must land on its own target rather
     // than be cancelled halfway. `settleForNextChange` hands back what the
     // viewer can see, so an animation that follows starts from there.
-    const visible = runtime?.settleForNextChange()
+    const visible = change ? runtime?.settleForNextChange() : undefined
     const glideFrom =
       glide === undefined
         ? undefined

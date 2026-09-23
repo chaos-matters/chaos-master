@@ -3,6 +3,7 @@ import { createStore } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { executeCommand } from '@/commands/registry'
+import { APART_FROM_LIVE_GLIDE } from '@/flame/glide/runtime'
 import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { recorderStream } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
@@ -275,5 +276,7 @@ export function createSeatCommandContext(seat: {
       center: () => {},
     },
     modal: { open: () => {} },
+    // A duel refuses transitions; the only glide is the viewer workspace's.
+    ...APART_FROM_LIVE_GLIDE,
   }
 }

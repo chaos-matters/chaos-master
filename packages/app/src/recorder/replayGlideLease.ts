@@ -19,6 +19,9 @@ export type ReplayGlideLease = {
   reset: () => void
   /** Hand the viewer's switches back and let go. */
   release: () => void
+  /** The viewer's own switches: those held, flips kept, or else the live
+   *  ones. What an export of the take starts from, wherever it is paused. */
+  viewer: () => GlideSwitches
 }
 
 export function createReplayGlideLease(): ReplayGlideLease {
@@ -59,6 +62,10 @@ export function createReplayGlideLease(): ReplayGlideLease {
       reset()
       viewer = undefined
       left = undefined
+    },
+    viewer() {
+      keepViewerFlips()
+      return viewer ?? captureGlideSwitches()
     },
   }
 }
