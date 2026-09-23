@@ -55,9 +55,9 @@ import the modal chunk, construct the launcher inside the captured owner via
 `runWithOwner` so it can read the app's modal context, and memoise the resulting
 promise, so that every later invocation reuses the same module and launcher.
 
-_(`lazyModals.ts:37-55`; the owner is captured at `:40` and re-entered at `:49`
+_(`lazyModals.ts:37-55` (`createLazyShowDocumentation`); the owner is captured at `:40` (`getOwner`) and re-entered at `:49`
 because `createShowDocumentation` calls `useRequestModal` during construction —
-`DocumentationModal.tsx:98`. `createLazyShowHelp` at `lazyModals.ts:57-97`
+`DocumentationModal.tsx:98` (`requestModal`). `createLazyShowHelp` at `lazyModals.ts:57-101`
 follows the same shape.)_
 
 ### REQ-DS-002 — A failed panel chunk load is recoverable
@@ -67,12 +67,12 @@ hashed chunk after a redeploy, or a dropped connection — **then** the launcher
 shall clear its memoised promise and surface the failure to the user, so that a
 subsequent click retries the import instead of silently doing nothing.
 
-> **Known deviation:** `packages/app/src/components/WorkspaceModalsHost/lazyModals.ts:45-51`
-> (and `:73-93` for Help) — there is no `.catch` and no reset of
+> **Known deviation:** `packages/app/src/components/WorkspaceModalsHost/lazyModals.ts:45-51` (`showDocumentation`)
+> (and `:75-97` (`showHelp`) for Help) — there is no `.catch` and no reset of
 > `instancePromise`, so the rejected promise is cached for the life of the page
 > and every later click resolves to the same rejection. The call sites discard
-> it: `packages/app/src/MainWorkspace.tsx:4096` is `void showDocumentation()`
-> and `:4099` is `void showHelp()`, neither wrapped. The button appears inert
+> it: `packages/app/src/MainWorkspace.tsx:4502` is `void showDocumentation()`
+> and `:4505` is `void showHelp()`, neither wrapped. The button appears inert
 > and only a full reload recovers. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
 
@@ -82,7 +82,7 @@ subsequent click retries the import instead of silently doing nothing.
 activated, the menu shall close before the launcher is invoked, so the expanded
 menu is never left behind the dialog.
 
-_(`SoftwareVersion.tsx:134-148` and `:150-164` — each handler calls
+_(`SoftwareVersion.tsx:154-168` (`docsPill`) and `:170-186` (`aboutPill`) — each handler calls
 `setOpen(false)` before `props.showDocs()` / `props.showHelp()`.)_
 
 ### REQ-DS-004 — The panel opens on Variations with tablist semantics
@@ -92,8 +92,8 @@ render the three tabs (`Variations`, `IFS Mathematics`, `WebGPU & API`) inside a
 `role="tablist"` container, and mark exactly one `role="tab"` button
 `aria-selected="true"`.
 
-_(`DocumentationModal.tsx:20-24` for the tab table, `:32` for the initial
-signal, `:54` for the tablist, `:59-64` for the per-tab button. No
+_(`DocumentationModal.tsx:20-24` (`TABS`) for the tab table, `:32` (`DocTab`) for the initial
+signal, `:54` (`tablist`) for the tablist, `:59-64` (`tab`) for the per-tab button. No
 `role="tabpanel"` or `aria-controls` is emitted.)_
 
 ### REQ-DS-005 — Only the active tab's subtree is mounted
@@ -102,7 +102,7 @@ signal, `:54` for the tablist, `:59-64` for the per-tab button. No
 that leaving the Variations tab tears down every live preview canvas rather than
 hiding it.
 
-_(`DocumentationModal.tsx:76-86` — three sibling `<Show>` blocks keyed on
+_(`DocumentationModal.tsx:76-86` (`tabBody`) — three sibling `<Show>` blocks keyed on
 `tab()`, not a CSS visibility toggle. This is what makes REQ-DS-017's teardown
 fire on a tab switch as well as on close.)_
 
@@ -112,10 +112,10 @@ fire on a tab switch as well as on close.)_
 Escape, the modal shall resolve the `requestModal` promise and remove its
 instance from the modal list, destroying the whole content subtree.
 
-_(`Modal.tsx:94-110` — `respond` resolves then filters the instance out, wrapped
-in `document.startViewTransition` where available; `:117-120` maps the dialog's
+_(`Modal.tsx:100-118` — `respond` resolves then filters the instance out, wrapped
+in `document.startViewTransition` where available; `:141-144` (`onCancel`) maps the dialog's
 `cancel` event onto `respond(undefined)`;
-`DocumentationModal.tsx:36` wires the title bar's `onClose` to `respond`. No
+`DocumentationModal.tsx:36` (`ModalTitleBar`) wires the title bar's `onClose` to `respond`. No
 backdrop-click dismissal is implemented.)_
 
 ### REQ-DS-007 — Catalog search is fuzzy and score-ordered
@@ -126,7 +126,7 @@ substring match, otherwise a subsequence score penalised by match position — a
 shall list only non-negative scores, in descending score order.
 
 _(`VariationDocsTab.tsx:19-36` for `fuzzyScore`, `:73-81` for `filtered`. An
-empty query short-circuits to registry order at `:75`.)_
+empty query short-circuits to registry order at `:75` (`allTypes`).)_
 
 ### REQ-DS-008 — An empty result set explains itself
 
@@ -143,8 +143,8 @@ render an "All" pill plus one pill per present category, in canonical
 `CATEGORIES` order; clicking the already-active category pill shall clear the
 filter rather than re-apply it.
 
-_(`VariationDocsTab.tsx:182` gates the row on `activeCategories().length > 1`,
-`:102-109` derives the present categories, `:200-202` is the toggle-off
+_(`VariationDocsTab.tsx:182` (`activeCategories`) gates the row on `activeCategories().length > 1`,
+`:102-109` derives the present categories, `:200-202` (`setCategoryFilter`) is the toggle-off
 behaviour.)_
 
 ### REQ-DS-010 — Results are grouped into counted category sections
@@ -153,9 +153,9 @@ The gallery shall group the filtered set by category, order the groups by
 `sortByCategory`, and head each group with its label and the number of
 variations it contains.
 
-_(`VariationDocsTab.tsx:83-100` for the grouping and sort, `:238-244` for the
+_(`VariationDocsTab.tsx:83-100` (`grouped`) for the grouping and sort, `:238-244` (`sectionHeader`) for the
 section header and count badge. Variations whose `categoryOf` is undefined are
-dropped at `:88`.)_
+dropped at `:88` (`cat`).)_
 
 ### REQ-DS-011 — Flipping dimension resets selection and filter
 
@@ -164,7 +164,7 @@ the first _documented_ variation in the new registry — falling back to that
 registry's default linear type when none is documented — and shall clear the
 category filter.
 
-_(`VariationDocsTab.tsx:63-68`. Without the reset the detail pane would hold a
+_(`VariationDocsTab.tsx:63-68` (`createEffect`). Without the reset the detail pane would hold a
 type that does not exist in the new registry.)_
 
 ### REQ-DS-012 — Documented variations are marked in the grid
@@ -172,8 +172,8 @@ type that does not exist in the new registry.)_
 **Where** a variation has an authored entry in the doc map, its gallery tile
 shall carry a "Documented formula" dot.
 
-_(`VariationDocsTab.tsx:275-280`, keyed on `hasDoc` from
-`flame/variations/docs/index.ts:31-33`.)_
+_(`VariationDocsTab.tsx:275-280` (`hasDoc`), keyed on `hasDoc` from
+`flame/variations/docs/index.ts:31-33` (`hasDoc`).)_
 
 ### REQ-DS-013 — Preview canvases get their own GPU context inside the Portal
 
@@ -181,7 +181,7 @@ The catalog gallery shall wrap its previews in a fresh `<Root>` and a
 `<ComputeGate>`, because the modal is rendered through a `Portal` and therefore
 cannot see the application's own `RootContext` or compute gate.
 
-_(`VariationDocsTab.tsx:212-215` and `:234`; the Portal is `Modal.tsx:81`.
+_(`VariationDocsTab.tsx:212-215` (`Root`) and `:234` (`ComputeGate`); the Portal is `Modal.tsx:82` (`Portal`).
 Omitting either provider is the failure mode recorded for WebGPU previews in
 modals — see the `LoadFlameModal` / `RandomizerGalleryModal` precedent.)_
 
@@ -191,8 +191,8 @@ modals — see the `LoadFlameModal` / `RandomizerGalleryModal` precedent.)_
 shall be granted GPU work at once, regardless of how many tiles the filter
 produced.
 
-_(`VariationDocsTab.tsx:234`; the capacity is `2` by default —
-`packages/app/src/defaults.ts:131-133`, overridable by
+_(`VariationDocsTab.tsx:234` (`ComputeGate`); the capacity is `2` by default —
+`packages/app/src/defaults.ts:131-133` (`COMPUTE_GATE_CAPACITY`), overridable by
 `VITE_COMPUTE_GATE_CAPACITY`.)_
 
 ### REQ-DS-015 — Tile reveal is staggered over a bounded index
@@ -202,7 +202,7 @@ _(`VariationDocsTab.tsx:234`; the capacity is `2` by default —
 recomputed for every change of filter so the stagger stays bounded rather than
 growing with the full registry size.
 
-_(`VariationDocsTab.tsx:112-122` builds the index map over `grouped()`, `:249`
+_(`VariationDocsTab.tsx:112-122` (`galleryIndexOf`) builds the index map over `grouped()`, `:249` (`galleryIndexOf`)
 reads it, `:261` applies `DelayedShow delayMs={idx * 25}`;
 `DelayedShow` clears its timer on cleanup —
 `components/DelayedShow/DelayedShow.tsx`.)_
@@ -213,9 +213,9 @@ The catalog shall render each preview at the resolution mapped to the session's
 hardware tier — 192×132 (low), 256×176 (mid), 320×220 (high), 384×264 (ultra) —
 and shall pass that same tier through as the preview's target quality.
 
-_(`VariationDocsTab.tsx:40-48` for the table, `:128-133` for the memos, `:268-269`
+_(`VariationDocsTab.tsx:40-48` (`PREVIEW_RESOLUTION_BY_TIER`) for the table, `:128-133` (`previewTier`) for the memos, `:268-269` (`hardwareTier`)
 for the props. **If** no tier has been detected, **then** `high` is assumed
-(`:129`). The earlier hard cap of `mid` / 160×110 was removed deliberately in
+(`:129` (`hardwareTier`)). The earlier hard cap of `mid` / 160×110 was removed deliberately in
 `220f836f`; an audit claim that this makes ~148 tiles allocate at once was
 examined and **refuted** — see REQ-DS-017.)_
 
@@ -225,11 +225,11 @@ examined and **refuted** — see REQ-DS-017.)_
 static image, swap the image in, and unmount the WebGPU canvas; **while** a tile
 is off-screen or the gallery is mid-scroll, it shall not mount a canvas at all.
 
-_(`VariationSelector.tsx:201` for `settledVisible`, `:256-263` for the mount
+_(`VariationSelector.tsx:202` for `settledVisible`, `:257-264` (`isPreviewMounted`) for the mount
 memo — `!paused && image() === undefined && (allowed() || settledVisible() ||
-renderStatus() === 'done')` — and `:265-299` for the snapshot and object-URL
+renderStatus() === 'done')` — and `:266-300` for the snapshot and object-URL
 cleanup. The deliberate absence of an `everVisible` latch is what bounds VRAM;
-the comment at `:250-255` records the measured 49-live-canvas regression that
+the comment at `:251-256` (`buffers`) records the measured 49-live-canvas regression that
 motivated it.)_
 
 ### REQ-DS-018 — The detail pane states what the variation is
@@ -239,7 +239,7 @@ name, its raw type identifier as a copy button, its category (where one is
 assigned), its dimension, and its parameter count with correct singular/plural
 wording.
 
-_(`SelectedVariationPanel.tsx:56-88`; the parameter count comes from
+_(`SelectedVariationPanel.tsx:56-88` (`detailHeader`); the parameter count comes from
 `paramDefaults` at `:35-36`.)_
 
 ### REQ-DS-019 — Undocumented prose degrades to a notice, not a blank
@@ -247,7 +247,7 @@ _(`SelectedVariationPanel.tsx:56-88`; the parameter count comes from
 **If** the selected variation has no authored `summary`, **then** the summary
 card shall render an informational notice saying documentation is in progress.
 
-_(`SelectedVariationPanel.tsx:90-104`.)_
+_(`SelectedVariationPanel.tsx:90-104` (`summaryCard`).)_
 
 ### REQ-DS-020 — Undocumented maths points at the shader instead
 
@@ -255,7 +255,7 @@ _(`SelectedVariationPanel.tsx:90-104`.)_
 sub-tab shall render a notice card that names the omission and directs the
 reader to the Shader Code sub-tab, which always has a source.
 
-_(`SelectedVariationPanel.tsx:126-145`.)_
+_(`SelectedVariationPanel.tsx:126-145` (`math`).)_
 
 ### REQ-DS-021 — TeX is authored so exactly one backslash reaches MathJax
 
@@ -268,10 +268,10 @@ are not escape-processed.
 
 _(All 229 authored entries across
 `flame/variations/docs/content{,.simple,.general,.general2,.rest,.3d}.ts` follow
-the doubled form — e.g. `content.ts:20`. Every quadrupled occurrence in the repo
+the doubled form — e.g. `content.ts:20` (`right`). Every quadrupled occurrence in the repo
 sits inside `\begin{cases}` — `content.ts:55`, `content.general.ts:141`,
 `content.general2.ts:1304`, `content.3d.ts:332`. The JSX form is
-`IfsGuideTab.tsx:37`, `:52`, `:67`. Doubling again outside `cases` renders a
+`IfsGuideTab.tsx:37`, `:52` (`formulaBlock`), `:67` (`MathSvg`). Doubling again outside `cases` renders a
 spurious line break; a stray single backslash in a TS literal is consumed by the
 compiler and the macro vanishes. Validate a new entry by rendering it through
 `renderTexToSvg`.)_
@@ -282,9 +282,9 @@ Every key in the variation doc map shall name a real variation type, and every
 key under a doc's `params` shall name a real field of that variation's
 `paramDefaults`.
 
-_(`flame/variations/docs/index.ts:18-25` merges the six content modules;
+_(`flame/variations/docs/index.ts:18-25` (`variationDocsContent`) merges the six content modules;
 `docs.coverage.test.ts` asserts both halves. Coverage is intentionally sparse —
-`types.ts:41-48` — with the modal falling back to REQ-DS-019/REQ-DS-020.)_
+`flame/variations/docs/types.ts:41-48` (`documentation`) — with the modal falling back to REQ-DS-019/REQ-DS-020.)_
 
 ### REQ-DS-023 — MathJax loads once, lazily, per page
 
@@ -293,8 +293,8 @@ memoise the readiness promise for the rest of the page's life, and render the Te
 in display mode; **while** that promise is pending the formula slot shall show a
 "Rendering…" placeholder rather than collapsing.
 
-_(`utils/mathjax.ts:17-21` for the memo, `:53` for the import, `:94` for the
-`\displaystyle{…}` wrap; `MathSvg.tsx:14-20` for the resource and `:23` for the
+_(`utils/mathjax.ts:17-21` (`mathjaxReady`) for the memo, `:53` (`mathjaxReady`) for the import, `:94` (`wrapped`) for the
+`\displaystyle{…}` wrap; `MathSvg.tsx:14-20` (`createResource`) for the resource and `:23` (`Rendering`) for the
 placeholder.)_
 
 ### REQ-DS-024 — A MathJax boot that never completes is not a hang
@@ -304,7 +304,7 @@ within 10 seconds, **then** `ensureMathJax` shall reject with a
 `MathJax failed to start within 10s` error, so the caller fails visibly instead
 of leaving every formula pending forever.
 
-_(`utils/mathjax.ts:59-79` — the timeout is cleared on both the resolve and the
+_(`utils/mathjax.ts:59-79` (`timeoutId`) — the timeout is cleared on both the resolve and the
 reject path. `renderTexToSvg` separately returns `null` rather than throwing
 when the document is missing or `tex2svg` throws — `:92`, `:98-99`.)_
 
@@ -316,8 +316,8 @@ paths — surviving being concatenated into another element's `innerHTML` — an
 that MathJax's speech Web Worker, whose path does not resolve under the bundler,
 is never spawned.
 
-_(`utils/mathjax.ts:41` and `:50`, with the reasoning at `:22-52`. The
-document-level `enableSpeech` / `enableBraille` flags at `:45-47` do **not** gate
+_(`utils/mathjax.ts:41` (`fontCache`) and `:50` (`renderActions`), with the reasoning at `:22-52` (`enableSpeech`). The
+document-level `enableSpeech` / `enableBraille` flags at `:45-47` (`enableSpeech`) do **not** gate
 the worker; clearing the render action is what does.)_
 
 ### REQ-DS-026 — Shader source always resolves to something
@@ -328,9 +328,9 @@ case for the inline-defined 3D registry — **then** it shall say so and display
 the resolved WGSL instead, and only **if** neither resolves shall it report the
 source unavailable.
 
-_(`SelectedVariationPanel.tsx:179-204` for the TS ladder and its loading state,
-`:205-212` for the WGSL view; sources come from `utils/variationSource.ts` via
-`:50-52`, where the accessor is annotated `(): string` on purpose to keep the
+_(`SelectedVariationPanel.tsx:179-204` (`lang`) for the TS ladder and its loading state,
+`:205-212` (`lang`) for the WGSL view; sources come from `utils/variationSource.ts` via
+`SelectedVariationPanel.tsx:50-52` (`typeId`), where the accessor is annotated `(): string` on purpose to keep the
 resource generic off the ~600-member variation union.)_
 
 ### REQ-DS-027 — Parameter metadata is derived from the real editor
@@ -342,9 +342,9 @@ derived value, an angle-shaped field name shall be the last-resort type guess,
 and a variation with no fields shall render a "No Configurable Parameters"
 notice instead of an empty table.
 
-_(`ParametersOverview.tsx:104-114` for the hidden probe, `:69-84` for the
-override precedence, `:24-25` for the name heuristic, `:87-102` for the empty
-notice. Captured metadata is reset on every change of variation — `:61-64` — so
+_(`ParametersOverview.tsx:104-114` (`primitives`) for the hidden probe, `:69-84` (`valueTypeOf`) for the
+override precedence, `:24-25` (`ANGLE_NAME`) for the name heuristic, `:87-102` (`fields`) for the empty
+notice. Captured metadata is reset on every change of variation — `:61-64` (`createEffect`) — so
 a stale probe cannot bleed across selections.)_
 
 ### REQ-DS-028 — Copy actions confirm, then revert
@@ -354,9 +354,9 @@ component shall write exactly the displayed payload to the clipboard and, on
 success, swap its icon and label to the confirmed state for 2000 ms before
 reverting.
 
-_(`CodeBlock.tsx:9-16` and `:29-40`; `SelectedVariationPanel.tsx:38-45` and
-`:69-74`. The Help modal's device-info copy uses the same pattern with a 1500 ms
-window — `HelpModal.tsx:212-219`.)_
+_(`CodeBlock.tsx:9-16` (`handleCopy`) and `:29-40` (`copied`); `SelectedVariationPanel.tsx:38-45` (`handleCopyId`) and
+`:69-74` (`copiedId`). The Help modal's device-info copy uses the same pattern with a 1500 ms
+window — `HelpModal.tsx:216-223` (`copyDeviceInfo`).)_
 
 ### REQ-DS-029 — A missing clipboard is a no-op, not a crash or a lie
 
@@ -364,9 +364,9 @@ window — `HelpModal.tsx:212-219`.)_
 that withholds it — **then** the documentation copy buttons shall do nothing and
 shall not enter the "Copied" state.
 
-_(`CodeBlock.tsx:10` and `SelectedVariationPanel.tsx:39` both guard on
+_(`CodeBlock.tsx:10` and `SelectedVariationPanel.tsx:39` (`clipboard`) both guard on
 `globalThis.navigator?.clipboard` before writing, and the confirmation flag is
-set only inside the resolved `.then`. Note `HelpModal.tsx:215` does **not** carry
+set only inside the resolved `.then`. Note `HelpModal.tsx:219` (`clipboard`) does **not** carry
 this guard — it calls `navigator.clipboard.writeText` unconditionally.)_
 
 ### REQ-DS-030 — The help surface reports the device it is actually running on
@@ -377,8 +377,8 @@ offer the same set plus app version, git SHA, user agent, platform, language,
 screen, viewport, WebGPU support, CPU cores and device RAM as one copyable text
 block.
 
-_(`HelpModal.tsx:101-118` for the query, `:123-172` for `gatherFullDeviceInfo`,
-`:549-618` for the rendered grid. Unchanged in this range — included because it
+_(`HelpModal.tsx:103-120` (`getGPUDeviceInformation`) for the query, `:125-174` for `gatherFullDeviceInfo`,
+`:569-638` (`gpuSection`) for the rendered grid. Unchanged in this range — included because it
 is the help surface named in scope.)_
 
 ### REQ-DS-031 — An empty adapter description falls back to the WebGL renderer
@@ -387,7 +387,7 @@ is the help surface named in scope.)_
 rendered device row and the copied text shall fall back to the WebGL renderer
 string, and shall print "Not exposed by browser" only when that is empty too.
 
-_(`HelpModal.tsx:112-114`, `:156-159`, `:558-564`.)_
+_(`HelpModal.tsx:114-116` (`renderer`), `:158-161` (`deviceName`), `:578-584` (`deviceName`).)_
 
 ### REQ-DS-032 — Hardware re-detection is guarded and reported
 
@@ -396,7 +396,7 @@ shall be disabled and labelled "Detecting..."; **when** it settles, the app shal
 toast the detected tier, and **if** detection throws, **then** it shall toast the
 failure and restore the control.
 
-_(`HelpModal.tsx:197-210` and `:439-445` — the `finally` block clears the flag on
+_(`HelpModal.tsx:201-214` (`detectTierAgain`) and `:459-465` (`pickerModeBtn`) — the `finally` block clears the flag on
 both paths.)_
 
 ### REQ-DS-033 — The panel collapses to one column on narrow viewports
@@ -405,7 +405,7 @@ both paths.)_
 collapse from the catalog/detail split to a single column, with the catalog
 capped at 280 px tall and separated by a bottom border rather than a right one.
 
-_(`DocumentationModal.module.css:1178-1188`; the desktop shell is
+_(`DocumentationModal.module.css:1178-1188` (`@media`); the desktop shell is
 `min(1220px, 91vw) × min(84vh, 850px)` at `:44-45`, inside a dialog capped at
 `min(96vw, 1320px) × min(92vh, 920px)` at `:2-3`.)_
 
@@ -415,7 +415,7 @@ The `lumenapeiron.com` origin shall serve `robots.txt` from static assets with
 `Allow: /` and a `Sitemap:` line pointing at its own sitemap, and shall send no
 `X-Robots-Tag` header on any response.
 
-_(`worker/index.ts:113-115` routes every non-review host through
+_(`worker/index.ts:116-118` (`isReviewHost`) routes every non-review host through
 `withSecurityHeaders` alone; `packages/app/public/robots.txt` and
 `public/sitemap.xml` are the served files. Guarded by
 `worker/index.test.ts` — "leaves production robots.txt to the static assets" and
@@ -434,8 +434,8 @@ redirect, an OG image — **then** it shall be served by the normal handler and
 merely wrapped in the noindex header, so exclusion from search does not change
 the origin's behaviour as a review deploy.
 
-_(`middleware/reviewHost.ts:14-35` for the substitute body,
-`:38-46` for `withNoIndex`, `worker/index.ts:122-127` for the two layers — where
+_(`middleware/reviewHost.ts:14-50` (`REVIEW_HOST`) for the substitute body,
+`:53-61` for `withNoIndex`, `worker/index.ts:125-130` (`isRead`) for the two layers — where
 `isRead` gates only the robots substitution and
 `withNoIndex(withSecurityHeaders(response))` wraps whatever the base handler
 returned. Two layers because they stop different things: robots.txt prevents the
@@ -451,12 +451,14 @@ not the production origin — the `dev` route, the `preview` deploy, and any
 future staging origin — so that a duplicate origin can never hand a crawler
 production's sitemap.
 
-> **Known deviation:** `packages/app/src/worker/middleware/reviewHost.ts:14-18` —
+<!-- cite-check: pinned a5c2f26f -->
+
+> **Fixed deviation** (#90, `c37f8aae`; this note describes the code at `a5c2f26f`): `packages/app/src/worker/middleware/reviewHost.ts:14-18` —
 > `isReviewHost` is exact equality against the single constant
 > `'dev.lumenapeiron.com'`, so it fails safe in the wrong direction. `env.preview`
 > in `packages/app/wrangler.jsonc:150-188` declares worker name
-> `chaos-master-preview` with **no** `routes` block (unlike `prod` at `:42` and
-> `dev` at `:95`), so it publishes on `*.workers.dev`;
+> `chaos-master-preview` with **no** `routes` block (unlike the prod environment's
+> `routes` at `:42` and the dev environment's at `:95`), so it publishes on `*.workers.dev`;
 > `.github/workflows/deploy.yml:147-156` deploys it on every `pull_request` and
 > `:159-208` posts that URL as a markdown link in a public PR comment built from
 > `.github/workflows/pr-deployment-table.md`. `worker/index.ts:113-115`
@@ -467,14 +469,16 @@ production's sitemap.
 > fix is to invert the predicate against `PRODUCTION_HOST`. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
 
+<!-- cite-check: live -->
+
 ### REQ-DS-037 — The landing production origin is fully crawlable
 
 The `about.lumenapeiron.com` origin shall serve `Allow: /` plus a `Sitemap:` line
 pointing at its own sitemap, and shall emit no robots meta tag.
 
-_(`packages/landing/src/pages/robots.txt.ts:18-32` — the file is an Astro route
+_(`packages/landing/src/pages/robots.txt.ts:18-32` (`PRODUCTION`) — the file is an Astro route
 rather than a `public/` asset precisely so the two deploys can differ;
-`Base.astro:42` emits the meta tag only under the review flag.
+`Base.astro:42` (`nofollow`) emits the meta tag only under the review flag.
 `packages/landing/public/sitemap.xml` lists the single production URL.)_
 
 ### REQ-DS-038 — The landing review deploy is excluded, twice
@@ -484,7 +488,7 @@ rather than a `public/` asset precisely so the two deploys can differ;
 `Sitemap:` line and shall emit `<meta name="robots" content="noindex, nofollow">`
 in every page head.
 
-_(`robots.txt.ts:16` and `:24-27`, `Base.astro:34` and `:42`,
+_(`robots.txt.ts:16` (`isReviewDeploy`) and `:24-27` (`REVIEW`), `Base.astro:34` (`isReviewDeploy`) and `:42` (`nofollow`),
 `packages/landing/package.json` `build:review` / `deploy:dev`. The meta tag is
 reliable here — unlike on the app — because the landing is server-rendered HTML.
 The review origin is `about.dev.lumenapeiron.com`,
@@ -518,7 +522,7 @@ it.
 > `packages/app/src/webmcp/tools/` contains `arcadeBeats.ts`,
 > `arcadeDirector.ts`, `openArena.ts`, `arenaStartClash.ts` and the rest
 > alongside the three that are named, and
-> `packages/app/src/lib/activeTab.ts:13-19` lists six modes. An assistant
+> `packages/app/src/lib/activeTab.ts:13-19` (`ArcadeMode`) lists six modes. An assistant
 > fetching the file is told authoritatively that half the Arcade has no agent
 > tools. Prefer a formulation that does not enumerate. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).

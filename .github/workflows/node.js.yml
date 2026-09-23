@@ -95,6 +95,32 @@ jobs:
         path: playwright-report/
         retention-days: 14
 
+  # Every `file:line` citation in a living doc must still point at the symbol
+  # it names (scripts/check-doc-citations.mjs; the rules are in
+  # docs/agent/CONVENTIONS.md section 9). It runs on pull requests too, unlike
+  # the ratchets below: a citation goes stale in the change that moves the
+  # code, and that change's author is the one who knows where it went. Nothing
+  # about it is a judgement call to defer to main. It is a job of its own so a
+  # stale line number never hides a failing test, nor the other way round. It
+  # needs full history, for citations pinned to an old revision, and no
+  # install: the script uses node and git only, and takes under a second.
+  citations:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    - name: Check the file:line citations in the docs
+      run: node scripts/check-doc-citations.mjs
+
   # The code-health ratchets, on main and on a manual run only. A pull request
   # that moves a ratchet is a conversation, not a blocked merge. They sit in
   # their own job so that a ratchet failure can never hide a test failure in

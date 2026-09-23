@@ -1,23 +1,33 @@
-# Testing Infrastructure
+# Testing
 
-This document describes the testing setup created to catch runtime errors in the Lumen Apeiron app.
+How the Lumen Apeiron monorepo is tested: what runs where, what each kind of
+test is for, and how to run the browser tests without taking someone else's
+port. The strategy behind it, and the audit that shaped it, is in
+[docs/agent/TESTING.md](../../docs/agent/TESTING.md); the guards and the rules
+for writing a test are in
+[docs/agent/CONVENTIONS.md](../../docs/agent/CONVENTIONS.md) §6.
+
+Counts are from 2026-09-23 at `9fc08078`.
 
 ## Which checks run where
 
-A pull request runs smoke plus what the branch touched. Main runs everything.
+A pull request runs the CI e2e project plus the tests the branch touched. Main
+runs everything.
 
 | Check                                                      | Pull request           | Push to main, or manual dispatch |
 | ---------------------------------------------------------- | ---------------------- | -------------------------------- |
 | `pnpm lint`, `pnpm typecheck`                              | yes                    | yes                              |
 | `@chaos-master/core` and `@chaos-master/mobile-runtime`    | in full                | in full                          |
-| The app suite (`packages/app`, ~2,500 tests)               | **scoped** (see below) | in full                          |
+| The app suite (`packages/app`, ~3,800 tests)               | **scoped** (see below) | in full                          |
+| The `node --test` suites of the app's and the root scripts | in full                | in full                          |
 | App build, landing build, `pnpm test:e2e:ci`               | yes                    | yes                              |
+| `pnpm docs:cite`, in the `citations` job                   | yes                    | yes                              |
 | `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch` | no                     | yes, in the `health` job         |
 
 The scoped run is `pnpm test:pr`, which calls `pnpm test:changed`
-(`scripts/test-changed.mjs`). It runs core and mobile-runtime in full — ~118
-tests, about a second together, nothing to gain by scoping them — and selects
-the app's test files as the union of:
+(`scripts/test-changed.mjs`). It runs core and mobile-runtime in full — about
+230 tests in five seconds, nothing to gain by scoping them — and selects the
+app's test files as the union of:
 
 1. **What the branch touched**, via `vitest --changed <base>`: every test file
    whose module graph reaches a changed file. On CI the base is the pull
@@ -86,153 +96,100 @@ that the always-on list does not name, will not run until the merge. The
 mitigation is not a cleverer selection — it is that **the merging agent runs
 `pnpm typecheck` and `pnpm test` on main after every merge and stops on red**,
 and that the deploy comes from main, so a red main is visible in minutes rather
-than at the next release. The alternative, a full 2,500-test suite on every push
-to every branch, costs more than the failure mode it prevents.
+than at the next release. The alternative, the full app suite on every push to
+every branch, costs more than the failure mode it prevents.
 
 ---
 
-## Created Files
+## Unit tests: vitest
 
-### 1. Playwright E2E Tests (`e2e/console-errors.spec.ts`)
-
-**Purpose**: End-to-end browser tests that capture console errors during rendering and interaction.
-
-**7 Test Cases**:
-
-1. Render app without console errors
-2. Render canvas without errors
-3. Handle rapid interactions without errors
-4. Handle quality preset changes without errors
-5. Handle slider interactions without errors
-6. Handle timeline interactions without errors
-7. Handle multiple rapid renders without errors
-
-**Usage**:
+Every package tests with vitest, and every test file sits next to the code it
+tests as `*.test.ts` or `*.test.tsx`: 334 files in `packages/app/src`, 16 in
+`packages/core/src`, 3 in `packages/mobile-runtime`. The app's config
+(`packages/app/vitest.config.ts`) runs them in happy-dom with the Solid plugin, so
+components render in a test, and resolves `@chaos-master/core` to its source.
 
 ```bash
-# Start dev server first
-pnpm start
-
-# Run Playwright tests (requires dev server running)
-npx playwright test e2e/console-errors.spec.ts
+pnpm test                                        # everything, as main runs it
+pnpm test:pr                                     # as a pull request runs it
+pnpm --filter chaos-master exec vitest run src/utils/timeline.test.ts   # one file
+pnpm test:watch                                  # the app suite, watching
+pnpm test:coverage                               # app and core, v8 coverage
 ```
 
-**Files**:
+The Node scripts have their own `node --test` suites:
+`pnpm --filter chaos-master test:scripts` for `packages/app/scripts`, and
+`pnpm test:scripts` for the root `scripts/` (the doc citation checker). Both
+run inside `pnpm test` and `pnpm test:pr`.
 
-- `playwright.config.ts` - Playwright configuration with console error detection setup
-- `e2e/console-errors.spec.ts` - 7 test cases for catching runtime errors
+Coverage writes `coverage-audit/coverage-summary.json` in each package, which
+`pnpm metrics` then reports; at `9fc08078` the app is at 53.22% of lines and
+core at 84.89%. It is never run in CI ([docs/agent/METRICS.md](../../docs/agent/METRICS.md) §3).
 
----
+## The ratchets and the test floors
 
-### 2. Vitest Integration Tests (`src/App.integration.test.tsx`)
+`pnpm metrics:check` (the `health` job, main only) compares today's numbers
+with `docs/agent/code-metrics.baseline.json` and fails when one got worse. Two
+of them are floors on the test suite: `test_files` (355) and `test_cases`
+(3,153), both counted statically, so deleting tests fails main even when
+everything left is green. Others hold the size of the tree
+(`largest_logic_file_loc`, `files_over_*`), header comments and coverage. A baseline only ever tightens, and by hand.
+Run `pnpm test:coverage` before `pnpm metrics:update`: the update refuses to write a baseline that lacks a key
+the old one tracked, and the coverage keys exist only after a coverage run.
+`mainWorkspaceSize.test.ts` is a ratchet of the same kind that runs on every
+pull request: `MainWorkspace.tsx` must have exactly the line count it names.
 
-**Purpose**: Integration tests for App component with CPU renderer mock.
+## Browser tests: Playwright
 
-**6 Test Cases**:
+`tests/` holds Playwright only: the specs, their helpers (`helpers.ts`,
+`pilotLock.ts`) and a reporter. Nothing in it is a unit test. The config is
+the root `playwright.config.ts`. It builds the app and serves the production
+preview (`pnpm --filter chaos-master e2e:serve`, `vite preview` with a
+self-signed certificate on `https://localhost:4173`), then runs one of two
+projects, both on headless Chromium with swiftshader standing in for a GPU:
 
-1. Render without console errors
-2. Handle canvasSize undefined gracefully
-3. Handle empty canvas gracefully
-4. Render main content structure
-5. Handle repeated renders without errors
-6. Handle rapid state changes
+| Project       | Specs                         | Runs                               | Today              |
+| ------------- | ----------------------------- | ---------------------------------- | ------------------ |
+| `chromium-ci` | `tests/*.ci.spec.ts`          | CI, every push; `pnpm test:e2e:ci` | 12 specs, 43 tests |
+| `chromium`    | every other `tests/*.spec.ts` | only when someone runs it locally  | 9 specs, 32 tests  |
 
-**Note**: These tests require SolidJS JSX transformation configuration. Currently blocked by JSX setup complexity.
+**Only `*.ci.spec.ts` runs in CI.** A spec in the `chromium` project is
+effectively unenforced: nothing runs it for you, and several of its tests need
+a real GPU to pass. A new spec should hold on the software adapter and be named
+`*.ci.spec.ts`; if it cannot, say so in its header. In the CI project a skip
+fails the run (`tests/reporters/failOnUnexpectedSkip.ts`) unless the test
+carries an `intentional-skip` annotation with a reason.
 
-**Files**:
+Swiftshader is good enough to mount the app and drive its DOM, and bad at
+everything a GPU does: it produces device-loss events that look like crashes.
+**Never judge WebGPU behaviour from `playwright test`.** Use
+`pnpm verify:webgpu` (`scripts/verify-webgpu-headed.mjs`), a headed Chrome
+pass on real hardware against an already running server.
 
-- `src/App.integration.test.tsx` - Unit/integration tests
-- `src/App.integration.mock.tsx` - Mock file with all dependency mocks
-- `src/vitest.setup.ts` - ResizeObserver polyfill
-- `vitest.config.ts` - Vitest configuration (with JSX not fully configured yet)
+### Running e2e on a port of your own
 
----
+`playwright.config.ts` pins port 4173 and reuses a server already listening
+there. When 4173 belongs to someone else (a person's own preview, or another
+agent), serve the build on a private port and point a local config at it:
 
-## Issues Encountered
+```bash
+# 1. Build once and serve it on a port of your own, say 4401.
+VITE_GA_ID= pnpm --filter chaos-master exec vite build
+pnpm --filter chaos-master exec vite preview --port 4401 --strictPort &
 
-### App Integration Tests
+# 2. playwright.private.config.ts, next to playwright.config.ts, not committed:
+#      import base from './playwright.config'
+#      export default {
+#        ...base,
+#        webServer: undefined,
+#        use: { ...base.use, baseURL: 'https://localhost:4401' },
+#      }
 
-**Problem**: Cannot render SolidJS components in vitest due to JSX transformation issues.
-
-**Error**: `ReferenceError: React is not defined` (even though we're using SolidJS, the JSX is being transformed incorrectly)
-
-**Potential Solutions**:
-
-1. Configure vitest to use `vite-plugin-solid`'s JSX transformation
-2. Use `h()` or `to()` functions instead of JSX syntax
-3. Create separate test-only build that includes JSX transformation
-
-### Playwright Tests
-
-**Problem**: Dev server not starting on expected port due to port conflicts.
-
-**Error**: `ERR_CONNECTION_REFUSED` when trying to connect to localhost:5173
-
-**Root Cause**: Multiple processes using ports, ssl() plugin in vite config causing issues
-
-**Workaround**: Run dev server manually first on a free port, then configure Playwright to use that port.
-
----
-
-## What Works
-
-1. ✅ **Existing unit tests**: `src/utils/*.test.ts`, `src/flame/*.test.ts` all pass
-2. ✅ **Mock infrastructure**: `App.integration.mock.tsx` has all necessary mocks
-3. ✅ **Vitest setup**: ResizeObserver polyfill and basic config working
-4. ✅ **Playwright tests**: Code structure ready, just need working dev server
-
----
-
-## Recommended Next Steps
-
-### For Immediate Value (Playwright)
-
-1. Fix port conflicts in dev server
-2. Run Playwright tests once server is ready
-3. Use Playwright as the primary CI test suite
-
-### For Long-Term CI/CD
-
-1. Set up proper SolidJS JSX transformation in vitest
-2. Create separate test build that includes test optimizations
-3. Use Playwright in CI and vitest for local development
-
----
-
-## Benefits
-
-These tests help catch:
-
-- `Cannot read properties of undefined (reading 'x')` errors
-- `Cannot destructure property 'width' of 'n(...)' as it is undefined` errors
-- CanvasSize() undefined errors
-- WorldToClip() undefined errors
-- Runtime errors during rapid interactions
-- Errors during quality preset changes
-- Timeline interaction errors
-
-**Files Modified to Fix Runtime Errors**:
-
-- `src/lib/Camera2D.tsx` - Added canvasSize fallback
-- `src/components/FlameColorEditor/FlameColorEditor.tsx` - Added null checks
-- `src/components/AffineEditor/AffineEditor.tsx` - Fixed all worldToClip calls
-- `src/flame/Flam3.tsx` - Added height fallback
-- `src/App.tsx` - Fixed qualityPointCountLimit undefined
-- `src/components/Quality/QualityPresets.tsx` - Added fillPercentage fallback
-
----
-
-## Usage in CI
-
-```yaml
-# Example GitHub Actions
-- name: Run Playwright E2E Tests
-  run: |
-    pnpm install
-    pnpm start > /dev/null 2>&1 &
-    sleep 10
-    npx playwright test
-
-- name: Run Vitest Unit Tests
-  run: pnpm test
+# 3. Run one spec, or a project.
+pnpm exec playwright test --config playwright.private.config.ts \
+  --project=chromium-ci tests/smoke.ci.spec.ts
 ```
+
+Stop the preview server by its PID or its port (`fuser -k 4401/tcp`) when you
+are done, never by process name. An agent that opens a headed browser passes
+`--class=agent-browser` so the window stays off the user's workspace.

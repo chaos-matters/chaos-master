@@ -91,7 +91,7 @@ the ordered, registered-command invocations that transformed it — never the un
 history's patches — so that a log survives a document-schema migration and can be
 edited, parameterized and replayed against a different starting state.
 
-_(`recorder/schema.ts:11-22`, `recorder/recorder.ts:25-51`; guarded by
+_(`recorder/schema.ts:12-23` (`INTENTS`), `recorder/recorder.ts:25-51` (`turns`); guarded by
 `recorder.test.ts:191` "replays a deterministic session into the same
 document".)_
 
@@ -103,7 +103,7 @@ not move the live-workspace mutation stamp, and shall not flag the document
 writes that run under it — so a compound command replays through its own
 implementation, and replay machinery never absorbs itself into a live take.
 
-_(`recorder/recorder.ts:597`, `:604-618`, `:975-982`; guarded by
+_(`recorder/recorder.ts:597` (`isTopLevel`), `:604-618` (`isTopLevel`), `:975-982` (`breakRecordingCoalescingIn`); guarded by
 `recorder.test.ts:1516` "ignores commands and writes inside
 withRecordingSuppressed".)_
 
@@ -119,10 +119,9 @@ or a recording is already active on that seat, **then** `start` shall return
 `'workspace-not-recordable'` or `'already-recording'` and shall leave no
 recording active.
 
-_(`recorder/types.ts:17-40`, `recorder/recorder.ts:356-414`,
-`schema.ts:204-235`; guarded by `recorder.test.ts:156`, `:165`, `:178`, and
-`:1770` "carries timeline, audio, sonification, and view state through a round
-trip".)_
+_(`recorder/startResult.ts:8-15` (`SessionRecordingStartResult`), `recorder/recorder.ts:356-414` (`startIn`),
+`schema.ts:204-235` (`TransformColorSnapshotSchema`); guarded by `recorder.test.ts:156` "reports a successful start and an already-active race", `:165` "reports a workspace that cannot be serialized", `:178` "reports a workspace outside the bounded session schema", and
+`:1770` "carries timeline, audio, sonification, and view state through a round trip".)_
 
 ### REQ-RR-004 — The audio file is never captured, only its wiring
 
@@ -130,7 +129,7 @@ trip".)_
 mapping, the source (`file` or `mic`) and the track _name_ only. Audio bytes,
 decoded buffers and microphone permission shall never enter a session file.
 
-_(`recorder/schema.ts:214-220`, `recorder/replay.ts:34-50`; guarded by
+_(`recorder/schema.ts:214-220` (`finite`), `recorder/replay.ts:34-50` (`canEnableReplayAudio`); guarded by
 `replay.test.ts:86` "never treats a missing recorded file identity as a
 wildcard".)_
 
@@ -144,8 +143,8 @@ entry lands, so a second drag of the same control becomes a second action
 matching the second undo step. A timeline undo push arriving while a flame
 command is running shall not clear those anchors.
 
-_(`recorder/recorder.ts:486-521`, `:552-580`, `:806-822`, `:836-852`; guarded by
-`recorder.test.ts:406`, `:427`, `:446`.)_
+_(`recorder/recorder.ts:486-521` (`coalesceRecordedAction`), `:552-580` (`recordActiveCommandAction`), `:806-822` (`slider`), `:836-852` (`anchors`); guarded by
+`recorder.test.ts:406` "folds one drag into a single action holding the final value", `:427` "keeps two drags of the same control as two actions (two undo steps)", `:446` "keeps distinct controls apart but folds a return to an earlier one".)_
 
 ### REQ-RR-006 — An unclaimed document write raises the honesty counter
 
@@ -156,7 +155,7 @@ entry, publish the new count, and warn — rather than dropping the mutation
 silently. `unnamedWriteCount` is the log's fidelity marker and 0 is the goal
 state; REQ-RR-041 is what it saves about each one.
 
-_(`recorder/recorder.ts:806-822`, `:836-852`, `:942-952`, `schema.ts:231-236`;
+_(`recorder/recorder.ts:806-822` (`slider`), `:836-852` (`anchors`), `:942-952` (`named`), `schema.ts:231-236` (`TransformColorSnapshotSchema`);
 guarded by `recorder.test.ts:1357` "attributes command writes, counts direct
 writes as unnamed".)_
 
@@ -171,10 +170,10 @@ seat reporting transport is the seat an Arcade agent is currently driving, no
 marker shall be recorded at all: the tool's own preview is not a claim that the
 session reproduces it.
 
-_(`recorder/recorder.ts:252-261`, `:762-771`, `:860-874`; guarded by
+_(`recorder/recorder.ts:251-260` (`noteSessionBudgetExceeded`), `:762-771` (`reportUnreplayableOnceIn`), `:860-874` (`Direct`); guarded by
 `recorder.test.ts:1335` "reports a high-rate unreplayable effect only once per
-take", `recorder.test.ts:1971` "tracks direct timeline seeks without flooding
-the recording" and `uiCoverageRatchet.test.ts:340`.)_
+take", `recorder.test.ts:2040` "tracks direct timeline seeks without flooding
+the recording" and `uiCoverageRatchet.test.ts:287` "keeps document and transport boundaries honest".)_
 
 ### REQ-RR-008 — Undo/redo is represented by its result, not the viewer's stacks
 
@@ -186,7 +185,7 @@ than the take's baseline, **then** the recorder shall retract the action it
 logged, count an unnamed write naming the reason, and clear the coalescing
 anchors.
 
-_(`recorder/recorder.ts:691-728`, `:742-752`, `:782-793`; `schema.ts:364-374`
+_(`recorder/recorder.ts:691-728` (`accumulated`), `:742-752` (`claiming`), `:782-793` (`started`); `schema.ts:364-374` (`isSessionJsonLengthValid`)
 refuses imported `history.undo`/`history.redo`. Guarded by
 `recorder.test.ts:347` "records undo as the resulting snapshot so batched replay
 stays faithful" and `:1247` "flags an undo of an edit made BEFORE recording
@@ -201,8 +200,8 @@ recorder shall drop that action, record a single deduplicated
 pretty-printed persisted form still does not fit at Stop, it shall trim the
 newest actions one at a time until it does, leaving an earlier valid prefix.
 
-_(`recorder/recorder.ts:251-260`, `:264-325`, `:442-473`, `schema.ts:25-40`;
-guarded by `recorder.test.ts:1555`, `:1567`, `:1582`, `:1596`.)_
+_(`recorder/recorder.ts:251-260` (`noteSessionBudgetExceeded`), `:264-325` (`snapshotAction`), `:442-473` (`stopIn`), `schema.ts:26-47` (`MAX_SESSION_JSON_CHARS`);
+guarded by `recorder.test.ts:1555` "keeps at most the schema action limit and reports one fidelity marker", `:1567` "drops schema-oversized actions without letting repeated events flood markers", `:1582` "drops actions after the timestamp limit with one fidelity marker", `:1596` "rejects an action that would exceed the whole-session JSON budget".)_
 
 ### REQ-RR-010 — A finished session detaches when the workspace diverges
 
@@ -212,8 +211,8 @@ recording is active, the recorder shall clear the last finished session — so a
 export can never embed steps describing a different flame from the one it
 rendered.
 
-_(`recorder/recorder.ts:416-428`, `:598-603`, `:654-661`, `:816-818`, `:847-849`;
-guarded by `recorder.test.ts:1927` "finished-session export association".)_
+_(`recorder/recorder.ts:416-428` (`lastFinishedSessionIn`), `:598-603` (`preservesFinishedSession`), `:654-661` (`commandDepth`), `:816-818` (`fromPreview`), `:847-849` (`commandDepth`);
+guarded by `recorder.test.ts:1996` "finished-session export association".)_
 
 ### REQ-RR-011 — Compound timeline edits record one value-pinned snapshot
 
@@ -227,7 +226,9 @@ animation rather than re-rolling it. **If** the mutation leaves the serialized
 snapshot unchanged, no action shall be emitted and the last finished session
 shall not be invalidated.
 
-> **Known deviation:** `packages/app/src/MainWorkspace.tsx:2388-2396` passes the
+<!-- cite-check: pinned a5c2f26f -->
+
+> **Fixed deviation** (#90, `b6838992`; this note describes the code at `a5c2f26f`): `packages/app/src/MainWorkspace.tsx:2388-2396` passes the
 > **raw** `timeline` to `useWorkspaceAnimationGen`, not the `recorderTimeline`
 > built at `MainWorkspace.tsx:3061`. `runTimelineSnapshotMutation`
 > (`recorder/timelineActions.ts:24-33`) finds no `RECORDER_SNAPSHOT_MUTATION`
@@ -237,8 +238,10 @@ shall not be invalidated.
 > today: they still produce one undo step, but a session recorded over them
 > replays without the animation they generated.
 
-_(`recorder/timelineActions.ts:24-33`, `:81-113`, `:377-419`; the facade is
-guarded by `timelineActions.test.ts:262`, `:289` and `:373` — none of which
+<!-- cite-check: live -->
+
+_(`recorder/timelineActions.ts:30-39` (`runTimelineSnapshotMutation`), `:87-119` (`recordSnapshotMutation`), `:377-419` (`removeAllKeyframesForPath`); the facade is
+guarded by `timelineActions.test.ts:262` "records a compound edit as one snapshot and preserves its return value", `:289` "keeps the semantic origin of a value-pinned compound edit" and `:373` "does not emit a phantom snapshot for a no-op compound edit" — none of which
 reaches the MainWorkspace wiring above.)_
 
 ### REQ-RR-012 — Paused frame stepping is authored; playing advance is not
@@ -256,8 +259,8 @@ since it started, for as long as the playhead is where the last advance left
 it, so the stop that ends the playback can say how far it got (REQ-RR-040). A
 seek, or anything else that moves the playhead, restarts the count.
 
-_(`recorder/timelineActions.ts:196-220`, `utils/timeline.ts:704-709`,
-`:1437-1473`; guarded by `timelineActions.test.ts:439` "records paused
+_(`recorder/timelineActions.ts:196-220` (`setCurrentFrame`), `utils/timeline.ts:704-709` (`setCurrentFrameRaw`),
+`:1437-1473` (`advanceFrame`); guarded by `timelineActions.test.ts:439` "records paused
 previous/next buttons as deterministic frame actions" and `recorder.test.ts:2057`
 "records direct Play and Pause as steps that pin the frame", whose Pause
 carries the count.)_
@@ -268,7 +271,7 @@ carries the count.)_
 `validateSession` shall reject the whole session. Equal timestamps are accepted:
 that is how a companion pair says it is one gesture and not two.
 
-_(`recorder/schema.ts:308-317`, `:343-350`; guarded by `recorder.test.ts:1659`
+_(`recorder/schema.ts:308-317` (`initialAudio`), `:343-350` (`RecordedSession`); guarded by `recorder.test.ts:1659`
 "rejects malformed payloads".)_
 
 ### REQ-RR-014 — Only registry-shaped command ids, never history commands
@@ -279,7 +282,7 @@ _(`recorder/schema.ts:308-317`, `:343-350`; guarded by `recorder.test.ts:1659`
 or `history.redo`, **then** `validateSession` shall reject the whole session
 rather than let an imported file operate on the viewer's own history stacks.
 
-_(`recorder/schema.ts:48-71`, `:364-374`; guarded by `recorder.test.ts:1435`
+_(`recorder/schema.ts:48-71` (`isCommandId`), `:364-374` (`isSessionJsonLengthValid`); guarded by `recorder.test.ts:1435`
 "accepts bounded symmetry edges and rejects imported history commands".)_
 
 ### REQ-RR-015 — Every session field is bounded before it is retained
@@ -292,7 +295,7 @@ file at most the same in bytes, actions at most 2000, each `t` in
 at most 16 — the last so a hostile zero-gap session cannot force hundreds of
 synchronous Web Audio graph rebuilds on replay.
 
-_(`recorder/schema.ts:25-40`, `:73-112`, `:308-349`; guarded by
+_(`recorder/schema.ts:26-47` (`MAX_SESSION_JSON_CHARS`), `:73-112` (`RecordedActionSchema`), `:308-349` (`initialAudio`); guarded by
 `recorder.test.ts:1659` "rejects malformed payloads" and `:1820` "bounds
 synchronous sonification model graph transitions".)_
 
@@ -305,7 +308,7 @@ embedded `initial` does not survive `tryValidateFlame` (which dispatches 2D vs 3
 and migrates older saves), **then** the whole session shall be rejected, rather
 than accepted as a different, quietly repaired session.
 
-_(`recorder/schema.ts:117-175`, `:289-306`, `:351-356`, `:376-378`; guarded for
+_(`recorder/schema.ts:117-175` (`animated`), `:289-306` (`RecordedSessionShellSchema`), `:351-356` (`parseSession`), `:376-378` (`initialView`); guarded for
 the round-trip half by `recorder.test.ts:1638` "round-trips through
 serialize/parse".)_
 
@@ -318,7 +321,7 @@ shall be discarded. Captions and follow-cam hints for a snapshot action shall be
 derived from the validated `kind` alone, so an imported session can never smuggle
 a selector or an arbitrary focus hint into the replay UI.
 
-_(`recorder/snapshotOrigin.ts:20-46`, `:60-90`, `:96-181`; guarded by
+_(`recorder/snapshotOrigin.ts:20-46` (`file`), `:60-90` (`SnapshotOrigin`), `:96-179` (`Randomize`); guarded by
 `snapshotOrigin.test.ts:36` "rejects unknown, oversized, and prototype-bearing
 imported values" and `:56` "never accepts a caller-provided focus selector".)_
 
@@ -331,11 +334,11 @@ having changed nothing (the video driver throwing with the 1-based step number).
 **If** a session recording is active, **then** replay shall refuse outright and
 close any batch it had opened.
 
-_(`recorder/replay.ts:199-203`, `recorder/player.ts:399-425`,
-`recorder/replayVideo.ts:620-625`; guarded by
+_(`recorder/replay.ts:199-203` (`isSessionRecording`), `recorder/player.ts:399-425` (`rejectBeforeStart`),
+`recorder/replayVideo.ts:620-625` (`validatedSession`); guarded by
 `player.test.ts:1142` "preflights every action before opening a batch or loading
-state", `replayVideo.test.ts:150`, `recorder.test.ts:1535` and
-`player.test.ts:1117`.)_
+state", `replayVideo.test.ts:150` "rejects an imported action before touching replay state", `recorder.test.ts:1535` "refuses to replay while a recording is active" and
+`player.test.ts:1117` "closes an open replay batch when a recording blocks a seek".)_
 
 ### REQ-RR-019 — A replay is invisible to the recorder and lands as one undo step
 
@@ -345,7 +348,7 @@ attributes those writes to the replay's own preview owner, and inside
 `withDeferredEffects` so intermediate states never create heavyweight resources —
 and the whole run shall commit as exactly one undoable entry.
 
-_(`recorder/replay.ts:164-203`, `hooks/useWorkspaceReplay.ts:527-592`; guarded by
+_(`recorder/replay.ts:164-203` (`withDeferredEffects`), `hooks/useWorkspaceReplay.ts:527-592` (`currentPaletteColors`); guarded by
 `player.test.ts:529` "collapses a whole run into one undo step" and `:346`
 "defers target side effects across an entire seek rebuild".)_
 
@@ -359,7 +362,7 @@ the session carries no timeline, audio, sonification or view snapshot, the
 corresponding target hook shall not be called at all, leaving the viewer's own
 state alone rather than clearing it.
 
-_(`recorder/replay.ts:205-225`; guarded by `replay.test.ts:235` "loads view
+_(`recorder/replay.ts:205-225` (`withRecordingSuppressed`); guarded by `replay.test.ts:235` "loads view
 before an optional sonification baseline and then actions" and `:295` "leaves
 target sonification untouched for a legacy session".)_
 
@@ -372,8 +375,8 @@ source, or a loaded file buffer whose current track name is a non-empty exact
 match for the recorded `trackName` for a `file` source. A missing recorded track
 name shall never be treated as a wildcard.
 
-_(`recorder/replay.ts:39-77`; guarded by `replay.test.ts:20`, `:37`, `:76`,
-`:86`, `:96`.)_
+_(`recorder/replay.ts:39-77` (`canEnableReplayAudio`); guarded by `replay.test.ts:20` "enables a loaded file only when its name matches the session", `:37` "restores wiring without acquiring or relabelling a mismatched file", `:76` "keeps file reactivity off when no buffer is loaded",
+`:86` "never treats a missing recorded file identity as a wildcard", `:96` "requires an existing live analyzer for microphone replay".)_
 
 ### REQ-RR-022 — Replay Undo carries only changed side state, and only live identities
 
@@ -387,9 +390,9 @@ quick-pick target and hovered variation shall each be dropped unless they name a
 transform that exists in the restored flame and is not a generated `_sym__` row
 (and, for quick-pick, a variation that still exists on it).
 
-_(`recorder/replaySideState.ts:54-88`, `:90-105`,
-`hooks/useWorkspaceReplay.ts:294-369`, `:546-592`; guarded by
-`replaySideState.test.ts:75`, `:110`, `:128`, `:135`, `:145`, `:152`, `:161`.)_
+_(`recorder/replaySideState.ts:54-88` (`normalizeReplayPresentation`), `:90-105` (`replaySideStateChanged`),
+`hooks/useWorkspaceReplay.ts:294-369` (`restoreReplaySideState`), `:546-592` (`withBatchWrite`); guarded by
+`replaySideState.test.ts:75` "restores only transform presentation that belongs to the restored flame", `:110` "drops picker state whose exact transform or variation no longer exists", `:128` "does not retain side-effect snapshots for a flame-only replay", `:135` "retains side effects when timeline silent-write state changed", `:145` "retains follow-cam timeline expansion so Undo can restore collapse", `:152` "retains palette restore colours so replay Undo and Redo restore the stash", `:161` "retains authored sonification state for replay Undo and Redo".)_
 
 ### REQ-RR-023 — Palette provenance moves with the replayed document
 
@@ -401,9 +404,9 @@ the action predates provenance; `flame.removePalette` clears it; and
 `flame.applyPalette` captures the pre-command colours only when the stash is
 empty.
 
-_(`recorder/replayPaletteState.ts:37-68`, `:72-105`,
-`hooks/useWorkspaceReplay.ts:512-525`; guarded by
-`replayPaletteState.test.ts:10`, `:35`, `:66`, `:90`, `:111`, `:144`.)_
+_(`recorder/replayPaletteState.ts:37-68` (`paletteRestoreColorsAfterReplayCommand`), `:72-95` (`runPaletteRestoreTransition`),
+`hooks/useWorkspaceReplay.ts:512-525` (`setStochasticFilterEnabled`); guarded by
+`replayPaletteState.test.ts:10` "captures the first palette apply exactly and preserves it across palette switches", `:35` "clears stale colours at load and remove boundaries", `:66` "restores serialized provenance for history-compressed replay actions", `:90` "keeps legacy workspace restores but clears legacy document loads", `:111` "moves load provenance with the replaced document through undo and redo", `:144` "moves palette apply/remove provenance through ordinary undo and redo".)_
 
 ### REQ-RR-024 — The command vocabulary wins over a session's saved hint
 
@@ -414,8 +417,8 @@ use the session's stored `focus` only where the central table has nothing to say
 record time, a command that declares its own `focus()` shall win over the central
 table.
 
-_(`recorder/focusPreparation.ts:460-478`, `recorder/focus.ts:158-165`, `:467-484`;
-guarded by `focusPreparation.test.ts:35`, `:51`, and `focus.test.ts:18`.)_
+_(`recorder/focusPreparation.ts:460-478` (`deriveReplayFocusPreparation`), `recorder/focus.ts:158-165` (`focusForCommand`), `:467-484` (`focusHintFor`);
+guarded by `focusPreparation.test.ts:35` "upgrades a legacy generic variation hint from the command arguments", `:51` "trusts the replay command ids over a stale exact hint", and `focus.test.ts:18` "lets a command that declares its own focus win".)_
 
 ### REQ-RR-025 — An unsafe or unresolvable hint changes nothing
 
@@ -427,9 +430,9 @@ shall be escaped for both backslash and quote before being placed inside an
 attribute selector, and a selector that still throws shall be skipped rather than
 aborting resolution.
 
-_(`recorder/focusPreparation.ts:170-176`, `:478-480`, `recorder/focus.ts:60-101`,
-`:103-125`, `:139-141`; guarded by `focusPreparation.test.ts:567`,
-`focus.test.ts:264`, `:269`, `:314`.)_
+_(`recorder/focusPreparation.ts:170-176` (`FINAL_AFFINE_FOCUS_ID`), `:478-480` (`spotlightFocus`), `recorder/focus.ts:60-101` (`focusSelectors`),
+`:103-125` (`resolveFocusElement`), `:139-141` (`cssQuote`); guarded by `focusPreparation.test.ts:567` "does not turn an unsafe imported id into workspace state",
+`focus.test.ts:264` "rejects a malformed hint instead of building a broken selector", `:269` "escapes quotes, because hints come out of user-supplied files", `:314` "resolves to null when nothing matches, so the overlay shows the canvas".)_
 
 ### REQ-RR-026 — Zero-sized matches are skipped, and targets are revealed in place
 
@@ -440,7 +443,7 @@ ancestors that actually clip it, using `block: 'nearest'`, `inline: 'nearest'`
 and `behavior: 'auto'`, so the recorder dock and canvas do not jump and each
 container's own reduced-motion policy is respected.
 
-_(`recorder/focus.ts:103-133`; guarded by `focus.test.ts:297` "skips a zero-sized
+_(`recorder/focus.ts:103-133` (`resolveFocusElement`); guarded by `focus.test.ts:297` "skips a zero-sized
 match and takes the next selector that is visible" and `:319` "reveals an
 off-screen target through its nearest scroll containers".)_
 
@@ -455,7 +458,7 @@ switch the affine mode/tab and colour view, and expand the floating actions —
 and **if** the step removes a transform, it shall clear the selection instead of
 selecting it.
 
-_(`recorder/focusPreparation.ts:373-457`, `hooks/useWorkspaceReplay.ts:370-440`;
+_(`recorder/focusPreparation.ts:373-457` (`applyContainerPreparation`), `hooks/useWorkspaceReplay.ts:370-440` (`prepareReplayFocus`);
 the derivation is guarded across `focusPreparation.test.ts`, the workspace
 application is not.)_
 
@@ -475,10 +478,9 @@ shall still advance at least one output frame between them, and the total frame
 count shall always be large enough to represent the last authored action even
 when the caller asks for no tail.
 
-_(`recorder/replayVideo.ts:424-539`, `recorder/player.ts:140-221`; guarded by
-`replayVideo.test.ts:21`, `:56`, `:70`, `:306`, `replayVideoPlayWindows.test.ts:77`
-and `playWindowReplay.test.ts:591` "gives the interface capture the same window
-the player plays".)_
+_(`recorder/replayVideo.ts:424-539` (`buildScheduleSpec`), `recorder/player.ts:140-221` (`closingHoldMs`); guarded by
+`replayVideo.test.ts:21` "matches replay timestamp clamping, authored holds, and speed", `:56` "gives simultaneous authored actions distinct video frames", `:70` "keeps the final step when an internal caller requests no tail", `:306` "always covers the hold the live player will take", `replayVideoPlayWindows.test.ts:77` "gives a play window its real duration, and an edit inside it its recorded time"
+and `playWindowReplay.test.ts:710` "gives the interface capture the same window the player plays".)_
 
 ### REQ-RR-029 — Video export refuses takes it cannot reproduce or afford
 
@@ -490,10 +492,10 @@ an encoder is allocated and, for the interface path, before the
 privacy-sensitive screen-share picker is shown. A non-zero `unnamedWriteCount`
 is not such a problem (REQ-RR-042).
 
-_(`recorder/replayVideo.ts:61`, `:354-420`, `:424-452`, `:501-507`,
-`:1093-1123`, `recorder/replayInterfaceVideo.ts:318-333`; guarded by
-`replayVideo.test.ts:40`, `:235`, `:246`, `:260`, `:275`, and the last sentence
-by `:214`.)_
+_(`recorder/replayVideo.ts:61` (`MAX_REPLAY_VIDEO_DURATION_MS`), `:354-420` (`flameUsesCustomVariation`), `:424-452` (`buildScheduleSpec`), `:501-507` (`durationMs`),
+`:1093-1123` (`createReplayVideoJobSpec`), `recorder/replayInterfaceVideo.ts:318-333` (`captureReplayInterfaceVideo`); guarded by
+`replayVideo.test.ts:40` "refuses pathological videos before allocating an encoder", `:235` "refuses custom variation code that the portable session cannot package", `:246` "checks custom variations introduced by a later whole-flame step", `:260` "checks custom variation ids carried by semantic add steps", `:275` "refuses an empty take that has no creation sequence to publish", and the last sentence
+by `:214` "publishes a take with uncaptured steps by skipping them, as replay does".)_
 
 ### REQ-RR-030 — The artwork driver renders in an isolated world with audio off
 
@@ -507,11 +509,10 @@ or a frame asks for an earlier moment of the step it has already paced past
 (REQ-RR-045). The plate shall be a fixed 1920×1080 landscape, matching the
 framing the editor authors in.
 
-_(`recorder/replayVideo.ts:37-42`, `:612-1078`, `:760`, `:863`, `:932-934`,
-`:998-1003`; guarded by `replayVideo.test.ts:86` "replays registered commands
-in an isolated world without mutating input", `:114`, `:181`,
-`replayVideoPlayWindows.test.ts:124` "renders the same frame for the same
-moment, in any order" and `replayGlideSwitches.test.ts:179`.)_
+_(`recorder/replayVideo.ts:37-42` (`landscape`), `:612-1078` (`createReplayVideoDriver`), `:760` (`play`), `:863` (`canEnable`), `:932-934` (`APART_FROM_LIVE_GLIDE`),
+`:998-1003` (`lastApplied`); guarded by `replayVideo.test.ts:86` "replays registered commands
+in an isolated world without mutating input", `:114` "preserves timeline write-through and renders the held frame", `:181` "builds a detached landscape MP4 without cropping the editor framing",
+`replayVideoPlayWindows.test.ts:124` "renders the same frame for the same moment, in any order" and `replayGlideSwitches.test.ts:179` (`advanceTimersByTime`).)_
 
 ### REQ-RR-031 — Caption-only steps reuse the accumulated artwork frame
 
@@ -521,8 +522,8 @@ and stochastic filters — the offscreen renderer shall re-encode the last
 accumulated artwork frame with an updated caption and progress bar instead of
 waiting for a GPU re-render that would correctly never arrive.
 
-_(`recorder/replayVideo.ts:109-126`,
-`components/ExportJobs/OffscreenAnimationRender.tsx:247-335`; the fingerprint is
+_(`recorder/replayVideo.ts:109-126` (`stochasticFilter`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:247-335` (`finish`); the fingerprint is
 guarded by `replayVideo.test.ts:159` "distinguishes visual steps from captions
 that can reuse artwork" — the run loop consuming it is not.)_
 
@@ -534,7 +535,7 @@ encoder and fail with a message about offline encoding support — an off-line
 schedule that reuses one frame many times cannot be paced by a real-time
 recorder, and the fallback carries no embedded session metadata.
 
-_(`components/ExportJobs/OffscreenAnimationRender.tsx:193-200`, `:214-223`.)_
+_(`components/ExportJobs/OffscreenAnimationRender.tsx:193-200` (`frameIndex`), `:214-223` (`audioBuffer`).)_
 
 ### REQ-RR-033 — Interface capture prompts on the export stack and always cleans up
 
@@ -550,7 +551,7 @@ capture shall abort with a message naming the actual problem, cancel the encoder
 and stop every track — and the source shall be stopped and the timeout cleared on
 every exit path.
 
-_(`recorder/replayInterfaceVideo.ts:151-197`, `:339-352`, `:378-387`, `:436-444`;
+_(`recorder/replayInterfaceVideo.ts:160-206` (`onError`), `:339-352` (`source`), `:378-387` (`bitmap`), `:436-444` (`width`);
 guarded by `replayInterfaceVideo.test.ts:113` "captures the ordinary replay after
 the source is active and cleans up" and `:191` "aborts safely when tab sharing
 stops before replay completion".)_
@@ -564,12 +565,12 @@ moment the export starts and carry the clone through its delayed canvas callback
 and finalizers, so a recording started while the job renders can never leak into a
 file it did not produce.
 
-_(`utils/exportPreferences.ts:17-34`,
-`components/ExportPngDialog/ExportPngDialog.tsx:1001`, `:1227`, `:1243`,
-`components/ExportJobs/ExportJobHost.tsx:136-141`,
-`utils/animationExport.ts:345-353`; guarded by `exportPreferences.test.ts:22`
+_(`utils/exportPreferences.ts:17-34` (`setEmbedStepsInExports`),
+`components/ExportPngDialog/ExportPngDialog.tsx:1029` (`sessionSnapshot`), `:1308` (`session`), `:1324` (`sessionSnapshot`),
+`components/ExportJobs/ExportJobHost.tsx:139-144` (`encodedSteps`),
+`utils/animationExport.ts:372-380` (`embedMetadata`); guarded by `exportPreferences.test.ts:22`
 "keeps the initiation-time recording after the current session changes", and by
-`flameInPng.test.ts:134` / `flameInMp4.test.ts:94` for the round-trip.)_
+`flameInPng.test.ts:134` "carries the flame and the session in separate chunks" / `flameInMp4.test.ts:94` "round-trips the flame and the session together" for the round-trip.)_
 
 ### REQ-RR-035 — Only metadata the export dialog changed is written back
 
@@ -579,8 +580,8 @@ fields that differ, through the semantic metadata command — so the whole Expor
 gesture is one recorder action and one history entry, and an untouched field is
 never rewritten.
 
-_(`components/ExportPngDialog/metadataCommit.ts:11-28`,
-`ExportPngDialog.tsx:1204-1208`, `:1233-1237`; guarded by
+_(`components/ExportPngDialog/metadataCommit.ts:11-28` (`commitChangedExportMetadata`),
+`ExportPngDialog.tsx:1280-1284` (`commitChangedExportMetadata`), `:1314-1318` (`commitChangedExportMetadata`); guarded by
 `metadataCommit.test.ts`.)_
 
 ### REQ-RR-036 — Motion blur accumulates sub-frames inside one output frame
@@ -593,7 +594,7 @@ gating each sub-frame on a cumulative point budget of
 `round(((index + 1) / samples) × limit)` — capturing only once the final
 sub-frame's full budget is reached.
 
-_(`utils/animationExport.ts:176-256`.)_
+_(`utils/animationExport.ts:179-271` (`motionBlurSamples`).)_
 
 ### REQ-RR-037 — Motion blur applies to the offscreen animation export too
 
@@ -623,7 +624,7 @@ restore the render settings, transforms and metadata it snapshotted before the
 first frame, and shall clear the export-running, progress, cancel, force-export,
 export-image and export-quality signals — on every one of those exit paths.
 
-_(`utils/animationExport.ts:322-330`, `:360-373`, `:371-386`.)_
+_(`utils/animationExport.ts:350-357` (`restoreFlameState`), `:387-401` (`setAnimationExportCancel`), `:399-415` (`cleanup`).)_
 
 ### REQ-RR-039 — Capture waits for the final image, and Stop & Save keeps what rendered
 
@@ -637,10 +638,10 @@ report their count — or, **if** no frame has been encoded yet, be treated as a
 cancel, the main-canvas path resolving an empty blob and the offscreen job
 dismissing itself, so no zero-frame file is offered.
 
-_(`utils/animationExport.ts:157-170`, `:224-274`,
-`components/ExportJobs/OffscreenAnimationRender.tsx:379-406`, `:388-396`,
-`components/ExportJobs/ExportJobHost.tsx:158-183`, `utils/exportJobs.ts:247-249`,
-`:279-289`.)_
+_(`utils/animationExport.ts:159-172` (`forceAnimationExportNow`), `:237-289` (`ExportInfo`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:379-406` (`actionIndex`), `:388-396` (`encodeFrame`),
+`components/ExportJobs/ExportJobHost.tsx:180-205` (`handleExport`), `utils/exportJobs.ts:263-265` (`requestJobForceExport`),
+`:295-302` (`dismissJob`).)_
 
 ### REQ-RR-040 — Play and Pause are steps that pin the frame
 
@@ -664,10 +665,10 @@ or without it. **When** a replay rebuilds from the baseline, the workspace
 target shall pause first, because every take starts paused. `execute_command`
 shall refuse the step live (`agentCallable: false`).
 
-_(`utils/timeline.ts:1437-1473`, `:1493-1527`, `recorder/recorder.ts:442-446`,
-`:883-932`, `recorder/documentWriteHook.ts:89-105`,
-`recorder/transportStep.ts:14-29`, `commands/builtins/timeline.ts:503-532`,
-`commands/registry.ts:590-594`, `hooks/useWorkspaceReplay.ts:476-480`; guarded
+_(`utils/timeline.ts:1437-1473` (`advanceFrame`), `:1493-1527` (`play`), `recorder/recorder.ts:442-446` (`stopIn`),
+`:883-932` (`Playback`), `recorder/documentWriteHook.ts:89-105` (`playbackProbes`),
+`recorder/transportStep.ts:14-29` (`TIMELINE_PLAYBACK_COMMAND_ID`), `commands/builtins/timeline.ts:503-532` (`reportTimelinePlaybackIn`),
+`commands/registry.ts:590-594` (`agentCallable`), `hooks/useWorkspaceReplay.ts:476-480` (`loadInitial`); guarded
 by `timelineActions.test.ts:613` "records Space pressed twice as two steps and
 replays to the paused frame", `:659` "pins the frame a playback stops on when
 it reaches the end by itself", `:694` "records a pause that a workspace flow
@@ -699,13 +700,13 @@ the count into the list, each line reading "reason, at m:ss"; **if** a session
 carries a count but no list, **then** they shall say "Details were not saved by
 the version that recorded it."
 
-_(`recorder/uncapturedSteps.ts:20-74`, `:94-148`, `recorder/recorder.ts:213`,
-`:225`, `:470-471`, `:742-752`, `:927-952`, `recorder/schema.ts:273-286`,
-`:338-340`, `:435-441`, `commands/builtins/history.ts:81-92`,
-`components/SessionRecorder/UncapturedSteps.tsx:18-45`; guarded by
-`recorder.test.ts:2073`, `:2107`, `:2121`, `:2134`, `:2153`, `:2182`, `:2194`,
-`uncapturedSteps.test.ts`, `SessionRecorderControls.test.tsx:277`,
-`SessionLibraryPanel.test.tsx:54`, `SessionReplayPanel.test.tsx:255`, `:282`,
+_(`recorder/uncapturedSteps.ts:20-74` (`UncapturedLog`), `:94-150` (`summarizeUncapturedSteps`), `recorder/recorder.ts:213` (`uncapturedSessionFields`),
+`:225` (`uncapturedJsonChars`), `:470-471` (`uncaptured`), `:742-752` (`claiming`), `:927-952` (`snapshot`), `recorder/schema.ts:273-286` (`UncapturedStepSchema`),
+`:338-340` (`uncapturedSteps`), `:435-441` (`unnamedWriteCount`), `commands/builtins/history.ts:81-92` (`unreplayableHistoryReason`),
+`components/SessionRecorder/UncapturedSteps.tsx:19-46` (`session`); guarded by
+`recorder.test.ts:2143` "saves each one with the time it happened and why it was not captured", `:2176` "names an undo that has nothing left to undo", `:2190` "names each one while the take is still recording", `:2203` "logs the named list when the take stops",
+`uncapturedSteps.test.ts`, `SessionRecorderControls.test.tsx:307` "names each uncaptured step while the take records",
+`SessionLibraryPanel.test.tsx:53` "names the steps each saved take did not capture", `SessionReplayPanel.test.tsx:255`, `:264` (`session`),
 and `recorder.test.ts` "an export during a take".)_
 
 ### REQ-RR-042 — An export skips uncaptured steps, and says so before it starts
@@ -721,12 +722,12 @@ started. Both export paths shall then run the take the way the in-app replay
 does: the uncaptured steps are not in `actions`, so there is nothing to apply
 for them, and the embedded session keeps their count and names.
 
-_(`components/SessionRecorder/SessionReplayPanel.tsx:681-688`, `:782-790`,
-`components/SessionRecorder/UncapturedSteps.tsx:53-82`,
-`recorder/uncapturedSteps.ts:157-170`, `recorder/replayVideo.ts:1100`,
-`recorder/replayInterfaceVideo.ts:324`; guarded by `replayVideo.test.ts:214`,
-`replayInterfaceVideo.test.ts:162`, `SessionReplayPanel.test.tsx:302`,
-`:348`.)_
+_(`components/SessionRecorder/SessionReplayPanel.tsx:681-688` (`unnamedWriteCount`), `:782-790` (`confirmingSkips`),
+`components/SessionRecorder/UncapturedSteps.tsx:53-82` (`ExportSkipNotice`),
+`recorder/uncapturedSteps.ts:159-172` (`describeExportSkips`), `recorder/replayVideo.ts:1100` (`uncaptured`),
+`recorder/replayInterfaceVideo.ts:324` (`uncaptured`); guarded by `replayVideo.test.ts:214` "publishes a take with uncaptured steps by skipping them, as replay does",
+`replayInterfaceVideo.test.ts:162` "records a take with uncaptured steps instead of refusing it", `SessionReplayPanel.test.tsx:302` "lists what an artwork export will skip before it starts",
+`:348` "starts a full-interface capture on the click that accepts the skipped steps".)_
 
 ### REQ-RR-043 — A picked blend partner is recorded with the weight it showed
 
@@ -756,15 +757,15 @@ shall treat a missing weight as 0, which is how everything that draws reads it:
 a partner saved without a weight is rebuilt at 0, without a snap. The weight is
 the edited flame's share of the blend: 0 draws the partner alone.
 
-_(`flame/blend.ts:17`, `hooks/useWorkspaceBlendPick.ts:43-99`,
-`commands/builtins/flame/coreCommands.ts:36-75`, `commands/registry.ts:288-296`,
-`recorder/synthesize/atoms.ts:523-556`, `canonical.ts:19-56`,
-`MainWorkspace.tsx:1329-1334`, `components/BlendFlameGallery/BlendFlameGallery.tsx`,
+_(`flame/blend.ts:17` (`DEFAULT_BLEND_WEIGHT`), `hooks/useWorkspaceBlendPick.ts:200-300` (`FlameDescriptor`),
+`commands/builtins/flame/coreCommands.ts:36-75` (`history`), `commands/registry.ts:288-296` (`setBlendFlame`),
+`recorder/synthesize/atoms.ts:523-556` (`blendFlame`), `canonical.ts:19-56` (`comparable`),
+`MainWorkspace.tsx:1328-1333` (`setupMorph`), `components/BlendFlameGallery/BlendFlameGallery.tsx`,
 `components/WorkspaceSidebar/WorkspaceSidebar.tsx` `onSelect`; guarded by
-`WorkspaceSidebar.gallery.test.tsx`, `useWorkspaceBlendPick.test.tsx:117`,
-`:155`, `:177`, `:196`, `:208`, `commands/builtins/flame/blend.test.ts:52`,
-`:68`, `:79`, `:88`, `:116`, `:143` and `planCreation.test.ts:209`, `:230`,
-`:252`.)_
+`WorkspaceSidebar.gallery.test.tsx`, `useWorkspaceBlendPick.test.tsx:152` "commits the weight its preview showed, replays to it, and undoes to the document before the hover",
+`:190` "gives a pick made without a hover, as on a touch screen, the same weight", `:177` (`setBlendFlame`), `:231` "puts back the pick, not the document before it, when a later hover leaves", `:287` "puts back exactly what a hover replaced when the pointer leaves", `commands/builtins/flame/blend.test.ts:52` "gives the default weight to a document that has none",
+`:68` "keeps a weight the document already has when its first partner names none", `:79` "keeps the weight when an existing blend swaps its partner", `:88` "lets a weight it is given win, over none or over the one the document has", `:116` "replays a weight from 0 to 1 and refuses anything else", `:143` "replays a take recorded before picks carried a weight at the weight the viewer saw" and `planCreation.test.ts:209` "builds a blend at the weight the target has", `:230` "rebuilds a partner saved without a weight, which draws as weight 0",
+`:252` "adds no blend step to a flame without a blend".)_
 
 ### REQ-RR-044 — A play window replays at the pace the take played it
 
@@ -809,18 +810,17 @@ its own clock back; the Play/Pause toggle (Space, the transport button) that
 took the replay over there shall leave it paused, as the press meant. A hold, a narration or a glide inside a
 window is not waited for.
 
-_(`recorder/playWindows.ts:83-150`, `recorder/playWindowPace.ts:18-178`,
-`recorder/playerPlayWindows.ts:34-138`, `recorder/player.ts:185-193`,
-`:294-305`, `:339-346`, `:385-408`, `:452-484`, `:548-553`, `:608-652`,
-`:680-681`, `:717-719`, `:726-733`, `recorder/timelineActions.ts:161-167`,
-`recorder/replayPlayback.ts:13-35`, `recorder/replay.ts:171-184`,
-`hooks/useWorkspaceReplay.ts:456-459`, `flame/Flam3.tsx:591-600`, `:1246-1253`,
-`utils/timeline.ts:729-731`; guarded by `playWindows.test.ts`,
-`playWindowPace.test.ts`, and `playWindowReplay.test.ts:211` "plays five seconds
-as five seconds and lands on the Pause frame with no jump", `:255`, `:291`,
-`:327`, `:363`, `:399`, `:432`, `:455`, `:483`, `:509`, `:548`, `:630` "pauses
-on the frame it had when the replay is closed", `:644`, `:659`, `:688`, and
-`SessionReplayPanelGlide.test.tsx:212`, `:232`.)_
+_(`recorder/playWindows.ts:83-150` (`planPlayWindows`), `recorder/playWindowPace.ts:18-178` (`nominalFramesPerMs`),
+`recorder/playerPlayWindows.ts:34-138` (`createPlayerPlayWindows`), `recorder/player.ts:185-193` (`stepGapMs`),
+`:294-305` (`createPlayerPlayWindows`), `:339-346` (`preserveBaseline`), `:385-408` (`rejectAction`), `:455-470` (`runStep`), `:548-553` (`reset`), `:608-652` (`finish`),
+`:680-681` (`holdAt`), `:717-719` (`holdAt`), `:726-733` (`stop`), `recorder/timelineActions.ts:161-167` (`togglePlay`),
+`recorder/replayPlayback.ts:13-35` (`timelineReplayPlayback`), `recorder/replay.ts:171-184` (`playback`),
+`hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:591-600` (`createEffect`), `:1246-1253` (`isAutoFpsReady`),
+`utils/timeline.ts:729-731` (`setIsPlaying`); guarded by `playWindows.test.ts`,
+`playWindowPace.test.ts`, and `playWindowReplay.test.ts:210` "plays five seconds
+as five seconds and lands on the Pause frame with no jump", `:254` "wraps a looping playback as often as the take did", `:290` "reproduces a render loop slower than the configured fps",
+`:326` "stops a non-looping playback where the take ran off its end", `:362` "starts a new window at a seek made while playing", `:398` "lands an edit made while playing at its recorded time and frame", `:431` "keeps the Pause frame when the replay speed changes inside the window", `:454` "holds the playhead through a replay Pause and resumes from it", `:482` "seeks into a window paused and restarts it from the baseline", `:508` "ends a take stopped while playing on the frame the playback had, still playing", `:547` "still replays a take recorded before the Pause carried its count", `:629` "pauses on the frame it had when the replay is closed", `:643` "pauses on the frame it had when the viewer takes the document over", `:658` "pauses on the frame the failed step ran on", `:687` "pauses on Space pressed inside the window, as the press meant", and
+`SessionReplayPanelGlide.test.tsx:212` "pauses the timeline where it is when the export is cancelled", `:232` "pauses the timeline where it is when the capture fails".)_
 
 ### REQ-RR-045 — The artwork video plays a play window frame by frame
 
@@ -838,11 +838,10 @@ as before. A window of D seconds lasts D / speed seconds of video, so a long
 one can take a take past the 300 s limit (REQ-RR-029), which a faster speed
 fits.
 
-_(`recorder/replayVideo.ts:442-539`, `:548-610`, `:647-659`, `:987-1049`,
-`components/ExportJobs/OffscreenAnimationRender.tsx:64`, `:327`; guarded by
-`replayVideoPlayWindows.test.ts:77`, `:93` "moves the playhead frame by frame
-through the window onto the Pause frame", `:114`, `:124`, `:137`, `:149`,
-`:164`.)_
+_(`recorder/replayVideo.ts:442-539` (`createReplayVideoSchedule`), `:548-610` (`replayStateAtFrame`), `:647-659` (`pacer`), `:987-1049` (`advanceTo`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:64` (`takeMs`), `:327` (`advanceTo`); guarded by
+`replayVideoPlayWindows.test.ts:77` "gives a play window its real duration, and an edit inside it its recorded time", `:93` "moves the playhead frame by frame through the window onto the Pause frame", `:114` "applies the edit at the frame the take made it on", `:124` "renders the same frame for the same moment, in any order", `:137` "keeps a take that ended still playing moving through the tail", `:149` "leaves a paused take exactly as it was",
+`:164` "refuses a window longer than the video limit, and fits it at a faster speed".)_
 
 ### REQ-RR-046 — Every replay hands the viewer's Glide switches back
 
@@ -881,27 +880,25 @@ glides it on its own plans (REQ-RR-045). A seat and the portal have canvases of
 their own but no glide of their own: a duel refuses transitions, and the
 portal's tours animate through their own `animateValue`.
 
-_(`recorder/replayGlideLease.ts`, `recorder/player.ts:306-308`, `:361-367`,
-`:452-484`, `:548-553`, `:608-615`, `:726-733`,
-`commands/builtins/glide.ts:14-17`, `:44-47`, `:50`, `:61-62`, `:65`, `:115`,
-`commands/types.ts:308-316`, `:352-362`, `:363-367`,
-`commands/registry.ts:537-543`, `webmcp/tools/executeCommand.ts:286-295`,
-`flame/glide/types.ts:181-194`,
-`recorder/recorder.ts:597-603`,
-`recorder/replayVideo.ts:932-934`, `recorder/synthesize/sandbox.ts:125-127`,
-`seats/seat.ts:279-280`, `components/Home/portalScript.ts:219-220`,
-`components/SessionRecorder/SessionReplayPanel.tsx:185-190`, `:714-729`,
-`flame/glide/runtime.ts:410-433`; guarded by `replayGlideSwitches.test.ts:98`,
-`:111`, `:122`, `:136`, `:149`, `:166` "keeps a switch the viewer flips while
-paused, though the take flips it again", `:187` "resumes a paused replay where
-it paused after a live glide.setQuality", `:212`, `:230`, `:261`, `:281`, `:301`,
-`:326` "plays on through a live glide.setQuality, and keeps the flip", `:350`
-"still hands a playing replay back to open export.png", `:366`, `:413` "never reaches the live glide while the artwork export
-glides into a flame", `:427`, `:435`, `:441`, `:471` "never reaches the live
+_(`recorder/replayGlideLease.ts`, `recorder/player.ts:306-308` (`glideLease`), `:361-367` (`openBatch`),
+`:455-470` (`runStep`), `:548-553` (`reset`), `:608-615` (`finish`), `:726-733` (`stop`),
+`commands/builtins/glide.ts:14-17` (`context`), `:44-46` (`preservesFinishedSession`), `:50` (`setGlideEnabled`), `:61-62` (`preservesFinishedSession`), `:65` (`setGlideQualityPreference`), `:98` (`runtime`),
+`commands/types.ts:315-323` (`glideSwitches`), `:351-361` (`reproduces`), `:369-374` (`presentationSwitch`),
+`commands/registry.ts:537-543` (`beforeCommand`), `webmcp/tools/executeCommand.ts:286-295` (`presentationSwitch`),
+`flame/glide/types.ts:181-188` (`GlideDriver`),
+`recorder/recorder.ts:597-603` (`isTopLevel`),
+`recorder/replayVideo.ts:932-934` (`APART_FROM_LIVE_GLIDE`), `recorder/synthesize/sandbox.ts:125-127` (`APART_FROM_LIVE_GLIDE`),
+`seats/seat.ts:279-280` (`APART_FROM_LIVE_GLIDE`), `components/Home/portalScript.ts:219-220` (`APART_FROM_LIVE_GLIDE`),
+`components/SessionRecorder/SessionReplayPanel.tsx:185-190` (`exportTookReplay`), `:714-729` (`setExportError`),
+`flame/glide/runtime.ts:410-433` (`captureGlideSwitches`); guarded by `replayGlideSwitches.test.ts:98` "follows the take while it plays and hands them back when it finishes",
+`:111` "hands them back when the replay is closed midway", `:122` "hands them back when a step fails", `:136` "hands them back when the viewer takes the document over", `:160` (`isFinished`), `:166` "keeps a switch the viewer flips while paused, though the take flips it again", `:187` "resumes a paused replay where
+it paused after a live glide.setQuality", `:212` "seeks forward from a paused replay after a live flip without a rebuild", `:230` "keeps the last finished take on the document it describes", `:261` "still rebuilds a paused replay after a live edit", `:281` "keeps the switch the viewer flips and puts back the one they left", `:301` "keeps the viewer's flip through a seek that rebuilds the take",
+`:330` "plays on through a live glide.setQuality, and keeps the flip", `:351`
+"still hands a playing replay back to open export.png", `:366` "sets them as the take had them at the step a seek lands on", `:413` "never reaches the live glide while the artwork export glides into a flame", `:427` "never reaches it while the synthesize sandbox checks the take", `:435` "leaves the viewer's switches alone while the artwork export replays", `:441` "leaves them alone while the synthesize sandbox checks a take", `:471` "never reaches the live
 glide or switches through a duel seat", `replayGlideQuality.test.ts:182` "glides
 the next step at a tier the viewer flips while it plays",
-`executeCommand.test.ts:458` and `SessionReplayPanelGlide.test.tsx:148`,
-`:163`, `:179`.)_
+`executeCommand.test.ts:458` "lets a glide in flight finish through glide.setQuality", `SessionReplayPanelGlide.test.tsx:148` "hands them back when the export succeeds",
+`:163` "hands them back when the export is cancelled midway", `:179` "hands them back when the capture fails while the replay runs".)_
 
 ### REQ-RR-047 — The artwork export glides at the take's own Glide quality
 
@@ -925,16 +922,16 @@ schedule (`glideMs`, `glideTiers`), so both replays straighten, frame and
 downshift a glide alike. Two exports of one request shall produce the same job and
 schedule.
 
-_(`recorder/glide.ts:48-50`, `:82-109`, `recorder/replayVideo.ts:84-86`,
-`:453-459`, `:527-528`, `:569-577`, `:612-615`, `:1058-1075`,
-`flame/glide/runtime.ts:232-236`,
-`components/ExportJobs/OffscreenAnimationRender.tsx:56`, `:69-85`, `:329`,
-`recorder/player.ts:513-529`, `:243`, `:739`, `recorder/replayGlideLease.ts:22-24`,
-`:66-69`, `components/SessionRecorder/SessionReplayPanel.tsx:705-711`; guarded
-by `replayGlideQuality.test.ts:175`, `:196` "gives the same glide lengths and
+_(`recorder/glide.ts:48-50` (`GlideQualityPreference`), `:82-109` (`presetOf`), `recorder/replayVideo.ts:84-86` (`glideMs`),
+`:453-459` (`spec`), `:527-528` (`glideMs`), `:569-577` (`replayFrameQuality`), `:612-615` (`createReplayVideoDriver`), `:1058-1075` (`glidePlanFor`),
+`flame/glide/runtime.ts:232-236` (`planned`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:56` (`createReplayVideoDriver`), `:69-85` (`Quality`), `:329` (`setPerFrameQuality`),
+`recorder/player.ts:518-529` (`settled`), `:243` (`viewerGlideSwitches`), `:739` (`viewerGlideSwitches`), `recorder/replayGlideLease.ts:22-24` (`GlideSwitches`),
+`:66-69` (`viewer`), `components/SessionRecorder/SessionReplayPanel.tsx:705-711` (`glide`); guarded
+by `replayGlideQuality.test.ts:175` "glides into each step at the tier in force once it ran, live", `:196` "gives the same glide lengths and
 step times as the live replay", `:207` "plans each glide with the inputs the
-live replay plans it with", `:226`, `:252`, `glide.test.ts:114`, `:129`,
-`:149` and `replayGlideSwitches.test.ts:242`.)_
+live replay plans it with", `:226` "renders each glide frame at its step's tier and each settle at full", `:252` "makes two exports of one take identical, whatever the switches do after", `recorder/glide.test.ts:114` "starts from the viewer's switch and follows the take's", `:129` (`reads`),
+`:149` "holds an export queued before the preference was sent to its tier", `replayGlideSwitches.test.ts:242` "names the viewer's own switches for an export, whatever the take holds".)_
 
 ### REQ-RR-048 — A replay never exports
 
@@ -947,11 +944,11 @@ that same replay, so it queues none either. The artwork export's driver and the
 synthesize sandbox have no export host to begin with. Outside a replay,
 `execute_command` shall still queue the render.
 
-_(`hooks/useWorkspaceReplay.ts:184-186`, `:443-454`,
-`commands/builtins/export.ts:75-79`,
-`:109-113`, `commands/types.ts:280-300`; guarded by
+_(`hooks/useWorkspaceReplay.ts:184-186` (`replayRunsExports`), `:443-454` (`workspace`),
+`commands/builtins/export.ts:75-79` (`execute`),
+`:109-113` (`execute`), `commands/types.ts:287-307` (`Background`); guarded by
 `useWorkspaceReplay.exportStep.test.ts:187` "queues nothing when the live
-replay plays it, and keeps its place", `:209`, `:220`.)_
+replay plays it, and keeps its place", `:209` "still renders when an agent runs it live, outside a replay", `:220` "cannot render in the artwork export or the synthesize sandbox".)_
 
 ### REQ-RR-049 — A change that glides itself glides once
 
@@ -984,17 +981,17 @@ and clears its wall-clock deadline, and only then read the document for the new
 glide, so no deadline is left to land a later glide early and no glide takes
 another's frame for its target.
 
-_(`flame/glide/runtime.ts:220-225`, `:280-301`, `flame/glide/types.ts:188-193`,
-`commands/types.ts:326-332`, `:375-388`, `commands/builtins/glide.ts:78-94`,
-`webmcp/tools/executeCommand.ts:137-162`, `:236-306`, `recorder/glide.ts:53-75`,
-`recorder/player.ts:452-472`, `:497-512`, `:560-575`; guarded by
+_(`flame/glide/runtime.ts:220-225` (`landInFlight`), `:280-301` (`landInFlight`), `flame/glide/types.ts:188-193` (`plannedDurationMs`),
+`commands/types.ts:326-332` (`SelfGlide`), `:375-388` (`glidesItself`), `commands/builtins/glide.ts:78-94` (`glidesItself`),
+`webmcp/tools/executeCommand.ts:137-162` (`withCallGlideMs`), `:236-306` (`withCallGlideMs`), `recorder/glide.ts:53-75` (`glideMsForAction`),
+`recorder/player.ts:452-472` (`runStep`), `:497-512` (`selfGlideOf`), `:560-575` (`runStep`); guarded by
 `runtime.test.ts:260` "finishes the replaced glide, so its caller hears back",
-`:275`, `:289`, `:304` "leaves no deadline armed to cut the next glide short",
-`runtimeReplaceExamples.test.ts:48`, `executeCommandSelfGlide.test.ts:71`
-"Glide on: one glide, at the planner duration, landing on the target", `:90`,
-`:107`, `:123`, `:145`, `:160`, `:176`, and `playerSelfGlide.test.ts:90`
-"Glide on: one glide, for the duration the step recorded", `:100`, `:111`,
-`:119`, `:132` "a seek rebuilds through it without a glide, keeping the steps
+`:275` "reads its target from the settled document, not from a frame", `:289` "glideTo also lands the replaced glide before reading its start", `:304` "leaves no deadline armed to cut the next glide short",
+`runtimeReplaceExamples.test.ts:48` "lands every pair on its target", `executeCommandSelfGlide.test.ts:71`
+"Glide on: one glide, at the planner duration, landing on the target", `:90` "glideMs: one glide, for that long, and the take keeps it",
+`:107` "the command's own duration wins over glideMs and the setting", `:123` "Glide off and nothing named: the command still glides, once, awaited", `:145` "glideMs 0: no glide at all, and the take says so", `:160` "reports the command's glide when the deadline landed it", `:176` "leaves no deadline behind to cut the next glide short", and `playerSelfGlide.test.ts:90`
+"Glide on: one glide, for the duration the step recorded", `:100` "Glide on, no recorded duration: one glide, for the replay's", `:111` "Glide off: one glide, the command's own",
+`:119` "times the step the way the live replay glides it", `:132` "a seek rebuilds through it without a glide, keeping the steps
 after it".)_
 
 ### REQ-RR-050 — A plain-flame load while playing records its Pause
@@ -1005,10 +1002,10 @@ the load's own writes out of the take, so the take records the Pause (REQ-RR-040
 ahead of the load's timeline snapshot, and its replay shall stop the timeline
 there and run the rest of the take on the stopped playhead, as the viewer saw it.
 
-_(`MainWorkspace.tsx:2709-2712`; guarded by `MainWorkspace.plainLoad.test.ts:17`
-"stops playback through pause(), before the unrecorded block", `:23`, and
+_(`MainWorkspace.tsx:2709-2712` (`withRecordingSuppressed`); guarded by `MainWorkspace.plainLoad.test.ts:17`
+"stops playback through pause(), before the unrecorded block", `:23` "never stops it through the raw setter, which reports nothing", and
 `playWindowReplay.test.ts:793` "records the Pause, so the replay stops where the
-take did", `:818`.)_
+take did", `:818` "the raw setter it replaces left the replay playing (the bug)".)_
 
 ---
 
@@ -1019,19 +1016,19 @@ behaviour is violated. Several cite a test for a pure helper the requirement
 depends on; that is noted where it applies, but the requirement itself is
 unguarded.
 
-| ID         | Why it is unguarded                                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| REQ-RR-007 | The Arcade-pilot exemption for seeks (`recorder.ts:867`) has no test of its own; the same exemption for Play and Pause is guarded (REQ-RR-040).                |
-| REQ-RR-011 | The facade is tested; the **MainWorkspace wiring** that decides whether the facade is used at all is not — which is exactly how its known deviation shipped.   |
-| REQ-RR-016 | Nothing constructs a prototype-bearing `paletteRestoreColors` and asserts the session is rejected rather than emptied.                                         |
-| REQ-RR-027 | `focusPreparation.test.ts` covers derivation only. Nothing tests `useWorkspaceReplay.ts:370-440`, which applies it — that hook has no test file.               |
-| REQ-RR-031 | The fingerprint is tested; the state-run loop in `OffscreenAnimationRender.tsx` that consumes it is not.                                                       |
-| REQ-RR-032 | No test file for `OffscreenAnimationRender.tsx`.                                                                                                               |
-| REQ-RR-036 | `utils/motionBlur.test.ts` re-derives the arithmetic inline and imports nothing from `animationExport.ts`; it stays green for any change to the export driver. |
-| REQ-RR-037 | `utils/motionBlur.test.ts` pins the sub-frame rule; blur itself is verified by measurement only (#91).                                                         |
-| REQ-RR-038 | No test file for `utils/animationExport.ts`.                                                                                                                   |
-| REQ-RR-039 | No test file for any of the four drivers it cites.                                                                                                             |
-| REQ-RR-044 | The `pacedPlayback` guards in `Flam3.tsx` and the `useWorkspaceReplay.ts:459` wiring are untested; tests use a stand-in render loop. Measured on a GPU.        |
+| ID         | Why it is unguarded                                                                                                                                                           |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REQ-RR-007 | The Arcade-pilot exemption for seeks (`recorder.ts:867` (`reportTimelineTransportIn`)) has no test of its own; the same exemption for Play and Pause is guarded (REQ-RR-040). |
+| REQ-RR-011 | The facade is tested; the **MainWorkspace wiring** that decides whether the facade is used at all is not — which is how its deviation (fixed in #90) shipped.                 |
+| REQ-RR-016 | Nothing constructs a prototype-bearing `paletteRestoreColors` and asserts the session is rejected rather than emptied.                                                        |
+| REQ-RR-027 | `focusPreparation.test.ts` covers derivation only. Nothing tests `useWorkspaceReplay.ts:370-440` (`prepareReplayFocus`), which applies it — that hook has no test file.       |
+| REQ-RR-031 | The fingerprint is tested; the state-run loop in `OffscreenAnimationRender.tsx` that consumes it is not.                                                                      |
+| REQ-RR-032 | No test file for `OffscreenAnimationRender.tsx`.                                                                                                                              |
+| REQ-RR-036 | `utils/motionBlur.test.ts` re-derives the arithmetic inline and imports nothing from `animationExport.ts`; it stays green for any change to the export driver.                |
+| REQ-RR-037 | `utils/motionBlur.test.ts` pins the sub-frame rule; blur itself is verified by measurement only (#91).                                                                        |
+| REQ-RR-038 | No test file for `utils/animationExport.ts`.                                                                                                                                  |
+| REQ-RR-039 | No test file for any of the four drivers it cites.                                                                                                                            |
+| REQ-RR-044 | The `pacedPlayback` guards in `Flam3.tsx` and the `useWorkspaceReplay.ts:476` (`loadInitial`) wiring are untested; tests use a stand-in render loop. Measured on a GPU.       |
 
 Partially guarded, worth naming: REQ-RR-019, REQ-RR-022 and REQ-RR-023 are
 covered where their logic lives in `recorder/`, but the `useWorkspaceReplay.ts`
@@ -1039,9 +1036,13 @@ half — capture, restore, and the forced commit against the real history — ha
 test at all.
 
 The pattern is one boundary: **everything under `packages/app/src/recorder/` is
-densely unit-tested; everything that wires it into the workspace or drives a
-GPU/encoder is not.** `hooks/useWorkspaceReplay.ts` (608 lines),
-`components/ExportPngDialog/ExportPngDialog.tsx` (1370 lines, only its 28-line
-`metadataCommit.ts` helper tested), `components/ExportJobs/*` (1056 lines) and
-`utils/animationExport.ts` (399 lines) have no tests. Both known deviations
-recorded in this spec live in exactly that untested band.
+densely unit-tested; what wires it into the workspace or drives a GPU/encoder is
+thinly tested at best.** Measured with `wc -l` on 2026-09-23:
+`hooks/useWorkspaceReplay.ts` (643 lines) is tested only for its export step
+(`useWorkspaceReplay.exportStep.test.ts`);
+`components/ExportPngDialog/ExportPngDialog.tsx` (1457 lines) only through
+`quickExport.test.tsx` and its 28-line `metadataCommit.ts` helper; the
+`components/ExportJobs/*.tsx` components (1199 lines) and
+`utils/animationExport.ts` (431 lines) have no tests. Both deviations this spec
+recorded lived in that band — REQ-RR-011's, fixed in #90, and REQ-RR-037's,
+resolved in #91 — and none is open.

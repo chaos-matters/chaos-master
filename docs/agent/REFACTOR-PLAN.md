@@ -12,24 +12,33 @@ are not a ranking signal.
 Each item states its acceptance criterion. An item is not done until that is
 demonstrably true.
 
+**Status, 2026-09-23.** Stages 1, 2 and 3 are done: #90, #91, #92, #93 and #87,
+merged 2026-09-20. What was left of Stages 4 and 5 is folded into the refactor
+plan that now orders all remaining work; see
+[Stages 4 and 5](#stages-4-and-5--folded-into-the-refactor-plan) at the end.
+The stage bodies below are kept as the record of what each stage asked for.
+Their file and line references describe the tree at `a5c2f26f`, the audited
+commit, and are pinned to it ([CONVENTIONS.md](CONVENTIONS.md) §9).
+
 ## Executable plans
 
 Each stage has a task-by-task plan with the actual test code, the actual fix,
 and acceptance criteria — written for someone with no context for this codebase.
 
-| Stage                          | Plan                                                                                                                  | Prerequisite                                   |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1 — confirmed defects          | [stage1-defects](../superpowers/plans/2026-09-10-audit-remediation-stage1-defects.md)                                 | none                                           |
-| — motion blur (split out)      | [offscreen-export-motion-blur](../superpowers/plans/2026-09-11-offscreen-export-motion-blur.md)                       | none; ships as its own PR                      |
-| 2 — characterization net       | [stage2-characterization-net](../superpowers/plans/2026-09-11-audit-remediation-stage2-characterization-net.md)       | none — **do this before any further refactor** |
-| 3 — measurable test quality    | [stage3-test-harness](../superpowers/plans/2026-09-11-audit-remediation-stage3-test-harness.md)                       | none                                           |
-| 4 and 5 — contract and hygiene | [stages4-5-contract-and-hygiene](../superpowers/plans/2026-09-11-audit-remediation-stages4-5-contract-and-hygiene.md) | Stage 2                                        |
+| Stage                          | Plan                                                                                                                  | Status                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1 — confirmed defects          | [stage1-defects](../superpowers/plans/2026-09-10-audit-remediation-stage1-defects.md)                                 | **Done**: #90, merge `520cd16d`                                   |
+| — motion blur (split out)      | [offscreen-export-motion-blur](../superpowers/plans/2026-09-11-offscreen-export-motion-blur.md)                       | **Done**: #91, merge `683f9177`                                   |
+| 2 — characterization net       | [stage2-characterization-net](../superpowers/plans/2026-09-11-audit-remediation-stage2-characterization-net.md)       | **Done**: #92, merge `75f53619`                                   |
+| 3 — measurable test quality    | [stage3-test-harness](../superpowers/plans/2026-09-11-audit-remediation-stage3-test-harness.md)                       | **Done**: #93, merge `a98c3876`; items 2 and 3 in #87, `fb3b1089` |
+| 4 and 5 — contract and hygiene | [stages4-5-contract-and-hygiene](../superpowers/plans/2026-09-11-audit-remediation-stages4-5-contract-and-hygiene.md) | Superseded by the refactor plan; see the end of this document     |
 
-Stages 1, 2 and 3 are independent of one another and can run in parallel.
-Stage 4 must not start before Stage 2 exists: every task in it moves code that
-nothing currently pins, which is the mistake this audit documents.
+The dated plans are historical: they describe the tree they were written
+against.
 
 ---
+
+<!-- cite-check: pinned a5c2f26f -->
 
 ## Stage 1 — Confirmed defects that reach the user
 
@@ -42,6 +51,8 @@ It carries the exact code, the failing test for each fix, and the manual
 tablet-verification protocol to run with the user.
 
 ### 1.0 Degenerate pinch gestures write NaN into the camera — HIGH
+
+**Done** in #90: `5c88d855` (the pinch guard) and `376cb80f` (the schema rejects infinite camera values).
 
 `packages/app/src/utils/createPinchHandler.ts:18`, consumed unguarded at
 `packages/app/src/lib/WheelZoomCamera3D.tsx:355`
@@ -73,6 +84,8 @@ radius stays finite, plus the manual tablet protocol in the plan — run against
 
 ### 1.1 Keyframe short-circuit swallows slider edits — HIGH
 
+**Done** in #90: `abd83151`.
+
 `packages/app/src/hooks/useWorkspaceTimelineBinding.ts:87`
 
 `getFlameCameraSetting` consults `getTimelineCameraKeyframeValue` for **every**
@@ -93,6 +106,8 @@ before the fix. Note the existing test file hard-codes `isDrivingView` and
 
 ### 1.2 Tablet split layout collapses across 680-768px — HIGH
 
+**Done** in #90: `7062e1f2`. The layout classification was rebuilt again in #95.
+
 `packages/app/src/App.module.css:21`
 
 A pre-existing `max-width: 768px` block overrides `.tabletLayout`, so every
@@ -107,6 +122,8 @@ breakpoint block, either by ordering or by excluding them from it.
 each of 679, 680, 744, 768 and 769px.
 
 ### 1.3 Beats mode never loads a track — HIGH
+
+**Done** in #90: `f1b74bb9` and `af2c4ee8`.
 
 `packages/app/src/webmcp/tools/arcadeBeats.ts:333`
 
@@ -124,6 +141,8 @@ asserting a decoded buffer is loaded and reactivity is enabled at the end.
 
 ### 1.4 Randomize / Smart Animation are not recorded — MEDIUM
 
+**Done** in #90: `b6838992`.
+
 `packages/app/src/MainWorkspace.tsx:2412` — `useWorkspaceAnimationGen` was handed
 `timeline` instead of `recorderTimeline`. Both presets use `Math.random()`, so
 without a snapshot the action cannot replay.
@@ -133,12 +152,16 @@ snapshot with origin `timeline.random` is emitted.
 
 ### 1.5 Director sessions overwrite each other's ratings — MEDIUM
 
+**Done** in #90: `404db62a`.
+
 `packages/app/src/arcade/tasteStore.ts:164` — records keyed by
 `(generation, candidateIndex)` only, so a new session at generation 1 overwrites
 the old one. **Fix.** Add a session id to the key. **Acceptance.** A test rating
 across two sessions and asserting `totalRatings` is the sum.
 
 ### 1.6 Motion blur silently dropped on offscreen export — MEDIUM
+
+**Done** in #91, merge `683f9177`: the offscreen path accumulates sub-frames.
 
 `packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx:1267` — the
 offscreen path ignores the sub-sampling setting; output is byte-identical to
@@ -147,6 +170,8 @@ disable the control on that path and say why. Silently ignoring the setting is
 the one unacceptable option.
 
 ### 1.7 PR-preview origin is indexable — MEDIUM
+
+**Done** in #90: `c37f8aae`.
 
 `packages/app/src/worker/middleware/reviewHost.ts:17` — PR #79 covered
 `dev.lumenapeiron.com` and `about.dev.lumenapeiron.com` but not the
@@ -157,8 +182,10 @@ test asserting `Allow: /` is never served from a non-production origin.
 
 ### 1.8 Three module-scope memos leak on every load — MEDIUM
 
-`packages/app/src/stores/workspaceLayoutStore.ts:114,120,126` — `isPhone`,
-`isTablet` and `isTouchLayout` are `createMemo` at module scope. Solid warns
+**Done** in #90: `b17c7b6e`. Instead of a smoke-spec console check, `5eb10f1e` added `moduleScopeComputations.test.ts`, which fails on the pattern statically.
+
+`packages/app/src/stores/workspaceLayoutStore.ts:114` (`isPhone`), `:120`
+(`isTablet`) and `:126` (`isTouchLayout`) are `createMemo` at module scope. Solid warns
 they will never be disposed, three times per page load, on every route and
 viewport.
 
@@ -171,6 +198,8 @@ this warning class, so it cannot come back.
 ---
 
 ## Stage 2 — The safety net that was skipped
+
+**Done** in #92, merge `75f53619`: all five items below, each run on both `v0.9.11` and `HEAD`. No regression from the refactor turned up; the golden round trip found pre-existing export losses ([TESTING.md](TESTING.md) §2).
 
 Phase 0 of `docs/REFACTOR_AND_IMPROVEMENT_STRATEGY.md` promised characterization
 tests over "schema boundaries, flame serialization, affine math" **before** any
@@ -196,6 +225,8 @@ or hand-write obviously fake values.
 ---
 
 ## Stage 3 — Make test quality measurable
+
+**Done.** Items 1 and 4-7 in #93, merge `a98c3876`; items 2 and 3 in #87, merge `fb3b1089`. The CI Playwright project is named `chromium-ci`, not `chromium-degraded`. All six mutants are caught, re-verified at `9fc08078` ([TESTING.md](TESTING.md) §1).
 
 The audit ran six mutation probes across six subsystems. **All six survived.**
 Until that changes, no coverage number in this repo means anything.
@@ -224,51 +255,46 @@ Until that changes, no coverage number in this repo means anything.
    It was widened twice, each time inside the commit that made widening
    necessary.
 
----
-
-## Stage 4 — Finish the contract
-
-Nine commitments in the refactor strategy were missed outright and 26 partially
-met. The ones still worth doing:
-
-- **`MainWorkspace.tsx` is 4,133 lines against a stated target of under 500.**
-  Down 48% from 7,928, which is real progress, but 8.3x the target. It still
-  holds the entire touch-layout JSX block. Either finish the decomposition or
-  amend the target in the strategy document — leaving a written commitment
-  8x missed is how a plan stops being believed.
-- **`WorkspaceModalsHost.tsx` renders none of the 15 modals it was created for.**
-  It is 103 lines rendering `SpotlightTour`, `SoftwareVersion`, `PilotOverlay`,
-  `DuelStage` and `ArenaOverlay`. Workstream 1.1 is structurally unstarted.
-- **Fix the two defeated lazy boundaries.** `DiffViewModal` (via
-  `WorkspaceSidebar.tsx:5`) and `AudioWiringModal`, 1,644 lines (via
-  `AudioReactivePanel.tsx:5`), are both pinned into the main chunk by a static
-  import. Extract the shared piece into its own file so the heavy part stays
-  splittable. Vite already reports both at build time.
-- **De-duplicate the five modules copied into `packages/core`.** `easing.ts` and
-  four others are byte-identical twins; the core copies are imported by nothing.
-  A fix applied to one does not reach the other. Re-export, do not copy.
-- **Measure Phase 2 properly.** Whether startup improved cannot be answered from
-  chunk sizes — the eager payload is 34 KB on both `v0.9.11` and `HEAD`. Measure
-  what the first route actually pulls at runtime.
-- **Correct the strategy document's baseline table.** It claims 39 WebMCP tools
-  (actual at `v0.9.11`: 34) and 219 test files (actual: 201). A plan whose
-  starting numbers are wrong cannot be used to judge whether it succeeded.
+<!-- cite-check: live -->
 
 ---
 
-## Stage 5 — Hygiene
+## Stages 4 and 5 — folded into the refactor plan
 
-- **Add header comments.** 984 of 1,055 source files have none, so `pnpm
-docs:index` cannot describe 93% of the tree. Mechanical, always an
-  improvement, and it makes every future agent session cheaper. Start with the
-  94 entry points that appear in [INDEX.md](INDEX.md) as `(no header comment)`.
-- **Fix the 117 non-discriminating assertions** (16% of the 735 added in this
-  range) — assertions a null or an unchanged value satisfies.
-- **`TabletSplitLayout.tsx` is dead code with a passing test** claiming coverage
-  of a layout no user can reach. Delete it or wire it up.
-- **Remove or wire the 8 orphan modules** reported by `pnpm arch`. All predate
-  this range.
-- **Reduce the five worst complexity offenders** (`commandPut` 39,
-  `validateBenchmarkResult` 34, `commandSequence` 31, `asMutationOptions` 30,
-  `flameComplexityError` 27) — but only where it genuinely helps a reader. See
-  [METRICS.md](METRICS.md) on why complexity is tracked and not gated.
+Stages 4 and 5 were never run as stages. Some of their items were done on the
+way, and a refactor plan that orders all remaining structural work took over
+the rest in September 2026.
+
+Done since the audit:
+
+- **The two defeated lazy boundaries** (`DiffViewModal`, `AudioWiringModal`):
+  fixed in #90 (`2efd73fc`); `lazyBoundaries.test.ts` holds it since #116.
+- **The 8 orphan modules** reported by `pnpm arch`: deleted in #115, merge
+  `14ca80ea`. `no-orphans` is an error in CI since #116.
+- **Core twins**: three of the app's copies of core modules (`utils/easing.ts`,
+  `utils/record.ts`, `utils/schemaUtil.ts`) re-export core since #115.
+- **`TabletSplitLayout.tsx`**, dead code with a passing test: deleted in #95
+  when the tablet layout was rebuilt.
+- **Header comments**: `missing_header_comment` is a ratchet, so no new file
+  lands without one; 999 of 1,157 files still have none.
+- **The strategy document's baseline table**: corrected in WP4 (#118).
+
+Still open, and now owned by the refactor plan, in this order:
+
+1. **WP4** — this docs truth pass and the citation checker (#118).
+2. **WP8** — command worlds.
+3. **M1** — milestone.
+4. **WP5.0-5.19** — the `MainWorkspace.tsx` split (4,546 lines against a target
+   of about 1,500), with milestones M2 and M3 along the way. It takes in
+   `WorkspaceModalsHost.tsx`, which still renders none of the modals it was
+   created for.
+5. **WP9** — one key router.
+6. **WP6 PR A** — the `utils/timeline.ts` split.
+7. **WP7** — `planGlide`, the most complex function in the tree (73).
+8. **M4** — milestone.
+9. **WP6 PR B**.
+
+Not scheduled in that plan: measuring what the first route pulls at runtime
+(the eager payload is 38.4 KB, [CODE-HEALTH.md](CODE-HEALTH.md) §6), the
+non-discriminating assertions (four were fixed in #115), and the complexity
+offenders other than `planGlide` (CODE-HEALTH.md §5).

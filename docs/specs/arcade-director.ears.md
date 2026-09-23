@@ -19,21 +19,21 @@ Arcade modes.
 - `packages/app/src/webmcp/tools/arcadeDirector.ts` — `director_propose`, `open_art_director`, `director_get_feedback`, `director_get_taste_profile`, and candidate normalisation
 - `packages/app/src/components/DirectorOverlay.tsx` — the modal: rating capture, tag chips, Breed Selected, Mutate Best, Load Candidate
 - `packages/app/src/hooks/useWorkspaceArtDirector.tsx` — session signals, seeding, modal lifecycle, `selectCandidate`
-- `packages/app/src/commands/types.ts:21-42,92-98` — `DirectorCandidate`, `DirectorState`, the optional `director` member of `CommandContext`
-- `packages/app/src/arcade/topics.ts:366-396` — `DIRECTOR_PRESETS` and `directorPromptCard`
-- `packages/app/src/components/Arcade/ArcadeModePanel.tsx:378-419` — the Director tab and its "Launch Art Director Overlay" button
-- `packages/app/src/webmcp/tools/index.ts:99-100,131-132` — registration order
+- `packages/app/src/commands/types.ts:31-54` (`DirectorCandidate`), `:104-110` (`director`) — `DirectorCandidate`, `DirectorState`, the optional `director` member of `CommandContext`
+- `packages/app/src/arcade/topics.ts:364-394` — `DIRECTOR_PRESETS` and `directorPromptCard`
+- `packages/app/src/components/Arcade/ArcadeModePanel.tsx:378-419` (`director`) — the Director tab and its "Launch Art Director Overlay" button
+- `packages/app/src/webmcp/tools/index.ts:99-100` (`directorGetFeedback`), `:131-132` (`directorPropose`) — registration order
 - `packages/app/src/webmcp/tools/openArtDirector.ts` — a one-line re-export barrel with no importers; behaviourally inert
 
 **Tests:**
 
 - `packages/app/src/webmcp/tools/arcadeDirector.test.ts` — the four tools against a mock `CommandContext`: refusal without context, propose, the alias, feedback read-back, profile read-back
 - `packages/app/src/arcade/tasteStore.test.ts` — feature extraction shape, record update-in-place, empty vs populated profile (runs under `happy-dom`, so the real `localStorage` round-trip is exercised)
-- `packages/app/src/arcade/topics.test.ts:160-175` — the Director presets and the prompt card's tool names
+- `packages/app/src/arcade/topics.test.ts:191-206` "director" — the Director presets and the prompt card's tool names
 - `packages/app/src/flame/breedFlame.test.ts:59,257` — `breedFlames` honours `count` and returns `[]` rather than throwing on mismatched dimensions, which is what REQ-AD-033 rests on
 - `packages/app/src/webmcp/tools/toolCount.test.ts` — every registered tool is named in the `docs/webmcp.md` table
 - _Gap:_ `DirectorOverlay.tsx` and `useWorkspaceArtDirector.tsx` have **no test file at all**. Every requirement covering the modal, the session lifecycle and the evolve buttons (REQ-AD-003, 004, 005, 011, 012, 013, 014, 015, 032, 033, 034, 035, 036) is unguarded.
-- _Gap:_ `tests/webmcp.spec.ts` names the Art Director but is **stale and never run**: CI runs only `tests/smoke.spec.ts` (`package.json:33`, `.github/workflows/node.js.yml:68`), and the spec still asserts the pre-#75 payload `{ success: true, message: 'Art Director UI opened.' }`, a heading named `Art Director`, and `Rate 4 stars` star buttons — none of which the shipped code produces. It is cited nowhere below.
+- `tests/webmcp.ci.spec.ts` — runs in PR CI (the `chromium-ci` project) since #93, which replaced the stale `tests/webmcp.spec.ts`. `tests/webmcp.ci.spec.ts:14` "registers webmcp on window and opens Art Director overlay on executeTool" opens the modal through `open_art_director`, checks the generation and fitness labels, clicks a Like reaction and loads a candidate; `:74` "opens Art Director from toolbar Genetics menu and populates candidates" opens it from the toolbar with four candidates and closes it. Neither asserts a stored rating, a tag, or a breed or mutate result.
 - Full list of unguarded IDs in [Coverage gaps](#coverage-gaps).
 
 ---
@@ -48,8 +48,8 @@ Arcade modes.
 `annotations.readOnlyHint` and ordered into the read half of the registration
 array ahead of every write tool.
 
-_(`webmcp/tools/index.ts:99-100` read half, `:131-132` write half;
-`arcadeDirector.ts:171-173`, `:236-238`)_
+_(`webmcp/tools/index.ts:99-100` (`directorGetFeedback`) read half, `:131-132` (`directorPropose`) write half;
+`arcadeDirector.ts:179-181` (`annotations`), `:244-246` (`annotations`))_
 
 ### REQ-AD-002 — The Arcade panel hands the agent the whole loop, not just a goal
 
@@ -59,7 +59,7 @@ prompt card that names `director_get_taste_profile`, `director_propose` and
 `director_get_feedback` in that order, so the agent reads the historical profile
 before proposing and reads feedback before evolving.
 
-_(`arcade/topics.ts:366-396`; `Arcade/ArcadeModePanel.tsx:378-419`. The panel's
+_(`arcade/topics.ts:364-394` (`DIRECTOR_PRESETS`); `Arcade/ArcadeModePanel.tsx:378-419` (`director`). The panel's
 "Launch Art Director Overlay" button calls `ctx?.director?.setOpen(true)` and
 nothing else — it opens the modal on whatever generation already exists, or on a
 seeded one per REQ-AD-005.)_
@@ -71,8 +71,8 @@ return immediately while a modal is already mounted, and shall clear both the
 re-entrancy latch and the `open` signal when the modal settles — whether it was
 dismissed by the close button, by Load Candidate, or by the modal host.
 
-_(`useWorkspaceArtDirector.tsx:57-61` the latch, `:110-114` the overlay's
-`respond`, `:118-121` the `finally`. Note the state itself survives a close: the
+_(`useWorkspaceArtDirector.tsx:58-62` (`isDirectorModalOpen`) the latch, `:112-116` (`respond`) the overlay's
+`respond`, `:120-123` the `finally`. Note the state itself survives a close: the
 candidates and generation stay in the signal, so reopening resumes the same
 generation rather than reseeding.)_
 
@@ -83,8 +83,8 @@ mounted, the workspace shall request the Director modal — this is the only sea
 by which `director_propose`'s `setOpen(true)` and the Arcade panel's launch
 button reach the UI, since neither calls `openArtDirectorUI` directly.
 
-_(`useWorkspaceArtDirector.tsx:124-128`; the tool side at
-`arcadeDirector.ts:137-138`)_
+_(`useWorkspaceArtDirector.tsx:126-130` (`createEffect`); the tool side at
+`arcadeDirector.ts:145-146` (`setState`))_
 
 ### REQ-AD-005 — An empty session seeds four mutants of the current flame
 
@@ -95,8 +95,8 @@ from a deep clone of the current workspace flame at strengths 0.2, 0.3, 0.4 and
 and mutating colours, and each carrying its own `scoreFlame(...).composite` as
 fitness.
 
-_(`useWorkspaceArtDirector.tsx:62-94`. The four preset names — Subtle, Moderate,
-Chaotic, Structural — are declared at `:65` and used only for their count and
+_(`useWorkspaceArtDirector.tsx:63-96` (`directorState`). The four preset names — Subtle, Moderate,
+Chaotic, Structural — are declared at `:66` (`presets`) and used only for their count and
 index; they are never displayed.)_
 
 ### REQ-AD-006 — A Director tool without a workspace refuses by name
@@ -108,8 +108,8 @@ and `director_get_feedback` shall return
 the replay renderer or a duel rival seat installs — **then** they shall return
 `{ error: 'Director context not found in workspace.' }` instead of throwing.
 
-_(`arcadeDirector.ts:10-12`, `:109-112`, `:175-178`; the optional member is
-declared at `commands/types.ts:92-98`. `director_get_taste_profile` needs no
+_(`arcadeDirector.ts:10-12` (`NOT_READY`), `:109-112` (`getWebMcpContext`), `:183-186` (`getWebMcpContext`); the optional member is
+declared at `commands/types.ts:104-110` (`director`). `director_get_taste_profile` needs no
 context at all — see REQ-AD-030.)_
 
 ### REQ-AD-007 — `director_propose` replaces the whole generation
@@ -122,7 +122,7 @@ falsy `generation` shall become 1, a missing `candidates` array shall become
 empty, and each candidate's fitness shall be the caller's `fitness` when given
 and `scoreFlame(flame).composite` otherwise.
 
-_(`arcadeDirector.ts:114-147`, fitness at `:50-56`. Replacement is total: the
+_(`arcadeDirector.ts:114-155` (`input`), fitness at `:50-56` (`calculatedFitness`). Replacement is total: the
 previous generation's in-session reactions and tags are discarded, though their
 persisted taste records survive per REQ-AD-035.)_
 
@@ -134,7 +134,7 @@ it with a mutation of the current workspace flame at strength `0.2 + index * 0.1
 in the workspace flame's own dimensionality, rather than passing the malformed
 descriptor to the preview renderer.
 
-_(`arcadeDirector.ts:20-48`)_
+_(`arcadeDirector.ts:20-48` (`rawCandidates`))_
 
 ### REQ-AD-009 — A candidate that cannot be repaired stays flame-less and renders a placeholder
 
@@ -144,8 +144,8 @@ shall render a "Candidate N" placeholder in place of a preview, and
 `director_get_feedback` shall report `features: undefined` for it — never a
 crash and never a fabricated feature set.
 
-_(`arcadeDirector.ts:50-54` the 0.85 default and the `as FlameDescriptor` cast,
-`:192-194` the feature guard; `DirectorOverlay.tsx:312-324` the placeholder
+_(`arcadeDirector.ts:50-54` (`calculatedFitness`) the 0.85 default and the `as FlameDescriptor` cast,
+`:200-202` (`features`) the feature guard; `DirectorOverlay.tsx:316-328` (`camera`) the placeholder
 fallback.)_
 
 ### REQ-AD-010 — `open_art_director` is the same tool under an older name
@@ -155,7 +155,7 @@ execute `director_propose`'s implementation and input schema unchanged, differin
 only in `name` and `description`, so a proposal made under either name lands in
 the same state and opens the same modal.
 
-_(`arcadeDirector.ts:153-158` — a spread of `directorPropose`.)_
+_(`arcadeDirector.ts:161-166` (`openArtDirector`) spreads `directorPropose`.)_
 
 ### REQ-AD-011 — Reaction toggles are three-state
 
@@ -165,7 +165,7 @@ carries, it shall clear the reaction to `null`. Either way it shall rebuild
 `lastFeedback.candidates` for **every** candidate from current reactions and
 tags, preserving any existing `selectedIndex`.
 
-_(`DirectorOverlay.tsx:52-78`)_
+_(`DirectorOverlay.tsx:52-78` (`toggleReaction`))_
 
 ### REQ-AD-012 — Every reaction change writes a taste record
 
@@ -176,7 +176,7 @@ or `'neutral'` when the reaction was cleared; the candidate's current `tags`;
 `lastFeedback.selectedIndex` currently equals this candidate's index; and
 `features` from `extractFlameTasteFeatures(candidate.flame)`.
 
-_(`DirectorOverlay.tsx:80-90`. Because Load Candidate closes the modal
+_(`DirectorOverlay.tsx:80-91` (`flame`). Because Load Candidate closes the modal
 (REQ-AD-015), `wasSelected` is false on every record written before a load; it
 can only be true for a candidate rated after reopening the same generation.)_
 
@@ -189,7 +189,7 @@ and write a taste record carrying the new tag list and the candidate's existing
 reaction (or `'neutral'` when it has none). Tags are per candidate, not per
 generation, and free-text tags cannot be entered.
 
-_(`DirectorOverlay.tsx:23-32` the vocabulary, `:93-134` the toggle.)_
+_(`DirectorOverlay.tsx:23-32` (`QUICK_TAGS`) the vocabulary, `:94-136` (`toggleTag`) the toggle.)_
 
 ### REQ-AD-014 — A flame-less candidate is rated in session only
 
@@ -198,7 +198,7 @@ update in the live director state, but no taste record shall be written — a
 record with no extractable features would poison the profile's category and
 palette aggregation.
 
-_(`DirectorOverlay.tsx:80`, `:124` — both writes are behind `if (candidate.flame)`.)_
+_(`DirectorOverlay.tsx:80` (`flame`), `:125` (`flame`) — both writes are behind `if (candidate.flame)`.)_
 
 ### REQ-AD-015 — Loading a candidate is an undoable workspace edit
 
@@ -208,7 +208,7 @@ of that candidate's flame through the history setter under the label
 with a snapshot of every candidate's reaction, tags and rationale, show the toast
 `Art Director: Loaded candidate <N> into workspace.`, and close the modal.
 
-_(`useWorkspaceArtDirector.tsx:32-55`; the button at `DirectorOverlay.tsx:426-434`.
+_(`useWorkspaceArtDirector.tsx:33-56` (`selectCandidate`); the button at `DirectorOverlay.tsx:430-438` (`loadBtn`).
 The clone matters: without it the workspace and the still-live candidate list
 would share one descriptor.)_
 
@@ -219,7 +219,7 @@ The taste store shall persist its records as a JSON array under the single
 module-level list so that a read after a successful write returns the same
 records without touching storage again.
 
-_(`arcade/tasteStore.ts:54`, `:57`, `:129-155`. `clearTasteStore` (`:301-308`)
+_(`arcade/tasteStore.ts:61` (`STORAGE_KEY`), `:64` (`memoryRatings`), `:136-162` (`getStoredRatings`). `clearTasteStore` (`:319-326`)
 empties both.)_
 
 ### REQ-AD-017 — Unreadable storage degrades to the in-memory list
@@ -229,9 +229,9 @@ does not parse to an array, **then** `getStoredRatings` shall return the
 in-memory list instead of throwing, so a private window, a sandboxed iframe or a
 corrupted key costs the session its history but not the Director.
 
-_(`arcade/tasteStore.ts:129-143`. The array is adopted as-is: no record is
+_(`arcade/tasteStore.ts:136-150` (`getStoredRatings`). The array is adopted as-is: no record is
 validated, so a hand-edited key whose entries lack `features` will make
-`deriveTasteProfile` throw at `:220`.)_
+`deriveTasteProfile` throw at `:238` (`variationCategories`).)_
 
 ### REQ-AD-018 — Unwritable storage never breaks rating
 
@@ -240,7 +240,7 @@ validated, so a hand-edited key whose entries lack `features` will make
 it in the in-memory list, so ratings continue to accumulate for the life of the
 page.
 
-_(`arcade/tasteStore.ts:148-155`)_
+_(`arcade/tasteStore.ts:155-162` (`saveRatings`))_
 
 ### REQ-AD-019 — The store keeps the newest hundred records
 
@@ -248,7 +248,7 @@ The taste store shall retain at most `MAX_RATINGS_HISTORY` (100) records,
 discarding the oldest on each save, so a long-running profile cannot grow the
 storage key without bound.
 
-_(`arcade/tasteStore.ts:55`, `:149` — `ratings.slice(-MAX_RATINGS_HISTORY)`.
+_(`arcade/tasteStore.ts:62`, `:156` — `ratings.slice(-MAX_RATINGS_HISTORY)`.
 Trimming happens on save only, so a payload longer than 100 read back from
 storage is aggregated in full until the next write.)_
 
@@ -258,16 +258,20 @@ A taste record's identity shall distinguish the Director session it came from,
 so that ratings made in a later session are appended to the profile rather than
 overwriting same-numbered candidates from an earlier one.
 
-> **Known deviation:** `packages/app/src/arcade/tasteStore.ts:164` — the id is
+<!-- cite-check: pinned a5c2f26f -->
+
+> **Fixed deviation** (#90, `404db62a`; this note describes the code at `a5c2f26f`): `packages/app/src/arcade/tasteStore.ts:164` — the id is
 > `cand-${generation}-${candidateIndex}` and nothing else. `generation` comes
 > straight from the agent (`webmcp/tools/arcadeDirector.ts:114-132`, stored as
 > `generation || 1`) and every prompt card starts an agent at generation 1, so
 > yesterday's `cand-1-0`…`cand-1-N` are silently replaced by today's. The record
-> carries a `timestamp` (`:170`) but it is never read — `deriveTasteProfile`
+> carries a `timestamp` (`tasteStore.ts:170`) but it is never read — `deriveTasteProfile`
 > (`:186-296`) does not touch it — and there is no session id, seed or flame
 > hash. `director_get_taste_profile`'s own description promises a profile
 > "derived across sessions" (`arcadeDirector.ts:230-231`). Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
+
+<!-- cite-check: live -->
 
 ### REQ-AD-021 — Re-rating a candidate updates its record in place
 
@@ -276,7 +280,7 @@ store shall replace that record in place — refreshing reaction, tags, note,
 `wasSelected`, features and timestamp — rather than appending a second one, so a
 user who flips Like to Dislike is counted once.
 
-_(`arcade/tasteStore.ts:166-177`; guarded by `tasteStore.test.ts:40-53`.)_
+_(`arcade/tasteStore.ts:184-195` (`existingIndex`); guarded by `tasteStore.test.ts:40-53` (`entry2`).)_
 
 ### REQ-AD-022 — Taste features are extracted from the candidate flame alone
 
@@ -287,9 +291,9 @@ sorted deduplicated set of variation **categories** resolved in the flame's own
 dimensionality, and a palette temperature — and nothing about the user, the
 generation or the session.
 
-_(`arcade/tasteStore.ts:90-124`; `categoryOf` at
-`flame/variationRegistry.ts:37-47`. `transformCount` (`:120`) counts every
-transform, while the category walk (`:100-108`) skips some — see REQ-AD-024.)_
+_(`arcade/tasteStore.ts:97-131` (`extractFlameTasteFeatures`); `categoryOf` at
+`flame/variationRegistry.ts:37-47`. `transformCount` (`tasteStore.ts:127`) counts every
+transform, while the category walk (`:107-115` (`visible`)) skips some — see REQ-AD-024.)_
 
 ### REQ-AD-023 — Palette temperature needs a margin of two
 
@@ -300,7 +304,7 @@ transform is warm when its `color.x`, wrapped into [0,1) and read as a hue in
 degrees, is ≥330 or ≤80, and cool when it is between 160 and 280; hues in the
 remaining bands count toward neither.
 
-_(`arcade/tasteStore.ts:62-85`)_
+_(`arcade/tasteStore.ts:69-92` (`derivePaletteTemperature`))_
 
 ### REQ-AD-024 — A transform with no explicit `visible` still counts
 
@@ -308,13 +312,13 @@ Feature extraction shall treat a transform whose `visible` field is absent as
 visible, since the schema's default is `true` and an agent-authored candidate
 descriptor is never parsed through the schema before it reaches the taste store.
 
-> **Known deviation:** `packages/app/src/arcade/tasteStore.ts:101` (and
-> `:72` in `derivePaletteTemperature`) — both loops read `if (!t.visible)
+> **Known deviation:** `packages/app/src/arcade/tasteStore.ts:108` (`visible`) (and
+> `:79` (`visible`) in `derivePaletteTemperature`) — both loops read `if (!t.visible)
 continue`, so a candidate composed as plain JSON with no `visible` key yields
 > `variationCategories: []` and `paletteTemperature: 'balanced'` for every
 > transform. `director_propose` passes agent input through untouched
 > (`webmcp/tools/arcadeDirector.ts:114-120`) and `normalizeCandidates` only
-> replaces a flame that is missing transforms entirely (`:20-48`), so this is
+> replaces a flame that is missing transforms entirely (`:20-48` (`rawCandidates`)), so this is
 > the normal shape of the tool's main input path. The sibling helper
 > `calculateStructuralSymmetry` in `webmcp/tools/scoreFlame.ts` uses
 > `(t.visible ?? true)`, so the two disagree about the same flame. Tracked in
@@ -329,8 +333,8 @@ distinguishes "No user taste data recorded yet." from
 "`<n>` candidate(s) rated. No likes registered yet." — dislikes alone never
 produce preferences.
 
-_(`arcade/tasteStore.ts:197-213`; the first branch guarded by
-`tasteStore.test.ts:61-64`.)_
+_(`arcade/tasteStore.ts:215-231` (`likes`); the first branch guarded by
+`tasteStore.test.ts:61-64` (`emptyProfile`).)_
 
 ### REQ-AD-026 — Preferred and avoided categories are frequency-ordered
 
@@ -340,7 +344,7 @@ appearing on any liked record, ordered by like frequency descending, and as
 their like count, ordered by dislike frequency descending. A category liked and
 disliked equally often appears in neither list beyond its like-driven entry.
 
-_(`arcade/tasteStore.ts:216-237`)_
+_(`arcade/tasteStore.ts:234-255` (`catLikeCount`))_
 
 ### REQ-AD-027 — Averages are taken over liked records only, to one decimal
 
@@ -348,7 +352,7 @@ The profile's `avgLikedSymmetry`, `avgLikedComplexity` and `avgLikedChaos` shall
 be the means of those metrics across liked records only — never disliked or
 neutral ones — each rounded to one decimal place.
 
-_(`arcade/tasteStore.ts:239-258`)_
+_(`arcade/tasteStore.ts:257-276` (`avgLikedSymmetry`))_
 
 ### REQ-AD-028 — Preferred palette is a strict majority of the liked records
 
@@ -356,7 +360,7 @@ The profile's `preferredPalette` shall be `warm` when liked records with a warm
 palette outnumber cool ones, `cool` in the mirror case, and `balanced` on a tie —
 liked records whose own temperature is `balanced` count toward neither side.
 
-_(`arcade/tasteStore.ts:260-267`; guarded by `arcadeDirector.test.ts:154-164`
+_(`arcade/tasteStore.ts:278-285` (`warmCount`); guarded by `arcadeDirector.test.ts:154-164` (`updated`)
 for the warm case.)_
 
 ### REQ-AD-029 — The summary is one sentence naming at most five signals
@@ -366,7 +370,7 @@ the two most-avoided ones, and shall always close with the liked symmetry and
 complexity averages out of 10 and the preferred palette — so an agent that reads
 nothing but `summary` still receives the direction.
 
-_(`arcade/tasteStore.ts:269-294`. `avgLikedChaos` is computed and returned as a
+_(`arcade/tasteStore.ts:287-312` (`summaryParts`). `avgLikedChaos` is computed and returned as a
 field but is deliberately absent from the sentence.)_
 
 ### REQ-AD-030 — `director_get_taste_profile` reads the store, never the session
@@ -375,7 +379,7 @@ field but is deliberately absent from the sentence.)_
 rating history and shall return `{ ok: true, profile }` unconditionally — with no
 workspace context, no open modal and no active generation required.
 
-_(`arcadeDirector.ts:228-246`; guarded by `arcadeDirector.test.ts:116-165`,
+_(`arcadeDirector.ts:236-254` (`directorGetTasteProfile`); guarded by `arcadeDirector.test.ts:116-165` "retrieves aggregated taste profile",
 which asserts the empty profile before any rating and the aggregated one after.)_
 
 ### REQ-AD-031 — `director_get_feedback` reads the session, never the store
@@ -387,7 +391,7 @@ dislikes and naming the selected candidate. **If** no generation is active it
 shall return `{ ok: true, generation: 0, candidates: [] }` with an explanatory
 message rather than an error.
 
-_(`arcadeDirector.ts:180-221`; guarded by `arcadeDirector.test.ts:70-114`.
+_(`arcadeDirector.ts:188-229` (`state`); guarded by `arcadeDirector.test.ts:70-114` "retrieves user feedback and extracted features".
 Features are recomputed from the candidate flames on every call — the tool never
 consults the persisted taste records, so a candidate rated in this session
 appears here with its live reaction and in REQ-AD-030's profile independently.)_
@@ -401,8 +405,8 @@ replace the state with `generation + 1`, `steeringPrompt` set to the current
 prompt field, the four children scored by composite fitness, an empty selection,
 and a bumped preview version so every thumbnail re-renders.
 
-_(`DirectorOverlay.tsx:137-168`; the button is disabled below two selections at
-`:448-454`. Selection order comes from `toggleSelect` appending at `:46-50`.)_
+_(`DirectorOverlay.tsx:139-171` (`breedSelectedCandidates`); the button is disabled below two selections at
+`:452-458` (`actionBtn`). Selection order comes from `:46-50` (`toggleSelect`), which appends.)_
 
 ### REQ-AD-033 — An impossible pairing yields an empty generation
 
@@ -411,10 +415,10 @@ neither carries any transform, **then** `breedFlames` shall return no children
 rather than throwing inside the modal — and the overlay shall advance to the
 next generation with an empty candidate grid.
 
-_(`flame/breedFlame.ts:588-618` and its comment about validation throwing inside
-a modal; `DirectorOverlay.tsx:152-165` applies the result unguarded, so the user
+_(`flame/breedFlame.ts:487-507` (`cfg`) and its comment about validation throwing inside
+a modal; `DirectorOverlay.tsx:154-168` (`offspring`) applies the result unguarded, so the user
 sees `Candidates (0)` and must reopen or re-propose. Guarded on the helper side
-by `breedFlame.test.ts:257`; the overlay's handling of the empty result is not.)_
+by `breedFlame.test.ts:257` "returns no children instead of throwing when parents differ"; the overlay's handling of the empty result is not.)_
 
 ### REQ-AD-034 — Mutate Best prefers a liked candidate over a fitter one
 
@@ -425,7 +429,7 @@ outranks a disliked one, regardless of fitness — resolving ties in favour of t
 lowest index, and shall replace the state with `generation + 1` and four
 mutations of that flame at strengths 0.2, 0.3, 0.4 and 0.5.
 
-_(`DirectorOverlay.tsx:170-231`)_
+_(`DirectorOverlay.tsx:173-235` (`mutateTopCandidates`))_
 
 ### REQ-AD-035 — Evolving a generation does not itself rate anything
 
@@ -433,7 +437,7 @@ Breeding and mutating shall write no taste records: the outgoing generation's
 reactions and tags leave the live state with it, and the profile keeps exactly
 the records that the Like/Dislike and tag interactions already wrote.
 
-_(`DirectorOverlay.tsx:158-165`, `:224-228` — neither path calls
+_(`DirectorOverlay.tsx:160-168` (`setState`), `:227-232` (`setState`) — neither path calls
 `recordCandidateFeedback`. Records for the outgoing generation survive in the
 store under their own `cand-<generation>-<index>` keys, so within one session
 generations do not collide; across sessions they do — REQ-AD-020.)_
@@ -446,8 +450,8 @@ shall not be autosaved, so a reload starts the next open at a freshly seeded
 generation 1; the taste records written during that session shall survive the
 reload and continue to feed `director_get_taste_profile`.
 
-_(`useWorkspaceArtDirector.tsx:26-29` — plain signals, no persistence; contrast
-`arcade/tasteStore.ts:148-155`. The workspace flame itself is autosaved
+_(`useWorkspaceArtDirector.tsx:27-30` (`createSignal`) — plain signals, no persistence; contrast
+`arcade/tasteStore.ts:155-162` (`saveRatings`). The workspace flame itself is autosaved
 separately, so a candidate loaded via REQ-AD-015 does survive a reload.)_
 
 ---
@@ -456,22 +460,22 @@ separately, so a candidate loaded via REQ-AD-015 does survive a reload.)_
 
 Requirements with **no test that goes red when they are violated**:
 
-| ID                             | What is unguarded                                                                     | Why                                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| REQ-AD-003, 004, 005           | Modal lifecycle, the open-signal effect, generation-1 seeding                         | `useWorkspaceArtDirector.tsx` has no test file                                                                 |
-| REQ-AD-011, 012, 013, 014, 015 | Rating capture, tag vocabulary, the flame-less guard, Load Candidate                  | `DirectorOverlay.tsx` has no test file                                                                         |
-| REQ-AD-032, 033, 034, 035      | Breed Selected, the empty-generation case, Mutate Best's scoring, no-rating-on-evolve | same                                                                                                           |
-| REQ-AD-036                     | Session state is not persisted                                                        | same                                                                                                           |
-| REQ-AD-008, 009                | Candidate repair and the flame-less fallback                                          | `arcadeDirector.test.ts` only ever passes well-formed flames from `createTestFlame`                            |
-| REQ-AD-017, 018, 019           | Storage read failure, write failure, the 100-record cap                               | `tasteStore.test.ts` never throws from storage and never stores more than two records                          |
-| REQ-AD-023, 024                | Palette hue bands and the margin of two; the implicit-`visible` deviation             | `tasteStore.test.ts:19` only asserts the value is one of the three literals                                    |
-| REQ-AD-026, 027, 029           | Category ordering, liked-only averages, summary composition                           | `tasteStore.test.ts:85-89` asserts totals and a `'likes symmetry'` substring; no ordering or numeric assertion |
-| REQ-AD-002 (partial)           | The Launch Art Director Overlay button                                                | `topics.test.ts` covers the presets and prompt card, not the panel                                             |
-| REQ-AD-001 (partial)           | `readOnlyHint` on the two read tools                                                  | `toolCount.test.ts` checks names against the docs table, not annotations                                       |
+| ID                             | What is unguarded                                                                     | Why                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| REQ-AD-003, 004, 005           | Modal lifecycle, the open-signal effect, generation-1 seeding                         | `useWorkspaceArtDirector.tsx` has no test file                                                                             |
+| REQ-AD-011, 012, 013, 014, 015 | Rating capture, tag vocabulary, the flame-less guard, Load Candidate                  | `DirectorOverlay.tsx` has no test file                                                                                     |
+| REQ-AD-032, 033, 034, 035      | Breed Selected, the empty-generation case, Mutate Best's scoring, no-rating-on-evolve | same                                                                                                                       |
+| REQ-AD-036                     | Session state is not persisted                                                        | same                                                                                                                       |
+| REQ-AD-008, 009                | Candidate repair and the flame-less fallback                                          | `arcadeDirector.test.ts` only ever passes well-formed flames from `createTestFlame`                                        |
+| REQ-AD-017, 018, 019           | Storage read failure, write failure, the 100-record cap                               | `tasteStore.test.ts` never throws from storage and never stores more than two records                                      |
+| REQ-AD-023, 024                | Palette hue bands and the margin of two; the implicit-`visible` deviation             | `tasteStore.test.ts:19` (`paletteTemperature`) only asserts the value is one of the three literals                         |
+| REQ-AD-026, 027, 029           | Category ordering, liked-only averages, summary composition                           | `tasteStore.test.ts:85-89` (`profile`) asserts totals and a `'likes symmetry'` substring; no ordering or numeric assertion |
+| REQ-AD-002 (partial)           | The Launch Art Director Overlay button                                                | `topics.test.ts` covers the presets and prompt card, not the panel                                                         |
+| REQ-AD-001 (partial)           | `readOnlyHint` on the two read tools                                                  | `toolCount.test.ts` checks names against the docs table, not annotations                                                   |
 
 Partially guarded, and worth knowing how thinly:
 
-- **REQ-AD-006** — `arcadeDirector.test.ts:18-23` asserts only `toHaveProperty('error')`, so the two distinct refusal messages are interchangeable as far as the suite is concerned.
-- **REQ-AD-020** — `tasteStore.test.ts:36` asserts `entry1.id === 'cand-1-0'`, which **pins the defective key shape**. Fixing REQ-AD-020 requires editing that assertion; it will not warn you that the fix was needed.
-- **REQ-AD-021** — genuinely guarded by `tasteStore.test.ts:40-53`.
+- **REQ-AD-006** — `arcadeDirector.test.ts:18-23` "refuses without workspace context" asserts only `toHaveProperty('error')`, so the two distinct refusal messages are interchangeable as far as the suite is concerned.
+- **REQ-AD-020** — guarded since #90 by `tasteStore.test.ts:92` "keeps ratings from separate Director sessions that reuse generation numbers" and `:112` "still updates a rating in place within one session". `tasteStore.test.ts:35` (`entry1`) still expects `cand-1-0`, the id of a record written without a session id.
+- **REQ-AD-021** — genuinely guarded by `tasteStore.test.ts:40-53` (`entry2`).
 - **REQ-AD-007, 010, 030, 031** — genuinely guarded by `arcadeDirector.test.ts`.

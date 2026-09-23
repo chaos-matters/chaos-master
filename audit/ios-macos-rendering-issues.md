@@ -4,6 +4,8 @@
 **Date**: 2026-07-19  
 **Scope**: Flame render pipeline from load through presentation on iOS Safari / macOS WebGPU
 
+<!-- cite-check: pinned fc96ecca -->
+
 > **Note on this document.** The findings below are the original investigation.
 > Two recommendations were revised during implementation — the `framesPending`
 > count valve cannot fire (the render gate caps the set at 3, so a `> 10`
@@ -294,6 +296,8 @@ function requestRedraw() {
 ```
 
 ---
+
+<!-- cite-check: pinned 755768c8 -->
 
 ## Resolution — What Shipped
 

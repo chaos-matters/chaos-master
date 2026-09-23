@@ -5,7 +5,7 @@
 packages/mobile/ios
 packages/mobile/android
 
-# Generated from the audit findings by a script; its body is quoted evidence —
+# docs/agent/BUGS.md: hand-edited, and its body is quoted evidence —
 # code, log lines and shell fragments — not prose. Prettier parses the `*` and
 # `_` in that quoted text as markdown emphasis and rewrites them, turning
 # `pull_request` into `pull*request` and `User-agent: *` into `User-agent: _`.
