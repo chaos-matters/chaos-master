@@ -50,10 +50,19 @@
   border-radius: 3px;
   transform: translateX(-50%);
   cursor: grab;
+  /* A finger drag moves the stop instead of scrolling the panel. */
+  touch-action: none;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* A hit area a fingertip can find; the handle itself is 12px wide. */
+.stopHandle::before {
+  content: '';
+  position: absolute;
+  inset: -6px -14px;
 }
 
 .stopHandle:hover {
@@ -140,6 +149,8 @@
   height: 10rem;
   border-radius: 4px;
   cursor: crosshair;
+  /* A finger drag moves the point instead of scrolling the panel. */
+  touch-action: none;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
