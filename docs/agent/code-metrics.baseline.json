@@ -9,7 +9,7 @@
   "test_files": 298,
   "test_cases": 2587,
   "test_file_ratio": 0.267,
-  "missing_header_comment": 1013,
+  "missing_header_comment": 1000,
   "todo_markers": 7,
   "coverage_lines_pct": 49.77,
   "coverage_functions_pct": 41.37,

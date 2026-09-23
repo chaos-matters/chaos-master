@@ -278,69 +278,12 @@
   background: var(--color-bg, #04060c);
 }
 
-.sidebarResizeHandle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 6px;
-  cursor: ew-resize;
-  z-index: 10;
-  flex-shrink: 0;
-  touch-action: none;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 1px;
-    transform: translateX(-50%);
-    background: var(--neutral-200);
-    border-radius: 2px;
-    transition:
-      width 0.15s ease,
-      background 0.15s ease;
-    opacity: 0.5;
-  }
-
-  &:hover::after {
-    width: 3px;
-    background: var(--accent-color, #3b82f6);
-    opacity: 1;
-  }
-
-  &:active::after {
-    width: 4px;
-    background: var(--accent-color, #3b82f6);
-  }
-
-  [data-theme='dark'] &::after {
-    background: var(--neutral-700);
-    opacity: 0.4;
-  }
-
-  [data-theme='dark'] &:hover::after {
-    background: var(--accent-color, #3b82f6);
-    opacity: 1;
-  }
-
-  [data-theme='dark'] &:active::after {
-    background: var(--accent-color, #3b82f6);
-  }
-}
-
 @media (pointer: coarse) {
   /* Above the duel stage (10008), so a duel can show the real editor rather
    than growing a second one of its own. */
   .sidebarOverDuel {
     z-index: 10009;
     background: var(--color-bg, #04060c);
-  }
-
-  .sidebarResizeHandle {
-    width: 12px;
   }
 }
 
@@ -1445,10 +1388,6 @@
     z-index: 10009;
     background: var(--color-bg, #04060c);
   }
-
-  .sidebarResizeHandle {
-    display: none;
-  }
 }
 
 /* Tablet portrait / mobile: overlay sidebar */
@@ -1509,10 +1448,6 @@
   .sidebarOverDuel {
     z-index: 10009;
     background: var(--color-bg, #04060c);
-  }
-
-  .sidebarResizeHandle {
-    display: none;
   }
 
   .sidebarHidden {

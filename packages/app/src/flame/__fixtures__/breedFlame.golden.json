@@ -9,11 +9,46 @@
       "mode": "uniform",
       "draws": {
         "length": 843,
-        "digest": "088fe884",
+        "perConsumer": {
+          "uniformCrossover": 12,
+          "crossVariations": 2,
+          "crossVariationParams": 5,
+          "crossColors": 16,
+          "crossColor": 52,
+          "perturbAffine": 576,
+          "mutateSelected": 150,
+          "perturbParams": 30
+        },
+        "digest": "809c0397",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348
+          {
+            "consumer": "uniformCrossover",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          }
         ]
       },
       "children": [
@@ -295,11 +330,45 @@
       "mode": "weighted",
       "draws": {
         "length": 865,
-        "digest": "6f62099f",
+        "perConsumer": {
+          "crossVariations": 2,
+          "crossVariationParams": 3,
+          "crossColors": 16,
+          "crossColor": 52,
+          "perturbAffine": 576,
+          "mutateSelected": 180,
+          "perturbParams": 36
+        },
+        "digest": "5b8dd95a",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348
+          {
+            "consumer": "crossVariations",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.3188313185237348
+          }
         ]
       },
       "children": [
@@ -602,11 +671,46 @@
       "mode": "shuffle",
       "draws": {
         "length": 855,
-        "digest": "7a4432fa",
+        "perConsumer": {
+          "shuffleCrossover": 12,
+          "crossVariations": 2,
+          "crossVariationParams": 5,
+          "crossColors": 16,
+          "crossColor": 52,
+          "perturbAffine": 576,
+          "mutateSelected": 162,
+          "perturbParams": 30
+        },
+        "digest": "90159087",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348
+          {
+            "consumer": "shuffleCrossover",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          }
         ]
       },
       "children": [
@@ -896,11 +1000,45 @@
       "mode": "alternate",
       "draws": {
         "length": 857,
-        "digest": "99246165",
+        "perConsumer": {
+          "crossVariations": 2,
+          "crossVariationParams": 4,
+          "crossColors": 18,
+          "crossColor": 65,
+          "perturbAffine": 576,
+          "mutateSelected": 168,
+          "perturbParams": 24
+        },
+        "digest": "d19721fc",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348
+          {
+            "consumer": "crossVariations",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          }
         ]
       },
       "children": [
@@ -1193,11 +1331,48 @@
       "mode": "smart",
       "draws": {
         "length": 879,
-        "digest": "64456f1a",
+        "perConsumer": {
+          "crossBreedAffineCoefficients": 24,
+          "crossBreedTransformPair": 24,
+          "fillRemainingFromUnmatched": 8,
+          "crossVariations": 3,
+          "crossVariationParams": 2,
+          "crossColors": 12,
+          "crossColor": 26,
+          "perturbAffine": 576,
+          "mutateSelected": 162,
+          "perturbParams": 42
+        },
+        "digest": "2cc6429c",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348
+          {
+            "consumer": "crossBreedAffineCoefficients",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbParams",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.3188313185237348
+          }
         ]
       },
       "children": [
@@ -1491,11 +1666,51 @@
       "mode": "uniform",
       "draws": {
         "length": 1063,
-        "digest": "87e9fabb",
+        "perConsumer": {
+          "uniformCrossover": 10,
+          "crossColors": 12,
+          "crossColor": 39,
+          "perturbAffine": 864,
+          "mutateSelected": 138
+        },
+        "digest": "26bfa96e",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348, 0.10544833214953542, 0.6965320110321045
+          {
+            "consumer": "uniformCrossover",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.10544833214953542
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.6965320110321045
+          }
         ]
       },
       "children": [
@@ -1794,11 +2009,50 @@
       "mode": "weighted",
       "draws": {
         "length": 1032,
-        "digest": "f5fd01cd",
+        "perConsumer": {
+          "crossColors": 10,
+          "crossColor": 26,
+          "perturbAffine": 864,
+          "mutateSelected": 132
+        },
+        "digest": "c9817b93",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348, 0.10544833214953542, 0.6965320110321045
+          {
+            "consumer": "crossColors",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.10544833214953542
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.6965320110321045
+          }
         ]
       },
       "children": [
@@ -2093,11 +2347,51 @@
       "mode": "shuffle",
       "draws": {
         "length": 1063,
-        "digest": "87e9fabb",
+        "perConsumer": {
+          "shuffleCrossover": 10,
+          "crossColors": 12,
+          "crossColor": 39,
+          "perturbAffine": 864,
+          "mutateSelected": 138
+        },
+        "digest": "27821942",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348, 0.10544833214953542, 0.6965320110321045
+          {
+            "consumer": "shuffleCrossover",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.10544833214953542
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.6965320110321045
+          }
         ]
       },
       "children": [
@@ -2396,11 +2690,50 @@
       "mode": "alternate",
       "draws": {
         "length": 1032,
-        "digest": "f5fd01cd",
+        "perConsumer": {
+          "crossColors": 10,
+          "crossColor": 26,
+          "perturbAffine": 864,
+          "mutateSelected": 132
+        },
+        "digest": "c9817b93",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348, 0.10544833214953542, 0.6965320110321045
+          {
+            "consumer": "crossColors",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.3188313185237348
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.10544833214953542
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.6965320110321045
+          }
         ]
       },
       "children": [
@@ -2695,11 +3028,53 @@
       "mode": "smart",
       "draws": {
         "length": 1107,
-        "digest": "00c925d7",
+        "perConsumer": {
+          "crossBreedAffineCoefficients": 48,
+          "crossBreedTransformPair": 24,
+          "fillRemainingFromUnmatched": 6,
+          "crossColors": 8,
+          "perturbAffine": 864,
+          "mutateSelected": 144,
+          "crossColor": 13
+        },
+        "digest": "f958c614",
         "checkpoints": [
-          0.41157995723187923, 0.2247862562071532, 0.28696164721623063,
-          0.7288877035025507, 0.03794747986830771, 0.05827995971776545,
-          0.3188313185237348, 0.10544833214953542, 0.6965320110321045
+          {
+            "consumer": "crossBreedAffineCoefficients",
+            "value": 0.41157995723187923
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.2247862562071532
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.28696164721623063
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.7288877035025507
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.03794747986830771
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.05827995971776545
+          },
+          {
+            "consumer": "mutateSelected",
+            "value": 0.3188313185237348
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.10544833214953542
+          },
+          {
+            "consumer": "perturbAffine",
+            "value": 0.6965320110321045
+          }
         ]
       },
       "children": [

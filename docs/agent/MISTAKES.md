@@ -104,8 +104,10 @@ count. A vacuous pass looks exactly like a real pass.
 **The rule.** After changing anything about the `arch` config, check that the
 module count and the orphan count both look sane. `tsconfig.depcruise.json`
 exists solely to give the resolver the `@/*` mapping from the repo root; do not
-point `tsConfig` at the root `tsconfig.json`. Correctly resolved, the graph is
-1,195 modules with 8 orphans and genuinely zero cycles.
+point `tsConfig` at the root `tsconfig.json`. Correctly resolved, the graph was
+1,195 modules with 8 orphans and genuinely zero cycles on 2026-09-10, and is
+1,270 modules with no violations at all since 2026-09-23 (WP2 deleted the 8
+orphans). A run that reports dozens of orphans is resolving wrongly.
 
 ### dependency-cruiser will not run on odd-numbered Node
 

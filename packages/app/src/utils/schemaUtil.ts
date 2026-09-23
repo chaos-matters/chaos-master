@@ -1,13 +1,4 @@
-import { recordKeys } from '@/utils/record'
-import * as v from '@/valibot'
-import type { BaseData, WgslStruct } from 'typegpu/data'
-
-export function structToSchema<T extends Record<string, BaseData>>(
-  struct: WgslStruct<T>,
-) {
-  const obj = {} as Record<keyof T, v.NumberSchema<undefined>>
-  for (const key of recordKeys(struct.propTypes)) {
-    obj[key] = v.number()
-  }
-  return v.object(obj)
-}
+// Builds a valibot number-object schema from a TypeGPU struct's fields. The
+// implementation lives in @chaos-master/core; the app keeps importing it from
+// here.
+export { structToSchema } from '@chaos-master/core'

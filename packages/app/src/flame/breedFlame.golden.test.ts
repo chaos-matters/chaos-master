@@ -25,10 +25,16 @@ import type { FlameDescriptor } from './schema/flameSchema'
  *
  * Two things are recorded per case:
  *
- *  - the draw sequence, as a length, a digest and every 128th value. Storing
- *    all ~1300 floats per case would be six figures of JSON for a diagnostic;
- *    the digest catches any reordering and the checkpoints say which 128-draw
- *    window it started in.
+ *  - the draw sequence: every value the seeded source handed out, and WHICH
+ *    function asked for it. The values alone cannot see a reordering: a
+ *    seeded source's i-th value is fixed by the seed, so the value sequence
+ *    depends only on how many draws were made. (It did: the 3D uniform and
+ *    shuffle cases drew 1063 values each and recorded the same digest.) Two
+ *    consumers that swap turns draw the same values in a different order of
+ *    consumers, so the record names the consumer of every draw. Stored as a
+ *    length, a count per consumer, a digest over (consumer, value) in draw
+ *    order, and every 128th draw with its consumer; storing all ~1000 draws
+ *    per case would be six figures of JSON for a diagnostic.
  *  - `children`, the canonicalized descriptors. This is the result, and it
  *    catches a change that consumes the same draws to different effect.
  *
@@ -41,7 +47,10 @@ import type { FlameDescriptor } from './schema/flameSchema'
  *     src/flame/breedFlame.golden.test.ts
  *
  * and read the diff. A changed digest means the draw order moved; if that was
- * not the point of your change, it is a bug.
+ * not the point of your change, it is a bug. The one expected exception: a
+ * consumer is named by its function name alone (see `consumerOfDraw`), so
+ * renaming a function that draws, or moving a draw into a new helper, changes
+ * the draw record while `children` stay equal. Say so when you regenerate.
  */
 
 /**
@@ -83,10 +92,18 @@ type CanonicalFlame = {
   finalTransform?: CanonicalTransform
 }
 
+/** One value the seeded source handed out, and the function that asked. */
+type Draw = {
+  consumer: string
+  value: number
+}
+
 type DrawRecord = {
   length: number
+  /** Draws per consumer, keyed in the order each consumer first drew. */
+  perConsumer: Record<string, number>
   digest: string
-  checkpoints: number[]
+  checkpoints: Draw[]
 }
 
 type GoldenCase = {
@@ -147,40 +164,105 @@ function canonicalize(flame: FlameDescriptor): CanonicalFlame {
 }
 
 /**
- * FNV-1a over the raw float64 words, so two draws that differ only in the last
- * mantissa bit still produce different digests. A float-to-string digest would
- * not; breeding perturbs by fractions of a coefficient and those bits matter.
+ * FNV-1a over each draw's consumer name, then its raw float64 words, in draw
+ * order. The words make two draws that differ only in the last mantissa bit
+ * produce different digests (a float-to-string digest would not; breeding
+ * perturbs by fractions of a coefficient and those bits matter). The name,
+ * closed by a 0 separator, makes the same values drawn by consumers in a
+ * different order produce a different digest.
  */
-function digestDraws(draws: number[]): string {
+function digestDraws(draws: Draw[]): string {
   const view = new ArrayBuffer(8)
   const asFloat = new Float64Array(view)
   const asWords = new Uint32Array(view)
   let hash = 0x811c_9dc5
+  const mix = (word: number) => {
+    hash = Math.imul(hash ^ word, 0x0100_0193) >>> 0
+  }
   for (const draw of draws) {
-    asFloat[0] = draw
-    hash = Math.imul(hash ^ asWords[0]!, 0x0100_0193) >>> 0
-    hash = Math.imul(hash ^ asWords[1]!, 0x0100_0193) >>> 0
+    for (let i = 0; i < draw.consumer.length; i++) {
+      mix(draw.consumer.charCodeAt(i))
+    }
+    mix(0)
+    asFloat[0] = draw.value
+    mix(asWords[0]!)
+    mix(asWords[1]!)
   }
   return hash.toString(16).padStart(8, '0')
 }
 
-function drawRecord(draws: number[]): DrawRecord {
-  const checkpoints: number[] = []
+function drawRecord(draws: Draw[]): DrawRecord {
+  const perConsumer: Record<string, number> = {}
+  for (const draw of draws) {
+    perConsumer[draw.consumer] = (perConsumer[draw.consumer] ?? 0) + 1
+  }
+  const checkpoints: Draw[] = []
   for (let i = 0; i < draws.length; i += CHECKPOINT_STRIDE) {
     checkpoints.push(draws[i]!)
   }
-  return { length: draws.length, digest: digestDraws(draws), checkpoints }
+  return {
+    length: draws.length,
+    perConsumer,
+    digest: digestDraws(draws),
+    checkpoints,
+  }
 }
 
-/** A seeded source that keeps every value it handed out. */
+/**
+ * The frames a draw passes through on its way from a consumer to the seeded
+ * source: the ambient-source helpers (`random01`, `randomRange`,
+ * `randomPerturbation`) and this file's own recording wrapper.
+ */
+const DRAW_PLUMBING =
+  /[\\/](randomSource\.ts|breedFlame\.golden\.test\.ts)(\?|$)/
+
+/**
+ * The function that asked for the current draw: the first NAMED frame on the
+ * stack outside the draw plumbing. Anonymous callbacks and native frames are
+ * skipped, so a `.map(() => random01())` inside `uniformCrossover` is charged
+ * to `uniformCrossover`.
+ *
+ * Only the name is kept. A file or a line would change the record when code
+ * moves between modules or a comment is added above it, and neither changes
+ * what breeding draws.
+ */
+function consumerOfDraw(): string {
+  const limit = Error.stackTraceLimit
+  // Saved to be put back below, never called, so an unbound `this` is moot.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const prepare = Error.prepareStackTrace
+  const holder: { stack?: unknown } = {}
+  let frames: NodeJS.CallSite[]
+  try {
+    Error.stackTraceLimit = 64
+    Error.prepareStackTrace = (_error, callSites) => callSites
+    Error.captureStackTrace(holder, consumerOfDraw)
+    // V8 formats a stack when it is first read, with whatever
+    // prepareStackTrace is installed THEN, so read it before restoring.
+    frames = holder.stack as NodeJS.CallSite[]
+  } finally {
+    Error.prepareStackTrace = prepare
+    Error.stackTraceLimit = limit
+  }
+  for (const frame of frames) {
+    const name = frame.getFunctionName()
+    const file = frame.getFileName()
+    if (!name || !file || file.startsWith('node:')) continue
+    if (DRAW_PLUMBING.test(file)) continue
+    return name
+  }
+  return '(no named caller)'
+}
+
+/** A seeded source that keeps every value it handed out, and who asked. */
 function recordingSource(seed: number) {
   const base = createSeededRandomSource(seed)
-  const draws: number[] = []
+  const draws: Draw[] = []
   return {
     draws,
     source: () => {
       const value = base()
-      draws.push(value)
+      draws.push({ consumer: consumerOfDraw(), value })
       return value
     },
   }
@@ -283,13 +365,17 @@ describe.skipIf(UPDATING)(
           )
         })
 
-        it('draws the same values in the same order', () => {
-          // Length first, then position, then the digest: a changed draw COUNT
-          // is a different bug from a changed draw ORDER, and the checkpoint
-          // index says which window to go and read.
+        it('draws the same values for the same consumers in the same order', () => {
+          // Length first, then who drew how many, then position, then the
+          // digest: a changed draw COUNT is a different bug from a changed
+          // draw ORDER, the per-consumer counts say whose count moved, and
+          // the checkpoint index says which window to go and read.
           expect(actual.draws.length).toBe(expected.draws.length)
+          expect(actual.draws.perConsumer).toEqual(expected.draws.perConsumer)
           const firstBadCheckpoint = expected.draws.checkpoints.findIndex(
-            (value, i) => actual.draws.checkpoints[i] !== value,
+            (draw, i) =>
+              actual.draws.checkpoints[i]?.consumer !== draw.consumer ||
+              actual.draws.checkpoints[i]?.value !== draw.value,
           )
           expect({
             firstDivergentDrawAtOrBefore:

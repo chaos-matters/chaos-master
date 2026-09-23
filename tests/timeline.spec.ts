@@ -1,4 +1,4 @@
-import { expect,test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Timeline System', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Timeline System', () => {
     await expect(timelineRuler).toBeVisible()
     // Should have markers for frame positions
     const markers = timelineRuler.locator('[data-key]')
-    await expect(markers).toHaveCountGreaterThan(0)
+    await expect(markers.first()).toBeAttached()
   })
 
   test('should have keyframe editor', async ({ page }) => {
@@ -83,9 +83,13 @@ test.describe('Timeline System', () => {
     await page.waitForTimeout(500)
   })
 
-  test('should render correctly with initial timeline state', async ({ page }) => {
+  test('should render correctly with initial timeline state', async ({
+    page,
+  }) => {
     // Check that timeline components are in the DOM
-    await page.waitForSelector('[data-testid="timeline-panel"]', { timeout: 5000 })
+    await page.waitForSelector('[data-testid="timeline-panel"]', {
+      timeout: 5000,
+    })
 
     // Check for keyframe editor
     await expect(page.locator('[data-testid="keyframe-editor"]')).toBeVisible()
@@ -222,10 +226,10 @@ test.describe('Timeline Playback', () => {
 
     // Check for markers
     const markers = timelineRuler.locator('[data-key]')
-    await expect(markers).toHaveCountGreaterThan(0)
+    await expect(markers.first()).toBeAttached()
 
     // Markers should have left positions
-    const markerElements = markers.all()
+    const markerElements = await markers.all()
     for (const marker of markerElements) {
       const style = await marker.getAttribute('style')
       expect(style).toContain('left:')

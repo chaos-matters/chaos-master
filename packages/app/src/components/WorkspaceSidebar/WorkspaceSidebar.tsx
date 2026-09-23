@@ -67,8 +67,6 @@ export interface WorkspaceSidebarProps {
   duelShowing: Accessor<boolean>
   duelSidebarOpen: Accessor<boolean>
   sidebarWidth: Accessor<number>
-  sideBarResizable: boolean
-  startSidebarDrag: (e: PointerEvent) => void
   animationExportRunning: Accessor<boolean>
   onTogglePlay: () => void
   onForceAnimationExportNow: () => void
@@ -197,12 +195,6 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
           if (props.setSidebarEl) props.setSidebarEl(el)
         }}
       >
-        {props.sideBarResizable && (
-          <div
-            class={ui.sidebarResizeHandle}
-            onPointerDown={props.startSidebarDrag}
-          />
-        )}
         <Show when={props.isPlaying() || props.animationExportRunning()}>
           <div
             class={ui.playbackOverlay}

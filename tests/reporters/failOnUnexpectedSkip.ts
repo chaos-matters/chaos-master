@@ -22,12 +22,14 @@ export default class FailOnUnexpectedSkip implements Reporter {
     this.unexpected.push(test.titlePath().filter(Boolean).join(' > '))
   }
 
-  onEnd(_result: FullResult) {
-    if (this.unexpected.length === 0) return
+  // Reporter.onEnd may resolve to a status override; its type does not admit
+  // a plain object, so the override goes back as a promise.
+  onEnd(_result: FullResult): Promise<{ status: 'failed' } | undefined> {
+    if (this.unexpected.length === 0) return Promise.resolve(undefined)
     console.error(
       `\n${this.unexpected.length} unexpected skip(s) in ${CI_PROJECT}:\n  ${this.unexpected.join('\n  ')}\n` +
         'Fix the spec, or annotate the skip as intentional-skip with a reason.',
     )
-    return { status: 'failed' as const }
+    return Promise.resolve({ status: 'failed' })
   }
 }
