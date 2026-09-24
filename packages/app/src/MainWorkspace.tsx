@@ -13,6 +13,7 @@ import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { replaceOpenDocument } from '@/lib/documentLoad'
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { trackAppInit } from '@/lib/telemetry'
+import { startViewTransition } from '@/lib/viewTransition'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { duelShowing, duelSidebarOpen } from './arcade/duel'
@@ -4483,11 +4484,7 @@ export function MainWorkspace(props: AppProps) {
               sidebarOpen={showSidebar}
               onToggleSidebar={() => {
                 // Same as the 'F' shortcut, so it works without a keyboard.
-                if ('startViewTransition' in document) {
-                  document.startViewTransition(toggleSidebarAsAuthoredAction)
-                } else {
-                  toggleSidebarAsAuthoredAction()
-                }
+                startViewTransition(toggleSidebarAsAuthoredAction)
               }}
             />
           </Show>

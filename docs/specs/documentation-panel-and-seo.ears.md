@@ -112,8 +112,10 @@ fire on a tab switch as well as on close.)_
 Escape, the modal shall resolve the `requestModal` promise and remove its
 instance from the modal list, destroying the whole content subtree.
 
-_(`Modal.tsx:100-118` — `respond` resolves then filters the instance out, wrapped
-in `document.startViewTransition` where available; `:141-144` (`onCancel`) maps the dialog's
+_(`Modal.tsx:101-110` — `respond` resolves then filters the instance out, wrapped
+in lib/viewTransition's `startViewTransition`: a view transition where the browser
+has one and is not Apple WebKit, at once otherwise; `Modal.tsx:133-136`
+(`onCancel`) maps the dialog's
 `cancel` event onto `respond(undefined)`;
 `DocumentationModal.tsx:36` (`ModalTitleBar`) wires the title bar's `onClose` to `respond`. No
 backdrop-click dismissal is implemented.)_

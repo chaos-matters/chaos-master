@@ -1,4 +1,5 @@
-import { createEffect, untrack } from 'solid-js'
+import { createEffect, on, untrack } from 'solid-js'
+import { viewTransitionsSettled as defaultViewTransitionsSettled } from '@/lib/viewTransition'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { isAppleWebKit as defaultIsAppleWebKit } from '@/utils/platform'
 import type { InteractiveRenderDriver, InteractiveRenderDriverOptions, } from './renderDriverTypes'
@@ -10,15 +11,28 @@ import type { InteractiveRenderDriver, InteractiveRenderDriverOptions, } from '.
  * - The primary convergence loop throttled by props.renderInterval.
  * - The Apple WebKit present pump (re-presenting canvas to avoid stale swapchain buffers).
  * - Automatic redraw request when the render interval drops from Infinity back to finite.
+ * - One present after each view transition ends.
  */
 export function createInteractiveRenderDriver(
   options: InteractiveRenderDriverOptions,
 ): InteractiveRenderDriver {
   const isWebKit = options.isAppleWebKit ?? defaultIsAppleWebKit
+  const transitionsSettled =
+    options.viewTransitionsSettled ?? defaultViewTransitionsSettled
+
+  // Set when a view transition ends; the next tick presents if it did not.
+  let presentAfterTransition = false
 
   const rafLoop = createAnimationFrame(
     (frameId) => {
-      options.renderTick(frameId)
+      const tick = options.renderTick(frameId)
+      if (!presentAfterTransition) return
+      presentAfterTransition = false
+      if (tick.presented) return
+      if (options.hasAccumulatedPoints && !options.hasAccumulatedPoints()) {
+        return
+      }
+      options.presentToCanvas()
     },
     () => (options.continueRendering() ? options.renderInterval() : Infinity),
     () => options.latestQueueFence?.() ?? Promise.resolve(),
@@ -56,6 +70,25 @@ export function createInteractiveRenderDriver(
       !options.gpuReady() ||
       !Number.isFinite(options.renderInterval()) ||
       !(options.isExportRenderer?.() ?? false),
+  )
+
+  // A view transition on Apple WebKit snapshots the page on every frame, and
+  // each snapshot presents this canvas's swap chain without choosing what it
+  // displays (GPUCanvasContextCocoa::surfaceBufferToImageBuffer, Safari 26 and
+  // iOS 26), which left an idle canvas on an old buffer: the previous flame.
+  // lib/viewTransition runs none there. Should one run anyway, on an engine
+  // that presents that way without being recognised as Apple WebKit, present
+  // the current image once on the tick after it ends. Elsewhere that shows
+  // the same image again.
+  createEffect(
+    on(
+      transitionsSettled,
+      () => {
+        presentAfterTransition = true
+        rafLoop.redraw()
+      },
+      { defer: true },
+    ),
   )
 
   // When the render interval drops from Infinity (modal closed) back to a

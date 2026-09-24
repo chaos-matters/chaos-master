@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { pushBackHandler } from '@/lib/backStack'
+import { startViewTransition } from '@/lib/viewTransition'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
 import type { ParentProps } from 'solid-js'
@@ -92,37 +93,28 @@ export function Modal(props: ParentProps<ModalProps>) {
               config: { content: Content, class: class_ },
             } = instance
 
-            // Answered once. With startViewTransition the removal from the
-            // list is deferred into the transition's callback, so the item's
-            // scope outlives the answer by a frame or two.
+            // Answered once. Where a view transition runs (not on Apple
+            // WebKit), the removal from the list waits for its callback, so
+            // the item's scope outlives the answer by a frame or two.
             let settled = false
 
             function respond(option: unknown) {
               if (settled) return
               settled = true
-              if ('startViewTransition' in document) {
-                const transition = document.startViewTransition(() => {
-                  resolve(option)
-                  setModalInstances((instances) =>
-                    instances.filter((ins) => ins !== instance),
-                  )
-                })
-                transition.ready.catch(() => {})
-                transition.finished.catch(() => {})
-              } else {
+              startViewTransition(() => {
                 resolve(option)
                 setModalInstances((instances) =>
                   instances.filter((ins) => ins !== instance),
                 )
-              }
+              })
             }
 
             // A dialog is the topmost layer while it is up, so the Android
             // back gesture closes it the way its own cancel does
             // (lib/backStack.ts). The entry stays until the scope disposes,
-            // which under startViewTransition is a frame or two after the
-            // answer - and answered, its handler does nothing. Dropping it at
-            // the answer instead let the press that arrives in that window
+            // which on Android, where a view transition runs, is a frame or
+            // two after the answer - and answered, its handler does nothing.
+            // Dropping it at the answer instead let a press in that window
             // through to the layer beneath, or minimised the app: the dialog
             // was still on screen, and something else took the press.
             // Swallowing one press during a 200ms dismissal is the safer half

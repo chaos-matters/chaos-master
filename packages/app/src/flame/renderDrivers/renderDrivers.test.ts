@@ -1,5 +1,5 @@
 import { createRoot, createSignal } from 'solid-js'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { awaitExportQueueFence, calculateNextExportIterations, createExportRenderDriver, createInteractiveRenderDriver, EXPORT_INITIAL_ITERATIONS, EXPORT_MAX_ITERATIONS, EXPORT_TARGET_TICK_MS, EXPORT_TICK_GROW_BELOW_MS, EXPORT_TICK_SHRINK_ABOVE_MS, } from './index'
 
 describe('renderDrivers', () => {
@@ -154,6 +154,93 @@ describe('renderDrivers', () => {
           ),
         ).resolves.toBeUndefined()
       })
+    })
+  })
+
+  describe('createInteractiveRenderDriver after a view transition', () => {
+    // An idle renderer (quality reached) presents once on the tick after a
+    // view transition ends, so WebKit's snapshot presents cannot leave an old
+    // buffer on screen (viewTransitionPresent.test.tsx has the whole story).
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    function setup(tick: { presented: boolean }, accumulated = true) {
+      const frames: FrameRequestCallback[] = []
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        frames.push(cb)
+        return frames.length
+      })
+      vi.stubGlobal('cancelAnimationFrame', () => {})
+      const [settled, setSettled] = createSignal(0)
+      const presentToCanvas = vi.fn()
+      const renderTick = vi.fn().mockReturnValue({
+        iterations: 0,
+        presented: tick.presented,
+        hadWork: tick.presented,
+      })
+      const dispose = createRoot((d) => {
+        createInteractiveRenderDriver({
+          renderTick,
+          renderInterval: () => 16,
+          continueRendering: () => tick.presented,
+          hasAccumulatedPoints: () => accumulated,
+          latestQueueFence: () => Promise.resolve(),
+          exportDriverActive: () => false,
+          gpuReady: () => true,
+          presentToCanvas,
+          isAppleWebKit: () => false,
+          viewTransitionsSettled: settled,
+        })
+        return d
+      })
+      let now = 0
+
+      async function frame() {
+        now += 1000
+        for (const cb of frames.splice(0)) cb(now)
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 0)
+        })
+      }
+      return { setSettled, presentToCanvas, renderTick, frame, dispose }
+    }
+
+    it('presents the idle image once, on the tick after a transition ends', async () => {
+      const t = setup({ presented: false })
+      await t.frame()
+      await t.frame()
+      expect(t.presentToCanvas).not.toHaveBeenCalled()
+
+      t.setSettled(1)
+      expect(t.presentToCanvas).not.toHaveBeenCalled()
+      await t.frame()
+      expect(t.presentToCanvas).toHaveBeenCalledTimes(1)
+      await t.frame()
+      await t.frame()
+      expect(t.presentToCanvas).toHaveBeenCalledTimes(1)
+      t.dispose()
+    })
+
+    it('adds no present when that tick presented anyway', async () => {
+      const t = setup({ presented: true })
+      await t.frame()
+      t.setSettled(1)
+      await t.frame()
+      expect(t.renderTick).toHaveBeenCalledTimes(2)
+      expect(t.presentToCanvas).not.toHaveBeenCalled()
+      t.dispose()
+    })
+
+    it('presents nothing before anything has accumulated', async () => {
+      // An empty accumulation would present a black frame.
+      const t = setup({ presented: false }, false)
+      await t.frame()
+      t.setSettled(1)
+      await t.frame()
+      expect(t.renderTick).toHaveBeenCalledTimes(2)
+      expect(t.presentToCanvas).not.toHaveBeenCalled()
+      t.dispose()
     })
   })
 })
