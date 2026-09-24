@@ -6,6 +6,7 @@ import { VariationMultiSelect } from '@/components/VariationMultiSelect/Variatio
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { generateRandomFlame } from '@/flame/randomize'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { variationTypes } from '@/flame/variations'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { shareNative } from '@/lib/nativeSave'
@@ -420,7 +421,7 @@ function LogoDialog(props: LogoDialogProps) {
                 <Slider
                   value={props.skipIters}
                   min={0}
-                  max={30}
+                  max={MAX_SKIP_ITERS_VALUE}
                   step={1}
                   onInput={props.onSkipItersChange}
                 />

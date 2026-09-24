@@ -15,6 +15,7 @@
  * and `sample.test.ts` checks that the two have not drifted.
  */
 
+import { projectFlameToSchema } from '@chaos-master/core'
 import { deepClone } from '@/utils/clone'
 import { applyEasing } from '@/utils/easing'
 import { interpolateAffine, lerpAffineLinear, lerpAngleShortest, lerpNumber, lerpScaleLog, } from './affine'
@@ -329,7 +330,9 @@ export function sampleGlide(plan: GlidePlan, t: number): FlameDescriptor {
       writeGlidePath(flame, path, value)
     }
   }
-  return flame
+  // Held to the same schema domains as `applyTracksToFlame`, or halfway from
+  // skipIters 10 to 15 is 12.5 here and 12 there.
+  return projectFlameToSchema(flame)
 }
 
 /** The flame a glide lands on. Always the exact canonical B. */

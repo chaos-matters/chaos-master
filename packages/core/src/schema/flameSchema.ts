@@ -42,7 +42,12 @@ export const camera3DDefault: {
 }
 
 const _edgeFadeColorDefault: [number, number, number, number] = [0, 0, 0, 0.8]
-const MAX_SKIP_ITERS_VALUE = 30
+/**
+ * Warm-up iterations before a point is plotted. 50, not the 30 the sidebar
+ * once stopped at: ten bundled animations pulse up to 50, and a frame the
+ * schema rejects is a PNG that will not open again (numberDomain.ts).
+ */
+export const MAX_SKIP_ITERS_VALUE = 50
 const MIN_EXPOSURE_VALUE = -8
 const MAX_EXPOSURE_VALUE = 8
 
@@ -346,7 +351,17 @@ export const RenderSettings = v.object({
     v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1)),
     0,
   ),
-  palettePhase: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0),
+  // Cyclic: the colour grading pass reads the phase through fract() and as a
+  // rotation angle, so 1.25 is 0.25 (see numberDomain.ts).
+  palettePhase: v.optional(
+    v.pipe(
+      v.number(),
+      v.minValue(0),
+      v.maxValue(1),
+      v.metadata({ cyclic: true }),
+    ),
+    0,
+  ),
   paletteSpeed: v.optional(v.pipe(v.number(), v.minValue(0)), 0.5),
   blendWeight: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1))),
   blendFlame: v.optional(v.unknown()),
