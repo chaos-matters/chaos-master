@@ -66,8 +66,8 @@ const ROWS: Row[] = [
   {
     field: 'skipIters',
     ...rs('skipIters'),
-    accept: [0, 30],
-    reject: [-1, 31, 2.5],
+    accept: [0, 50],
+    reject: [-1, 51, 2.5],
   },
   {
     field: 'plotsPerChain',

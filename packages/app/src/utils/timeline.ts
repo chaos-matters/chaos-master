@@ -11,7 +11,7 @@ interface WindowTimelineState {
   getFrame: () => number
 }
 
-import { MAX_TIMELINE_FRAME, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, } from '@chaos-master/core'
+import { MAX_TIMELINE_FRAME, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, projectFlameToSchema, } from '@chaos-master/core'
 import type { EasingCurve } from '@chaos-master/core'
 
 export type { EasingCurve }
@@ -2081,7 +2081,6 @@ function applyTransformAndVariationTracks(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transforms = flame.transforms as Record<string, any>
   for (const [path, track] of trackMap) {
-    if (typeof path !== 'string') continue
     const value = resolveLoopValue(track.keyframes, frame, loop)
     if (value === null || typeof value !== 'number') continue
 
@@ -2147,6 +2146,7 @@ export function applyTracksToFlame(
   applyRenderSettingTracks(flame, trackMap, frame, loop)
   applyTransformAndVariationTracks(flame, trackMap, frame, loop)
   applyFinalTransformTracks(flame, trackMap, frame, loop)
+  projectFlameToSchema(flame) // a fraction between keys is not a flame
 }
 
 /**

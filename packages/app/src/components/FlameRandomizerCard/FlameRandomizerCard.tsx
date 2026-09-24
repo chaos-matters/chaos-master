@@ -6,6 +6,7 @@ import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
 import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { MUTATION_PRESETS, MUTATION_RATE_DEFAULTS } from '@/flame/randomize'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { randomFlameVariationTypes } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
@@ -542,7 +543,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                   <Slider
                     value={props.flame.renderSettings.skipIters}
                     min={0}
-                    max={30}
+                    max={MAX_SKIP_ITERS_VALUE}
                     step={1}
                     showValue={false}
                     onInput={(v) => {
@@ -554,7 +555,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                       label="Range"
                       value={skipItersRange()}
                       min={0}
-                      max={30}
+                      max={MAX_SKIP_ITERS_VALUE}
                       step={1}
                       onInput={setSkipItersRange}
                     />

@@ -57,7 +57,7 @@ describe('flame schema — render-settings boundaries', () => {
     ['contrast below min (0.01)', { contrast: 0 }],
     ['gamma above max (8)', { gamma: 8.5 }],
     ['gamma below min (0.1)', { gamma: 0.05 }],
-    ['skipIters above max (30)', { skipIters: 31 }],
+    ['skipIters above max (50)', { skipIters: 51 }],
     ['skipIters non-integer', { skipIters: 2.5 }],
     ['paletteMode above max (1)', { paletteMode: 2 }],
     ['paletteMode non-integer', { paletteMode: 0.5 }],

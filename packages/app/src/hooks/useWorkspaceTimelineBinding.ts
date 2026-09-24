@@ -1,3 +1,4 @@
+import { projectFlameToSchema } from '@chaos-master/core'
 import { allTransformVariations, isAnyParametricVariationType, } from '@/flame/variations'
 import { resolveKeyframeValue } from '@/utils/timeline'
 import type { PointInitMode } from '@/flame/pointInitMode'
@@ -386,6 +387,25 @@ function setFlameVariationSetting(
   }
 }
 
+function writeFlameValue(
+  draft: FlameDescriptor,
+  path: string,
+  value: FlameValue,
+): void {
+  const renderSetter = RENDER_SETTERS[path]
+  if (renderSetter) {
+    renderSetter(draft.renderSettings, value)
+    return
+  }
+
+  if (setFlameCameraSetting(draft.renderSettings, path, value)) return
+
+  const parts = path.split('.')
+  if (setFlameTransformSetting(draft.transforms, parts, value)) return
+
+  setFlameVariationSetting(draft.transforms, parts, value)
+}
+
 export function useWorkspaceTimelineBinding(
   params: UseWorkspaceTimelineBindingParams,
 ) {
@@ -412,20 +432,11 @@ export function useWorkspaceTimelineBinding(
 
   function setFlameValue(path: string, value: FlameValue) {
     history.setSilently((draft) => {
-      const renderSetter = RENDER_SETTERS[path]
-      if (renderSetter) {
-        renderSetter(draft.renderSettings, value)
-        return
-      }
-
-      if (setFlameCameraSetting(draft.renderSettings, path, value)) return
-
-      const parts = path.split('.')
-      if (setFlameTransformSetting(draft.transforms, parts, value)) {
-        return
-      }
-
-      setFlameVariationSetting(draft.transforms, parts, value)
+      writeFlameValue(draft, path, value)
+      // The timeline writes the value it resolved at the playhead, which
+      // between two keyframes is an interpolation: skipIters 12.5 would leave
+      // a document that no longer shares or saves. Same projection as a frame.
+      projectFlameToSchema(draft)
     })
   }
 

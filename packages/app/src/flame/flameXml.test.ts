@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { rgbToOklab } from './flam3PaletteParser'
 import { FLAM3_SAMPLES } from './flam3Samples'
 import { exportFlameXml, extractFlamePalette, FLAM3_ALIASES_RAW, isFlameXmlContent, parseFlameXml, resolveVariationType, } from './flameXml'
+import { MAX_SKIP_ITERS_VALUE } from './schema/flameSchema'
 import { isVariationType, variationTypes } from './variations'
 import { getNormalizedVariationName } from './variations/utils'
 
@@ -328,7 +329,7 @@ describe('exportFlameXml skipIters', () => {
     // warm-up (every golden fixture came back at 30, not 17).
     const base = parseFlameXml(SIMPLE_FLAME_XML)
     const lost: string[] = []
-    for (let skipIters = 0; skipIters <= 30; skipIters++) {
+    for (let skipIters = 0; skipIters <= MAX_SKIP_ITERS_VALUE; skipIters++) {
       const flame = {
         ...base,
         renderSettings: { ...base.renderSettings, skipIters },

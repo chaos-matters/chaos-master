@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { flameTargetKey } from './audioAnalysis'
 import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, randomizeMappings, RENDER_PRESET_IDS, } from './audioWiringPresets'
 import type { TransformInfo } from './audioAnalysis'
@@ -182,7 +183,7 @@ describe('preset ranges stay inside the flame schema', () => {
     lightPower: [0, 5],
     depthColorPower: [0, 5],
     zoom: [0.01, 500],
-    skipIters: [0, 30],
+    skipIters: [0, MAX_SKIP_ITERS_VALUE],
   }
 
   const everyPreset = () => [

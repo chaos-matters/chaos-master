@@ -12,6 +12,7 @@ import { colorInitModeToImplFn } from '@/flame/colorInitMode'
 import { drawModeToImplFn } from '@/flame/drawMode'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { startViewTransition } from '@/lib/viewTransition'
 import { recordKeys } from '@/utils/record'
 import type { Accessor, Setter } from 'solid-js'
@@ -78,7 +79,7 @@ export function RenderSettingsSection(props: RenderSettingsSectionProps) {
                 label="Skip Iterations"
                 value={flameDescriptor.renderSettings.skipIters}
                 min={0}
-                max={30}
+                max={MAX_SKIP_ITERS_VALUE}
                 step={1}
                 onInput={(newSkipIters) => {
                   setRenderSetting('skipIters', newSkipIters)

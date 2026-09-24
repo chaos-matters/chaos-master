@@ -1,3 +1,5 @@
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
+
 const BAND_RANGES: [number, number][] = [
   [20, 60], // sub-bass
   [60, 250], // bass
@@ -661,7 +663,7 @@ const RENDER_SETTING_BOUNDS: Partial<
   lightPower: [0, 5],
   depthColorPower: [0, 5],
   zoom: [0.01, 500],
-  skipIters: [0, 30],
+  skipIters: [0, MAX_SKIP_ITERS_VALUE],
 }
 
 function clampRenderSetting(param: RenderSettingKey, value: number): number {

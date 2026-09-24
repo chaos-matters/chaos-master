@@ -279,29 +279,28 @@ function writeTimelineValue(
   path: string,
   value: TimelineSnapshotValue,
 ): void {
+  // A few first-level settings are intentionally generic in the editor and
+  // are newer than applyTracksToFlame's explicit list. Preserve those too.
+  if (path === 'blendWeight' && typeof value === 'number') {
+    flame.renderSettings.blendWeight = value
+  } else if (!path.includes('.') && path in flame.renderSettings) {
+    ;(flame.renderSettings as unknown as Record<string, unknown>)[path] =
+      deepClone(value)
+  }
+
   // Reuse the renderer's canonical path application for camera, transform,
-  // variation and final-transform tracks.
+  // variation and final-transform tracks. Last, so that its schema projection
+  // holds the write above to the domain the live write-through keeps.
   applyTracksToFlame(
     [
       {
         parameterPath: path,
-        keyframes: [{ frame: 0, value }],
+        keyframes: [{ frame: 0, value: deepClone(value) }],
       },
     ],
     flame,
     0,
   )
-
-  // A few first-level settings are intentionally generic in the editor and
-  // are newer than applyTracksToFlame's explicit list. Preserve those too.
-  if (path === 'blendWeight' && typeof value === 'number') {
-    flame.renderSettings.blendWeight = value
-    return
-  }
-  if (!path.includes('.') && path in flame.renderSettings) {
-    ;(flame.renderSettings as unknown as Record<string, unknown>)[path] =
-      deepClone(value)
-  }
 }
 
 function applyTimelinePose(
@@ -311,15 +310,9 @@ function applyTimelinePose(
   const posed = deepClone(base)
   if (!timeline.animationEnabled || !timeline.previewHeld) return posed
   const frame = timeline.currentFrame ?? timeline.config.startFrame
-  applyTracksToFlame(
-    timeline.tracks,
-    posed,
-    frame,
-    loopOptsFromConfig(timeline.config, timeline.tracks),
-  )
-
   // Keep generic first-level render settings and blendWeight in sync with the
-  // live editor. applyTracksToFlame owns the structured path vocabulary.
+  // live editor. applyTracksToFlame owns the structured path vocabulary, and
+  // runs last so its schema projection covers these writes too.
   for (const track of timeline.tracks) {
     if (track.parameterPath.includes('.')) continue
     const value = resolveLoopValue(
@@ -337,6 +330,12 @@ function applyTimelinePose(
       ] = deepClone(value)
     }
   }
+  applyTracksToFlame(
+    timeline.tracks,
+    posed,
+    frame,
+    loopOptsFromConfig(timeline.config, timeline.tracks),
+  )
   return posed
 }
 

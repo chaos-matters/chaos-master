@@ -7,6 +7,7 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { useToast } from '@/contexts/ToastContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { getAncestryNodes, initAncestry } from '@/flame/ancestry'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { compileCustomVariationCode } from '@/flame/variations/custom'
 import { getVariationDoc } from '@/flame/variations/docs'
 import { gpuStatus } from '@/lib/gpuStatus'
@@ -2232,7 +2233,7 @@ export function BenchmarksPage() {
                           class={ui.numberInput}
                           type="number"
                           min="0"
-                          max="30"
+                          max={MAX_SKIP_ITERS_VALUE}
                           value={settings().skipIters}
                           disabled={running()}
                           onInput={(event) => {
@@ -2240,7 +2241,10 @@ export function BenchmarksPage() {
                               'skipIters',
                               Math.max(
                                 0,
-                                Math.min(30, Number(event.currentTarget.value)),
+                                Math.min(
+                                  MAX_SKIP_ITERS_VALUE,
+                                  Number(event.currentTarget.value),
+                                ),
                               ),
                             )
                           }}
