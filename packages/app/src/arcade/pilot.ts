@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { DEFAULT_SEAT } from '@/seats/seatId'
+import { markSessionClosed, markSessionRunning } from './interruptedSession'
 import { clearPilotFocus } from './pilotFocus'
 import type { GlideSwitches } from '@/flame/glide/types'
 import type { RecordedSession } from '@/recorder/schema'
@@ -143,6 +144,8 @@ export function startPilot(
     glideAtStart: input.glideAtStart,
   })
   appendPilotLog('system', `${input.title} started`)
+  // Survives a reload, so the next page can tell the agent its session ended.
+  markSessionRunning({ mode: input.mode, title: input.title })
   return { ok: true }
 }
 
@@ -196,6 +199,7 @@ export function endPilot(
   }
   setLastPilotSession(extras.session)
   setPilot(ended)
+  markSessionClosed()
   appendPilotLog('system', `${ended.title}: ${reason}`)
   return ended
 }
@@ -209,6 +213,7 @@ export function notePilotSaveResult(saved: boolean): void {
 
 export function resetPilot(): void {
   setPilot({ phase: 'idle' })
+  markSessionClosed()
   clearPilotFocus()
   setPilotLog([])
   setLastPilotSession(undefined)

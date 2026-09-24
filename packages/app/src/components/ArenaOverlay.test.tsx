@@ -127,8 +127,8 @@ describe('ArenaOverlay Component', () => {
   it('renders high-contrast top bar HUD strip and fighter cards', () => {
     mountArenaOverlay()
 
-    // Top Bar elements
-    expect(screen.getByText('Flame Clash Arena 3D')).toBeDefined()
+    // Top Bar elements. createTestFlame is 2D, and the title says so.
+    expect(screen.getByText('Flame Clash Arena 2D')).toBeDefined()
     expect(screen.getByText('READY TO CLASH')).toBeDefined()
 
     // Fighter names on both sides

@@ -1,4 +1,5 @@
 import { batch, createEffect, createResource, createSignal, ErrorBoundary, lazy, onCleanup, onMount, Show, Suspense, } from 'solid-js'
+import { interruptionAnnouncement } from './arcade/interruptedSession'
 import { ArcadeHub } from './components/Arcade/ArcadeHub'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { HomeTab } from './components/Home/HomeTab'
@@ -370,6 +371,10 @@ export function Wrappers() {
                   grid still up and a starter flame one tap away. The toast
                   column sits above the welcome screen's own layer. */}
               <MessageToast message={launchNotice()} />
+              {/* A reload that ended an agent's Arcade session, said once. Its
+                  own toast: it is known only after a check that tells a
+                  reload from a duplicated tab (arcade/interruptedSession.ts). */}
+              <MessageToast message={interruptionAnnouncement() ?? null} />
               <Root
                 adapterOptions={{
                   powerPreference: 'high-performance',

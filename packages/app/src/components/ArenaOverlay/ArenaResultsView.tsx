@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
-import { Zap } from '@/icons'
+import { Star, Zap } from '@/icons'
 import ui from '../ArenaOverlay.module.css'
 import { SCHOOL_COLORS } from './championCardCanvas'
 import type { ArenaFighterStats } from '@/commands/types'
@@ -40,7 +40,7 @@ export function WinnerTrophyCard(props: WinnerTrophyCardProps) {
         <span class={ui.winnerTrophyTitle}>Chaos Master • Arena Champion</span>
         <Show when={props.winStreak > 0}>
           <div class={ui.streakBadge} title="Current Arena Win Streak">
-            <span class={ui.streakFire}>★</span>
+            <Star class={ui.streakFire} aria-hidden="true" />
             <span>
               Streak: {props.winStreak} {props.winStreak === 1 ? 'Win' : 'Wins'}
             </span>

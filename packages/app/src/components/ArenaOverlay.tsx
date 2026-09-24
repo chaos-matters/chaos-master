@@ -21,8 +21,11 @@ import { ArenaFighterCard } from './ArenaOverlay/ArenaFighterCard'
 import { BattleLogDrawer, WinnerTrophyCard, } from './ArenaOverlay/ArenaResultsView'
 import { ArenaTopBar } from './ArenaOverlay/ArenaTopBar'
 import { exportChampionCardPng, SCHOOL_COLORS, } from './ArenaOverlay/championCardCanvas'
+import { playClashOnce } from './ArenaOverlay/clashPlayback'
+import { createClashRequests } from './ArenaOverlay/clashRequests'
 import loadModalUi from './LoadFlameModal/LoadFlameModal.module.css'
 import type { Component } from 'solid-js'
+import type { ClashPlayback } from './ArenaOverlay/clashPlayback'
 import type { ArenaFighterStats, CommandContext } from '@/commands/types'
 import type { AnimationLoad } from '@/components/LoadFlameModal/LoadFlameModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -96,6 +99,16 @@ function handleArenaKeyboardNavigation(
     e.preventDefault()
     actions.onClose()
   }
+}
+
+/**
+ * The dimension a clash is staged in: player 1's flame's, 3D when it does not
+ * say. One function for the staging and the title, so the two cannot disagree.
+ */
+function clashDimensions(flame: FlameDescriptor | undefined): 2 | 3 {
+  // A fighter can arrive unvalidated (an agent's flame through the arena's
+  // setters); one with no render settings is staged in 3D, not a crash.
+  return (flame?.renderSettings?.dimensions as 2 | 3 | undefined) ?? 3
 }
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
@@ -248,6 +261,13 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   let initialDuration: number | null = null
   let initialAnimationEnabled: boolean | null = null
   let wasClashStaged = false
+  /** Gives the viewer's loop setting back; set while a clash owns playback. */
+  let clashPlayback: ClashPlayback | null = null
+  const clashRequests = createClashRequests()
+  const releaseClashPlayback = () => {
+    clashPlayback?.release()
+    clashPlayback = null
+  }
   const [cachedSimResult, setCachedSimResult] =
     createSignal<SimulateClashResult | null>(null)
 
@@ -263,7 +283,9 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     return id
   }
 
-  const clearAllTimers = () => {
+  // Every stop ends the clash an agent may be awaiting; say why.
+  const clearAllTimers = (reason = 'The clash was stopped.') => {
+    clashRequests.cancel(reason)
     if (activeInterval !== null) {
       clearInterval(activeInterval)
       activeInterval = null
@@ -289,6 +311,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   const restoreWorkspace = () => {
+    releaseClashPlayback()
     if (wasClashStaged && initialFlame) {
       if (timeline) {
         timeline.pause()
@@ -317,7 +340,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     const base = p1?.flame ?? initialFlame
     if (!base) return
 
-    clearAllTimers()
+    clearAllTimers('The opponent was changed.')
     restoreWorkspace()
     setGameState('idle')
     setWinner(null)
@@ -471,11 +494,12 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
       if (opts?.stance) {
         setStance(opts.stance as TacticalStance)
       }
-      return new Promise((resolve) => {
-        runSimulation((res) => {
-          resolve(res)
-        })
-      })
+      return runSimulation()
+        ? clashRequests.track()
+        : Promise.resolve({
+            cancelled: true,
+            reason: 'The clash could not start: both fighters need a flame.',
+          })
     }
 
     // If P2 is not set, generate an archetype opponent
@@ -486,25 +510,24 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   })
 
   onCleanup(() => {
-    clearAllTimers()
+    clearAllTimers('The arena was closed.')
     restoreWorkspace()
   })
 
   const handleClose = () => {
-    clearAllTimers()
+    clearAllTimers('The arena was closed.')
     restoreWorkspace()
     props.arena.setOpen(false)
     props.onClose?.()
   }
 
-  const runSimulation = (
-    onComplete?: (simRes: SimulateClashResult) => void,
-  ) => {
+  /** Returns whether a clash started. */
+  const runSimulation = (): boolean => {
     const p1 = props.arena.player1Stats()
     const p2 = props.arena.player2Stats()
-    if (!p1 || !p2 || !p1.flame || !p2.flame) return
+    if (!p1 || !p2 || !p1.flame || !p2.flame) return false
 
-    clearAllTimers()
+    clearAllTimers('A new clash replaced it.')
     captureWorkspace()
 
     setGameState('clashing')
@@ -514,7 +537,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
       'Fighters engaging in shared arena volume... Calculating trajectory and impact dynamics!',
     )
 
-    const flameDimensions = (p1.flame.renderSettings?.dimensions as 2 | 3) ?? 3
+    const flameDimensions = clashDimensions(p1.flame)
 
     const simRes = simulateClash.execute(
       {
@@ -530,7 +553,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
     if (!simRes || !simRes.rounds) {
       setGameState('idle')
-      return
+      return false
     }
 
     setCachedSimResult(simRes)
@@ -549,10 +572,11 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     )
     wasClashStaged = true
 
-    // Start timeline playback
+    // Play the rounds once: the viewer's timeline loops by default, which
+    // replayed round 1 under ROUND 3 / 3 after the verdict.
     if (timeline) {
-      timeline.setCurrentFrame(0)
-      timeline.play()
+      releaseClashPlayback()
+      clashPlayback = playClashOnce(timeline)
     }
 
     // Step through rounds with impact VFX sync
@@ -602,16 +626,17 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         currentIdx++
       } else {
         finishSimulation(simRes)
-        onComplete?.(simRes)
       }
     }, 1000)
+    return true
   }
 
   const finishSimulation = (simRes: SimulateClashResult) => {
+    clashRequests.complete(simRes)
     clearAllTimers()
-    if (timeline) {
-      timeline.pause()
-    }
+    // Holds the last frame, where the verdict is; a skip gets there too.
+    if (clashPlayback) clashPlayback.finish()
+    else timeline?.pause()
 
     const p1 = props.arena.player1Stats()
     const p2 = props.arena.player2Stats()
@@ -655,7 +680,8 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   const loadFighter = (player: 1 | 2) => {
-    clearAllTimers()
+    clearAllTimers('A fighter was reloaded.')
+    releaseClashPlayback()
     wasClashStaged = false
     if (props.arena.selectFighter) {
       props.arena.selectFighter(player)
@@ -697,6 +723,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
           winner={winner()}
           commentary={commentary()}
           eventBanner={eventBanner()}
+          dimensions={clashDimensions(props.arena.player1Stats()?.flame)}
           onReplay={() => {
             runSimulation()
           }}

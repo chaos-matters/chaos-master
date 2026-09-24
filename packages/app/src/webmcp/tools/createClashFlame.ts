@@ -1,3 +1,4 @@
+import { TEAM_A_HUE, TEAM_B_HUE, teamTintedColor, wrapTurn, } from '@/flame/clash/teamTint'
 import { deepClone } from '@/utils/clone'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
@@ -86,16 +87,7 @@ function translateTransform3D(
   }
 
   if (tintColor !== undefined && tintMode !== 'none') {
-    const rawColor = clone.color as unknown
-    const origColor =
-      typeof rawColor === 'object' && rawColor !== null && 'x' in rawColor
-        ? (rawColor as { x: number; y: number }).x
-        : Array.isArray(rawColor)
-          ? (rawColor[0] ?? 0)
-          : 0
-    const finalHue =
-      tintMode === 'blend' ? (origColor + tintColor) / 2 : tintColor
-    clone.color = { x: finalHue, y: 1.0 }
+    clone.color = teamTintedColor(clone.color, tintColor, tintMode)
   }
 
   return clone
@@ -167,7 +159,7 @@ function populate3DTransforms(
       dx,
       dy,
       dz,
-      Math.max(0, Math.min(1, baseTint + spread)),
+      wrapTurn(baseTint + spread),
       tintMode,
     )
     transformed.probability = scaledProb
@@ -360,8 +352,8 @@ export function parseCreateClashInput(
     axis: raw.axis ?? 'x',
     separation,
     distance,
-    tintA: raw.tintA ?? 0.15,
-    tintB: raw.tintB ?? 0.65,
+    tintA: raw.tintA ?? TEAM_A_HUE,
+    tintB: raw.tintB ?? TEAM_B_HUE,
     tint,
     powerA: raw.powerA,
     powerB: raw.powerB,
@@ -408,12 +400,12 @@ export const createClashFlame: WebMcpTool = {
       tintA: {
         type: 'number',
         description:
-          'Palette hue coordinate for Player 1 (0.0–1.0). Default is 0.15.',
+          'Team hue for Player 1, as a fraction of the OkLab hue circle (0.0–1.0). Default is 0.132 (vermillion).',
       },
       tintB: {
         type: 'number',
         description:
-          'Palette hue coordinate for Player 2 (0.0–1.0). Default is 0.65.',
+          'Team hue for Player 2, as a fraction of the OkLab hue circle (0.0–1.0). Default is 0.656 (sky blue).',
       },
       tint: {
         type: 'string',

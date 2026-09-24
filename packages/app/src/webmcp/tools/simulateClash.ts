@@ -1,3 +1,4 @@
+import { TEAM_A_HUE, TEAM_B_HUE } from '@/flame/clash/teamTint'
 import { resolveClashCombat } from '@/flame/stats'
 import { deepClone } from '@/utils/clone'
 import { calculateEffectivePower, TACTICAL_STANCES, } from '@/webmcp/tools/arenaArchetypes'
@@ -202,8 +203,8 @@ export function parseSimulateClashInput(
     seed: raw.seed ?? 31415,
     separation: raw.separation ?? 2.2,
     dimensions: raw.dimensions ?? 3,
-    tintA: raw.tintA ?? 0.15,
-    tintB: raw.tintB ?? 0.65,
+    tintA: raw.tintA ?? TEAM_A_HUE,
+    tintB: raw.tintB ?? TEAM_B_HUE,
     stanceA: raw.stanceA ?? 'balanced',
     stanceB: raw.stanceB ?? 'balanced',
   }
@@ -310,11 +311,13 @@ export const simulateClash: WebMcpTool = {
       },
       tintA: {
         type: 'number',
-        description: 'Palette hue for Player 1. Default is 0.15.',
+        description:
+          'Team hue for Player 1, as a fraction of the OkLab hue circle. Default is 0.132 (vermillion).',
       },
       tintB: {
         type: 'number',
-        description: 'Palette hue for Player 2. Default is 0.65.',
+        description:
+          'Team hue for Player 2, as a fraction of the OkLab hue circle. Default is 0.656 (sky blue).',
       },
       stanceA: {
         type: 'string',

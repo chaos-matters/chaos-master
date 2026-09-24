@@ -5,9 +5,11 @@ import { vec2f } from 'typegpu/data'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resetPilot, startPilot } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
+import { playClashOnce } from '@/components/ArenaOverlay/clashPlayback'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
+import { advancePlaybackTick } from '@/utils/playbackTick'
 import { createTimelineState } from '@/utils/timeline'
 import { createSessionPlayer } from './player'
 import { cancelSessionRecording, reportDocumentWrite, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder'
@@ -565,7 +567,7 @@ describe('Play and Pause during a recording', () => {
         if (!timeline.isPlaying()) return
         const config = timeline.config()
         const interval = setInterval(() => {
-          for (let i = 0; i < config.timeScale; i++) timeline.advanceFrame()
+          advancePlaybackTick(timeline, config.timeScale)
         }, 1000 / config.fps)
         onCleanup(() => {
           clearInterval(interval)
@@ -744,5 +746,121 @@ describe('Play and Pause during a recording', () => {
     // to the viewer, so the take neither records it nor flags it.
     expect(session.actions).toEqual([])
     expect(session.unnamedWriteCount).toBe(0)
+  })
+
+  // The arena plays its rounds once on the viewer's own timeline, through
+  // the recorder-aware one the workspace hands out, and holds the last frame.
+  describe('an arena clash in the middle of a take', () => {
+    function recordClash(
+      end: (clash: ReturnType<typeof playClashOnce>) => void,
+    ) {
+      vi.useFakeTimers()
+      const live = makeTimelineWorld()
+      configure(live, { startFrame: 0, endFrame: 90, loop: true })
+      const stopLive = driveRenderLoop(live.facade)
+      startSessionRecording(live.flame, {
+        timeline: snapshotTimeline(live.raw),
+      })
+      // The viewer's own animation was playing when Clash was pressed.
+      live.facade.play()
+      vi.advanceTimersByTime(500)
+      const clash = playClashOnce(live.facade)
+      end(clash)
+      const held = {
+        frame: live.raw.currentFrame(),
+        playing: live.raw.isPlaying(),
+      }
+      clash.release()
+      const session = stopOrThrow()
+      stopLive()
+      return { live, session, held }
+    }
+
+    function replayOf(session: ReturnType<typeof stopOrThrow>) {
+      const replay = makeTimelineWorld()
+      const stopReplay = driveRenderLoop(replay.facade)
+      const player = createSessionPlayer(session, replayTargetFor(replay))
+      player.play()
+      vi.advanceTimersByTime(20_000)
+      stopReplay()
+      expect(player.isFinished()).toBe(true)
+      return replay
+    }
+
+    it('records no seek of its own, and replays to the frame it held', () => {
+      const { session, held } = recordClash(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+
+      expect(held).toEqual({ frame: 90, playing: false })
+      expect(
+        session.actions.filter((a) => a.id === 'timeline.setCurrentFrame'),
+      ).toEqual([])
+      const replay = replayOf(session)
+      expect(replay.raw.isPlaying()).toBe(false)
+      expect(replay.raw.currentFrame()).toBe(90)
+    })
+
+    it('skipped to the result, it replays to the same last frame', () => {
+      const { session, held } = recordClash((clash) => {
+        vi.advanceTimersByTime(700)
+        clash.finish()
+      })
+
+      expect(held).toEqual({ frame: 90, playing: false })
+      expect(
+        session.actions.filter((a) => a.id === 'timeline.setCurrentFrame'),
+      ).toEqual([])
+      const replay = replayOf(session)
+      expect(replay.raw.isPlaying()).toBe(false)
+      expect(replay.raw.currentFrame()).toBe(90)
+    })
+
+    // At speeds above 1 a render tick advances several frames. The clash's
+    // pause landed partway through one, and the rest of the tick went on
+    // advancing a paused timeline: recorded seeks to 0, 1, 2, and a playhead
+    // left off the last frame.
+    it('holds the last frame at every viewer speed, with no recorded seek', () => {
+      const missed: string[] = []
+      for (let timeScale = 1; timeScale <= 10; timeScale++) {
+        vi.useFakeTimers()
+        const live = makeTimelineWorld()
+        configure(live, { startFrame: 0, endFrame: 90, loop: true })
+        live.raw.setConfig({ ...live.raw.config(), timeScale })
+        const stopLive = driveRenderLoop(live.facade)
+        startSessionRecording(live.flame, {
+          timeline: snapshotTimeline(live.raw),
+        })
+        const clash = playClashOnce(live.facade)
+        vi.advanceTimersByTime(10_000)
+        clash.finish()
+        const frame = live.raw.currentFrame()
+        clash.release()
+        const session = stopOrThrow()
+        stopLive()
+        vi.useRealTimers()
+        const seeks = session.actions.filter(
+          (a) => a.id === 'timeline.setCurrentFrame',
+        )
+        if (frame !== 90 || seeks.length > 0) {
+          missed.push(
+            `speed ${timeScale}: frame ${frame}, ${seeks.length} seeks`,
+          )
+        }
+      }
+      expect(missed).toEqual([])
+    })
+
+    // The stop's count is what paces the window on replay: a clash that
+    // reported 0 frames played over its seconds skewed the take's pace.
+    it('records the frames it played on its stop', () => {
+      const { session } = recordClash(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+      const stops = session.actions
+        .filter((a) => a.id === 'timeline.setPlaying' && a.args[0] === false)
+        .map((a) => a.args)
+      expect(stops).toEqual([[false, 90, 90]])
+    })
   })
 })
