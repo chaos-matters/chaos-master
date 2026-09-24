@@ -546,9 +546,10 @@ Each rule comes from one of the earlier cuts.
 - **Undefined variables.** Several modules read `--color-*` and `--accent` variables that are
   never defined, so they show their dark fallbacks in the light theme too.
 - **Found while building phases 1 and 2.**
-  - The tour arrow points 8px before its target's centre: `measureAndPosition` in
-    `SpotlightTour.tsx` subtracts half the arrow, and the stylesheet's -8px margin subtracts it
-    again. A fix must keep `--seam-at` at the arrow's centre.
+  - Fixed since: the tour arrow pointed 8px before its target's centre, as `measureAndPosition`
+    in `SpotlightTour.tsx` took half the arrow off its offset and the stylesheet's -8px margin
+    took it off again. The offset is the arrow's centre now, the number `--seam-at` carries, and
+    `SpotlightTour.arrow.test.tsx` holds where the arrow points.
   - The touch search input is styled inline with literal whites (`TouchControlSurface.tsx`,
     around its search field), and `.affineGridWrap` has a literal black wash on glass.
   - The light desktop export tracker's job count is 3.68:1, and the rail sheet's own vertical
