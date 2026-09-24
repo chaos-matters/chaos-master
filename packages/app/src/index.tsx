@@ -1,6 +1,7 @@
 /* @refresh reload */
 import './styles/index.css'
 import { render } from 'solid-js/web'
+import { installLeaveSitePrompt } from './arcade/leaveSitePrompt'
 import { installLockKeyGate } from './arcade/lockKeyGate'
 import { loadHaptics } from './lib/haptics'
 import { loadLifecycle } from './lib/lifecycle'
@@ -10,6 +11,9 @@ import { isBenchmarksPath, isExplorerPath } from './routing/appPath'
 // First, before any other key listener exists, so it hears every key before
 // they do: under the Arcade's screen lock, no key reaches the page.
 installLockKeyGate()
+
+// While an agent's take records, leaving or reloading asks first.
+installLeaveSitePrompt()
 
 // Solid Devtools is opt-in: it instruments every component (a real dev-startup
 // cost) and must never ship to production. Enable with `VITE_DEVTOOLS=1 pnpm dev`.
