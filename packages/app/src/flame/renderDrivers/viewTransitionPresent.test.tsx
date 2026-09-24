@@ -5,8 +5,10 @@
  * chain behind the renderer's back. A renderer that reached its quality limit,
  * and went idle, before the transition ended left the previous flame on screen
  * until something drew again (the iOS "shows the old flame until I drag").
- * Apple WebKit now gets no transition (lib/viewTransition.ts); where one runs
- * anyway, the render driver presents again once it ends.
+ * An answered dialog now goes at once, with no transition on any engine
+ * (Modal.tsx), and Apple WebKit gets none from lib/viewTransition.ts either;
+ * where one runs anyway, the render driver presents again once it ends
+ * (renderDrivers.test.ts).
  *
  * The canvas and the page's frame loop are models of WebKit's, cited below;
  * the render driver, the frame loop helper and the Modal are the real ones.
@@ -369,14 +371,15 @@ describe('a flame loaded from a dialog, on a canvas that presents like WebKit', 
     })
   })
 
-  it('where a view transition runs anyway, is on screen once it has faded out', async () => {
+  it('elsewhere, is on screen with no view transition and no snapshot', async () => {
     // An engine that presents like WebKit's but is not recognised as Apple
-    // WebKit: the transition runs, and the driver presents once it ends.
+    // WebKit, and has view transitions: the answer still starts none.
     onEngine('')
-    const seen = await loadFlameB(true)
-    expect(seen.transitionsStarted).toBe(1)
-    expect(seen.snapshots).toBeGreaterThan(0)
-    expect(seen.onScreen).toBe('B')
+    expect(await loadFlameB(true)).toEqual({
+      onScreen: 'B',
+      transitionsStarted: 0,
+      snapshots: 0,
+    })
   })
 
   it('is on screen when the browser has no view transitions', async () => {

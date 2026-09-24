@@ -101,15 +101,6 @@ WebGPU buffers consume significant VRAM. When components using `<Flam3>` are hid
 
 ## 3. DOM & UI Conventions
 
-- **View Transitions:** Use `startViewTransition` from `@/lib/viewTransition` for seamless transitions between major layout shifts (e.g., toggling the sidebar, changing themes), never `document.startViewTransition` directly: `src/viewTransitionCallers.test.ts` fails on a direct call. The helper runs the update at once, with no transition, on Apple WebKit, where a transition's per-frame snapshots present WebGPU canvases behind the renderer's back, and where the API is missing. Elsewhere it counts each transition's end, so renderers can present again.
-
-```tsx
-startViewTransition(() => {
-  setFlameDescriptor((draft) => {
-    draft.renderSettings.drawMode = mode
-  })
-})
-```
-
+- **No view transitions around state changes:** Change UI state in the event handler itself, never inside a view transition's update callback, whether `startViewTransition` from `@/lib/viewTransition` or `document.startViewTransition` (which `src/viewTransitionCallers.test.ts` rejects anywhere but that helper). The browser runs that callback only after it renders a frame, seconds while an export holds the GPU, and until the transition finishes every click on the page goes to `<html>`. See [MISTAKES.md](../agent/MISTAKES.md), "jsdom has no `startViewTransition`, so its branch went untested".
 - **Avoid Emojis:** Per project rules, avoid unicode emojis in the UI. Always use consistent SVG icons (e.g., from `src/icons`).
 - **Glassmorphism & Theming:** Use CSS variables mapped to the current theme (`light` or `dark`). Backgrounds and dropdowns should maintain the app's standard dark aesthetics and transparency layers where required.

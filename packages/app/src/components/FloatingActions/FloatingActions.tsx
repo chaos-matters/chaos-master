@@ -1,7 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
-import { startViewTransition } from '@/lib/viewTransition'
 import { isSessionRecording } from '@/recorder/recorder'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import { recorderExportPending, recorderSavePending, recorderTaskPending, recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
@@ -442,11 +441,12 @@ export function FloatingActions(props: Props) {
               class={ui.toggle}
               classList={{ [ui.toggleActive as string]: props.showTimeline() }}
               onClick={() => {
+                // Read and written in the same click. Applied a frame later,
+                // in a view transition, a second click read the state the
+                // first had not yet changed, and two clicks toggled once.
                 const checked = !props.showTimeline()
-                startViewTransition(() => {
-                  props.setShowTimeline(checked)
-                  if (!checked) props.setAnimationEnabled(false)
-                })
+                props.setShowTimeline(checked)
+                if (!checked) props.setAnimationEnabled(false)
               }}
               title={
                 props.showTimeline()

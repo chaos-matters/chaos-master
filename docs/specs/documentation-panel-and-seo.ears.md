@@ -110,13 +110,14 @@ fire on a tab switch as well as on close.)_
 
 **When** the title-bar close button is pressed or the dialog is cancelled with
 Escape, the modal shall resolve the `requestModal` promise and remove its
-instance from the modal list, destroying the whole content subtree.
+instance from the modal list at once, destroying the whole content subtree,
+without waiting for the browser to render a frame.
 
-_(`Modal.tsx:101-110` — `respond` resolves then filters the instance out, wrapped
-in lib/viewTransition's `startViewTransition`: a view transition where the browser
-has one and is not Apple WebKit, at once otherwise; `Modal.tsx:133-136`
-(`onCancel`) maps the dialog's
-`cancel` event onto `respond(undefined)`;
+_(`Modal.tsx:104-111` (`respond`) resolves, then filters the instance out, in
+the same call. It used to do both inside `document.startViewTransition`'s
+callback, which runs only after a rendered frame, so an answered dialog stayed
+open and modal for as long as frames were late, seconds during an export;
+`:128-131` (`onCancel`) maps the dialog's `cancel` event onto `respond(undefined)`;
 `DocumentationModal.tsx:36` (`ModalTitleBar`) wires the title bar's `onClose` to `respond`. No
 backdrop-click dismissal is implemented.)_
 

@@ -760,7 +760,7 @@ the edited flame's share of the blend: 0 draws the partner alone.
 _(`flame/blend.ts:17` (`DEFAULT_BLEND_WEIGHT`), `hooks/useWorkspaceBlendPick.ts:200-300` (`FlameDescriptor`),
 `commands/builtins/flame/coreCommands.ts:36-75` (`history`), `commands/registry.ts:288-296` (`setBlendFlame`),
 `recorder/synthesize/atoms.ts:523-556` (`blendFlame`), `canonical.ts:19-56` (`comparable`),
-`MainWorkspace.tsx:1328-1333` (`setupMorph`), `components/BlendFlameGallery/BlendFlameGallery.tsx`,
+`MainWorkspace.tsx:1318-1323` (`setupMorph`), `components/BlendFlameGallery/BlendFlameGallery.tsx`,
 `components/WorkspaceSidebar/WorkspaceSidebar.tsx` `onSelect`; guarded by
 `WorkspaceSidebar.gallery.test.tsx`, `useWorkspaceBlendPick.test.tsx:152` "commits the weight its preview showed, replays to it, and undoes to the document before the hover",
 `:190` "gives a pick made without a hover, as on a touch screen, the same weight", `:177` (`setBlendFlame`), `:231` "puts back the pick, not the document before it, when a later hover leaves", `:287` "puts back exactly what a hover replaced when the pointer leaves", `commands/builtins/flame/blend.test.ts:52` "gives the default weight to a document that has none",
