@@ -222,21 +222,24 @@ export function SpotlightTour(props: SpotlightTourProps) {
       left: `${Math.max(CARD_PADDING, cardLeft)}px`,
     })
 
-    // Position the arrow to point at the target center, not card center
+    // Point the arrow at the target's centre. Its offset along the edge is
+    // its centre, as its class pulls its box back by half its size (and the
+    // glass layer breaks its edge there, --seam-at). The box keeps 12px
+    // inside the card's ends, clear of its rounded corners.
     const arrowHalf = 8 // half of 16px arrow size
     let arrowOffsetStyle: Record<string, string> = {}
     if (pos === 'top' || pos === 'bottom') {
       const arrowLeft = clamp(
-        targetCenterX - cardLeft - arrowHalf,
-        12,
-        cardW - 12 - 16,
+        targetCenterX - cardLeft,
+        12 + arrowHalf,
+        cardW - 12 - arrowHalf,
       )
       arrowOffsetStyle = { left: `${arrowLeft}px` }
     } else {
       const arrowTop = clamp(
-        targetCenterY - cardTop - arrowHalf,
-        12,
-        cardH - 12 - 16,
+        targetCenterY - cardTop,
+        12 + arrowHalf,
+        cardH - 12 - arrowHalf,
       )
       arrowOffsetStyle = { top: `${arrowTop}px` }
     }
@@ -549,7 +552,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
           >
             <Show when={glassCard()}>
               {/* The arrow's centre sits at its offset along the edge: its
-                  class also pulls it back by half its width. */}
+                  class pulls its box back by half its width. */}
               <div
                 class={ui.glassLayer}
                 aria-hidden="true"
