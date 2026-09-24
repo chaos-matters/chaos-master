@@ -180,6 +180,31 @@ does not interrupt the user. Confirm you are on real hardware by reading
 `(await navigator.gpu.requestAdapter()).info` — it should name a real GPU, not
 a software renderer.
 
+### jsdom has no `startViewTransition`, so its branch went untested
+
+**What happened.** Until 2026-09-24, `Modal.tsx` took an answered dialog down
+inside `document.startViewTransition`'s update callback, which the browser runs
+only after it has rendered a frame. While an export kept the GPU busy, the
+answered export dialog stayed open and modal over the export tracker, and its
+Close, a second answer to it, did nothing. In headed Chrome on the agent
+workspace it took 2 s from Export Image to the dialog leaving, and then 3 s
+more in which the transition's overlay took every click. The sidebar, theme,
+timeline and render-mode toggles changed state the same way: each a frame late,
+two quick clicks on the timeline toggle toggled it once, and a click anywhere
+during one of their transitions went to `<html>`.
+
+**Why it was not obvious.** jsdom has no `startViewTransition`, so every unit
+test ran the synchronous fallback and passed. At 60 fps the wait is a frame or
+two and a 250 ms fade, which nobody notices; it grows with frame time, and an
+export or a hidden window makes frames slow.
+
+**The rule.** Change state at the input, never inside a view transition's
+callback: the callback waits for a rendered frame, and from the call until the
+transition finishes Chromium sends every click on the page to `<html>`. A
+`pointer-events: none` rule on the `::view-transition` pseudo-elements does not
+change that (measured in Chromium 148). A test of code that branches on a
+browser API jsdom lacks must stub that API, or it tests the other branch.
+
 ---
 
 ## Typechecking

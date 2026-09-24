@@ -1,7 +1,6 @@
 import { createSignal, For, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { pushBackHandler } from '@/lib/backStack'
-import { startViewTransition } from '@/lib/viewTransition'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
 import type { ParentProps } from 'solid-js'
@@ -93,34 +92,30 @@ export function Modal(props: ParentProps<ModalProps>) {
               config: { content: Content, class: class_ },
             } = instance
 
-            // Answered once. Where a view transition runs (not on Apple
-            // WebKit), the removal from the list waits for its callback, so
-            // the item's scope outlives the answer by a frame or two.
+            // Answered once, and the answer takes the dialog down there and
+            // then. It used to wait inside startViewTransition's callback, for
+            // a fade, and the browser runs that callback only once it has
+            // rendered a frame: while an export kept the GPU busy that took
+            // seconds, so the answered dialog stayed modal over the export
+            // tracker, and a Close pressed meanwhile was a second answer and
+            // did nothing.
             let settled = false
 
             function respond(option: unknown) {
               if (settled) return
               settled = true
-              startViewTransition(() => {
-                resolve(option)
-                setModalInstances((instances) =>
-                  instances.filter((ins) => ins !== instance),
-                )
-              })
+              resolve(option)
+              setModalInstances((instances) =>
+                instances.filter((ins) => ins !== instance),
+              )
             }
 
             // A dialog is the topmost layer while it is up, so the Android
             // back gesture closes it the way its own cancel does
-            // (lib/backStack.ts). The entry stays until the scope disposes,
-            // which on Android, where a view transition runs, is a frame or
-            // two after the answer - and answered, its handler does nothing.
-            // Dropping it at the answer instead let a press in that window
-            // through to the layer beneath, or minimised the app: the dialog
-            // was still on screen, and something else took the press.
-            // Swallowing one press during a 200ms dismissal is the safer half
-            // of that trade.
+            // (lib/backStack.ts). Taking the dialog down disposes this scope,
+            // so the entry leaves with it: the stack never holds one for a
+            // dialog that is gone, nor lacks one for a dialog still on screen.
             const dropBackEntry = pushBackHandler(() => {
-              if (settled) return
               respond(undefined)
             }, 'modal')
             onCleanup(dropBackEntry)

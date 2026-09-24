@@ -10,22 +10,43 @@ function Host(props: { onReady: (request: RequestModalFn) => void }) {
   return null
 }
 
+function mountModalHost(): RequestModalFn {
+  let request: RequestModalFn | undefined
+  render(() => (
+    <Modal>
+      <Host
+        onReady={(fn) => {
+          request = fn
+        }}
+      />
+    </Modal>
+  ))
+  if (!request) throw new Error('the modal host did not mount')
+  return request
+}
+
+/**
+ * A startViewTransition that never runs its update callback: a renderer that
+ * has not produced a frame yet. jsdom has none of its own, so without this a
+ * dismissal that waited for one would pass here all the same.
+ */
+function stallViewTransitions(): () => void {
+  Object.defineProperty(document, 'startViewTransition', {
+    configurable: true,
+    value: () => ({ ready: Promise.resolve(), finished: Promise.resolve() }),
+  })
+  return () => {
+    Reflect.deleteProperty(document, 'startViewTransition')
+  }
+}
+
 describe('Modal and back', () => {
   afterEach(cleanup)
 
   it('cancels the top dialog and leaves the registry empty', async () => {
-    let request: RequestModalFn | undefined
-    render(() => (
-      <Modal>
-        <Host
-          onReady={(fn) => {
-            request = fn
-          }}
-        />
-      </Modal>
-    ))
+    const request = mountModalHost()
 
-    const answer = request?.<string | undefined>({
+    const answer = request<string | undefined>({
       content: () => <p>Keep this flame?</p>,
     })
     expect(backDepth()).toBe(1)
@@ -37,86 +58,47 @@ describe('Modal and back', () => {
     expect(backDepth()).toBe(0)
   })
 
-  it('swallows a back that arrives while it is dismissing', async () => {
-    // startViewTransition defers the removal from the list into its own
-    // callback, so the dialog is still on screen for a frame or two after it
-    // has been answered. Dropping its back entry at the answer let a press
-    // inside that window through: the layer beneath was dismissed by a press
-    // meant for the dialog, and with an empty stack the app minimised.
-    const deferred: (() => void)[] = []
-    Object.defineProperty(document, 'startViewTransition', {
-      configurable: true,
-      value: (callback: () => void) => {
-        deferred.push(callback)
-        return { ready: Promise.resolve(), finished: Promise.resolve() }
-      },
-    })
+  it('goes at the answer, back entry and all, without waiting for a frame', async () => {
+    // Taking an answered dialog down used to wait in startViewTransition's
+    // callback, so it stayed on screen, answered, until the browser rendered
+    // a frame - seconds, while an export kept the GPU busy - and its back
+    // entry had to stay for that window too, swallowing the next press. Gone
+    // at the answer, it leaves no window: the next press is for the layer
+    // that is on screen now.
+    const restore = stallViewTransitions()
     const beneath = vi.fn()
     const dropBeneath = pushBackHandler(beneath, 'beneath')
 
     try {
-      let request: RequestModalFn | undefined
-      render(() => (
-        <Modal>
-          <Host
-            onReady={(fn) => {
-              request = fn
-            }}
-          />
-        </Modal>
-      ))
-
-      const answer = request?.<string | undefined>({
+      const request = mountModalHost()
+      const answer = request<string | undefined>({
         content: () => <p>Keep this flame?</p>,
       })
       expect(backDepth()).toBe(2)
 
-      // The answer, then a second press before the transition has run.
       expect(popBack()).toBe(true)
-      expect(popBack()).toBe(true)
-      expect(beneath).not.toHaveBeenCalled()
-
-      // Once the dialog is actually gone, the stack is the layer beneath's.
-      deferred.forEach((callback) => {
-        callback()
-      })
+      expect(document.querySelector('dialog')).toBeNull()
       await expect(answer).resolves.toBeUndefined()
       expect(backDepth()).toBe(1)
+      expect(beneath).not.toHaveBeenCalled()
+
       expect(popBack()).toBe(true)
       expect(beneath).toHaveBeenCalledTimes(1)
     } finally {
       dropBeneath()
-      Reflect.deleteProperty(document, 'startViewTransition')
+      restore()
     }
   })
 
-  it('swallows a back that follows its own button', async () => {
-    // The same window, reached the way a user reaches it: tap Cancel, press
-    // back before the dialog has finished leaving.
-    const deferred: (() => void)[] = []
-    Object.defineProperty(document, 'startViewTransition', {
-      configurable: true,
-      value: (callback: () => void) => {
-        deferred.push(callback)
-        return { ready: Promise.resolve(), finished: Promise.resolve() }
-      },
-    })
+  it('goes at its own button, and the next back reaches the layer beneath', async () => {
+    // The same, reached the way a user reaches it: tap Cancel, press back.
+    const restore = stallViewTransitions()
     const beneath = vi.fn()
     const dropBeneath = pushBackHandler(beneath, 'beneath')
 
     try {
-      let request: RequestModalFn | undefined
-      render(() => (
-        <Modal>
-          <Host
-            onReady={(fn) => {
-              request = fn
-            }}
-          />
-        </Modal>
-      ))
-
-      const answer = request?.<string | undefined>({
+      const request = mountModalHost()
+      const answer = request<string | undefined>({
         content: (props) => (
           <button
             type="button"
@@ -131,17 +113,15 @@ describe('Modal and back', () => {
       expect(backDepth()).toBe(2)
 
       document.querySelector<HTMLButtonElement>('dialog button')?.click()
-      expect(popBack()).toBe(true)
-      expect(beneath).not.toHaveBeenCalled()
-
-      deferred.forEach((callback) => {
-        callback()
-      })
+      expect(document.querySelector('dialog')).toBeNull()
       await expect(answer).resolves.toBe('cancel')
       expect(backDepth()).toBe(1)
+
+      expect(popBack()).toBe(true)
+      expect(beneath).toHaveBeenCalledTimes(1)
     } finally {
       dropBeneath()
-      Reflect.deleteProperty(document, 'startViewTransition')
+      restore()
     }
   })
 })

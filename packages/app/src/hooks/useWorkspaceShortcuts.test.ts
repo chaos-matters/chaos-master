@@ -13,8 +13,8 @@
  * with nothing to keyframe is nobody's, Shift+I included.
  */
 import '@/commands/builtins'
-import { createRoot } from 'solid-js'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createRoot, createSignal } from 'solid-js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetPilot, startPilot } from '@/arcade/pilot'
 import { executeCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
@@ -23,6 +23,7 @@ import { createRecorderAwareTimeline } from '@/recorder/timelineActions'
 import { createTimelineState } from '@/utils/timeline'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
+import type { Theme } from '@/contexts/ThemeContext'
 import type { SeatId } from '@/seats/seatId'
 
 function drive(lock: 'screen' | 'seat', seatId: SeatId) {
@@ -45,6 +46,8 @@ type MountOptions = {
   targetedParameter?: () => string | null
   canUndo?: boolean
   canRedo?: boolean
+  theme?: () => Theme
+  setTheme?: (theme: Theme) => void
 }
 
 /** The hook mounted over a real timeline. Effects created inside
@@ -73,8 +76,8 @@ function mount(options: MountOptions = {}) {
         canUndo: () => options.canUndo ?? false,
         canRedo: () => options.canRedo ?? false,
       },
-      theme: () => 'dark',
-      setTheme: () => {},
+      theme: options.theme ?? (() => 'dark'),
+      setTheme: options.setTheme ?? (() => {}),
       targetedParameter: options.targetedParameter ?? (() => null),
       recorderTimeline: {
         togglePlay: recorderTimeline.togglePlay,
@@ -393,4 +396,45 @@ describe('the sidebar key', () => {
       expect(ev.defaultPrevented).toBe(false)
     },
   )
+})
+
+describe('the sidebar and theme keys while no frame has been drawn', () => {
+  // Both used to change the page inside document.startViewTransition's
+  // callback, which runs only once the browser has drawn a frame, and until
+  // the transition ended every click on the page landed on <html>. Measured
+  // in headed Chrome during an export: the change came a frame late, then the
+  // fade, and a click made in between was lost. The stub never runs its
+  // callback, a renderer with no frame yet; jsdom has no startViewTransition
+  // of its own, so without it these would test the other branch.
+  beforeEach(() => {
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: () => ({ ready: Promise.resolve(), finished: Promise.resolve() }),
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'startViewTransition')
+    disposeHook?.()
+    disposeHook = undefined
+  })
+
+  it('F toggles the sidebar at the press', () => {
+    const { toggleSidebar } = mount()
+
+    press('KeyF', 'f')
+
+    expect(toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('Ctrl+D switches the theme at the press, and back at the next', () => {
+    const [theme, setTheme] = createSignal<Theme>('dark')
+    mount({ theme, setTheme })
+
+    press('KeyD', 'd', { ctrlKey: true })
+    expect(theme()).toBe('light')
+
+    press('KeyD', 'd', { ctrlKey: true })
+    expect(theme()).toBe('dark')
+  })
 })
