@@ -26,7 +26,7 @@
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.4.0",
     "typegpu": "0.12.0",
-    "valibot": "1.2.0",
+    "valibot": "1.4.2",
     "wgpu-matrix": "3.4.2"
   },
   "devDependencies": {

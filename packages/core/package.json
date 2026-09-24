@@ -26,7 +26,7 @@
   "dependencies": {
     "structurajs": "0.12.6",
     "typegpu": "0.12.0",
-    "valibot": "1.2.0"
+    "valibot": "1.4.2"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
@@ -34,6 +34,6 @@
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "4.1.8",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^5.0.1"
   }
 }
