@@ -67,6 +67,12 @@ const [arcadeMode, setArcadeModeSignal] = createSignal<ArcadeMode | undefined>(
 
 export { activeTab, arcadeMode }
 
+/** The fragment the view on screen stands for, whatever the address bar says
+ *  this instant: a history navigation the screen lock holds
+ *  (lib/historyHold.ts) puts the address bar back to it. */
+let shown = globalThis.location?.hash ?? ''
+export const shownFragment = (): string => shown
+
 function hashFor(tab: AppTab, mode?: ArcadeMode): string {
   if (tab === 'home') return HOME_HASH
   if (tab === 'arcade') return mode ? `${ARCADE_HASH}=${mode}` : ARCADE_HASH
@@ -76,6 +82,7 @@ function hashFor(tab: AppTab, mode?: ArcadeMode): string {
 export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
   setActiveTabSignal(tab)
   setArcadeModeSignal(tab === 'arcade' ? mode : undefined)
+  shown = hashFor(tab, mode)
   const { location, history } = globalThis
   if (!location || !history) return
   // Preserve the query string: a share link (`?s=`, `?flame=`, `?cv=`) must
@@ -92,6 +99,7 @@ export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
 // link into an already-open tab. Follow it rather than letting the UI and the
 // address bar disagree.
 globalThis.addEventListener?.('hashchange', () => {
+  shown = globalThis.location.hash
   setActiveTabSignal(tabFromHash())
   setArcadeModeSignal(arcadeModeFromHash())
 })

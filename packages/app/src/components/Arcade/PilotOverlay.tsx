@@ -6,6 +6,7 @@ import { agentDriving, drivingState, lastPilotSession, pilot, pilotElapsedMs, pi
 import { finishPilot } from '@/arcade/pilotActions'
 import { Robot, Stop } from '@/icons'
 import { createBackLayer } from '@/lib/backStack'
+import { holdHistory } from '@/lib/historyHold'
 import { LockShield } from './LockShield'
 import { formatElapsed, reasonLabel, savedLine } from './pilotFormat'
 import ui from './PilotOverlay.module.css'
@@ -125,11 +126,15 @@ export function PilotOverlay(props: {
    * exactly as long as the card.
    */
   const takeFocusUntilDismissed = (card: HTMLDialogElement) => {
+    // The browser's Back closes the card too, and leaves the view where it
+    // is: the lock's hold on history carries over to the card.
+    const releaseHistory = holdHistory(resetPilot)
     onMount(() => {
       card.showModal()
       card.focus({ preventScroll: true })
     })
     onCleanup(() => {
+      releaseHistory()
       card.close()
       giveFocusBack()
     })

@@ -5,7 +5,7 @@
  * window and document listener that did not ask whether the pilot owned the
  * keyboard: the debug panel's Ctrl+M, a gallery's or a modal's Delete and
  * Enter. Under the lock no key gets past the shield; the pilot's Esc-twice
- * still works, Home opened behind it or not, and every key is the page's again
+ * still works, whatever listens after it, and every key is the page's again
  * once the take and its end card are over.
  *
  * The shield stops a key on its way up, so a capture listener above it heard
@@ -189,18 +189,27 @@ test.describe('keys under the screen lock', () => {
     await expect(debugPanel(page)).toBeHidden()
   })
 
-  test('Escape twice ends the take with Home opened behind it', async ({
+  test('Escape twice ends the take past a later Escape listener', async ({
     page,
   }) => {
     await openEditor(page)
     await startLock(page)
-    // A take starts in the editor, but the address bar can still open Home
-    // under it, and Home claims Escape in the capture phase too, whatever
-    // steps the agent takes after.
+    // A capture listener added after the lock that claims Escape, as Home's
+    // did when the address bar opened it under a take (which lib/historyHold
+    // now holds), and an agent step after it.
     await page.evaluate(() => {
-      window.location.hash = '#home'
+      const win = window as unknown as { escapeClaims: number }
+      win.escapeClaims = 0
+      document.addEventListener(
+        'keydown',
+        (ev) => {
+          if (ev.key !== 'Escape') return
+          win.escapeClaims += 1
+          ev.stopImmediatePropagation()
+        },
+        true,
+      )
     })
-    await expect(page.locator('[class^="_home_"]')).toBeAttached()
     expect(
       await callTool(page, 'execute_command', {
         commandId: 'flame.setExposure',
@@ -216,8 +225,12 @@ test.describe('keys under the screen lock', () => {
     await expect(
       page.getByRole('dialog', { name: /Stopped by you/ }),
     ).toBeVisible()
-    // The keys that ended the take did not also leave Home.
-    expect(await page.evaluate(() => window.location.hash)).toBe('#home')
+    // The keys that ended the take reached nothing else.
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { escapeClaims: number }).escapeClaims,
+      ),
+    ).toBe(0)
   })
 })
 
