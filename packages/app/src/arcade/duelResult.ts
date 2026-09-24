@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { closeDuelView } from './duel'
+import { closeDuelView, duel } from './duel'
 import type { DuelVerdict } from './duelJudge'
 import type { PilotEndReason } from './pilot'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -76,7 +76,9 @@ export function setDuelShareUrl(id: string, shareUrl: string): void {
  */
 export function clearDuelResult(): void {
   setDuelResult(undefined)
-  closeDuelView()
+  // Only the result screen: a running duel is ended by its clock or its End
+  // button, never by dismissing a card.
+  if (duel().phase === 'result') closeDuelView()
 }
 
 /**

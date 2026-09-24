@@ -96,6 +96,18 @@ describe('arena WebMCP tools', () => {
       expect(res).toHaveProperty('error')
     })
 
+    it('says a clash that ended without a verdict was cancelled, and why', async () => {
+      const ctx = createMockCommandContext()
+      ctx.arena!.startClash = () =>
+        Promise.resolve({ cancelled: true, reason: 'The arena was closed.' })
+      setWebMcpContext(ctx)
+
+      const res = await run(arenaStartClash)
+
+      expect(res).toMatchObject({ success: false, cancelled: true })
+      expect(res.message).toMatch(/The arena was closed/)
+    })
+
     it('opens arena and initiates animated clash in UI with mapped archetype stats', async () => {
       const ctx = createMockCommandContext()
       setWebMcpContext(ctx)

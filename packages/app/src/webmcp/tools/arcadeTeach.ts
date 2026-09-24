@@ -1,6 +1,7 @@
 import { describeAllowedCommands, SAMPLE_VARIATION_TYPES, SAMPLE_VARIATION_TYPES_3D, } from '@/arcade/commandHints'
 import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { qualityRank } from '@/arcade/guard'
+import { acknowledgeInterruption, interruptionMessage, } from '@/arcade/interruptedSession'
 import { clearNarration, narration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
 import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
@@ -21,13 +22,16 @@ const NOT_READY = {
 export const arcadeStatus: WebMcpTool = {
   name: 'arcade_status',
   description:
-    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, the last narration, and — during a duel — the time left on the clock. Call it when unsure what to do next.',
+    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, the last narration, and — during a duel — the time left on the clock. Call it when unsure what to do next. After a reload ends a session it reports that once, which releases the other tools.',
   inputSchema: { type: 'object', properties: {} },
   annotations: { readOnlyHint: true },
   execute: () => {
     const state = pilot()
     const driving = state.phase === 'driving' ? state : undefined
     const duel = runningDuel()
+    // Reading the status is the acknowledgement: once said, the other tools
+    // are released.
+    const interrupted = acknowledgeInterruption()
     return {
       phase: state.phase,
       mode: state.phase === 'idle' ? undefined : state.mode,
@@ -63,6 +67,14 @@ export const arcadeStatus: WebMcpTool = {
         state.phase === 'ended'
           ? { reason: state.reason, sessionName: state.sessionName }
           : undefined,
+      interrupted: interrupted
+        ? {
+            mode: interrupted.mode,
+            title: interrupted.title,
+            reason: 'reload',
+            message: interruptionMessage(interrupted),
+          }
+        : undefined,
     }
   },
 }

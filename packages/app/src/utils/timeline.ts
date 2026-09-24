@@ -1460,8 +1460,11 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     const next = currentFrame() + 1
     const count = playedFrames() + 1
     const wrapped = next > cfg.endFrame
-    setCurrentFrame(wrapped ? cfg.startFrame : next)
-    if (playing) played = { count, at: currentFrame() }
+    const target = wrapped ? cfg.startFrame : next
+    // Counted before the move: whatever the move sets off (an arena clash
+    // pauses on its last frame) must read this advance in the count.
+    if (playing) played = { count, at: target }
+    setCurrentFrame(target)
     if (wrapped && !cfg.loop) {
       setIsPlaying(false)
       resetFpsMeter()

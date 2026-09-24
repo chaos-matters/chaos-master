@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { Cross } from '@/icons'
+import { Cross, Star } from '@/icons'
 import ui from '../ArenaOverlay.module.css'
 import type { ClashRoundOutcome } from '@/webmcp/tools/simulateClash'
 
@@ -11,6 +11,8 @@ export interface ArenaTopBarProps {
   readonly winner: 1 | 2 | null
   readonly commentary: string | null
   readonly eventBanner: string | null
+  /** The arena the clash is staged in: player 1's flame's dimension. */
+  readonly dimensions: 2 | 3
   readonly onReplay: () => void
   readonly onClose: () => void
 }
@@ -20,10 +22,10 @@ export function ArenaTopBar(props: ArenaTopBarProps) {
     <div class={ui.topBarStrip}>
       <div class={ui.topBarLeft}>
         <div class={ui.pulseDot} />
-        <h2 class={ui.title}>Flame Clash Arena 3D</h2>
+        <h2 class={ui.title}>{`Flame Clash Arena ${props.dimensions}D`}</h2>
         <Show when={props.winStreak > 0}>
           <div class={ui.streakBadge} title="Current Arena Win Streak">
-            <span class={ui.streakFire}>★</span>
+            <Star class={ui.streakFire} aria-hidden="true" />
             <span>
               Streak: {props.winStreak} {props.winStreak === 1 ? 'Win' : 'Wins'}
             </span>

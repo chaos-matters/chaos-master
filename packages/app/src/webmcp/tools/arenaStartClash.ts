@@ -3,6 +3,13 @@ import { ARENA_ARCHETYPES, generateArchetypeOpponent, } from '@/webmcp/tools/are
 import type { ArchetypeId, TacticalStance, } from '@/webmcp/tools/arenaArchetypes'
 import type { WebMcpTool } from '@/webmcp/types'
 
+const isCancelled = (
+  result: unknown,
+): result is { cancelled: true; reason: string } =>
+  typeof result === 'object' &&
+  result !== null &&
+  (result as { cancelled?: unknown }).cancelled === true
+
 export const arenaStartClash: WebMcpTool = {
   name: 'arena_start_clash',
   description:
@@ -93,6 +100,16 @@ export const arenaStartClash: WebMcpTool = {
         stance: raw.stance,
         rounds: raw.rounds ?? 3,
       })
+
+      // Settled without a verdict: replaced by a newer clash, the arena
+      // closed, or the clash could not start. Say so rather than succeed.
+      if (isCancelled(result)) {
+        return {
+          success: false,
+          cancelled: true,
+          message: `The clash ended without a verdict. ${result.reason}`,
+        }
+      }
 
       return {
         success: true,

@@ -1,4 +1,5 @@
 import { mutateFlame } from '@/flame/randomize'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -71,6 +72,9 @@ function resolveCombatantPayload(
     flame,
   }
 }
+
+const invalidFighter = (field: string) =>
+  `Invalid ${field}: it failed schema validation. Inspect the structure with get_flame, or omit it to use the workspace flame.`
 
 export const openArena: WebMcpTool = {
   name: 'open_arena',
@@ -145,11 +149,28 @@ export const openArena: WebMcpTool = {
       currentFlame,
     )
 
+    // The agent's flames go through the schema the editor loads with, as
+    // set_flame's do: the arena reads their render settings and transforms.
+    const fighter1 = p1Flame && tryValidateFlame(deepClone(p1Flame))
+    const fighter2 = p2Flame && tryValidateFlame(deepClone(p2Flame))
+    if (p1Flame && !fighter1) return { error: invalidFighter('player1Flame') }
+    if (p2Flame && !fighter2) return { error: invalidFighter('player2Flame') }
+
     arena.setPlayer1Stats(
-      resolveCombatantPayload('Player 1', raw.player1Name, p1StatsObj, p1Flame),
+      resolveCombatantPayload(
+        'Player 1',
+        raw.player1Name,
+        p1StatsObj,
+        fighter1,
+      ),
     )
     arena.setPlayer2Stats(
-      resolveCombatantPayload('Player 2', raw.player2Name, p2StatsObj, p2Flame),
+      resolveCombatantPayload(
+        'Player 2',
+        raw.player2Name,
+        p2StatsObj,
+        fighter2,
+      ),
     )
     arena.setOpen(true)
 

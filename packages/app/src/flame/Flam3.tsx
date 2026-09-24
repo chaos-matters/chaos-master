@@ -10,6 +10,7 @@ import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { logTime } from '@/utils/logTime'
 import { exportTickIterations } from '@/utils/motionBlur'
+import { advancePlaybackTick } from '@/utils/playbackTick'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { vramTrack } from '@/utils/vramLog'
@@ -603,9 +604,7 @@ export function Flam3(props: Flam3Props) {
     const cfg = timeline.config()
     const intervalMs = 1000 / cfg.fps
     const intervalId = window.setInterval(() => {
-      for (let i = 0; i < cfg.timeScale; i++) {
-        timeline.advanceFrame()
-      }
+      advancePlaybackTick(timeline, cfg.timeScale)
     }, intervalMs)
 
     onCleanup(() => {

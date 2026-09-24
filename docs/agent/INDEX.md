@@ -30,7 +30,7 @@ file instead of rediscovering the architecture every session.
 
 | Directory                 | Package name                   | Source files | LOC    |
 | ------------------------- | ------------------------------ | ------------ | ------ |
-| `packages/app`            | `chaos-master`                 | 1107         | 188.7k |
+| `packages/app`            | `chaos-master`                 | 1112         | 189.5k |
 | `packages/core`           | `@chaos-master/core`           | 27           | 3.8k   |
 | `packages/landing`        | `@chaos-master/landing`        | 20           | 2.5k   |
 | `packages/mobile-runtime` | `@chaos-master/mobile-runtime` | 7            | 600    |
@@ -66,14 +66,15 @@ file instead of rediscovering the architecture every session.
 
 #### Flame engine (`packages/app/src/flame/`) — variations, pipeline, serialization
 
-| Module          | Entry point                                                             | LOC   | What it is            |
-| --------------- | ----------------------------------------------------------------------- | ----- | --------------------- |
-| `variations`    | [index.ts](../../packages/app/src/flame/variations/parametric/index.ts) | 33.6k | _(no header comment)_ |
-| `examples`      | [index.ts](../../packages/app/src/flame/examples/index.ts)              | 12.7k | _(no header comment)_ |
-| `glide`         | [index.ts](../../packages/app/src/flame/glide/index.ts)                 | 2.9k  | _(no header comment)_ |
-| `renderDrivers` | [index.ts](../../packages/app/src/flame/renderDrivers/index.ts)         | 400   | _(no header comment)_ |
-| `schema`        | [flameSchema.ts](../../packages/app/src/flame/schema/flameSchema.ts)    | 100   | _(no header comment)_ |
-| `variations3D`  | [index.ts](../../packages/app/src/flame/variations3D/index.ts)          | 50    | _(no header comment)_ |
+| Module          | Entry point                                                             | LOC   | What it is                                                                                |
+| --------------- | ----------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------- |
+| `variations`    | [index.ts](../../packages/app/src/flame/variations/parametric/index.ts) | 33.6k | _(no header comment)_                                                                     |
+| `examples`      | [index.ts](../../packages/app/src/flame/examples/index.ts)              | 12.7k | _(no header comment)_                                                                     |
+| `glide`         | [index.ts](../../packages/app/src/flame/glide/index.ts)                 | 2.9k  | _(no header comment)_                                                                     |
+| `renderDrivers` | [index.ts](../../packages/app/src/flame/renderDrivers/index.ts)         | 400   | _(no header comment)_                                                                     |
+| `clash`         | [teamTint.ts](../../packages/app/src/flame/clash/teamTint.ts)           | 100   | A clash team's colour: a hue on the OkLab (a, b) plane, for every transform of that team. |
+| `schema`        | [flameSchema.ts](../../packages/app/src/flame/schema/flameSchema.ts)    | 100   | _(no header comment)_                                                                     |
+| `variations3D`  | [index.ts](../../packages/app/src/flame/variations3D/index.ts)          | 50    | _(no header comment)_                                                                     |
 
 #### Components (`packages/app/src/components/`) — UI surfaces
 
@@ -91,8 +92,8 @@ file instead of rediscovering the architecture every session.
 | `LoadFlameModal`        | [LoadFlameModal.tsx](../../packages/app/src/components/LoadFlameModal/LoadFlameModal.tsx)                      | 1.6k | _(no header comment)_                                                                                                                        |
 | `AffineEditor`          | [AffineEditor.tsx](../../packages/app/src/components/AffineEditor/AffineEditor.tsx)                            | 1.4k | _(no header comment)_                                                                                                                        |
 | `Arcade`                | [ArcadeModePanel.tsx](../../packages/app/src/components/Arcade/ArcadeModePanel.tsx)                            | 1.4k | _(no header comment)_                                                                                                                        |
+| `ArenaOverlay`          | [ArenaResultsView.tsx](../../packages/app/src/components/ArenaOverlay/ArenaResultsView.tsx)                    | 1.4k | _(no header comment)_                                                                                                                        |
 | `AudioReactivePanel`    | [AudioReactivePanel.tsx](../../packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx)          | 1.4k | _(no header comment)_                                                                                                                        |
-| `ArenaOverlay`          | [ArenaResultsView.tsx](../../packages/app/src/components/ArenaOverlay/ArenaResultsView.tsx)                    | 1.3k | _(no header comment)_                                                                                                                        |
 | `LogoFaviconGenerator`  | [LogoFaviconGenerator.tsx](../../packages/app/src/components/LogoFaviconGenerator/LogoFaviconGenerator.tsx)    | 1.3k | _(no header comment)_                                                                                                                        |
 | `VariationSelector`     | [VariationSelector.tsx](../../packages/app/src/components/VariationSelector/VariationSelector.tsx)             | 1.3k | _(no header comment)_                                                                                                                        |
 | `ExportJobs`            | [OffscreenAnimationRender.tsx](../../packages/app/src/components/ExportJobs/OffscreenAnimationRender.tsx)      | 1.2k | _(no header comment)_                                                                                                                        |
@@ -175,7 +176,7 @@ file instead of rediscovering the architecture every session.
 
 | Module  | Entry point                                              | LOC  | What it is                                     |
 | ------- | -------------------------------------------------------- | ---- | ---------------------------------------------- |
-| `tools` | [index.ts](../../packages/app/src/webmcp/tools/index.ts) | 5.7k | Barrel export for all WebMCP tool definitions. |
+| `tools` | [index.ts](../../packages/app/src/webmcp/tools/index.ts) | 5.8k | Barrel export for all WebMCP tool definitions. |
 
 #### Core package (`packages/core/src/`) — pure, dependency-free logic
 
@@ -190,20 +191,21 @@ file instead of rediscovering the architecture every session.
 
 #### Arcade (`packages/app/src/arcade/`) — arena, director and beats modes
 
-| File                                                                   | LOC | What it is                                                                                              |
-| ---------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------- |
-| [topics.ts](../../packages/app/src/arcade/topics.ts)                   | 500 | _(no header comment)_                                                                                   |
-| [animatablePaths.ts](../../packages/app/src/arcade/animatablePaths.ts) | 350 | _(no header comment)_                                                                                   |
-| [tasteStore.ts](../../packages/app/src/arcade/tasteStore.ts)           | 350 | Persistent taste profile store and flame feature extraction for Evolutionary Art Director.              |
-| [duel.ts](../../packages/app/src/arcade/duel.ts)                       | 250 | _(no header comment)_                                                                                   |
-| [duelActions.ts](../../packages/app/src/arcade/duelActions.ts)         | 250 | _(no header comment)_                                                                                   |
-| [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts)             | 200 | _(no header comment)_                                                                                   |
-| [pilot.ts](../../packages/app/src/arcade/pilot.ts)                     | 200 | _(no header comment)_                                                                                   |
-| [affineControls.ts](../../packages/app/src/arcade/affineControls.ts)   | 150 | _(no header comment)_                                                                                   |
-| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)       | 150 | _(no header comment)_                                                                                   |
-| [lockKeyGate.ts](../../packages/app/src/arcade/lockKeyGate.ts)         | 150 | The screen lock's key gate: while the pilot owns the keyboard, no key listener of the page hears a key. |
-| [duelHud.ts](../../packages/app/src/arcade/duelHud.ts)                 | 100 | _(no header comment)_                                                                                   |
-| [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts)       | 100 | _(no header comment)_                                                                                   |
+| File                                                                         | LOC | What it is                                                                                                        |
+| ---------------------------------------------------------------------------- | --- | ----------------------------------------------------------------------------------------------------------------- |
+| [topics.ts](../../packages/app/src/arcade/topics.ts)                         | 500 | _(no header comment)_                                                                                             |
+| [animatablePaths.ts](../../packages/app/src/arcade/animatablePaths.ts)       | 350 | _(no header comment)_                                                                                             |
+| [tasteStore.ts](../../packages/app/src/arcade/tasteStore.ts)                 | 350 | Persistent taste profile store and flame feature extraction for Evolutionary Art Director.                        |
+| [interruptedSession.ts](../../packages/app/src/arcade/interruptedSession.ts) | 300 | An Arcade session a page reload cut short, remembered so the agent is told instead of editing the viewer's flame. |
+| [duel.ts](../../packages/app/src/arcade/duel.ts)                             | 250 | _(no header comment)_                                                                                             |
+| [duelActions.ts](../../packages/app/src/arcade/duelActions.ts)               | 250 | _(no header comment)_                                                                                             |
+| [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts)                   | 200 | _(no header comment)_                                                                                             |
+| [pilot.ts](../../packages/app/src/arcade/pilot.ts)                           | 200 | _(no header comment)_                                                                                             |
+| [affineControls.ts](../../packages/app/src/arcade/affineControls.ts)         | 150 | _(no header comment)_                                                                                             |
+| [commandHints.ts](../../packages/app/src/arcade/commandHints.ts)             | 150 | _(no header comment)_                                                                                             |
+| [lockKeyGate.ts](../../packages/app/src/arcade/lockKeyGate.ts)               | 150 | The screen lock's key gate: while the pilot owns the keyboard, no key listener of the page hears a key.           |
+| [duelHud.ts](../../packages/app/src/arcade/duelHud.ts)                       | 100 | _(no header comment)_                                                                                             |
+| [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts)             | 100 | _(no header comment)_                                                                                             |
 
 #### Workspace hooks (`packages/app/src/hooks/`)
 

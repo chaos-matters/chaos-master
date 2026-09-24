@@ -13,6 +13,7 @@
  * is still useful for the dev overlay and Vitest tests.
  */
 
+import { interruptedSession, interruptionChecked, interruptionMessage, } from '@/arcade/interruptedSession'
 import { agentDriving } from '@/arcade/pilot'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { clearWebMcpContext, setWebMcpContext } from './contextBridge'
@@ -47,9 +48,27 @@ export const toMcpResult = (raw: unknown) => {
  *  enforce the guard themselves. */
 const DRIVING_SAFE_TOOLS = new Set(['execute_command'])
 
+/** Still answer after a reload ended a session: the acknowledgement, and a
+ *  fresh start, which supersedes the interrupted session. */
+const interruptionAllows = (name: string): boolean =>
+  name === 'arcade_status' || name.startsWith('arcade_start_')
+
 export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
   ...tool,
   execute: async (args: unknown, context: { signal?: AbortSignal }) => {
+    // A reload ended the agent's session. Its next call would read or edit
+    // the viewer's own flame while it still thinks it plays its seat, so
+    // every tool says so instead, until the agent acknowledges. The first
+    // call after a load waits for the check that tells a reload from a
+    // duplicated tab (a few hundred milliseconds at most, once).
+    await interruptionChecked()
+    const interrupted = interruptedSession()
+    if (interrupted && !interruptionAllows(tool.name)) {
+      return {
+        content: [{ type: 'text', text: interruptionMessage(interrupted) }],
+        isError: true,
+      }
+    }
     // One lock, one door. While the Arcade drives, every mutation goes
     // through the guarded escape hatch or an arcade_* tool; the document-level
     // tools (set_flame, undo, load_share_link, ...) would otherwise write

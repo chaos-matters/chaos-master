@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
+import { createMockCommandContext } from '@/webmcp/testUtils'
 import { formatSummarizedMetadata, formatSummarizedRenderSettings, formatSummarizedTransforms, formatTransformSummary, } from './getFlame'
 import { resolveTransformDetail } from './getFlameDetail'
 import { mutateFlame } from './mutateFlame'
@@ -125,9 +127,38 @@ describe('getFlameDetail modular subroutines', () => {
 })
 
 describe('openArena tool execution contract', () => {
+  afterEach(() => {
+    clearWebMcpContext()
+  })
+
   it('returns error when workspace context or arena is not available', () => {
     const res = openArena.execute({}, {}) as { error: string }
     expect(res.error).toBeDefined()
+  })
+
+  it('refuses a fighter flame that is not a flame, and opens nothing', () => {
+    const ctx = createMockCommandContext()
+    const setOpen = vi.fn()
+    const setPlayer1Stats = vi.fn()
+    ctx.arena = {
+      setOpen,
+      setPlayer1Stats,
+      setPlayer2Stats: vi.fn(),
+    } as unknown as NonNullable<typeof ctx.arena>
+    setWebMcpContext(ctx)
+
+    const res = openArena.execute(
+      {
+        player1Stats: {},
+        player2Stats: {},
+        player1Flame: { transforms: { t1: { probability: 'lots' } } },
+      },
+      {},
+    ) as { error?: string }
+
+    expect(res.error).toMatch(/player1Flame/)
+    expect(setOpen).not.toHaveBeenCalled()
+    expect(setPlayer1Stats).not.toHaveBeenCalled()
   })
 })
 
