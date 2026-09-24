@@ -22,7 +22,7 @@ Wrap `packages/app` in Capacitor as a bundled, offline-capable iOS/iPadOS and An
 
 ## 2. Verdict in brief
 
-- **The app fits Capacitor well.** It is a client-only SPA with a relative asset base (`packages/app/vite.config.ts`). It has no service worker, workers, WASM or `SharedArrayBuffer`, and it routes by fragment. It runs from `capacitor://localhost` (iOS) and `https://localhost` (Android) with no COOP/COEP and no path rewrites.
+- **The app fits Capacitor well.** It is a client-only SPA. It has no service worker, workers, WASM or `SharedArrayBuffer`, and it routes by fragment. It runs from `capacitor://localhost` (iOS) and `https://localhost` (Android) with no COOP/COEP and no path rewrites.
 - **WebGPU inside the WebView is the one gate, and it is unverified on both platforms.**
   - iOS 26 WKWebView: Apple states that WebGPU is on by default.
   - Android System WebView: plausible from WebView 146, on Vulkan-capable Android 12+ devices. Chrome's 121 launch excluded WebView.
@@ -46,7 +46,7 @@ Wrap `packages/app` in Capacitor as a bundled, offline-capable iOS/iPadOS and An
 | MercuryPitch / Beside Cue does                                                                                                                        | We do                                                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | One shell package per app (`apps/beside-cue`, `apps/mercurypitch`) with committed `ios/` and `android/`                                               | `packages/mobile` (this repo globs only `packages/*`) with committed `ios/` and `android/`                                                                                                                                                            |
-| Shared `packages/mobile-runtime`: product-neutral ports (haptics, purchases, paywall, notifications) with `web`, `capacitor/*` and `testing` adapters | `packages/mobile-runtime` with the same shape, plus the platform services MercuryPitch kept elsewhere (save/share, lifecycle, back button, external links, deep links), so there is **one** seam. Beside Cue grew two seams and never reconciled them |
+| Shared `packages/mobile-runtime`: product-neutral ports (haptics, purchases, paywall, notifications) with `web`, `capacitor/*` and `testing` adapters | `packages/mobile-runtime` with the same shape, plus the platform services MercuryPitch kept elsewhere (save/share, lifecycle, back button, external links, deep links), so there is **one** seam. Two seams would drift apart and never be reconciled |
 | The shell's own `vite.config.ts` aliases the web `src`                                                                                                | **One** Vite config in `packages/app` with a `native` mode (`pnpm build:native` writes `dist-native`), and `webDir: '../app/dist-native'` in the shell. Verified: `cap add` and `cap sync` accept the outside `webDir`                                |
 | Capacitor 8.5 with SwiftPM (no CocoaPods), so `cap add`/`cap sync` run on Linux                                                                       | Same (Capacitor 8.5.1)                                                                                                                                                                                                                                |
 | Reusable `capacitor-app.yml` + thin per-app caller; every secret passed explicitly with an app prefix                                                 | Same: caller `lumen-mobile.yml`, prefix `LUMEN_*`, tags `mobile-v*`                                                                                                                                                                                   |
@@ -246,8 +246,9 @@ Steps marked **(you)** need the Apple account or the vault; the rest is in the r
 - **Do** export `.p12` files with `openssl pkcs12 -export -legacy`. The OpenSSL 3 default is refused by the macOS keychain, and CI does not say why.
 - **Do** keep one fixed debug keystore, so CI and local APKs can update each other without an uninstall that wipes on-device data.
 - **Do** treat `fetch` status 0 with a body as success for bundled media on iOS. The `capacitor://` handler answers range-less media requests that way.
-- **Do** compile GPU pipelines at init and run animation on wall-clock time. Stutter on first draw and fixed-step clocks under low fps hurt Beside Cue on iPhone.
-- **Don't** copy Beside Cue's `base: './'` reasoning, its hard-coded Test Store key, its first `AudioSession.swift` (the route-change feedback loop), or its README secrets table (out of date).
+- **Do** compile GPU pipelines at init and run animation on wall-clock time, so the first draw does not stutter and animation keeps its speed under low fps on iPhone.
+- **Don't** re-apply the audio session category or the speaker override on every route change. Each one posts another route change, and the loop makes audio and the UI stutter. Override only when the route really is the built-in receiver, behind a reentrancy guard.
+- **Don't** treat a relative asset base (`base: './'`) as a Capacitor requirement. Capacitor serves `webDir` at the origin root on both platforms.
 - **Don't** keep plaintext signing material in a directory. The vault is the only source of truth.
 
 ## 8. Risks and decisions

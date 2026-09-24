@@ -3,9 +3,10 @@ name: Capacitor app
 # Native builds for a Capacitor app in this repository, as a reusable workflow.
 #
 # Ported on 2026-09-11 from MercuryPitch's `.github/workflows/capacitor-app.yml`.
-# Beside Cue wrote every rule below and paid for most of them in failed runs;
-# the comments are kept verbatim because they are the reason each branch
-# exists. This file is what an app reuses instead of a copy of its own, and
+# Beside Cue wrote every rule below except the holder-name mask in the two
+# signing steps, and paid for most of them in failed runs; the comments are
+# kept close to verbatim because they are the reason each branch exists.
+# This file is what an app reuses instead of a copy of its own, and
 # `.github/workflows/lumen-mobile.yml` is its caller. There is exactly one
 # place to fix a build lesson.
 #
@@ -816,6 +817,20 @@ jobs:
           # Lets codesign use the key without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
           rm -f "$RUNNER_TEMP/cert.p12"
+          # Apple names the certificate after the account holder, and xcodebuild
+          # prints that name on every CodeSign line. The team ID is a secret and
+          # already masked; mask every holder name in this keychain before a
+          # later step can print one. No -v: an untrusted identity is printed
+          # too. A name can itself hold a quote, so it runs from the first
+          # quote to the last. No identity at all means signing cannot work,
+          # so stop here.
+          security find-identity -p codesigning "$keychain" | awk '
+            /"/ {
+              s = $0; sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
+              sub(/^[^:]*: /, "", s); sub(/ \([^()]*\)$/, "", s)
+              if (s != "") { print "::add-mask::" s; n++ }
+            }
+            END { if (!n) { print "::error::No signing identity found to mask"; exit 1 } }'
 
       # Only an upload talks to App Store Connect, so only an upload gets the key.
       - name: Write App Store Connect API key
@@ -883,13 +898,13 @@ jobs:
           #
           #   error: Choose a certificate to revoke. Your account has
           #   reached the maximum number of certificates.
-          #   error: No profiles for 'com.irchiinnuss.besidecue' were
+          #   error: No profiles for '<bundle id>' were
           #   found ... iOS App Development provisioning profiles
           #
           # It was asking for a DEVELOPMENT profile to archive a release,
-          # which nothing here wants, and every build from 163 onward
-          # failed on it. The export step below has always signed
-          # manually with these same materials; the archive now does too,
+          # which nothing here wants, and once the account reached that
+          # limit every build failed on it. The export step below has always
+          # signed manually with these same materials; the archive now does too,
           # so a build depends on the secrets it was given and never on
           # what Apple will let the account create today.
           #
@@ -1102,6 +1117,21 @@ jobs:
           # Lets codesign use the key without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
           rm -f "$RUNNER_TEMP/cert.p12"
+
+          # Apple names the certificate after the account holder, and xcodebuild
+          # prints that name on every CodeSign line. The team ID is a secret and
+          # already masked; mask every holder name in this keychain before a
+          # later step can print one. No -v: an untrusted identity is printed
+          # too. A name can itself hold a quote, so it runs from the first
+          # quote to the last. No identity at all means signing cannot work,
+          # so stop here.
+          security find-identity -p codesigning "$keychain" | awk '
+            /"/ {
+              s = $0; sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
+              sub(/^[^:]*: /, "", s); sub(/ \([^()]*\)$/, "", s)
+              if (s != "") { print "::add-mask::" s; n++ }
+            }
+            END { if (!n) { print "::error::No signing identity found to mask"; exit 1 } }'
 
           profiles="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$profiles"
