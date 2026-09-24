@@ -35,6 +35,8 @@ export interface InteractiveRenderDriverOptions {
   isAppleWebKit?: () => boolean
   isExportRenderer?: () => boolean
   onStallResumed?: () => void
+  /** Changes when a view transition ends; defaults to lib/viewTransition's. */
+  viewTransitionsSettled?: () => number
 }
 
 export interface InteractiveRenderDriver {

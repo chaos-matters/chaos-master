@@ -11,7 +11,8 @@ reading the code, defaulting to refuted when unconvinced. One further finding
 (`cam3d-pinch-nan`) came from a follow-up investigation into why the tablet
 exporter needed fixing twice, and five more from the stage 2 characterization
 net and the motion blur work (2026-09-11) -- those carry their lens and the PR
-that found or fixed them.
+that found or fixed them. Finding 64 came later, from maff's report from the
+iOS app (2026-09-23), and is under [Found after the audit](#found-after-the-audit).
 
 Every finding below cites a file and a line and was found by reading code, not
 by pattern-matching a linter.
@@ -50,13 +51,14 @@ The **Now** line under each finding, and the table in
 
 | | Count |
 | --- | ---: |
-| Findings raised | 63 |
+| Findings raised | 64 |
 | **Confirmed** | **37** |
 | — of which high | 5 |
 | — of which medium | 9 |
 | — of which low | 23 |
 | Refuted | 5 |
 | Low, not verified | 21 |
+| From a device report | 1 |
 
 The fixes for the high and medium findings were planned task by task in
 [../superpowers/plans/2026-09-10-audit-remediation-stage1-defects.md](../superpowers/plans/2026-09-10-audit-remediation-stage1-defects.md),
@@ -71,7 +73,7 @@ The findings further down keep the words and line numbers they were found
 with, pinned to `a5c2f26f`; this table is the part that tracks main. Every
 citation in it is checked on every pull request by `pnpm docs:cite`, so a
 change that moves or removes the cited code fails CI until the row is
-updated.
+updated. Row 64 was added later, with the pull request that finished its fix.
 
 | Found as | Findings | Fixed | Open | Refuted |
 | --- | ---: | ---: | ---: | ---: |
@@ -80,7 +82,8 @@ updated.
 | Confirmed, low | 23 | 5 | 18 | 0 |
 | Refuted | 5 | 0 | 0 | 5 |
 | Low, not verified | 21 | 4 | 16 | 1 |
-| **All** | **63** | **20** | **37** | **6** |
+| Device report | 1 | 1 | 0 | 0 |
+| **All** | **64** | **21** | **37** | **6** |
 
 4 of the open findings are partly fixed; the row says which part is left.
 "Refuted, still" means the audit's refutation still holds on main.
@@ -148,8 +151,9 @@ updated.
 | 59 | [`shutterAngle` never set](#reported-low-severity-not-independently-verified) | low, not verified | fixed, #91 (`98f80d64`) | `packages/app/src/components/ExportPngDialog/ExportPngDialog.tsx:1377` (`motionBlurSettings`), `packages/app/src/utils/motionBlur.ts:25` (`shutterAngle`); test `packages/app/src/utils/motionBlur.test.ts:35` "hands both export paths the same settings, shutter angle included" |
 | 60 | [`focusHintFor` resolves prototype keys](#reported-low-severity-not-independently-verified) | low, not verified | open | `packages/app/src/recorder/focus.ts:174` (`Object.freeze`), `:476` (`STATIC_COMMAND_HINTS`) |
 | 61 | [Export loop has no test coverage](#reported-low-severity-not-independently-verified) | low, not verified | open | `packages/app/src/flame/renderDrivers/renderDrivers.test.ts:75` "starts with initial iterations and provides wake handle" creates the driver disabled (`:77` (`createSignal`)), so the loop at `packages/app/src/flame/renderDrivers/createExportRenderDriver.ts:183` (`disposed`) never runs under test |
-| 62 | [Present-pump gate lost its comment](#reported-low-severity-not-independently-verified) | low, not verified | open | `packages/app/src/flame/renderDrivers/createInteractiveRenderDriver.ts:58` (`isExportRenderer`); the old comment is in Flam3.tsx before `38130d81` |
+| 62 | [Present-pump gate lost its comment](#reported-low-severity-not-independently-verified) | low, not verified | open | `packages/app/src/flame/renderDrivers/createInteractiveRenderDriver.ts:72` (`isExportRenderer`); the old comment is in Flam3.tsx before `38130d81` |
 | 63 | [`CompletedRunCard` captures `props.run`](#reported-low-severity-not-independently-verified) | low, not verified | open | `packages/app/src/pages/Benchmarks/BenchmarksPage.tsx:599` (`props.run`); harmless inside its `<For>` today |
+| 64 | [A dialog pick stays hidden on iOS](#a-flame-picked-from-a-dialog-stayed-hidden-behind-the-previous-one-on-ios-until-the-canvas-was-touched) | device report | fixed, #122 (`a37f4b88`, `14545b77`) and #131 (`9895189f`) | `packages/app/src/lib/viewTransition.ts:36` (`isAppleWebKit`), `packages/app/src/flame/renderDrivers/createInteractiveRenderDriver.ts:85` (`transitionsSettled`); test `packages/app/src/flame/renderDrivers/viewTransitionPresent.test.tsx:363` "on Apple WebKit, is on screen with no view transition and no snapshot", test `packages/app/src/flame/renderDrivers/viewTransitionPresent.test.tsx:372` "where a view transition runs anyway, is on screen once it has faded out" |
 
 ---
 
@@ -917,3 +921,23 @@ Rated low by the finder and so never put through refutation. Check before acting
 **Skeptical re-review of PRs #73/#83 — @chaos-master/core extr.** Five things in this area the finder should have caught.
 
 1. **The worker decomposition dropped 74% of its comments, and the finder's method could not see it.** They assert "the only new lines are function signatures and dispatch calls, and the only removed lines are declarations that gained `export`." That is false. I counted comment lines in `v0.9.11:packages/app/src/worker/index.ts` against the whole post-split tree (index.ts + types.ts + utils.ts + routes/* + middleware/*, excluding tests): 261 comment lines before, 140 after, 193 distinct comment lines lost. Two of the losses are cross-file invariants that now exist nowhere: `packages/app/src/worker/types.ts:36` `GALLERY_SECTIONS` lost "Mirrors the CHECK constraint in migrations/0001_gallery_content.sql — keep the two in step", and `packages/app/src/worker/routes/gallery.ts:5` `MISSING_TABLE` lost the paragraph explaining that the same regex lives in `scripts/gallery-targets.mjs` and is what decides whether the deploy tooling offers to run migrations. In a repo whose comments carry this much operational knowledge, that is a bigge
+
+---
+
+<!-- cite-check: live -->
+
+## Found after the audit
+
+### A flame picked from a dialog stayed hidden behind the previous one on iOS until the canvas was touched
+
+`packages/app/src/lib/viewTransition.ts:36` (`isAppleWebKit`) — **high** · correctness · reported by maff from the TestFlight app, 2026-09-23 · present since `8e026b9e` (2025-05) and in `mobile-v0.9.12` · lens: device report, WebKit source and a real-GPU emulator
+
+**Now:** fixed in #122 (`a37f4b88`, `14545b77`) and #131 (`9895189f`). See [Status on main](#status-on-main).
+
+**Evidence.** Closing any dialog ran a root view transition (`Modal.tsx:101-110` (`respond`)). While one runs, WebKit snapshots the page on every frame, and painting a WebGPU canvas into a snapshot presents its swap chain without choosing what the canvas displays (GPUCanvasContextCocoa::surfaceBufferToImageBuffer, WebKit `49480340a1`, the code in Safari 26 and iOS 26); the display preparation after the frame presents once more. The renderer and the WebKit present pump stop at the quality limit, which a phone reaches inside the 250 ms fade, so nothing presented after it.
+
+**How it fails.** On iOS, in the app and in Safari, a flame picked in Load Flame, Recents or the gallery flickered during the fade, then left the previous flame, or a buffer never drawn, on screen until a touch on the canvas drew again. Chrome and Android never showed it.
+
+**Verification.** `viewTransitionPresent.test.tsx` drives the real Modal and render driver against a model of WebKit's canvas presentation and frame order, and an emulator of the same ran on production builds in real-GPU Chrome. Before #122 the pick ended on the previous flame, or at the high preset on a buffer never drawn. After #122 it ended on the new one, with 16 or 17 snapshot presents during the fade. After #131 no view transition runs on Apple WebKit (`utils/platform.test.ts` covers iOS and macOS Safari and the iOS app's WKWebView), and the pick, the sidebar toggle and the theme switch land with no snapshot and no stale buffer.
+
+**Suggested fix.** Fixed in #122, which presents once after each view transition ends, and #131, which runs none on Apple WebKit.

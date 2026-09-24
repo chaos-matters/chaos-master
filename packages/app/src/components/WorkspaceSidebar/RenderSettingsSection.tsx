@@ -12,6 +12,7 @@ import { colorInitModeToImplFn } from '@/flame/colorInitMode'
 import { drawModeToImplFn } from '@/flame/drawMode'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
+import { startViewTransition } from '@/lib/viewTransition'
 import { recordKeys } from '@/utils/record'
 import type { Accessor, Setter } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
@@ -376,11 +377,7 @@ export function RenderSettingsSection(props: RenderSettingsSectionProps) {
                     const update = () => {
                       setRenderSetting('drawMode', mode)
                     }
-                    if ('startViewTransition' in document) {
-                      document.startViewTransition(update)
-                    } else {
-                      update()
-                    }
+                    startViewTransition(update)
                   }}
                 >
                   <For each={recordKeys(drawModeToImplFn)}>
@@ -412,11 +409,7 @@ export function RenderSettingsSection(props: RenderSettingsSectionProps) {
                     const update = () => {
                       setRenderSetting('colorInitMode', mode)
                     }
-                    if ('startViewTransition' in document) {
-                      document.startViewTransition(update)
-                    } else {
-                      update()
-                    }
+                    startViewTransition(update)
                   }}
                 >
                   <For each={recordKeys(colorInitModeToImplFn)}>
@@ -450,11 +443,7 @@ export function RenderSettingsSection(props: RenderSettingsSectionProps) {
                     const update = () => {
                       setRenderSetting('pointInitMode', mode)
                     }
-                    if ('startViewTransition' in document) {
-                      document.startViewTransition(update)
-                    } else {
-                      update()
-                    }
+                    startViewTransition(update)
                   }}
                 >
                   <For

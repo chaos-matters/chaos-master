@@ -57,6 +57,11 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
   {
+    file: 'src/viewTransitionCallers.test.ts',
+    why: 'walks all of src/ for document.startViewTransition calls that bypass lib/viewTransition',
+    genre: 'filesystem',
+  },
+  {
     file: 'src/lib/camera2DRotation.test.ts',
     why: 'walks src/, scripts/ and the landing package for <Camera2D> mounts that omit the view rotation',
     genre: 'filesystem',
