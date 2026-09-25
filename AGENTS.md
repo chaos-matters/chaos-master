@@ -42,8 +42,7 @@ merge, and user preferences.
    with", in commits, PR bodies, or any other artifact. The user is the sole
    author. Verify with `git log --format='%an|%ae'` before merging.
 6. **No emojis** in code, UI, logs, commits, or PR text. Use an SVG icon
-   component from the project's icon set. (The emoji step names in
-   `.github/workflows/node.js.yml` predate this rule; do not add more.)
+   component from the project's icon set.
 7. **Never put real personal data in a fixture.** Not "just to get the parser
    working". Generate fixtures from the format spec and make them
    checksum-invalid so they can never be someone's real account.
@@ -56,12 +55,20 @@ merge, and user preferences.
 pnpm check           # typecheck + lint:fix + fmt:fix + validate-wgsl. Rewrites files.
 pnpm typecheck       # core, then the app project
 pnpm lint            # type-aware eslint; needs a raised Node heap
-pnpm test            # core + app vitest + script tests
+pnpm test            # core + app vitest + script tests; PR CI runs it, see below
+pnpm test:changed    # the app tests a branch's changes can reach (local)
 pnpm test:coverage   # app vitest with v8 coverage, writes coverage-audit/
 pnpm test:e2e        # full Playwright suite (local only, see below)
 pnpm test:e2e:ci     # the CI-stable smoke subset
 pnpm ci              # lint + typecheck + test + e2e smoke
 ```
+
+**Locally, run the tests for what you touched** (`pnpm test:changed`, or
+`pnpm --filter chaos-master exec vitest run <path>` for one file), plus
+`pnpm check`. Do not run the full suite on your machine as a matter of course:
+every pull request's CI runs the full `pnpm test`, the `health` checks and the
+CI-safe e2e, in parallel jobs, in a few minutes
+([packages/app/TESTING.md](packages/app/TESTING.md)).
 
 ### Documentation and code health
 

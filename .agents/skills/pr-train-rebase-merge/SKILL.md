@@ -86,12 +86,14 @@ git rebase --onto origin/main <OLD_PARENT_TIP_SHA> <BRANCH_NAME>
 
 #### E. Verify Local Build, Types, and Tests
 
-Always run local validation to catch any integration breakage caused by changes in `main`:
+Run local validation for what the rebase touched, to catch integration breakage caused by changes in `main`:
 
 ```bash
 pnpm typecheck
-pnpm test # or targeted vitest runs
+pnpm test:changed # the app tests the branch's changes can reach
 ```
+
+The pull request's CI runs the full suite, `health` and the CI-safe e2e after the push; there is no need to run the whole suite locally.
 
 #### F. Ensure Commit Authorship Rules
 

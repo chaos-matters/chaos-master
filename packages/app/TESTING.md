@@ -11,28 +11,39 @@ Counts are from 2026-09-23 at `9fc08078`.
 
 ## Which checks run where
 
-A pull request runs the CI e2e project plus the tests the branch touched. Main
-runs everything.
+Every pull request runs what main runs, since 2026-09-24. The jobs of
+`.github/workflows/node.js.yml` run in parallel, so a pull request waits for
+the slowest one rather than for the sum:
 
-| Check                                                      | Pull request           | Push to main, or manual dispatch |
-| ---------------------------------------------------------- | ---------------------- | -------------------------------- |
-| `pnpm lint`, `pnpm typecheck`                              | yes                    | yes                              |
-| `@chaos-master/core` and `@chaos-master/mobile-runtime`    | in full                | in full                          |
-| The app suite (`packages/app`, ~3,800 tests)               | **scoped** (see below) | in full                          |
-| The `node --test` suites of the app's and the root scripts | in full                | in full                          |
-| App build, landing build, `pnpm test:e2e:ci`               | yes                    | yes                              |
-| `pnpm docs:cite`, in the `citations` job                   | yes                    | yes                              |
-| `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch` | no                     | yes, in the `health` job         |
+| Job         | What it runs                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lint`      | `pnpm lint`                                                                                                                                                                                 |
+| `typecheck` | `pnpm typecheck`                                                                                                                                                                            |
+| `test`      | the full `pnpm test`, in four legs: the app suite in three vitest shards (`pnpm test:app --shard=N/3`), and `pnpm test:packages` (core, mobile-runtime and the `node --test` script suites) |
+| `build`     | the app build, the landing build, then `pnpm test:e2e:ci`                                                                                                                                   |
+| `citations` | `pnpm docs:cite`                                                                                                                                                                            |
+| `health`    | `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch`                                                                                                                                  |
 
-The scoped run is `pnpm test:pr`, which calls `pnpm test:changed`
-(`scripts/test-changed.mjs`). It runs core and mobile-runtime in full — about
-230 tests in five seconds, nothing to gain by scoping them — and selects the
-app's test files as the union of:
+`pnpm test` is exactly `pnpm test:packages && pnpm test:app`, so the four
+legs together run what it runs. A new suite goes into one of those two
+scripts, and CI picks it up.
+
+**Locally, run the tests for what you touched, not the whole suite.** PR CI
+runs the full suite, `health` and the CI-safe e2e on every push, so the full
+run is its job, not your machine's. `pnpm test:changed` below picks the tests a
+change can reach; a single file is
+`pnpm --filter chaos-master exec vitest run <path>`.
+
+### The scoped run, for local use
+
+`pnpm test:pr` runs core and mobile-runtime in full — about 230 tests in five
+seconds, nothing to gain by scoping them — plus the script suites, and
+`pnpm test:changed` (`scripts/test-changed.mjs`), which selects the app's test
+files as the union of:
 
 1. **What the branch touched**, via `vitest --changed <base>`: every test file
-   whose module graph reaches a changed file. On CI the base is the pull
-   request's base SHA from the event payload, which is why the checkout uses
-   `fetch-depth: 0`.
+   whose module graph reaches a changed file. The base is `origin/main` unless
+   an argument or `TEST_CHANGED_BASE` names another.
 2. **The always-on list** in `scripts/always-on-tests.mjs`: test files that
    reach their subject through `readFileSync`, `readdirSync` or
    `import.meta.glob` rather than an import. The module graph has no edge to
@@ -43,9 +54,8 @@ app's test files as the union of:
 Scoping switches off and the whole app suite runs when the branch touched the
 harness itself: a `vite`/`vitest` config, a `package.json`, `pnpm-lock.yaml`, a
 `tsconfig*.json`, `vitest.setup.*`, or the scoper itself —
-`scripts/test-changed.mjs`, `scripts/always-on-tests.mjs` and
-`.github/workflows/node.js.yml`. A change to the selection logic must not be
-validated by the very selection it changes.
+`scripts/test-changed.mjs` and `scripts/always-on-tests.mjs`. A change to the
+selection logic must not be validated by the very selection it changes.
 
 ### Writing a test that reads the source tree
 
@@ -79,7 +89,7 @@ instead of source, or if the core alias is dropped: vitest's dependency walk
 skips anything whose resolved path contains `node_modules`, and the cover would
 disappear silently.
 
-Run it yourself the same way CI does:
+Run it:
 
 ```bash
 pnpm test:changed                    # against origin/main
@@ -87,17 +97,14 @@ pnpm test:changed <commit-ish>       # against something else
 node scripts/test-changed.mjs --dry-run   # print the selection, run nothing
 ```
 
-### The trade-off this accepts
+### What a scoped run can miss
 
-A pull request can be green and still break main. Scoping is a bet that the
-module graph plus the always-on list covers what a change can reach, and that
-bet is wrong sometimes: a test the graph does not connect to the change, and
-that the always-on list does not name, will not run until the merge. The
-mitigation is not a cleverer selection — it is that **the merging agent runs
-`pnpm typecheck` and `pnpm test` on main after every merge and stops on red**,
-and that the deploy comes from main, so a red main is visible in minutes rather
-than at the next release. The alternative, the full app suite on every push to
-every branch, costs more than the failure mode it prevents.
+A scoped run is a bet that the module graph plus the always-on list covers
+what a change can reach, and the bet is wrong sometimes: a test the graph does
+not connect to the change, and that the always-on list does not name, is not
+selected. Until 2026-09-24 CI made that bet on every pull request and main
+found out after the merge. Now it is only a local shortcut: the pull
+request's own CI runs the whole suite before anything merges.
 
 ---
 
@@ -110,8 +117,8 @@ tests as `*.test.ts` or `*.test.tsx`: 334 files in `packages/app/src`, 16 in
 components render in a test, and resolves `@chaos-master/core` to its source.
 
 ```bash
-pnpm test                                        # everything, as main runs it
-pnpm test:pr                                     # as a pull request runs it
+pnpm test                                        # everything, as CI runs it (leave it to CI)
+pnpm test:pr                                     # scoped to what the branch touched, for local use
 pnpm --filter chaos-master exec vitest run src/utils/timeline.test.ts   # one file
 pnpm test:watch                                  # the app suite, watching
 pnpm test:coverage                               # app and core, v8 coverage
@@ -120,7 +127,7 @@ pnpm test:coverage                               # app and core, v8 coverage
 The Node scripts have their own `node --test` suites:
 `pnpm --filter chaos-master test:scripts` for `packages/app/scripts`, and
 `pnpm test:scripts` for the root `scripts/` (the doc citation checker). Both
-run inside `pnpm test` and `pnpm test:pr`.
+run inside `pnpm test` (in `pnpm test:packages`) and `pnpm test:pr`.
 
 Coverage writes `coverage-audit/coverage-summary.json` in each package, which
 `pnpm metrics` then reports; at `9fc08078` the app is at 53.22% of lines and
@@ -128,10 +135,10 @@ core at 84.89%. It is never run in CI ([docs/agent/METRICS.md](../../docs/agent/
 
 ## The ratchets and the test floors
 
-`pnpm metrics:check` (the `health` job, main only) compares today's numbers
-with `docs/agent/code-metrics.baseline.json` and fails when one got worse. Two
-of them are floors on the test suite: `test_files` (355) and `test_cases`
-(3,153), both counted statically, so deleting tests fails main even when
+`pnpm metrics:check` (the `health` job, on every pull request) compares
+today's numbers with `docs/agent/code-metrics.baseline.json` and fails when one
+got worse. Two of them are floors on the test suite: `test_files` (355) and
+`test_cases` (3,153), both counted statically, so deleting tests fails the check even when
 everything left is green. Others hold the size of the tree
 (`largest_logic_file_loc`, `files_over_*`), header comments and coverage. A baseline only ever tightens, and by hand.
 Run `pnpm test:coverage` before `pnpm metrics:update`: the update refuses to write a baseline that lacks a key

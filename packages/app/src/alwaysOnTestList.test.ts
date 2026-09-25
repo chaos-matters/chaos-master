@@ -1,13 +1,14 @@
 // Guards the always-on test list in scripts/always-on-tests.mjs.
 //
-// A pull request runs the app suite scoped to what it touched, and that
-// scoping works off vitest's module graph. A test that reaches its subject
-// through the filesystem -- readFileSync, readdirSync, import.meta.glob -- has
-// no edge in that graph, so it is only ever selected by being named on the
-// always-on list.
+// `pnpm test:pr` / `pnpm test:changed` run the app suite scoped to what a
+// branch touched (a local tool since 2026-09-24; CI runs the full suite), and
+// that scoping works off vitest's module graph. A test that reaches its
+// subject through the filesystem -- readFileSync, readdirSync,
+// import.meta.glob -- has no edge in that graph, so it is only ever selected
+// by being named on the always-on list.
 //
 // Which makes the list the weak point. Nothing stops the next such test from
-// being written and quietly never running on a pull request; that is exactly
+// being written and quietly never running in a scoped run; that is exactly
 // how the Playwright specs outside the smoke subset rotted (see
 // docs/agent/TESTING.md section 4), and a green tick that tests nothing is
 // worse than no tick.

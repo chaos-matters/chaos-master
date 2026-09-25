@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // ============================================================
-// The app test suite, scoped to a pull request
+// The app test suite, scoped to what a branch touched
 // ============================================================
 //
-// `pnpm test` runs all of packages/app. That is the right thing on main and
-// the wrong thing on a pull request, where most changes touch a handful of
-// modules. This picks the subset:
+// `pnpm test` runs all of packages/app, and since 2026-09-24 every pull
+// request's CI does, in shards (.github/workflows/node.js.yml). This is the
+// local tool for the step before that: run the tests a change can reach, in a
+// fraction of the time, before pushing. It picks the subset:
 //
 //   node scripts/test-changed.mjs                 # against origin/main
 //   node scripts/test-changed.mjs <commit-ish>    # against something else
@@ -32,8 +33,7 @@
 // in under a second, so `pnpm test:pr` runs both in full. Only the app's
 // 2,500-plus are worth scoping.
 //
-// See packages/app/TESTING.md for which checks run where, and why a green PR
-// is not a promise that main stays green.
+// See packages/app/TESTING.md for which checks run where.
 // ============================================================
 
 import { spawnSync } from 'node:child_process'
@@ -62,10 +62,11 @@ const APP = join(ROOT, 'packages/app')
  * so the rule lives here instead of depending on an upstream glob that is
  * already wrong in one of its two halves.
  *
- * The scoper counts as harness. This file, the list it reads and the workflow
- * that calls it all decide what runs, so a branch touching one of them has to
- * prove itself against the whole suite -- otherwise a change to the selection
- * logic would be validated by the very selection it changed.
+ * The scoper counts as harness. This file and the list it reads decide what
+ * runs, so a branch touching one of them has to prove itself against the
+ * whole suite -- otherwise a change to the selection logic would be validated
+ * by the very selection it changed. (The CI workflow was on this list while CI
+ * called the scoper; it has run the full suite since 2026-09-24.)
  */
 const FULL_RUN_TRIGGERS = [
   /(^|\/)(vite|vitest)\.config\.[^/]+$/,
@@ -75,7 +76,6 @@ const FULL_RUN_TRIGGERS = [
   /(^|\/)vitest\.setup\.[^/]+$/,
   /(^|\/)scripts\/test-changed\.mjs$/,
   /(^|\/)scripts\/always-on-tests\.mjs$/,
-  /(^|\/)\.github\/workflows\/node\.js\.yml$/,
 ]
 
 function git(args) {
@@ -99,8 +99,8 @@ const base =
 
 if (git(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]).code !== 0) {
   fail(
-    `cannot resolve base ref "${base}". On CI a pull request passes the base ` +
-      'SHA and needs fetch-depth: 0 on the checkout; locally, run `git fetch origin`.',
+    `cannot resolve base ref "${base}". Run \`git fetch origin\`, or pass a ` +
+      'commit this clone has (in a shallow clone, fetch its history first).',
   )
 }
 
