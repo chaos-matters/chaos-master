@@ -5,25 +5,25 @@ import type { LooseTransform, LooseVariation } from './crossoverUtils'
 describe('crossoverUtils', () => {
   describe('crossVariationParams', () => {
     it('returns undefined when neither variation has params', () => {
-      const vA: LooseVariation = { type: 'linear', weight: 1 }
-      const vB: LooseVariation = { type: 'linear', weight: 1 }
+      const vA: LooseVariation = { type: 'linearVar', weight: 1 }
+      const vB: LooseVariation = { type: 'linearVar', weight: 1 }
       expect(crossVariationParams(vA, vB)).toBeUndefined()
     })
 
     it('returns undefined when params objects are empty', () => {
-      const vA: LooseVariation = { type: 'linear', weight: 1, params: {} }
-      const vB: LooseVariation = { type: 'linear', weight: 1, params: {} }
+      const vA: LooseVariation = { type: 'linearVar', weight: 1, params: {} }
+      const vB: LooseVariation = { type: 'linearVar', weight: 1, params: {} }
       expect(crossVariationParams(vA, vB)).toBeUndefined()
     })
 
     it('inherits params from either parent when present', () => {
       const vA: LooseVariation = {
-        type: 'blob',
+        type: 'blobVar',
         weight: 1,
         params: { high: 2, low: 0.5, waves: 4 },
       }
       const vB: LooseVariation = {
-        type: 'blob',
+        type: 'blobVar',
         weight: 1,
         params: { high: 10, low: 0.1, waves: 8 },
       }
@@ -43,12 +43,12 @@ describe('crossoverUtils', () => {
     it('returns the variation type with the highest weight', () => {
       const t = {
         variations: {
-          v1: { type: 'linear', weight: 0.2 },
-          v2: { type: 'spherical', weight: 0.8 },
-          v3: { type: 'swirl', weight: 0.5 },
+          v1: { type: 'linearVar', weight: 0.2 },
+          v2: { type: 'sphericalVar', weight: 0.8 },
+          v3: { type: 'swirlVar', weight: 0.5 },
         },
       }
-      expect(getDominantVariationType(t)).toBe('spherical')
+      expect(getDominantVariationType(t)).toBe('sphericalVar')
     })
   })
 
@@ -59,21 +59,21 @@ describe('crossoverUtils', () => {
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v1: { type: 'swirl', weight: 1 } },
+        variations: { v1: { type: 'swirlVar', weight: 1 } },
       }
       const t2: LooseTransform = {
         probability: 0.5,
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v1: { type: 'swirl', weight: 0.9 } },
+        variations: { v1: { type: 'swirlVar', weight: 0.9 } },
       }
       const t3: LooseTransform = {
         probability: 0.5,
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v1: { type: 'linear', weight: 1 } },
+        variations: { v1: { type: 'linearVar', weight: 1 } },
       }
       const t4: LooseTransform = {
         probability: 0.5,
@@ -84,8 +84,8 @@ describe('crossoverUtils', () => {
       }
 
       const grouped = groupTransformsByDominantType([t1, t2, t3, t4])
-      expect(grouped.byType.get('swirl')).toEqual([t1, t2])
-      expect(grouped.byType.get('linear')).toEqual([t3])
+      expect(grouped.byType.get('swirlVar')).toEqual([t1, t2])
+      expect(grouped.byType.get('linearVar')).toEqual([t3])
       expect(grouped.unmatched).toEqual([t4])
     })
   })
@@ -104,21 +104,21 @@ describe('crossoverUtils', () => {
   describe('crossBreedMatchedVariations', () => {
     it('averages weights and crosses params for matched types, preserving unmatched types', () => {
       const varsA: Record<string, LooseVariation> = {
-        v1: { type: 'swirl', weight: 0.4 },
-        v2: { type: 'spherical', weight: 0.6 },
+        v1: { type: 'swirlVar', weight: 0.4 },
+        v2: { type: 'sphericalVar', weight: 0.6 },
       }
       const varsB: Record<string, LooseVariation> = {
-        v3: { type: 'swirl', weight: 0.8 },
-        v4: { type: 'horseshoe', weight: 0.5 },
+        v3: { type: 'swirlVar', weight: 0.8 },
+        v4: { type: 'horseshoeVar', weight: 0.5 },
       }
 
       const result = crossBreedMatchedVariations(varsA, varsB)
       const values = Object.values(result)
 
       // Should have swirl (averaged 0.6), spherical (0.6), and horseshoe (0.5)
-      const swirl = values.find((v) => v.type === 'swirl')
-      const spherical = values.find((v) => v.type === 'spherical')
-      const horseshoe = values.find((v) => v.type === 'horseshoe')
+      const swirl = values.find((v) => v.type === 'swirlVar')
+      const spherical = values.find((v) => v.type === 'sphericalVar')
+      const horseshoe = values.find((v) => v.type === 'horseshoeVar')
 
       expect(swirl).toBeDefined()
       expect(swirl!.weight).toBeCloseTo(0.6)
@@ -136,14 +136,14 @@ describe('crossoverUtils', () => {
         preAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
         postAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
         color: { x: 0.2, y: 0.2 },
-        variations: { v1: { type: 'linear', weight: 1 } },
+        variations: { v1: { type: 'linearVar', weight: 1 } },
       }
       const tb: LooseTransform = {
         probability: 0.6,
         preAffine: { a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 },
         postAffine: { a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 },
         color: { x: -0.2, y: -0.2 },
-        variations: { v2: { type: 'linear', weight: 0.5 } },
+        variations: { v2: { type: 'linearVar', weight: 0.5 } },
       }
 
       const child = crossBreedTransformPair(ta, tb)
@@ -152,7 +152,7 @@ describe('crossoverUtils', () => {
       expect(child.color.x).toBeLessThanOrEqual(0.4)
       const childVars = Object.values(child.variations)
       expect(childVars.length).toBe(1)
-      expect(childVars[0]!.type).toBe('linear')
+      expect(childVars[0]!.type).toBe('linearVar')
       expect(childVars[0]!.weight).toBeCloseTo(0.75)
     })
   })
@@ -164,21 +164,21 @@ describe('crossoverUtils', () => {
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v: { type: 'swirl', weight: 1 } },
+        variations: { v: { type: 'swirlVar', weight: 1 } },
       }
       const tA2: LooseTransform = {
         probability: 0.2,
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v: { type: 'swirl', weight: 1 } },
+        variations: { v: { type: 'swirlVar', weight: 1 } },
       }
       const tB1: LooseTransform = {
         probability: 0.9,
         preAffine: {},
         postAffine: {},
         color: { x: 0, y: 0 },
-        variations: { v: { type: 'swirl', weight: 1 } },
+        variations: { v: { type: 'swirlVar', weight: 1 } },
       }
 
       const { crossBred, excessA, excessB } = crossBreedMatchedTypePairs(
@@ -202,7 +202,7 @@ describe('crossoverUtils', () => {
           preAffine: {},
           postAffine: {},
           color: { x: 0, y: 0 },
-          variations: { orig_var: { type: 'bubble', weight: 1 } },
+          variations: { orig_var: { type: 'bubbleVar', weight: 1 } },
         },
       ]
 
@@ -211,7 +211,7 @@ describe('crossoverUtils', () => {
       const varKeys = Object.keys(filled[0]!.variations)
       expect(varKeys.length).toBe(1)
       expect(varKeys[0]).not.toBe('orig_var')
-      expect(filled[0]!.variations[varKeys[0]!]!.type).toBe('bubble')
+      expect(filled[0]!.variations[varKeys[0]!]!.type).toBe('bubbleVar')
     })
   })
 })

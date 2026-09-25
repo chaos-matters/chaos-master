@@ -914,11 +914,11 @@ describe('Timeline Utilities', () => {
             preAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
             postAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
             variations: {
-              linearT: { type: 'linearT', weight: 1.0 },
-              spherical: {
-                type: 'spherical',
+              v1: { type: 'linearVar', weight: 1.0 },
+              v2: {
+                type: 'juliaNVar',
                 weight: 0.5,
-                params: { strength: 1.0 },
+                params: { power: 1.0, dist: 5 },
               },
             },
           },
@@ -1075,11 +1075,11 @@ describe('Timeline Utilities', () => {
           keyframes: [{ frame: 0, value: 0.4 }],
         },
         {
-          parameterPath: 't1.linearT',
+          parameterPath: 't1.v1',
           keyframes: [{ frame: 0, value: 0.85 }],
         },
         {
-          parameterPath: 't1.spherical.strength',
+          parameterPath: 't1.v2.power',
           keyframes: [{ frame: 0, value: 2.5 }],
         },
       ]
@@ -1093,8 +1093,8 @@ describe('Timeline Utilities', () => {
       expect(t1.color.x).toBe(0.75)
       expect(t1.probability).toBe(0.6)
       expect(t1.colorSpeed).toBe(0.4)
-      expect(t1.variations.linearT.weight).toBe(0.85)
-      expect(t1.variations.spherical.params.strength).toBe(2.5)
+      expect(t1.variations.v1.weight).toBe(0.85)
+      expect(t1.variations.v2.params.power).toBe(2.5)
     })
 
     it('seeds and applies 2D finalTransform tracks', () => {

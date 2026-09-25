@@ -37,7 +37,7 @@ describe('flameClashChoreography', () => {
           k: 1,
           l: 0,
         },
-        variations: { linearT: { type: 'linearT', weight: 1 } },
+        variations: { v0: { type: 'linear3D', weight: 1 } },
       },
       p2_t0_0: {
         probability: 1,
@@ -55,7 +55,7 @@ describe('flameClashChoreography', () => {
           k: 1,
           l: 0,
         },
-        variations: { linearT: { type: 'linearT', weight: 1 } },
+        variations: { v0: { type: 'linear3D', weight: 1 } },
       },
     },
   } as unknown as FlameDescriptor
@@ -77,12 +77,12 @@ describe('flameClashChoreography', () => {
       p1_t0_0: {
         probability: 1,
         postAffine: { a: 1, b: 0, c: -2.0, d: 0, e: 1, f: 0 },
-        variations: { linearT: { type: 'linearT', weight: 1 } },
+        variations: { v0: { type: 'linearVar', weight: 1 } },
       },
       p2_t0_0: {
         probability: 1,
         postAffine: { a: 1, b: 0, c: 2.0, d: 0, e: 1, f: 0 },
-        variations: { linearT: { type: 'linearT', weight: 1 } },
+        variations: { v0: { type: 'linearVar', weight: 1 } },
       },
     },
   } as unknown as FlameDescriptor

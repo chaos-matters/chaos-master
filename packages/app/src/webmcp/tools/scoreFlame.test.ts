@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applySymmetryToFlame } from '@/flame/symmetry'
+import { generateVariationId } from '@/flame/transformFunction'
 import { scoreFlame } from './scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -26,8 +27,8 @@ describe('scoreFlame tool', () => {
           colorSpeed: 0.6,
           visible: true,
           variations: {
-            linearVar: { type: 'linearVar', weight: 0.5 },
-            juliaVar: { type: 'juliaVar', weight: 0.8 },
+            [generateVariationId()]: { type: 'linearVar', weight: 0.5 },
+            [generateVariationId()]: { type: 'juliaVar', weight: 0.8 },
           },
         },
         t2: {
@@ -38,7 +39,7 @@ describe('scoreFlame tool', () => {
           colorSpeed: 0.9,
           visible: true,
           variations: {
-            sinusoidalVar: { type: 'sinusoidalVar', weight: 1.2 },
+            [generateVariationId()]: { type: 'sinusoidalVar', weight: 1.2 },
           },
         },
       },
@@ -63,7 +64,7 @@ describe('scoreFlame tool', () => {
   })
 
   it('correctly scores symmetry variations and excludes linearVar from chaos', () => {
-    const mk = (key: string) =>
+    const mk = (type: string) =>
       ({
         version: '1.0',
         metadata: { name: 'probe' },
@@ -73,7 +74,7 @@ describe('scoreFlame tool', () => {
             visible: true,
             probability: 1,
             colorSpeed: 0.4,
-            variations: { [key]: { type: key, weight: 1 } },
+            variations: { [generateVariationId()]: { type, weight: 1 } },
           },
         },
       }) as unknown as FlameDescriptor
@@ -119,6 +120,17 @@ describe('scoreFlame tool', () => {
     expect(linearRes.metrics.symmetryScore).toBe(0)
     expect(linearRes.metrics.chaosLevel).toBe(0)
     expect(linearRes.powerLevel).toBe(670)
+
+    // The 3D registry's linear is as linear as the 2D one: a 3D flame of
+    // linear3D alone scores what the 2D linearVar flame scores.
+    const flame3D = mk('linear3D')
+    flame3D.renderSettings.dimensions = 3
+    const linear3DRes = (
+      scoreFlame.execute({ flame: flame3D }, {}) as ScoreResult
+    ).stats
+    expect(linear3DRes.metrics.symmetryScore).toBe(0)
+    expect(linear3DRes.metrics.chaosLevel).toBe(0)
+    expect(linear3DRes.powerLevel).toBe(670)
   })
 
   it('correctly scores structural rotational symmetry transforms (_sym__ prefix)', () => {
@@ -131,7 +143,9 @@ describe('scoreFlame tool', () => {
           visible: true,
           probability: 1,
           colorSpeed: 0.4,
-          variations: { linearVar: { type: 'linearVar', weight: 1 } },
+          variations: {
+            [generateVariationId()]: { type: 'linearVar', weight: 1 },
+          },
         },
       },
     } as unknown as FlameDescriptor
@@ -187,5 +201,20 @@ describe('scoreFlame tool', () => {
       10,
     )
     expect(capped).toBe(10)
+  })
+
+  // The darkest flame the schema allows: exposure -8, vibrancy 0, colour
+  // speed 0. Energy is a 0..10 measurement like the other three.
+  it('calculates energy intensity respecting minimum bounds', async () => {
+    const { calculateEnergyIntensity } = await import('./scoreFlame')
+    const floored = calculateEnergyIntensity(
+      {
+        exposure: -8,
+        vibrancy: 0,
+      } as unknown as FlameDescriptor['renderSettings'],
+      1,
+      0,
+    )
+    expect(floored).toBe(0)
   })
 })

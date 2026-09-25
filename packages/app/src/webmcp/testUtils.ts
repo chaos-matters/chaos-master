@@ -12,7 +12,11 @@ import type { CommandContext, DirectorState } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
-/** Minimal flame descriptor for testing. */
+/**
+ * Minimal flame descriptor for testing, shaped like a flame the app holds:
+ * registered variation types (`linearVar`, not the legacy `linear` that
+ * `validateFlame` rewrites on load) under ids that are not type names.
+ */
 export function createTestFlame(): FlameDescriptor {
   return {
     transforms: {
@@ -24,7 +28,7 @@ export function createTestFlame(): FlameDescriptor {
         colorSpeed: 0.4,
         visible: true,
         variations: {
-          v1: { type: 'linear', weight: 1 },
+          v1: { type: 'linearVar', weight: 1 },
         },
       },
       t2: {
@@ -35,7 +39,7 @@ export function createTestFlame(): FlameDescriptor {
         colorSpeed: 0.6,
         visible: true,
         variations: {
-          v2: { type: 'sinusoidal', weight: 0.7 },
+          v2: { type: 'sinusoidalVar', weight: 0.7 },
         },
       },
     },

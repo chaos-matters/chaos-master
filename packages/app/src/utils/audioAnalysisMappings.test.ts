@@ -359,3 +359,55 @@ describe('applyAudioMappingsToFlame modular target appliers', () => {
     expect(flame.renderSettings).toBe(canaryRs)
   })
 })
+
+// The PR #124 review's probes. A variation-weight target names a variation
+// TYPE, and the applier used to look it up as a KEY of `variations` first:
+// it moved whichever variation had an id spelled like the type, and a type
+// named after an Object member wrote through the prototype chain.
+describe('a variation-weight target finds its variation by type', () => {
+  const weightOf = (variationType: string): AudioMappingEntry[] => [
+    {
+      audioFeature: 'rms',
+      target: { kind: 'variationWeight', transformIdx: 0, variationType },
+      sensitivity: 1,
+      range: [0, 3.5],
+    },
+  ]
+  const variationsOf = (flame: Record<string, unknown>) =>
+    (
+      flame.transforms as Record<
+        string,
+        { variations: Record<string, { type: string; weight: number }> }
+      >
+    ).t0!.variations
+
+  it('not the variation whose id reads like the type', () => {
+    const flame = createSampleFlame()
+    variationsOf(flame).juliaVar = { type: 'sphericalVar', weight: 1 }
+    variationsOf(flame).v2 = { type: 'juliaVar', weight: 1 }
+    applyAudioMappingsToFlame(flame, LOUD_FRAME, weightOf('juliaVar'))
+    expect(variationsOf(flame).juliaVar!.weight).toBe(1)
+    expect(variationsOf(flame).v2!.weight).toBe(3.5)
+  })
+
+  it('and never writes through the prototype chain', () => {
+    const inherited = () => [
+      ({} as { weight?: unknown }).weight,
+      (Object as unknown as { weight?: unknown }).weight,
+    ]
+    for (const type of ['__proto__', 'constructor']) {
+      // Built the way a shared or loaded flame arrives: parsed JSON.
+      const flame = JSON.parse(
+        `{"transforms":{"t0":{"variations":{"v1":{"type":"${type}","weight":1}}}}}`,
+      ) as Record<string, unknown>
+      try {
+        applyAudioMappingsToFlame(flame, LOUD_FRAME, weightOf(type))
+        expect([type, ...inherited()]).toEqual([type, undefined, undefined])
+        expect(variationsOf(flame).v1!.weight).toBe(3.5)
+      } finally {
+        delete (Object.prototype as { weight?: unknown }).weight
+        delete (Object as unknown as { weight?: unknown }).weight
+      }
+    }
+  })
+})

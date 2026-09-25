@@ -15,8 +15,37 @@ describe('tasteStore', () => {
     expect(features.fitness.composite).toBeGreaterThan(0)
     expect(features.metrics.complexity).toBeGreaterThan(0)
     expect(features.transformCount).toBe(2)
-    expect(Array.isArray(features.variationCategories)).toBe(true)
+    // linearVar and sinusoidalVar, both in the registry's General category.
+    expect(features.variationCategories).toEqual(['general'])
     expect(['warm', 'cool', 'balanced']).toContain(features.paletteTemperature)
+  })
+
+  // A 3D flame renders a 2D type through the 3D renderer's own resolution: a
+  // mapped name as its 3D variation (gaussianVar as gaussian3D, a blur), any
+  // other 2D type as its 2D function. Looking it up in the 3D registry alone
+  // found nothing, so a 3D flame's 2D variations taught the profile nothing.
+  it("reads a 3D flame's 2D variations as the renderer draws them", () => {
+    const flame = createTestFlame()
+    const identity3D = {
+      ...{ a: 1, b: 0, c: 0, d: 0, e: 0, f: 1 },
+      ...{ g: 0, h: 0, i: 0, j: 0, k: 1, l: 0 },
+    }
+    const types = ['sinusoidalVar', 'gaussianVar']
+    Object.values(flame.transforms).forEach((t, i) => {
+      Object.assign(t, {
+        preAffine: identity3D,
+        postAffine: identity3D,
+        variations: { [`v${i}`]: { type: types[i], weight: 1 } },
+      })
+    })
+    flame.renderSettings.dimensions = 3
+
+    // sinusoidalVar draws as itself, General; gaussianVar as gaussian3D,
+    // a Blur in the 3D registry although gaussianVar is General in 2D.
+    expect(extractFlameTasteFeatures(flame).variationCategories).toEqual([
+      'blur',
+      'general',
+    ])
   })
 
   it('records feedback and updates existing candidates', () => {
@@ -87,6 +116,15 @@ describe('tasteStore', () => {
     expect(profile.likeCount).toBe(1)
     expect(profile.dislikeCount).toBe(1)
     expect(profile.summary).toContain('likes symmetry')
+    // The liked and the disliked candidate are the same flame, so General is
+    // liked as often as disliked: preferred, and not avoided.
+    expect([profile.preferredCategories, profile.avoidedCategories]).toEqual([
+      ['general'],
+      [],
+    ])
+    expect(profile.summary).toBe(
+      'Prefers general variations; likes symmetry ~0/10, complexity ~1.4/10, and balanced palettes.',
+    )
   })
 
   it('keeps ratings from separate Director sessions that reuse generation numbers', () => {

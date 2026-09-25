@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rgbToOklab } from './flam3PaletteParser'
 import { FLAM3_SAMPLES } from './flam3Samples'
-import { exportFlameXml, extractFlamePalette, FLAM3_ALIASES_RAW, isFlameXmlContent, parseFlameXml, resolveVariationType, } from './flameXml'
+import { exportFlameXml, extractFlamePalette, FLAM3_ALIASES_RAW, isFlameXmlContent, parseFlameXml, parseFlameXmlWithReport, resolveVariationType, } from './flameXml'
 import { MAX_SKIP_ITERS_VALUE } from './schema/flameSchema'
 import { isVariationType, variationTypes } from './variations'
 import { getNormalizedVariationName } from './variations/utils'
@@ -112,6 +112,15 @@ describe('resolveVariationType', () => {
     expect(resolveVariationType('wedge_sph')).toBe('wedgeSphVar')
     expect(resolveVariationType('pre_blur')).toBe('preBlurVar')
     expect(resolveVariationType('gaussian_blur')).toBe('gaussianBlurVar')
+  })
+
+  // The alias table is a plain object, so a name every object inherits used to
+  // resolve to that member: 'constructor' to the Object function.
+  it('resolves no name an object inherits', () => {
+    const inherited = ['constructor', '__proto__', 'toString', 'valueOf']
+    expect(
+      inherited.filter((name) => resolveVariationType(name) !== undefined),
+    ).toEqual([])
   })
 
   it('applies explicit aliases', () => {
@@ -457,6 +466,32 @@ describe('parseFlameXml', () => {
     expect(types).not.toContain('totally_made_upVar')
   })
 
+  // An attribute named like an inherited Object member failed the whole import:
+  // it resolved to the member, and the schema refused a type that is not a
+  // string. It is an unknown variation, skipped and reported as one.
+  it('skips a variation named like an inherited Object member, and reports it', () => {
+    const xml = `<?xml version="1.0"?>
+<flame name="Inherited" size="800 600" center="0 0" scale="200"
+       background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="1" color="0" linear="1" constructor="0.5" coefs="1 0 0 1 0 0"/>
+  <xform weight="1" color="1" coefs="1 0 0 1 0 0">
+    <var name="spherical" weight="1"/>
+    <var name="__proto__" weight="1"/>
+  </xform>
+</flame>`
+    const { flame, warnings } = parseFlameXmlWithReport(xml)
+    const types = xforms(flame).map((t) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.values((t as any).variations).map(
+        (v: unknown) => (v as { type: unknown }).type,
+      ),
+    )
+    expect(types).toEqual([['linearVar'], ['sphericalVar']])
+    expect(warnings).toContain(
+      'Skipped 2 variation(s) with no Lumen Apeiron equivalent: constructor, __proto__',
+    )
+  })
+
   it('converts background 0-255 to 0-1', () => {
     const xml = `<?xml version="1.0"?>
 <flame name="Bg" size="800 600" center="0 0" scale="200"
@@ -610,7 +645,11 @@ describe('exportFlameXml', () => {
     const t = xforms(flame)[0]!
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(t as any).variations = {
-      v0: { type: 'custom_abc123', weight: 1, visible: true },
+      v0: {
+        type: 'custom_0c1d2e3f_4a5b_4c6d_8e7f_9a0b1c2d3e4f',
+        weight: 1,
+        visible: true,
+      },
     }
     const xml = exportFlameXml(flame)
     expect(xml).not.toContain('custom')
@@ -623,7 +662,11 @@ describe('exportFlameXml', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(t as any).variations = {
       v0: { type: 'sphericalVar', weight: 1, visible: true },
-      v1: { type: 'custom_xyz', weight: 1, visible: true },
+      v1: {
+        type: 'custom_7f6e5d4c_3b2a_4190_8f7e_6d5c4b3a2910',
+        weight: 1,
+        visible: true,
+      },
     }
     const xml = exportFlameXml(flame)
     expect(xml).toContain('spherical="1.000000"')

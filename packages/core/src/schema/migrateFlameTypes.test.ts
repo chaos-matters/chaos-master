@@ -41,8 +41,8 @@ describe('VARIATION_TYPE_MIGRATIONS', () => {
   })
 
   it('never chains: no target is itself a legacy name', () => {
-    const chained = Object.values(VARIATION_TYPE_MIGRATIONS).filter(
-      (to) => to in VARIATION_TYPE_MIGRATIONS,
+    const chained = Object.values(VARIATION_TYPE_MIGRATIONS).filter((to) =>
+      Object.hasOwn(VARIATION_TYPE_MIGRATIONS, to),
     )
     expect(chained).toEqual([])
   })
@@ -84,6 +84,19 @@ describe('migrateFlameVariationTypes', () => {
     const flame = rawFlame({ type: 'notARealVariation' })
     migrateFlameVariationTypes(flame)
     expect(firstVariation(flame).type).toBe('notARealVariation')
+  })
+
+  // The table is a plain object, so `in` also finds what every object
+  // inherits: 'constructor' became the Object function and '__proto__'
+  // Object.prototype, where any other unknown name passes through.
+  it('passes through a type named like an inherited Object member', () => {
+    const names = ['constructor', 'toString', 'hasOwnProperty', '__proto__']
+    const rewritten = names.filter((type) => {
+      const flame = rawFlame({ type })
+      migrateFlameVariationTypes(flame)
+      return firstVariation(flame).type !== type
+    })
+    expect(rewritten).toEqual([])
   })
 
   it('widens a 2D affine on a 3D flame into the kernel row layout, value by value', () => {
@@ -161,4 +174,15 @@ describe('validateFlame', () => {
     )[0]!
     expect(variation.type).toBe('horseshoeVar')
   })
+
+  // The migration passes such a name through (above), and the schema refuses
+  // it: a plain-object table looked up by that type would find the member.
+  it.each(['constructor', 'toString'])(
+    'refuses a type named %s, which every object inherits',
+    (type) => {
+      expect(() => validateFlame(rawFlame({ type }))).toThrow(
+        'This flame cannot be shown',
+      )
+    },
+  )
 })

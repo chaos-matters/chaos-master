@@ -14,7 +14,7 @@ describe('getFlame modular subroutines', () => {
     const t = {
       probability: 0.8,
       variations: {
-        linearVar: { type: 'linearVar', weight: 1.0 },
+        v1: { type: 'linearVar', weight: 1.0 },
       },
       color: { x: 0.2, y: 0.8 },
       colorSpeed: 0.5,
@@ -90,11 +90,11 @@ describe('getFlameDetail modular subroutines', () => {
   const transforms = {
     t_alpha: {
       probability: 0.5,
-      variations: { juliaVar: { type: 'juliaVar', weight: 1 } },
+      variations: { v1: { type: 'juliaVar', weight: 1 } },
     } as unknown as TransformFunction,
     t_beta: {
       probability: 0.8,
-      variations: { sphericalVar: { type: 'sphericalVar', weight: 1 } },
+      variations: { v1: { type: 'sphericalVar', weight: 1 } },
     } as unknown as TransformFunction,
   }
 
@@ -191,7 +191,7 @@ describe('scoreClashRound tool execution contract', () => {
           colorSpeed: 0.5,
           preAffine: { a: 1, b: 0, c: 0, d: -1, e: 1, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: { sphericalVar: { type: 'sphericalVar', weight: 1 } },
+          variations: { v1: { type: 'sphericalVar', weight: 1 } },
         },
         p2_t1_0: {
           probability: 1,
@@ -200,7 +200,7 @@ describe('scoreClashRound tool execution contract', () => {
           colorSpeed: 0.5,
           preAffine: { a: 1, b: 0, c: 0, d: 1, e: 1, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: { polarVar: { type: 'polarVar', weight: 1 } },
+          variations: { v1: { type: 'polarVar', weight: 1 } },
         },
       },
     }

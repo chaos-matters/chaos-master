@@ -235,8 +235,28 @@ export const TransformId = v.pipe(v.string(), v.brand('TransformId'))
 export type VariationId = v.InferOutput<typeof VariationId>
 export const VariationId = v.pipe(v.string(), v.brand('VariationId'))
 
+/**
+ * A variation's type is looked up by name in plain-object tables (previews,
+ * docs, the registries), where a type named after an Object member resolves to
+ * what every object inherits. So a type may not take any name Object.prototype
+ * has, read from the engine rather than listed, nor a name an id may not take;
+ * any other unknown name still loads as it is written.
+ */
+const FORBIDDEN_VARIATION_TYPES: ReadonlySet<string> = new Set([
+  ...FORBIDDEN_ENTITY_IDS,
+  ...Object.getOwnPropertyNames(Object.prototype),
+])
+
+const VariationType = v.pipe(
+  v.string(),
+  v.check(
+    (type) => !FORBIDDEN_VARIATION_TYPES.has(type),
+    'A variation type cannot be a name every object inherits, such as toString or __proto__',
+  ),
+)
+
 export const BaseVariationDescriptor = v.object({
-  type: v.string(),
+  type: VariationType,
   weight: v.number(),
   visible: v.optional(v.boolean(), true),
   params: v.optional(v.record(v.string(), v.number())),

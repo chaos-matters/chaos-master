@@ -174,7 +174,12 @@ export function migrateFlameVariationTypes<T>(data: T): T {
         if (typeof variation !== 'object' || variation === null) continue
 
         const type = variation.type
-        if (typeof type === 'string' && type in VARIATION_TYPE_MIGRATIONS) {
+        // Own keys only: `in` also finds 'constructor', 'toString' and the
+        // rest of what a plain object inherits.
+        if (
+          typeof type === 'string' &&
+          Object.hasOwn(VARIATION_TYPE_MIGRATIONS, type)
+        ) {
           variation.type = VARIATION_TYPE_MIGRATIONS[type]
         }
       }
