@@ -1,6 +1,9 @@
 import { onCleanup } from 'solid-js'
-import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from '@/utils/autosaveSettings'
+import { useOptionalToast } from '@/contexts/ToastContext'
+import { autosaveIntervalMin, autosaveRecents } from '@/utils/autosaveSettings'
 import { getOldestRecentFlame, MAX_RECENT_FLAMES, saveRecentFlame, upsertRecentFlame, } from '@/utils/recentFlames'
+import { createAutosaveQuestion } from './autosaveQuestion'
+import { createSaveReminder } from './saveReminder'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { FlushOutcome } from '@/lib/documentLoad'
 import type { RecentWriteOutcome } from '@/utils/recentFlames'
@@ -86,6 +89,12 @@ export interface UseWorkspaceAutosaveParams {
    * walk away from it. Answering no keeps it, so no is the default.
    */
   confirmDiscardUnsaved: () => Promise<boolean>
+  /**
+   * Take a toast down by the id `showToast` returned. Defaults to the
+   * ToastProvider's own, which is where MainWorkspace's `showToast` comes
+   * from; tests that stand in for the store pass theirs.
+   */
+  dismissToast?: (id: number) => void
 }
 
 export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
@@ -99,6 +108,8 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
     confirmOverwriteOldest,
     confirmDiscardUnsaved,
   } = params
+  const dismissToast =
+    params.dismissToast ?? useOptionalToast()?.dismissToast ?? (() => {})
 
   const newAutosaveId = () =>
     `autosave-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
@@ -121,8 +132,6 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
   let autosaveBaseline = autosaveSnapshot()
   let editingSince: number | null = null
   let lastAutosaveAt = 0
-  let reminderShown = false
-  let autosavePromptShown = false
 
   const isFlameDirty = () => autosaveSnapshot() !== autosaveBaseline
   const markSavedBaseline = () => {
@@ -400,63 +409,37 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
     window.removeEventListener('pagehide', saveOnPagehide)
   })
 
+  const question = createAutosaveQuestion({
+    agentDriving,
+    showToast,
+    dismissToast,
+    // The notice belongs to this write too: the user has just asked for
+    // auto-saving, so a write that did not land is theirs to hear about. A
+    // refusal especially: answering yes and seeing no complaint is how a
+    // session came to edit for hours with every write discarded.
+    onYes: () => {
+      noticeOutcome(flushDirtyToRecents())
+    },
+  })
+
+  const reminder = createSaveReminder({ agentDriving, showToast, dismissToast })
+
   const AUTOSAVE_POLL_MS = 30_000
-  const REMINDER_AFTER_MS = 5 * 60_000
   const autosavePoll = setInterval(() => {
     const dirty = isFlameDirty()
     if (dirty && editingSince === null) editingSince = Date.now()
 
-    if (
-      dirty &&
-      autosaveRecents() === 'unset' &&
-      !autosavePromptShown &&
-      !agentDriving()
-    ) {
-      autosavePromptShown = true
-      showToast('Auto-save your flames to Recents while you edit?', 'sticky', [
-        {
-          label: 'Yes',
-          onClick: () => {
-            setAutosaveRecents('on')
-            // The notice belongs to this write too: the user has just asked
-            // for auto-saving, so a write that did not land is theirs to hear
-            // about - and this used to reach it through `autosaveNow`. A
-            // refusal especially: answering yes and seeing no complaint is
-            // how a session came to edit for hours with every write discarded.
-            noticeOutcome(flushDirtyToRecents())
-          },
-        },
-        { label: 'No', onClick: () => setAutosaveRecents('off') },
-      ])
-      return
-    }
+    // The first-run question. It waits while a view with its own top bar
+    // covers the editor (hooks/autosaveQuestion.ts).
+    if (dirty && autosaveRecents() === 'unset' && question.ask()) return
 
     if (dirty && autosaveRecents() === 'on') {
       const intervalMs = Math.max(1, autosaveIntervalMin()) * 60_000
       if (Date.now() - lastAutosaveAt >= intervalMs) autosaveNow()
     }
 
-    if (
-      !reminderShown &&
-      !saveReminderDismissed() &&
-      !agentDriving() &&
-      editingSince !== null &&
-      Date.now() - editingSince >= REMINDER_AFTER_MS
-    ) {
-      const shown = showToast(
-        'Enjoying this flame? Save it for later, export a PNG, or share a link from the actions bar.',
-        12000,
-        [
-          {
-            label: "Don't show again",
-            onClick: () => setSaveReminderDismissed(true),
-          },
-        ],
-      )
-      // Same as the notices above: a muted store shows nothing and returns
-      // -1, and this is the only reminder the run gets.
-      if (shown !== -1) reminderShown = true
-    }
+    // Held like the question while the editor is covered (hooks/saveReminder.ts).
+    reminder.poll(editingSince)
   }, AUTOSAVE_POLL_MS)
 
   onCleanup(() => {

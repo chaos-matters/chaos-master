@@ -1,4 +1,4 @@
-import { createContext, createSignal, onCleanup, untrack } from 'solid-js'
+import { createContext, createSignal, onCleanup, untrack, useContext, } from 'solid-js'
 import { agentDriving } from '@/arcade/pilot'
 import { useContextSafe } from '@/utils/useContextSafe'
 import type { JSX } from 'solid-js'
@@ -177,4 +177,9 @@ export function ToastProvider(props: { children: JSX.Element }) {
 
 export function useToast() {
   return useContextSafe(ToastContext, 'useToast', 'ToastProvider')
+}
+
+/** The toast store, or undefined outside a ToastProvider (a unit test). */
+export function useOptionalToast(): ToastContextValue | undefined {
+  return useContext(ToastContext)
 }
