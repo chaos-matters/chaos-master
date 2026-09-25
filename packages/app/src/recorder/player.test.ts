@@ -644,8 +644,8 @@ describe('createSessionPlayer', () => {
       player.play()
       vi.advanceTimersByTime(0)
       player.pause()
-      executeCommand('flame.setGamma', ctx, 9)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      executeCommand('flame.setGamma', ctx, 7)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       player.play()
       expect(loaded()).toBe(2)
@@ -684,14 +684,14 @@ describe('createSessionPlayer', () => {
       expect(player.currentAction()).toBeUndefined()
       executeCommand('flame.setGamma', ctx, 7)
       executeCommand('flame.setGamma', ctx, 8)
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       history.commit()
 
       // The pending replay timer was cancelled; step 2 can neither overwrite
       // the manual value nor append itself to the user's preview.
       vi.advanceTimersByTime(10_000)
       expect(player.stepIndex()).toBe(0)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       // The gesture and replay prefix remain two coherent undo steps.
       history.undo()
@@ -719,10 +719,10 @@ describe('createSessionPlayer', () => {
       expect(loaded()).toBe(1)
 
       if (!history.isPreviewing()) history.startPreview('Manual gamma scrub')
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       history.commit()
       expect(player.isPlaying()).toBe(false)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       player.play()
       expect(loaded()).toBe(2)
@@ -947,7 +947,7 @@ describe('createSessionPlayer', () => {
 
       // Re-seeking the step we are on still rebuilds — that is how the viewer
       // discards edits of their own and gets the recorded state back.
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       player.seek(2)
       expect(loaded()).toBe(2)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
@@ -1040,8 +1040,8 @@ describe('createSessionPlayer', () => {
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
 
       // Carry on from step 1 with an edit of the viewer's own...
-      executeCommand('flame.setGamma', ctx, 9)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      executeCommand('flame.setGamma', ctx, 7)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       // ...which is its own undo step, on top of the replayed one.
       history.undo()

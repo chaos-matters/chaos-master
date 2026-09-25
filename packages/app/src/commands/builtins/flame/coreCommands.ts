@@ -5,6 +5,7 @@ import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../../registry'
+import { heldFirstArg, heldSetting, projectRenderSetting, } from '../settingDomain'
 import { isAbsentRef, isPlainRecord } from './helpers'
 
 registerCommand({
@@ -25,8 +26,9 @@ registerCommand({
   label: 'Set Blend Weight',
   description: 'Set the blend weight for crossfading (0-1)',
   coalesceKey: () => 'blendWeight',
+  normalizeArgs: heldFirstArg('blendWeight'),
   execute(ctx, weight?: unknown) {
-    const w = typeof weight === 'number' ? Math.max(0, Math.min(1, weight)) : 0
+    const w = heldSetting(ctx, 'blendWeight', weight, 0)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.blendWeight = w
     }, 'Blend Weight')
@@ -46,6 +48,10 @@ registerCommand({
   id: 'flame.setBlendFlame',
   label: 'Set Blend Flame',
   description: `Set or clear the flame being blended with (null clears). An optional second argument sets the weight (0-1); without it, the document keeps the weight it has, and one with no weight yet gets ${DEFAULT_BLEND_WEIGHT}`,
+  normalizeArgs: (ctx, args) =>
+    args.length === 2
+      ? [args[0], projectRenderSetting(ctx, 'blendWeight', args[1])]
+      : args,
   execute(ctx, flame?: unknown, weight?: unknown) {
     const next = isAbsentRef(flame) ? undefined : tryValidateFlame(flame)
     if (!isAbsentRef(flame) && !next) {
@@ -54,7 +60,7 @@ registerCommand({
     }
     const named =
       typeof weight === 'number' && Number.isFinite(weight)
-        ? Math.max(0, Math.min(1, weight))
+        ? heldSetting(ctx, 'blendWeight', weight, 0)
         : undefined
     ctx.setFlameDescriptor(
       (draft) => {

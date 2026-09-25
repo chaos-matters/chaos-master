@@ -1,9 +1,10 @@
 import { applyColorMapToFlame } from '@/flame/colorMap'
-import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { MAX_SKIP_ITERS_VALUE, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../../registry'
 import { num, str } from '../describeArgs'
+import { heldFirstArg, heldSetting, projectRenderSetting, } from '../settingDomain'
 import { isPlainRecord, tryValidatePalette } from './helpers'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -16,9 +17,10 @@ registerCommand({
       : `Skipped iterations: ${n}`
   },
   label: 'Set Skip Iters',
-  description: 'Set the number of initial skip iterations',
+  description: `Set the number of initial skip iterations (a whole number, 0-${MAX_SKIP_ITERS_VALUE})`,
+  normalizeArgs: heldFirstArg('skipIters'),
   execute(ctx, iters?: unknown) {
-    const value = typeof iters === 'number' ? iters : 1
+    const value = heldSetting(ctx, 'skipIters', iters, 1)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.skipIters = value
     })
@@ -100,8 +102,9 @@ registerCommand({
   },
   label: 'Set Exposure',
   description: 'Set the flame exposure value',
+  normalizeArgs: heldFirstArg('exposure'),
   execute(ctx, value?: unknown) {
-    const v = typeof value === 'number' ? value : 0.25
+    const v = heldSetting(ctx, 'exposure', value, 0.25)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.exposure = v
     })
@@ -116,8 +119,9 @@ registerCommand({
   },
   label: 'Set Vibrancy',
   description: 'Set the flame vibrancy value',
+  normalizeArgs: heldFirstArg('vibrancy'),
   execute(ctx, value?: unknown) {
-    const v = typeof value === 'number' ? value : 0.5
+    const v = heldSetting(ctx, 'vibrancy', value, 0.5)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.vibrancy = v
     })
@@ -132,8 +136,9 @@ registerCommand({
   },
   label: 'Set Gamma',
   description: 'Set the flame gamma value',
+  normalizeArgs: heldFirstArg('gamma'),
   execute(ctx, value?: unknown) {
-    const v = typeof value === 'number' ? value : 2.2
+    const v = heldSetting(ctx, 'gamma', value, 2.2)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.gamma = v
     })
@@ -148,8 +153,9 @@ registerCommand({
   },
   label: 'Set Contrast',
   description: 'Set the flame contrast value',
+  normalizeArgs: heldFirstArg('contrast'),
   execute(ctx, value?: unknown) {
-    const v = typeof value === 'number' ? value : 1
+    const v = heldSetting(ctx, 'contrast', value, 1)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.contrast = v
     })
@@ -165,10 +171,16 @@ registerCommand({
   },
   label: 'Set Background Color',
   description: 'Set the background color (RGB, values 0-1)',
+  normalizeArgs: (ctx, args) =>
+    args.map((channel, index) =>
+      index < 3
+        ? projectRenderSetting(ctx, `backgroundColor.${index}`, channel)
+        : channel,
+    ),
   execute(ctx, r?: unknown, g?: unknown, b?: unknown) {
-    const cr = typeof r === 'number' ? r : 0
-    const cg = typeof g === 'number' ? g : 0
-    const cb = typeof b === 'number' ? b : 0
+    const cr = heldSetting(ctx, 'backgroundColor.0', r, 0)
+    const cg = heldSetting(ctx, 'backgroundColor.1', g, 0)
+    const cb = heldSetting(ctx, 'backgroundColor.2', b, 0)
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings.backgroundColor = [cr, cg, cb]
     })
