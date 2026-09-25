@@ -21,7 +21,8 @@ name: Capacitor app
 #                     a PR is built against its own base. No macOS runner.
 #   release tag       The release. Android store artifacts, a signed iOS
 #                     archive uploaded to TestFlight with the tag's version as
-#                     the marketing version, and an ad-hoc IPA.
+#                     the marketing version, and an ad-hoc IPA that is
+#                     exported but never uploaded.
 #   manual run        A release rehearsal that stops short of the store: the
 #                     Android release artifacts, and a signed iOS archive that
 #                     is thrown away. Run from a release tag, it is the release
@@ -818,17 +819,26 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
           rm -f "$RUNNER_TEMP/cert.p12"
           # Apple names the certificate after the account holder, and xcodebuild
-          # prints that name on every CodeSign line. The team ID is a secret and
-          # already masked; mask every holder name in this keychain before a
-          # later step can print one. No -v: an untrusted identity is printed
-          # too. A name can itself hold a quote, so it runs from the first
-          # quote to the last. No identity at all means signing cannot work,
-          # so stop here.
-          security find-identity -p codesigning "$keychain" | awk '
+          # prints that name on every CodeSign line, and again shell-escaped
+          # (First\ Last) wherever it dumps a script phase's environment. The
+          # team ID is a secret and already masked; mask every holder name in
+          # this keychain, in both forms, before a later step can print one.
+          # No -v: an untrusted identity is printed too. A name can itself hold
+          # a quote, so it runs from the first quote to the last. No identity
+          # at all means signing cannot work, so stop here.
+          security find-identity -p codesigning "$keychain" | awk -v q="'" '
             /"/ {
               s = $0; sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
               sub(/^[^:]*: /, "", s); sub(/ \([^()]*\)$/, "", s)
-              if (s != "") { print "::add-mask::" s; n++ }
+              if (s == "") next
+              print "::add-mask::" s; n++
+              e = ""
+              for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (index(" ()\"\\$&;|<>*?!#~`" q, c)) e = e "\\"
+                e = e c
+              }
+              if (e != s) print "::add-mask::" e
             }
             END { if (!n) { print "::error::No signing identity found to mask"; exit 1 } }'
 
@@ -1119,17 +1129,26 @@ jobs:
           rm -f "$RUNNER_TEMP/cert.p12"
 
           # Apple names the certificate after the account holder, and xcodebuild
-          # prints that name on every CodeSign line. The team ID is a secret and
-          # already masked; mask every holder name in this keychain before a
-          # later step can print one. No -v: an untrusted identity is printed
-          # too. A name can itself hold a quote, so it runs from the first
-          # quote to the last. No identity at all means signing cannot work,
-          # so stop here.
-          security find-identity -p codesigning "$keychain" | awk '
+          # prints that name on every CodeSign line, and again shell-escaped
+          # (First\ Last) wherever it dumps a script phase's environment. The
+          # team ID is a secret and already masked; mask every holder name in
+          # this keychain, in both forms, before a later step can print one.
+          # No -v: an untrusted identity is printed too. A name can itself hold
+          # a quote, so it runs from the first quote to the last. No identity
+          # at all means signing cannot work, so stop here.
+          security find-identity -p codesigning "$keychain" | awk -v q="'" '
             /"/ {
               s = $0; sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
               sub(/^[^:]*: /, "", s); sub(/ \([^()]*\)$/, "", s)
-              if (s != "") { print "::add-mask::" s; n++ }
+              if (s == "") next
+              print "::add-mask::" s; n++
+              e = ""
+              for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (index(" ()\"\\$&;|<>*?!#~`" q, c)) e = e "\\"
+                e = e c
+              }
+              if (e != s) print "::add-mask::" e
             }
             END { if (!n) { print "::error::No signing identity found to mask"; exit 1 } }'
 
@@ -1138,6 +1157,7 @@ jobs:
           printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profiles/${APP_SLUG}-adhoc.mobileprovision"
 
       - name: Archive and export IPA
+        id: export
         if: env.ADHOC == 'true'
         shell: bash
         env:
@@ -1188,21 +1208,23 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export"
 
-      - name: Upload IPA
-        if: env.ADHOC == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.app-slug }}-ios-release
-          path: ${{ runner.temp }}/export/*.ipa
-          if-no-files-found: error
-          retention-days: 90
-
+      # The IPA stops here: it is never uploaded. The repository is public, so
+      # anyone signed in to GitHub can download a run's artifacts, and a signed
+      # ad-hoc IPA carries the account holder's name (in the signing
+      # certificate and the profile's TeamName) and the UDID of every
+      # registered device. The mask on the signing step reaches only the log.
+      # Installs come from TestFlight, which the same tag uploads; the export
+      # stays because it proves the ad-hoc profile still signs.
       - name: Report signing state
         if: always()
         shell: bash
+        env:
+          EXPORT_OUTCOME: ${{ steps.export.outcome }}
         run: |
-          if [[ "$ADHOC" == "true" ]]; then
-            echo "Ad-hoc IPA exported: installable on the devices registered in the ad-hoc profile." >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$ADHOC" == "true" && "$EXPORT_OUTCOME" == "success" ]]; then
+            echo "Ad-hoc IPA signed and exported, not uploaded: install from TestFlight." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$ADHOC" == "true" ]]; then
+            echo "Ad-hoc IPA not exported: the job stopped before or during the export." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Simulator build only: no installable IPA on this trigger." >> "$GITHUB_STEP_SUMMARY"
           fi

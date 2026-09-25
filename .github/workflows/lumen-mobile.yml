@@ -6,12 +6,13 @@ name: Lumen Apeiron Mobile
 # them. What stays here is what is genuinely Lumen Apeiron's: which paths are
 # its own, which tag releases it, and which secrets it may reach.
 #
-# WHAT RUNS WHEN. This fork is PRIVATE, so a macOS minute is billed at ten
-# ubuntu minutes against the plan quota, and iOS runs only where it proves
-# something the Android job cannot. The reusable workflow's `changes` job
-# (ubuntu, about a minute) decides, and writes its reasons to the run summary.
+# WHAT RUNS WHEN. iOS runs only where it proves something the Android job
+# cannot. The rule dates from when this fork was private and a macOS minute
+# cost ten ubuntu minutes of quota; the repository is public now, and standard
+# runners are free. The reusable workflow's `changes` job (ubuntu, about a
+# minute) decides, and writes its reasons to the run summary.
 #
-#   trigger                    Android (ubuntu)            iOS (macOS, billed x10)
+#   trigger                    Android (ubuntu)            iOS (macOS)
 #   -------------------------  --------------------------  -------------------------------------
 #   pull request to main that  tests, lint, debug APK      simulator build, only if the PR
 #   touches the paths below                                touches packages/mobile/,
@@ -21,7 +22,8 @@ name: Lumen Apeiron Mobile
 #                              only if the push touched
 #                              the paths below
 #   push of a mobile-v* tag    the above, plus release     signed archive uploaded to
-#                              AAB and APK                 TestFlight, plus an ad-hoc IPA
+#                              AAB and APK                 TestFlight; an ad-hoc IPA is
+#                                                          exported, never uploaded
 #   workflow_dispatch on a     the above, plus release     signed archive, NOT uploaded: proves
 #   branch                     AAB and APK                 the certificate, the profile and the
 #                                                          device compile
@@ -33,8 +35,9 @@ name: Lumen Apeiron Mobile
 # all; and a tag or manual run that cannot sign falls back to the simulator
 # build, so iOS is still compiled.
 #
-# To stop every macOS job without a commit (quota running low), set the
-# repository variable LUMEN_IOS_CI to "off":
+# To stop every macOS job without a commit (say the repository goes private
+# again and its quota runs low), set the repository variable LUMEN_IOS_CI to
+# "off":
 #
 #   gh variable set LUMEN_IOS_CI --body off
 #
