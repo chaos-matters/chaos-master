@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { duelReady, duelRemainingMs, duelRivalSeat, duelShowing, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
-import { finishDuel } from '@/arcade/duelActions'
+import { endDuelOnRenderFailure, finishDuel } from '@/arcade/duelActions'
 import { duelHudModel } from '@/arcade/duelHud'
 import { duelJudge } from '@/arcade/duelJudge'
 import { duelResult } from '@/arcade/duelResult'
@@ -133,6 +133,9 @@ export function DuelStage(props: {
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
                 interactive
+                onRenderError={(error) => {
+                  void endDuelOnRenderFailure(props.ctx, 'player', error)
+                }}
               />
               <Show when={runningDuel()}>
                 <DuelChips ctx={props.ctx} flame={props.playerFlame} />
@@ -152,6 +155,9 @@ export function DuelStage(props: {
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
                 interactive={false}
+                onRenderError={(error) => {
+                  void endDuelOnRenderFailure(props.ctx, 'rival', error)
+                }}
               />
               {/* The agent's play-by-play, in its own half. On the seam it cut
                   the divider and stacked a fourth object into the centre

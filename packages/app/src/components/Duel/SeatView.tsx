@@ -1,4 +1,4 @@
-import { createMemo, Show } from 'solid-js'
+import { createMemo, ErrorBoundary, onMount, Show } from 'solid-js'
 import { vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS } from '@/defaults'
 import { palette as makePalette } from '@/flame/colorMap'
@@ -34,6 +34,12 @@ export function SeatView(props: {
   adaptiveFilter: boolean
   stochasticFilter: boolean
   interactive: boolean
+  /**
+   * The seat's renderer threw. Its own boundary stops the error here, so a
+   * GPU failure in the duel cannot reach the app's boundary and take the
+   * editor down with it; what the duel does about it is the stage's call.
+   */
+  onRenderError: (error: unknown) => void
 }) {
   /*
    * `Flam3` takes the palette as a prop and ignores the descriptor's own —
@@ -88,37 +94,65 @@ export function SeatView(props: {
             the comparison; this is the figure, and it belongs to a flame. */}
         <span class={ui.seatScore}>{props.score}</span>
       </h3>
-      <AutoCanvas
-        class={ui.seatCanvas}
-        role="img"
-        ariaLabel={`${props.label}: fractal flame`}
+      <ErrorBoundary
+        fallback={(error) => (
+          <RenderFailed error={error} onFailed={props.onRenderError} />
+        )}
       >
-        <Show
-          when={is3D()}
-          fallback={
-            <WheelZoomCamera2D
-              zoom={props.zoom}
-              position={props.position}
-              rotation={() => props.flame().renderSettings.camera.rotation ?? 0}
+        <AutoCanvas
+          class={ui.seatCanvas}
+          role="img"
+          ariaLabel={`${props.label}: fractal flame`}
+        >
+          <Show
+            when={is3D()}
+            fallback={
+              <WheelZoomCamera2D
+                zoom={props.zoom}
+                position={props.position}
+                rotation={() =>
+                  props.flame().renderSettings.camera.rotation ?? 0
+                }
+                interactive={() => props.interactive}
+              >
+                <FlameLayer />
+              </WheelZoomCamera2D>
+            }
+          >
+            <WheelZoomCamera3D
+              theta={props.camera3D.theta}
+              phi={props.camera3D.phi}
+              radius={props.camera3D.radius}
+              target={props.camera3D.target}
+              fov={props.camera3D.fov}
+              roll={props.camera3D.roll}
               interactive={() => props.interactive}
             >
               <FlameLayer />
-            </WheelZoomCamera2D>
-          }
-        >
-          <WheelZoomCamera3D
-            theta={props.camera3D.theta}
-            phi={props.camera3D.phi}
-            radius={props.camera3D.radius}
-            target={props.camera3D.target}
-            fov={props.camera3D.fov}
-            roll={props.camera3D.roll}
-            interactive={() => props.interactive}
-          >
-            <FlameLayer />
-          </WheelZoomCamera3D>
-        </Show>
-      </AutoCanvas>
+            </WheelZoomCamera3D>
+          </Show>
+        </AutoCanvas>
+      </ErrorBoundary>
     </section>
+  )
+}
+
+/**
+ * What a seat shows in place of its canvas, and the one place the failure is
+ * reported from: after mount, because ending the duel takes this component's
+ * own stage down, which must not happen while the boundary is still
+ * rendering its fallback.
+ */
+function RenderFailed(props: {
+  error: unknown
+  onFailed: (error: unknown) => void
+}) {
+  onMount(() => {
+    props.onFailed(props.error)
+  })
+  return (
+    <p class={ui.seatCanvas} role="status">
+      This flame could not render.
+    </p>
   )
 }

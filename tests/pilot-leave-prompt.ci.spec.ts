@@ -75,6 +75,27 @@ test.describe('while an agent’s take records', () => {
         () => (window as unknown as { beforeReload?: boolean }).beforeReload,
       ),
     ).toBe(true)
+
+    // The split screen cannot render on CI's software GPU, which used to take
+    // the whole editor down with it. Now the duel ends on its own and says
+    // why, and the editor's tools keep answering.
+    let status: Record<string, unknown> = {}
+    await expect
+      .poll(
+        async () => {
+          status = await callTool(page, 'arcade_status', {})
+          return status.phase
+        },
+        { timeout: 15_000 },
+      )
+      .toBe('ended')
+    expect(status).toMatchObject({
+      lastEnd: { reason: 'error' },
+      interrupted: { reason: 'render' },
+    })
+    expect(await callTool(page, 'get_flame', {})).toHaveProperty(
+      'transformCount',
+    )
   })
 
   test('a history jump within the page leaves the take recording', async ({
