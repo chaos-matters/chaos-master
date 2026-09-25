@@ -200,3 +200,29 @@ export function projectFlameToSchema<T>(flame: T): T {
   projected(dimensions === 3 ? spatial : flat, flame)
   return flame
 }
+
+/**
+ * `value` as the flame would hold it at `path` once projected, for a command
+ * or an audio mapping that writes one setting rather than a whole flame. A
+ * path the schema does not bound, or a value that is not a number there,
+ * comes back as it is. As in `projectFlameToSchema`, an array is copied before
+ * it changes and an object is projected in place.
+ */
+export function projectFlameValue(
+  path: readonly (string | number)[],
+  value: unknown,
+  dimensions?: unknown,
+): unknown {
+  const { flat, spatial } = flameDomainPlans()
+  let plan: DomainPlan | undefined = dimensions === 3 ? spatial : flat
+  for (const segment of path) {
+    if (plan.kind === 'number') return value
+    const key = String(segment)
+    plan =
+      plan.kind === 'each'
+        ? plan.plan
+        : plan.fields.find(([field]) => String(field) === key)?.[1]
+    if (!plan) return value
+  }
+  return projected(plan, value)
+}

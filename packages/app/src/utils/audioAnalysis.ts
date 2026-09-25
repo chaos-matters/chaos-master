@@ -1,4 +1,4 @@
-import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
+import { projectFlameValue } from '@chaos-master/core'
 
 const BAND_RANGES: [number, number][] = [
   [20, 60], // sub-bass
@@ -633,7 +633,7 @@ export type MappingSmoothingState = Map<
 const DIRTY_THRESHOLD = 0.005 // 0.5% change threshold
 
 /**
- * What each render setting is allowed to be, mirroring flameSchema.
+ * A modulated render setting held to the domain the flame schema gives it.
  *
  * A mapping whose range exceeds the schema does not merely look wrong — a
  * flame carrying the result is INVALID, and `validateFlame` then throws for
@@ -645,38 +645,25 @@ const DIRTY_THRESHOLD = 0.005 // 0.5% change threshold
  * value would ship inside it.
  *
  * A range is authored by hand in the wiring editor and shipped in presets, so
- * neither can be trusted to respect a bound it never sees. Clamping happens
- * HERE, at the one place every mapping funnels through.
- *
- * Anything absent is genuinely unbounded in the schema and left alone.
+ * neither can be trusted to respect a bound it never sees. The projection is
+ * the schema's own (`projectFlameValue`), the one the timeline and the
+ * commands use: skipIters floors as the renderer reads it, palettePhase wraps
+ * as fract() reads it, and every other bound clamps.
  */
-const RENDER_SETTING_BOUNDS: Partial<
-  Record<RenderSettingKey, [min: number, max: number]>
-> = {
-  vibrancy: [0, 3],
-  exposure: [-8, 8],
-  palettePhase: [0, 1],
-  paletteSpeed: [0, Number.MAX_SAFE_INTEGER],
-  contrast: [0.01, 20],
-  gamma: [0.1, 8],
-  highlightPower: [0, 2],
-  lightPower: [0, 5],
-  depthColorPower: [0, 5],
-  zoom: [0.01, 500],
-  skipIters: [0, MAX_SKIP_ITERS_VALUE],
-}
-
-function clampRenderSetting(param: RenderSettingKey, value: number): number {
+function heldRenderSetting(
+  param: RenderSettingKey,
+  value: number,
+  dimensions: unknown,
+): number {
+  const path = param === 'zoom' ? ['camera', 'zoom'] : [param]
   // NaN would fail validation as surely as an out-of-range number, and can
-  // arrive from a degenerate range.
-  if (!Number.isFinite(value)) return 0
-  const bounds = RENDER_SETTING_BOUNDS[param]
-  const clamped =
-    bounds === undefined
-      ? value
-      : Math.max(bounds[0], Math.min(bounds[1], value))
-  // The schema additionally requires an integer here.
-  return param === 'skipIters' ? Math.round(clamped) : clamped
+  // arrive from a degenerate range. Its stand-in, 0, is projected like any
+  // other value: it is below gamma's and contrast's minimum.
+  return projectFlameValue(
+    ['renderSettings', ...path],
+    Number.isFinite(value) ? value : 0,
+    dimensions,
+  ) as number
 }
 
 interface AudioMutationContext {
@@ -756,7 +743,7 @@ function applyRenderSettingTarget(
   val: number,
 ): void {
   ctx.rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
-  const safe = clampRenderSetting(tgt.param, val)
+  const safe = heldRenderSetting(tgt.param, val, ctx.rs.dimensions)
   if (tgt.param === 'zoom') {
     ctx.camera ??= (ctx.rs.camera as Record<string, unknown>) ?? {}
     ;(ctx.camera as Record<string, number>).zoom = safe

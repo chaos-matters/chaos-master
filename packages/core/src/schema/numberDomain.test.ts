@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import { pureClone } from '../utils/clone'
 import { FlameDescriptor, FlameDescriptor3D, renderSettingsDefault, validateFlame, } from './flameSchema'
-import { flameDomainPlans, numberDomainOf, projectFlameToSchema, projectNumber, } from './numberDomain'
+import { flameDomainPlans, numberDomainOf, projectFlameToSchema, projectFlameValue, projectNumber, } from './numberDomain'
 import type { DomainPlan, NumberDomain } from './numberDomain'
 
 const whole = (min: number, max: number): NumberDomain => ({
@@ -297,5 +297,46 @@ describe('the compiled plan', () => {
     projectFlameToSchema(flame)
     expect(flame.renderSettings.backgroundColor).toEqual([1, 0, 0])
     expect(keyframeValue).toEqual([1.5, 0, 0])
+  })
+})
+
+describe('projectFlameValue', () => {
+  const at = (path: string, value: unknown, dimensions?: number) =>
+    projectFlameValue(['renderSettings', ...path.split('.')], value, dimensions)
+
+  it('floors an integer setting and clamps it at both ends', () => {
+    expect(at('skipIters', 7.9)).toBe(7)
+    expect(at('skipIters', -3)).toBe(0)
+    expect(at('skipIters', 60)).toBe(50)
+    expect(at('plotsPerChain', 0.5)).toBe(1)
+  })
+
+  it('wraps a cyclic setting', () => {
+    expect(at('palettePhase', 1.25)).toBe(0.25)
+    expect(at('palettePhase', -0.25)).toBe(0.75)
+  })
+
+  it('reaches a bound inside a nested object or a tuple', () => {
+    expect(at('camera.zoom', 9000, 3)).toBe(500)
+    expect(at('backgroundColor.1', 2)).toBe(1)
+    expect(at('camera', { zoom: 0, position: [3, 4] })).toEqual({
+      zoom: 0.01,
+      position: [3, 4],
+    })
+  })
+
+  it('copies an array it has to change', () => {
+    const colour = [1.5, -1, 0.5]
+    expect(at('backgroundColor', colour)).toEqual([1, 0, 0.5])
+    expect(colour).toEqual([1.5, -1, 0.5])
+  })
+
+  it('leaves a value the schema does not bound as it is', () => {
+    expect(at('paletteSpeed', 9000)).toBe(9000)
+    expect(at('camera.position', [1e5, -1e5])).toEqual([1e5, -1e5])
+    expect(at('notASetting', 7.5)).toBe(7.5)
+    expect(at('skipIters.deeper', 7.5)).toBe(7.5)
+    expect(at('skipIters', 'seven')).toBe('seven')
+    expect(at('skipIters', Number.NaN)).toBeNaN()
   })
 })

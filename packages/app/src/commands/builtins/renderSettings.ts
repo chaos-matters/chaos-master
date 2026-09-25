@@ -5,6 +5,7 @@ import { renderSettingsDefault } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import * as v from '@/valibot'
 import { registerCommand } from '../registry'
+import { projectRenderSetting } from './settingDomain'
 
 /**
  * One command for every scalar render setting, addressed by the same
@@ -100,6 +101,12 @@ registerCommand({
     typeof path === 'string'
       ? `Set ${path}${typeof value === 'number' ? ` to ${Number(value.toFixed(3))}` : ''}`
       : undefined,
+  // The value that lands is the one the schema's domain allows, and that is
+  // the one a take records (settingDomain.ts).
+  normalizeArgs: (ctx, args) =>
+    args.length >= 2 && typeof args[0] === 'string'
+      ? [args[0], projectRenderSetting(ctx, args[0], args[1]), ...args.slice(2)]
+      : args,
   execute(ctx, path?: unknown, value?: unknown) {
     if (typeof path !== 'string') {
       console.warn(
@@ -128,7 +135,10 @@ registerCommand({
         >
         draft.renderSettings.camera3D = {
           ...existing,
-          ...(value as Record<string, unknown>),
+          ...(projectRenderSetting(ctx, 'camera3D', value) as Record<
+            string,
+            unknown
+          >),
         } as unknown as NonNullable<typeof draft.renderSettings.camera3D>
       }, 'Set camera3D')
       return
@@ -153,7 +163,10 @@ registerCommand({
         >
         draft.renderSettings.camera = {
           ...existing,
-          ...(value as Record<string, unknown>),
+          ...(projectRenderSetting(ctx, 'camera', value) as Record<
+            string,
+            unknown
+          >),
         } as unknown as NonNullable<typeof draft.renderSettings.camera>
       }, 'Set camera')
       return
@@ -222,7 +235,7 @@ registerCommand({
         }
         node = node[segment] as Record<string, unknown>
       }
-      node[leaf] = value
+      node[leaf] = projectRenderSetting(ctx, path, value)
     }, `Set ${path}`)
   },
 })
