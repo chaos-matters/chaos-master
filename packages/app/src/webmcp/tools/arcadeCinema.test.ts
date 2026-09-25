@@ -223,9 +223,9 @@ describe('Cinema tools', () => {
         variations: Record<string, unknown>
       }
       copy.variations = {
-        [`v${index}a`]: { type: 'linear', weight: 1 },
-        [`v${index}b`]: { type: 'spherical', weight: 0.5 },
-        [`v${index}c`]: { type: 'swirl', weight: 0.25 },
+        [`v${index}a`]: { type: 'linearVar', weight: 1 },
+        [`v${index}b`]: { type: 'sphericalVar', weight: 0.5 },
+        [`v${index}c`]: { type: 'swirlVar', weight: 0.25 },
       }
       busy[`t${index}`] = copy
     }

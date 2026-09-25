@@ -86,16 +86,21 @@ describe('mutationOperators', () => {
   describe('maybeSwapVariationType', () => {
     it('swaps variation type when swapChance is 1 and alternatives exist', () => {
       withRandomSource(createSeededRandomSource(42), () => {
-        const v: RandomVariationLike = { type: 'linear', weight: 1.0 }
-        maybeSwapVariationType(v, 1.0, ['linear', 'swirl', 'spherical'], 0.5)
-        expect(v.type).not.toBe('linear')
+        const v: RandomVariationLike = { type: 'linearVar', weight: 1.0 }
+        maybeSwapVariationType(
+          v,
+          1.0,
+          ['linearVar', 'swirlVar', 'sphericalVar'],
+          0.5,
+        )
+        expect(v.type).not.toBe('linearVar')
       })
     })
 
     it('does not swap variation type when swapChance is 0', () => {
-      const v: RandomVariationLike = { type: 'linear', weight: 1.0 }
-      maybeSwapVariationType(v, 0, ['linear', 'swirl'], 0.5)
-      expect(v.type).toBe('linear')
+      const v: RandomVariationLike = { type: 'linearVar', weight: 1.0 }
+      maybeSwapVariationType(v, 0, ['linearVar', 'swirlVar'], 0.5)
+      expect(v.type).toBe('linearVar')
     })
   })
 
@@ -105,7 +110,7 @@ describe('mutationOperators', () => {
         const t = createRandomMutatedTransform(
           1,
           2,
-          ['linear', 'swirl'],
+          ['linearVar', 'swirlVar'],
           2,
           0.5,
         )
@@ -123,7 +128,7 @@ describe('mutationOperators', () => {
         const t = createRandomMutatedTransform(
           1,
           2,
-          ['linear', 'swirl'],
+          ['linearVar', 'swirlVar'],
           3,
           0.5,
         )
@@ -172,8 +177,8 @@ describe('mutationOperators', () => {
     it('normalizes variation weights in modify mode', () => {
       const t = {
         variations: {
-          v1: { type: 'linear', weight: 0.8 },
-          v2: { type: 'swirl', weight: 0.8 },
+          v1: { type: 'linearVar', weight: 0.8 },
+          v2: { type: 'swirlVar', weight: 0.8 },
         },
       }
       withRandomSource(createSeededRandomSource(600), () => {
@@ -181,7 +186,7 @@ describe('mutationOperators', () => {
           strength: 0.5,
           weightRate: 0.5,
           swapChance: 0,
-          pool: ['linear', 'swirl'],
+          pool: ['linearVar', 'swirlVar'],
           minVariations: 1,
           maxVariations: 2,
         })

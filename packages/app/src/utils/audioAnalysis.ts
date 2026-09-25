@@ -826,11 +826,13 @@ function applyVariationWeightTarget(
   const tx = txArr[tgt.transformIdx]
   if (!tx) return
   const vars = (tx.variations as Record<string, Record<string, unknown>>) ?? {}
-  const v =
-    vars[tgt.variationType] ??
-    Object.values(vars).find(
-      (candidate) => candidate.type === tgt.variationType,
-    )
+  // By type only. The key of `variations` is the variation's id: looked up by
+  // the type's name, it found a variation whose id reads like another's type,
+  // and for a type named after an Object member ('__proto__', 'constructor')
+  // it wrote the weight onto the prototype chain of every object.
+  const v = Object.values(vars).find(
+    (candidate) => candidate.type === tgt.variationType,
+  )
   if (v) {
     ;(v as Record<string, number>).weight = val
   }

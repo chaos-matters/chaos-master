@@ -130,10 +130,15 @@ export const VARIATION_2D_TO_3D_MAP: Record<string, TransformVariationType3D> =
     starfield: 'starfield3D',
   }
 
+// Own keys only, as in the 2D path: `in` also finds 'constructor' and the
+// rest of what a plain object inherits. Everything downstream only sees what
+// this returns.
 export function resolveVariationType3D(type: string): string | undefined {
   if (isVariationType3D(type)) return type
-  if (type in VARIATION_2D_TO_3D_MAP) return VARIATION_2D_TO_3D_MAP[type]
-  if (type in transformVariations) return type
+  if (Object.hasOwn(VARIATION_2D_TO_3D_MAP, type)) {
+    return VARIATION_2D_TO_3D_MAP[type]
+  }
+  if (Object.hasOwn(transformVariations, type)) return type
   return undefined
 }
 

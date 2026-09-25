@@ -66,6 +66,11 @@ export const ALWAYS_ON = [
     why: 'walks src/, scripts/ and the landing package for <Camera2D> mounts that omit the view rotation',
     genre: 'filesystem',
   },
+  {
+    file: 'src/fixtureRealism.test.ts',
+    why: 'walks the app and core sources and the Playwright specs with the TypeScript AST for flame fixtures and variation tables no real flame matches',
+    genre: 'filesystem',
+  },
 
   // Read a non-source file the graph has no edge to.
   {

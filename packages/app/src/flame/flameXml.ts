@@ -86,8 +86,12 @@ export function resolveVariationType(flam3Name: string): string | undefined {
   if (cleaned === '') return undefined
   const key = normKey(cleaned)
 
-  const alias = FLAM3_ALIASES[cleaned.toLowerCase()] ?? FLAM3_ALIASES[key]
-  if (alias !== undefined) return alias
+  // Own keys only: the table is a plain object, and `constructor` or
+  // `__proto__` would otherwise resolve to what every object inherits.
+  const alias = [cleaned.toLowerCase(), key].find((name) =>
+    Object.hasOwn(FLAM3_ALIASES, name),
+  )
+  if (alias !== undefined) return FLAM3_ALIASES[alias]
 
   const fromRegistry = NORMALIZED_TO_TYPE.get(key)
   if (fromRegistry !== undefined) return fromRegistry

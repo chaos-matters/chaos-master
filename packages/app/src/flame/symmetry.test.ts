@@ -18,7 +18,7 @@ const baseFlame = {
       visible: true,
       preAffine: { a: 0.5, b: 0, c: 0, d: 0, e: 0.5, f: 0 },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-      variations: { v1: { type: 'linear', weight: 1, visible: true } },
+      variations: { v1: { type: 'linearVar', weight: 1, visible: true } },
     },
   },
 } as unknown as FlameDescriptor

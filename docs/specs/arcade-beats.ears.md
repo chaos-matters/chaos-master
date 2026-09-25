@@ -470,7 +470,7 @@ Requirements with no test that goes red when they are violated:
   and four of the five `FlameTarget` variants are not covered.
 - **REQ-AB-017, REQ-AB-023** — no test inspects the snapshot the tool
   dispatches. `createMockCommandContext` stubs `canEnable: vi.fn(() => true)`
-  (`webmcp/testUtils.ts:157` (`canEnable`)), so the mapping test never reaches the real
+  (`webmcp/testUtils.ts:161` (`canEnable`)), so the mapping test never reaches the real
   authorization. That stub is why the HIGH defect behind REQ-AB-020 shipped
   green; REQ-AB-020 itself is guarded since #90 by
   `arcadeBeats.test.ts:257` "says whether the mapping actually left reactivity on", which

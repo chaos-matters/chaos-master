@@ -3,11 +3,13 @@
  */
 
 import { scoreFlame } from '@/flame/fitness'
-import { categoryOf } from '@/flame/variationRegistry'
+import { resolveVariationType3D } from '@/flame/transformFunction3D'
+import { categoryOf, isVariationTypeFor } from '@/flame/variationRegistry'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FitnessScores } from '@/flame/fitness'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
+import type { VariationCategory } from '@/flame/variations/categories'
 
 export type CandidateReaction = 'like' | 'dislike' | 'neutral'
 
@@ -92,6 +94,21 @@ function derivePaletteTemperature(
 }
 
 /**
+ * A variation's category as the flame draws it. A 3D flame resolves a type as
+ * the 3D renderer does: a mapped 2D name draws as its 3D variation, any other
+ * 2D type as its 2D function, and each keeps the category of what it draws as.
+ */
+function drawnCategory(
+  dims: Dims,
+  type: string,
+): VariationCategory | undefined {
+  if (dims === 2) return categoryOf(2, type)
+  const drawn = resolveVariationType3D(type)
+  if (drawn === undefined) return undefined
+  return categoryOf(isVariationTypeFor(3, drawn) ? 3 : 2, drawn)
+}
+
+/**
  * Extracts aesthetic and topological taste features from a flame descriptor.
  */
 export function extractFlameTasteFeatures(
@@ -106,8 +123,10 @@ export function extractFlameTasteFeatures(
 
   for (const t of transforms) {
     if (!t.visible) continue
-    for (const vType of Object.keys(t.variations ?? {})) {
-      const cat = categoryOf(dims, vType)
+    // By type: the key of `t.variations` is the variation's id, which no
+    // registry entry is named.
+    for (const variation of Object.values(t.variations ?? {})) {
+      const cat = drawnCategory(dims, variation.type)
       if (cat) {
         categories.add(cat)
       }

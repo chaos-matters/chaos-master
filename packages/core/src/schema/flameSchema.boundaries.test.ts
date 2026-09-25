@@ -216,3 +216,50 @@ describe('validateFlame entity ids', () => {
     expect(errors.length).toBeGreaterThan(0)
   })
 })
+
+// A variation's type is looked up by name in plain-object tables (previews,
+// docs, the renderer's registries), so a type named after an Object member
+// resolves to what every object inherits: the PR #124 review found an audio
+// target writing through Object.prototype that way, and a Duel tile getting
+// Object.prototype.toString as its preview flame. So a type refuses every name
+// an object inherits, and the names an id refuses; any other unknown name
+// still loads as it is written.
+describe('validateFlame variation types', () => {
+  const withType = (type: string) => {
+    const f = flame()
+    const t0 = (f.transforms as Record<string, ReturnType<typeof transform>>)
+      .t0!
+    t0.variations = { v0: { type, weight: 1 } }
+    return f
+  }
+  const loadedType = (type: string) => {
+    const { out } = validate(withType(type))
+    const t0 = Object.values(out?.transforms ?? {})[0]
+    return Object.values(t0?.variations ?? {})[0]?.type
+  }
+
+  it.each([
+    '__proto__',
+    'constructor',
+    'prototype',
+    'toString',
+    'hasOwnProperty',
+    'valueOf',
+  ])('rejects a variation typed %s', (type) => {
+    const { out, errors } = validate(withType(type))
+    expect(out).toBeUndefined()
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it('rejects every name Object.prototype has, whatever the engine adds', () => {
+    const loaded = Object.getOwnPropertyNames(Object.prototype).filter(
+      (type) => loadedType(type) !== undefined,
+    )
+    expect(loaded).toEqual([])
+  })
+
+  it('keeps any other unknown name as it is written', () => {
+    const names = ['notARealVariation', 'tostring', 'ValueOf']
+    expect(names.map(loadedType)).toEqual(names)
+  })
+})
