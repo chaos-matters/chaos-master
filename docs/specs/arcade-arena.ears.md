@@ -575,7 +575,7 @@ violated:
 - REQ-AA-010 — `ArenaOverlay.test.tsx:228` "rerolling opponent updates opponent stats and triggers new archetype" asserts only that the rerolled opponent has a name and a flame; the state reset (rounds, battle log, cached simulation, restore) is not checked.
 - REQ-AA-012 — `ArenaOverlay.test.tsx:216` "renders Sync Active and From Gallery action buttons" asserts the buttons render, not what they do.
 - REQ-AA-034 — `ArenaOverlay.test.tsx:257` "immediately presents the Center Winner Trophy Card upon results state" asserts the trophy card renders; the winner mapping, the streak rules and the draw-leaves-streak branch are not asserted.
-- REQ-AA-023 — `simulateClash.test.ts:86` "runs multi-round simulation and produces round outcomes" checks ownership sums to 1 and `webmcp.test.ts:508` "score_clash_round" checks determinism; the `0.7/0.3` contested split, the symmetry weighting and the `0.01` verdict margin have no direct assertion.
+- REQ-AA-023 — `simulateClash.test.ts:86` "runs multi-round simulation and produces round outcomes" checks ownership sums to 1 and `webmcp.test.ts:533` "score_clash_round" checks determinism; the `0.7/0.3` contested split, the symmetry weighting and the `0.01` verdict margin have no direct assertion.
 
 **End-to-end:** `tests/arcade.spec.ts` covers Teach and Cinema. No Playwright test opens
 the arena, so nothing verifies that the overlay renders on a real GPU, that a clash plays

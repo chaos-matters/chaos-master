@@ -815,7 +815,7 @@ _(`recorder/playWindows.ts:83-150` (`planPlayWindows`), `recorder/playWindowPace
 `:294-305` (`createPlayerPlayWindows`), `:339-346` (`preserveBaseline`), `:385-408` (`rejectAction`), `:455-470` (`runStep`), `:548-553` (`reset`), `:608-652` (`finish`),
 `:680-681` (`holdAt`), `:717-719` (`holdAt`), `:726-733` (`stop`), `recorder/timelineActions.ts:161-167` (`togglePlay`),
 `recorder/replayPlayback.ts:13-35` (`timelineReplayPlayback`), `recorder/replay.ts:171-184` (`playback`),
-`hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:591-600` (`createEffect`), `:1246-1253` (`isAutoFpsReady`),
+`hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:607-616` (`createEffect`), `:1262-1269` (`isAutoFpsReady`),
 `utils/timeline.ts:729-731` (`setIsPlaying`); guarded by `playWindows.test.ts`,
 `playWindowPace.test.ts`, and `playWindowReplay.test.ts:210` "plays five seconds
 as five seconds and lands on the Pause frame with no jump", `:254` "wraps a looping playback as often as the take did", `:290` "reproduces a render loop slower than the configured fps",

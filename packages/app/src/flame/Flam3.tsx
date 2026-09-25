@@ -27,6 +27,7 @@ import { createIFSPipeline3D } from './ifsPipeline3D'
 import { createExportRenderDriver, createInteractiveRenderDriver, EXPORT_COUNT_SIGNAL_INTERVAL_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_PRESENT_INTERVAL_MS, } from './renderDrivers'
 import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
+import { customVariationsVersion } from './variations/custom'
 import type { v4f } from 'typegpu/data'
 import type { Palette } from './colorMap'
 import type { ExportImageType } from './exportImageType'
@@ -501,6 +502,18 @@ export function Flam3(props: Flam3Props) {
     'colorGradingMs',
   ])
 
+  // The custom variations' version this renderer's pipeline follows. An
+  // export keeps the code it started with: while the export driver runs, the
+  // version stays where it was when the export began, read without tracking,
+  // so an edit or a rename partway through neither restarts a still nor
+  // changes an animation's later frames. Reading it untracked alone would not
+  // do: every new animation frame re-runs the fingerprint below. The canvas
+  // takes the change when the export ends.
+  const pipelineVariationsVersion = createMemo<number>((atExportStart) => {
+    if (!exportDriverActive()) return customVariationsVersion()
+    return atExportStart ?? untrack(customVariationsVersion)
+  })
+
   // Also returns the flame snapshot so the pipeline creation uses the exact same
   // value — re-reading untrack(animatedFlame) separately can return a different
   // flame when outputTextures() memo re-evaluation causes nested effect flushes.
@@ -508,6 +521,9 @@ export function Flam3(props: Flam3Props) {
     const flame = animatedFlame()
     const bf = props.blendFlame
     return JSON.stringify({
+      // Editing a custom variation keeps its type and changes its code, so
+      // nothing below changes: the version makes the canvas show the edit.
+      customVariationsVersion: pipelineVariationsVersion(),
       transforms: recordEntries(flame.transforms).map(([tid, t]) => ({
         tid,
         variations: recordEntries(t.variations).map(([vid, v]) => ({
