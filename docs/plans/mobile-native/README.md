@@ -197,7 +197,7 @@ P2 afterwards: the variation library as the large detent, a palette sheet using 
 - [x] `.github/workflows/capacitor-app.yml` (reusable, ported from MercuryPitch; purchase plumbing removed, with `PURCHASES` markers where it returns) and the caller `.github/workflows/lumen-mobile.yml` (2026-09-11; not yet run on GitHub). The fork is **private**, so macOS minutes are metered:
   - PRs: Android tests/lint/debug APK; an iOS simulator build only when `packages/mobile/`, `packages/mobile-runtime/` or the workflows change; nothing signed.
   - Push to main: Android only.
-  - `mobile-v*` tag: Android release AAB/APK, plus a signed iOS archive uploaded to TestFlight and an ad-hoc IPA.
+  - `mobile-v*` tag: Android release AAB/APK, plus a signed iOS archive uploaded to TestFlight. The ad-hoc IPA is exported but never uploaded, because a public artifact would carry the holder's name and the registered device UDIDs.
   - Manual run on a branch: a signed archive without upload (proves the certificate and profile).
   - Missing secrets skip jobs instead of failing them. `gh variable set LUMEN_IOS_CI --body off` stops every macOS job without a commit.
 - [x] The lessons are kept: no `paths:` filter on tag triggers (a `changes` job instead); `cancel-in-progress` only for PRs; SwiftPM via `-clonedSourcePackagesDirPath $RUNNER_TEMP/spm`; a throwaway keychain; manual signing through `LUMEN_PROFILE`; build number = `github.run_number`; the marketing version from the tag, else `packages/app/package.json`.
