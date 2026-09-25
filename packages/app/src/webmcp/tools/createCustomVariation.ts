@@ -50,7 +50,7 @@ export const createCustomVariationTool: WebMcpTool = {
 
     try {
       if (updateId) {
-        const result = updateCustomVariation(updateId, name, codeBody)
+        const result = updateCustomVariation(updateId, codeBody, name)
         if (!result.success) {
           return {
             error: 'Failed to update custom variation',

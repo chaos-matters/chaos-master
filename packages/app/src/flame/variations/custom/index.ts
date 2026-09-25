@@ -1,4 +1,5 @@
 export {
+  customVariationsVersion,
   getCacheVersion,
   getCustomVariationDef,
   getCustomVariations,
@@ -12,6 +13,7 @@ export {
   previewCustomVariation,
   collectFlameCustomVariations,
   importSharedVariations,
+  loadAndImportSharedVariations,
   persistSharedVariations,
   remapFlameCustomVariations,
   generateCustomVariationId,

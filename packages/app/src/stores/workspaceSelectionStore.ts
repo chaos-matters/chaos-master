@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { isCustomVariationRegistered } from '@/flame/variations/custom'
+import { customVariationsVersion, isCustomVariationRegistered, } from '@/flame/variations/custom'
 import { persistentSignal } from '@/utils/persistentSignal'
 import type { Accessor, Setter } from 'solid-js'
 import type { QuickPickerMode } from '@/components/QuickVariationPicker/QuickVariationPicker'
@@ -84,8 +84,12 @@ export function createWorkspaceSelectionStore(): WorkspaceSelectionStore {
   const [hoveredCustomVarDef, setHoveredCustomVarDef] =
     createSignal<CustomVariationDef | null>(null)
 
-  const [customVarsVersion, setCustomVarsVersion] = createSignal(0)
+  const [workspaceCustomVarsVersion, setCustomVarsVersion] = createSignal(0)
   const bumpCustomVarsVersion = () => setCustomVarsVersion((v) => v + 1)
+  // Follows the registry too: an agent's create_custom_variation and a link's
+  // import change the custom variations without the workspace bumping.
+  const customVarsVersion = () =>
+    workspaceCustomVarsVersion() + customVariationsVersion()
 
   function customStatus(type: string): 'none' | 'available' | 'unavailable' {
     if (!type.startsWith('custom_')) return 'none'
