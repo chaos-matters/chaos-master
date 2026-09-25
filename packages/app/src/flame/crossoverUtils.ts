@@ -9,6 +9,9 @@ export type LooseVariation = {
 }
 
 export type LooseTransform = {
+  /** The parent it came from, which decides the child's symmetry set
+   *  (breedSymmetry.ts). A cross-bred pair of both parents has none. */
+  parent?: 'a' | 'b'
   probability: number
   colorSpeed?: number
   visible?: boolean
@@ -157,6 +160,8 @@ export function crossBreedTransformPair(
 
   ta.probability = ta.probability * 0.5 + tb.probability * 0.5
   ta.variations = crossBreedMatchedVariations(ta.variations, tb.variations)
+  // A blend of both parents counts toward neither one's symmetry set.
+  if (ta.parent !== tb.parent) delete ta.parent
 
   return ta
 }
