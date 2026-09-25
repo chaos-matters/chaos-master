@@ -2092,6 +2092,17 @@ function applyTransformAndVariationTracks(
   }
 }
 
+const AFFINE_KEYS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
+const AFFINE_KEYS_3D = [
+  ...AFFINE_KEYS_2D,
+  'g',
+  'h',
+  'i',
+  'j',
+  'k',
+  'l',
+] as const
+
 function applyFinalTransformTracks(
   flame: FlameDescriptor,
   trackMap: Map<string, TimelineTrack>,
@@ -2117,24 +2128,18 @@ function applyFinalTransformTracks(
           }
         : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   }
-  applyTrackNumber(trackMap, 'finalTransform.a', frame, loop, (v) => {
-    flame.finalTransform!.a = v
-  })
-  applyTrackNumber(trackMap, 'finalTransform.b', frame, loop, (v) => {
-    flame.finalTransform!.b = v
-  })
-  applyTrackNumber(trackMap, 'finalTransform.c', frame, loop, (v) => {
-    flame.finalTransform!.c = v
-  })
-  applyTrackNumber(trackMap, 'finalTransform.d', frame, loop, (v) => {
-    flame.finalTransform!.d = v
-  })
-  applyTrackNumber(trackMap, 'finalTransform.e', frame, loop, (v) => {
-    flame.finalTransform!.e = v
-  })
-  applyTrackNumber(trackMap, 'finalTransform.f', frame, loop, (v) => {
-    flame.finalTransform!.f = v
-  })
+  // The terms the final transform has in its own layout: a-f in 2D, a-l in
+  // 3D. A track on g-l never turns a 2D-layout final transform into a 3D one,
+  // which would change what its a-f mean.
+  const final = flame.finalTransform as Record<string, number>
+  const is3D = ['g', 'h', 'i', 'j', 'k', 'l'].some(
+    (key) => final[key] !== undefined,
+  )
+  for (const key of is3D ? AFFINE_KEYS_3D : AFFINE_KEYS_2D) {
+    applyTrackNumber(trackMap, `finalTransform.${key}`, frame, loop, (v) => {
+      final[key] = v
+    })
+  }
 }
 
 export function applyTracksToFlame(
