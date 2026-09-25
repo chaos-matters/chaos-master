@@ -1,11 +1,14 @@
 import { deepClone } from '@/utils/clone'
 import { recordEntries } from '@/utils/record'
+import { breedableEntries, inheritSymmetry } from './breedSymmetry'
 import { crossBreedMatchedTypePairs, crossVariationParams, fillRemainingFromUnmatched, getDominantVariationType, groupTransformsByDominantType, } from './crossoverUtils'
 import { random01, randomPerturbation, randomRange } from './randomize'
 import { validateFlame } from './schema/flameSchema'
+import { reweighSymmetryCopies } from './symmetry'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { transformVariations } from './variations'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from './variations3D'
+import type { BreedParent } from './breedSymmetry'
 import type { LooseTransform, LooseVariation } from './crossoverUtils'
 import type { FlameDescriptor } from './schema/flameSchema'
 
@@ -59,9 +62,15 @@ export const DEFAULT_BREED_CONFIG: BreedConfig = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyTransform = any
 
+/**
+ * The transforms Breed breeds from: the user's, never a `_sym__` copy. A copy
+ * is the symmetry writer's rotation or mirror of the user's transforms; bred
+ * as a gene it lost its place in the set and came out as an ordinary
+ * `breed_` transform. The child gets its set from `inheritSymmetry` instead.
+ */
 function transformEntries(flame: FlameDescriptor): [string, AnyTransform][] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return recordEntries(flame.transforms as any) as [string, AnyTransform][]
+  return breedableEntries(flame.transforms as any)
 }
 
 function variationEntries(t: AnyTransform): [string, LooseVariation][] {
@@ -396,12 +405,20 @@ function handleSingleParentBreed(
   return Array.from({ length: count }, () => {
     const child = deepClone(parent)
     mutateFlameLight(child, mutationStrength)
+    // The clone already holds the parent's copies as the parent shows them
+    // (the light mutation skips them): only their weight follows the
+    // mutated user transforms.
+    reweighSymmetryCopies(child.transforms)
     return validateFlame(child)
   })
 }
 
-function extractLooseTransforms(flame: FlameDescriptor): LooseTransform[] {
+function extractLooseTransforms(
+  flame: FlameDescriptor,
+  parent: BreedParent,
+): LooseTransform[] {
   return transformEntries(flame).map(([, t]) => ({
+    parent,
     probability: t.probability ?? 0,
     colorSpeed: t.colorSpeed,
     visible: t.visible,
@@ -506,8 +523,8 @@ export function breedFlames(
     return handleSingleParentBreed(parentA, cfg.count, cfg.mutationStrength)
   }
 
-  const transformsA = extractLooseTransforms(parentA)
-  const transformsB = extractLooseTransforms(parentB)
+  const transformsA = extractLooseTransforms(parentA, 'a')
+  const transformsB = extractLooseTransforms(parentB, 'b')
 
   // Determine target transform count: average of both parents, clamped
   const targetCount = Math.max(
@@ -542,7 +559,17 @@ export function breedFlames(
     }
 
     normalizeSelectedProbabilities(selected)
-    children.push(assembleChildFlame(selected, c, parentA, parentB))
+    const child = assembleChildFlame(selected, c, parentA, parentB)
+    const from = (p: BreedParent) => selected.filter((t) => t.parent === p)
+    children.push(
+      inheritSymmetry(
+        child,
+        parentA,
+        parentB,
+        from('a').length,
+        from('b').length,
+      ),
+    )
   }
 
   return children
