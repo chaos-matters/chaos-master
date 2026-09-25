@@ -89,6 +89,8 @@ and both teach people to ignore them — see
 `pnpm docs:index` reads each file's **leading comment block** to build the
 module blurbs. If a module shows `(no header comment)` in the index, add a
 header comment to that file — do not describe it by hand in the index.
+The index holds no file or line counts, so adding a file changes it only when
+the file is a new module or big enough to be listed; `pnpm metrics` gives sizes.
 
 ---
 
