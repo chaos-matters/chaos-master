@@ -1,4 +1,3 @@
-
 name: Chaos-Master CI
 
 on:
@@ -6,70 +5,126 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  # Lets a branch exercise the main-only jobs (the full suite, and health)
-  # before it is merged, instead of finding out on main.
+  # Runs the same jobs on any branch, on demand.
   workflow_dispatch:
 
+# Every job runs on pull requests, on pushes to main and on a manual run alike
+# (since 2026-09-24; before that a pull request ran a scoped app suite and no
+# `health`). The jobs run in parallel, so a pull request waits for its slowest
+# job, not for the sum of them: lint, typecheck, the test shards and the
+# build-and-e2e job each take a runner of their own.
+#
+# Type-aware linting (typescript-eslint strictTypeChecked + projectService)
+# holds the whole TS program in memory; on this codebase peak is ~2.5GB, which
+# OOMs Node's ~2GB default heap. The runner has 16GB, so the jobs that build
+# the program (lint, typecheck, the vitest shards) lift the ceiling well clear
+# of the peak rather than throttling CI. See eslint.config.js (docs content
+# files are already dropped to syntax-only linting to trim peak).
+
 jobs:
-  build:
-
+  lint:
     runs-on: ubuntu-latest
-
-    # Type-aware linting (typescript-eslint strictTypeChecked + projectService)
-    # holds the whole TS program in memory; on this codebase peak is ~2.5GB, which
-    # OOMs Node's ~2GB default heap. The runner has 16GB, so lift the ceiling well
-    # clear of the peak rather than throttling CI. Applies to every step (tsc and
-    # vitest build the same program). See eslint.config.js (docs content files are
-    # already dropped to syntax-only linting to trim peak).
     env:
       NODE_OPTIONS: --max-old-space-size=6144
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-
     steps:
-    # Full history: the scoped pull-request test run diffs the working tree
-    # against the base commit, and the default shallow clone has neither the
-    # base commit nor the branch history to reach it.
-    - name: ⬇️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
-    - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
-        
-    - name: 📦 Install all dependencies
+        node-version: 24.x
+
+    - name: Install all dependencies
       run: |
         corepack enable
         pnpm install
 
-    - name: 🧹 Lint code
+    - name: Lint code
       run: pnpm lint
 
-    - name: 🔍 Type check
+  typecheck:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    - name: Install all dependencies
+      run: |
+        corepack enable
+        pnpm install
+
+    - name: Type check
       run: pnpm typecheck
 
-    # Everything, on main and on a manual run. This is the run that decides
-    # whether main is green.
-    - name: 🧪 Run tests
-      if: github.event_name != 'pull_request'
-      run: pnpm test
+  # The full suite, `pnpm test`, on every pull request, split so it finishes
+  # in a few minutes of wall-clock: the app's vitest suite in three shards
+  # (vitest --shard splits its test files), and core, mobile-runtime and the
+  # node --test script suites in a fourth leg. `pnpm test` is exactly
+  # `pnpm test:packages && pnpm test:app`, so the legs together run what it
+  # runs; a new suite goes into one of those two scripts and CI picks it up.
+  # fail-fast is off so one red shard does not hide another.
+  #
+  # The scoped run (`pnpm test:pr`, scripts/test-changed.mjs) is a local tool
+  # now, for checking a change quickly before pushing; CI no longer uses it.
+  test:
+    name: test (${{ matrix.part }})
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: app 1/3
+            run: pnpm test:app --shard=1/3
+          - part: app 2/3
+            run: pnpm test:app --shard=2/3
+          - part: app 3/3
+            run: pnpm test:app --shard=3/3
+          - part: core, mobile-runtime, scripts
+            run: pnpm test:packages
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    # On a pull request: core and mobile-runtime in full (a second, together),
-    # and the app suite scoped to what the branch touched plus a list of tests
-    # that read the source tree through the filesystem and so cannot be scoped.
-    # See scripts/test-changed.mjs and packages/app/TESTING.md.
-    - name: Run tests scoped to the pull request
-      if: github.event_name == 'pull_request'
-      run: pnpm test:pr
-      env:
-        TEST_CHANGED_BASE: ${{ github.event.pull_request.base.sha }}
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
 
-    - name: 🛠️ Build project
+    - name: Install all dependencies
+      run: |
+        corepack enable
+        pnpm install
+
+    - name: Run tests (${{ matrix.part }})
+      run: ${{ matrix.run }}
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    - name: Install all dependencies
+      run: |
+        corepack enable
+        pnpm install
+
+    - name: Build the app
       run: pnpm --filter chaos-master run build
 
     # The landing site has no tests, which is defensible for a marketing page.
@@ -77,7 +132,7 @@ jobs:
     - name: Build landing
       run: pnpm --filter @chaos-master/landing run build
 
-    - name: 🎭 Install Playwright browsers
+    - name: Install Playwright browsers
       run: pnpm exec playwright install --with-deps chromium
 
     # The chromium-ci Playwright project: every *.ci.spec.ts, i.e. the specs
@@ -87,7 +142,7 @@ jobs:
     - name: Run CI-safe e2e
       run: pnpm test:e2e:ci
 
-    - name: 📎 Upload Playwright report
+    - name: Upload Playwright report
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@v4
       with:
@@ -97,10 +152,9 @@ jobs:
 
   # Every `file:line` citation in a living doc must still point at the symbol
   # it names (scripts/check-doc-citations.mjs; the rules are in
-  # docs/agent/CONVENTIONS.md section 9). It runs on pull requests too, unlike
-  # the ratchets below: a citation goes stale in the change that moves the
-  # code, and that change's author is the one who knows where it went. Nothing
-  # about it is a judgement call to defer to main. It is a job of its own so a
+  # docs/agent/CONVENTIONS.md section 9). A citation goes stale in the change
+  # that moves the code, and that change's author is the one who knows where
+  # it went. It is a job of its own so a
   # stale line number never hides a failing test, nor the other way round. It
   # needs full history, for citations pinned to an old revision, and no
   # install: the script uses node and git only, and takes under a second.
@@ -121,14 +175,13 @@ jobs:
     - name: Check the file:line citations in the docs
       run: node scripts/check-doc-citations.mjs
 
-  # The code-health ratchets, on main and on a manual run only. A pull request
-  # that moves a ratchet is a conversation, not a blocked merge. They sit in
-  # their own job so that a ratchet failure can never hide a test failure in
-  # `build`, and so the branch that fixes a ratchet is obvious from the job
-  # that went red.
+  # The code-health checks: the generated index, the metrics ratchet and the
+  # module graph. On pull requests too since 2026-09-24 (about 25 s), so a
+  # change that moves a ratchet sees it fail before the merge, not main after
+  # it. They sit in their own job so that a ratchet failure can never hide a
+  # test failure, and so the branch that fixes a ratchet is obvious from the
+  # job that went red.
   health:
-    if: github.event_name != 'pull_request'
-
     runs-on: ubuntu-latest
 
     steps:

@@ -45,14 +45,16 @@ someone made on purpose, in writing, rather than a number quietly drifting.
 Metrics not listed as lower-is-better or higher-is-better in
 `scripts/code-metrics.mjs` are **informational only** and never fail the check.
 
-**Where the ratchet is enforced.** In CI, in the `health` job, on pushes to main
-and on a manual `workflow_dispatch` — **not on pull requests**. Alongside
-`pnpm docs:index:check`, and in a job of its own so a ratchet failure never
-masks a test failure. The choice is deliberate: re-freezing is a decision
-someone makes on purpose, and forcing that decision inside a pull request turns
-it into a merge blocker to be got around rather than a call to be made. Nothing
-runs the ratchet before CI either — the pre-push hook is typecheck and lint —
-so run `pnpm metrics:check` yourself when a change adds files.
+**Where the ratchet is enforced.** In CI, in the `health` job, on every pull
+request, on pushes to main and on a manual `workflow_dispatch` (pull requests
+since 2026-09-24; until then it ran on main only, on the reasoning that
+re-freezing inside a pull request turns a decision into a merge blocker).
+Alongside `pnpm docs:index:check`, and in a job of its own so a ratchet failure
+never masks a test failure. Re-freezing is still a decision someone makes on
+purpose, in writing; it is now made in the change that needs it, which sees the
+ratchet fail before the merge. Nothing runs the ratchet before CI — the
+pre-push hook is typecheck and lint — so run `pnpm metrics:check` yourself when
+a change adds files.
 
 The coverage keys are the exception. `--check` only compares keys the current
 run produced, and a CI run has no `coverage-audit/` summary to read, so

@@ -105,20 +105,24 @@ and where each item stands at `9fc08078`:
 ## 4. What runs, and where
 
 ```bash
-pnpm test            # core, mobile-runtime and app vitest, plus the node --test script suites
-pnpm test:pr         # the same, with the app suite scoped to what a branch touched
+pnpm test            # core, mobile-runtime and app vitest, plus the node --test script suites (CI runs it)
+pnpm test:pr         # the same, with the app suite scoped to what a branch touched (local)
 pnpm test:coverage   # app and core vitest with v8 coverage -> coverage-audit/
 pnpm test:e2e        # every Playwright project, against a production build (local)
 pnpm test:e2e:ci     # the chromium-ci project: every tests/*.ci.spec.ts
 pnpm verify:webgpu   # standalone headed Chrome against an already running server
 ```
 
-Today CI runs lint, typecheck, the tests (`pnpm test:pr` on a pull request,
-`pnpm test` on main), both builds and `pnpm test:e2e:ci` in the `build` job;
-the citation check in its own `citations` job; and on main only, the ratchets
-in the `health` job. [packages/app/TESTING.md](../../packages/app/TESTING.md)
-has the whole split. When this section was first written, CI ran only
-`tests/smoke.spec.ts` for e2e; the two updates below record how that changed.
+Today CI runs, on every pull request and every push to main, in parallel jobs:
+lint, typecheck, the full `pnpm test` in four shards, both builds and
+`pnpm test:e2e:ci`, the citation check, and the ratchets in the `health` job
+(since 2026-09-24; before that a pull request ran the app suite scoped by
+`pnpm test:pr`, and `health` ran on main only). So run the tests for what you
+touched locally (`pnpm test:changed`, or one file), and leave the full suite,
+`health` and the CI-safe e2e to the pull request's CI.
+[packages/app/TESTING.md](../../packages/app/TESTING.md) has the whole split.
+When this section was first written, CI ran only `tests/smoke.spec.ts` for e2e;
+the two updates below record how that changed.
 
 > **Update, 2026-09-21.** Two corrections. The generated-index check and the
 > metrics ratchet were never in CI when this was written; they are now, in a
@@ -127,7 +131,8 @@ has the whole split. When this section was first written, CI ran only
 > places: a pull request runs core and mobile-runtime in full plus the app
 > suite scoped to what it touched, while main runs everything. The full split,
 > and the trade-off it accepts, is in
-> [packages/app/TESTING.md](../../packages/app/TESTING.md).
+> [packages/app/TESTING.md](../../packages/app/TESTING.md). (Superseded on
+> 2026-09-24: pull requests run the full suite and `health` too; see above.)
 
 **A Playwright spec outside the CI project is effectively unenforced.** At
 the first audit three specs were actively misleading:

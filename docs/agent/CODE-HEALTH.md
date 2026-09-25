@@ -19,15 +19,13 @@ pnpm verify:webgpu    # headed browser pass on real hardware
 ```
 
 **Where they run.** `pnpm docs:index:check`, `pnpm metrics:check` and
-`pnpm arch` run in CI in the `health` job, on pushes to main and on a manual
-`workflow_dispatch` — **not on pull requests**. A pull request that nudges a
-ratchet is a conversation about whether to re-freeze, not a blocked merge, and
-the merging agent is the one who sees main go red. They sit in a job of their
-own so a ratchet failure can never mask a test failure in `build`.
-`pnpm docs:cite` is the exception: it runs on pull requests too, in its own
-`citations` job, because a citation goes stale in the change that moves the
-code ([CONVENTIONS.md](CONVENTIONS.md) §9). `pnpm test:coverage` and
-`pnpm verify:webgpu` are local-only by design — see [METRICS.md](METRICS.md) §3.
+`pnpm arch` run in CI in the `health` job, on every pull request, on pushes to
+main and on a manual `workflow_dispatch` (pull requests since 2026-09-24), in a
+job of their own so a ratchet failure can never mask a test failure.
+`pnpm docs:cite` runs in its own `citations` job, because a citation goes stale
+in the change that moves the code ([CONVENTIONS.md](CONVENTIONS.md) §9).
+`pnpm test:coverage` and `pnpm verify:webgpu` are local-only by design — see
+[METRICS.md](METRICS.md) §3.
 
 `pnpm arch` joined the `health` job in WP3 (#116, 2026-09-23). It stayed out
 while it was red on two import cycles (`flame/mutationOperators.ts <->

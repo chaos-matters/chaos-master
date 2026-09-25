@@ -98,10 +98,12 @@ Before pushing:
 npm run lint          # ESLint
 npm run typecheck     # TypeScript
 npm run format:check  # Code formatting
-npm test              # Run tests
+pnpm test:changed     # The tests your change can reach (from the repo root)
 ```
 
-All checks must pass before committing or pushing.
+All checks must pass before committing or pushing. Do not run the full suite
+locally as a matter of course: every pull request's CI runs it, with `health`
+and the CI-safe e2e (see ../../AGENTS.md).
 
 ## Meta Commands
 
