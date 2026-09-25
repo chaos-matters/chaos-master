@@ -15,14 +15,73 @@ module.exports = {
       from: {},
       to: { circular: true },
     },
+    // The two core rules only work because npm packages stay in the graph as
+    // leaves: `doNotFollow` below keeps them, and `exclude` must not name
+    // node_modules. Until WP3b (2026-09-23) it did, so every npm target was
+    // removed before a rule saw it and `core-stays-pure` could fire only on an
+    // import of packages/app (docs/agent/MISTAKES.md, "dependency-cruiser
+    // drops npm packages before its rules see them").
     {
       name: 'core-stays-pure',
       severity: 'error',
       comment:
         '@chaos-master/core must stay free of DOM, WebGPU and Solid so it can ' +
-        'be tested anywhere and reused off the browser main thread.',
+        'be tested anywhere and reused off the browser main thread, and must ' +
+        'not reach into another workspace package. Solid and the WebGPU ' +
+        'types are refused even if core declared them.',
       from: { path: '^packages/core/src' },
-      to: { path: '(^packages/app|solid-js|typegpu|@webgpu)' },
+      to: { path: '^packages/(?!core/)|solid-js|@webgpu' },
+    },
+    {
+      // Core may import what packages/core/package.json lists under
+      // `dependencies` (valibot, structurajs, typegpu), and nothing else.
+      // dependency-cruiser reads the package.json closest to the importing
+      // file, so for core that is core's own manifest.
+      //
+      // typegpu is declared, so this rule lets it through; `core-typegpu-frozen`
+      // below keeps it to the files that import it today. Whether core should
+      // carry it at all is docs/agent/BUGS.md #33.
+      name: 'core-declared-deps-only',
+      severity: 'error',
+      comment:
+        'Core imports only its declared runtime dependencies. A dev ' +
+        'dependency, a package core does not declare (the root ' +
+        'devDependencies hold browser-only ones such as @codemirror/*), a ' +
+        'Node built-in, or an import that does not resolve is a dependency ' +
+        'core does not have wherever it runs. Declare it, or keep it out of core.',
+      from: { path: '^packages/core/src' },
+      to: {
+        dependencyTypes: [
+          'core',
+          'npm-dev',
+          'npm-no-pkg',
+          'npm-unknown',
+          'npm-optional',
+          'npm-peer',
+          'npm-bundled',
+          'unknown',
+          'undetermined',
+        ],
+      },
+    },
+    {
+      // docs/agent/BUGS.md #33: core carries a TypeGPU shader function and
+      // pulls typegpu into the Worker's import graph. Until that is settled,
+      // typegpu stays in the three core files that import it today (frozen in
+      // WP3b, 2026-09-24). A fourth file is an error; the fix for #33 shrinks
+      // this list, and nothing should grow it.
+      name: 'core-typegpu-frozen',
+      severity: 'error',
+      comment:
+        'typegpu is frozen to math/affineTransform.ts, ' +
+        'math/affineTransform3D.ts and utils/schemaUtil.ts in core ' +
+        '(docs/agent/BUGS.md #33). Keep new GPU code in the app.',
+      from: {
+        path: '^packages/core/src',
+        pathNot:
+          '^packages/core/src/(math/affineTransform|math/affineTransform3D|utils/schemaUtil)\\.ts$',
+      },
+      to: { path: '(^|/)typegpu(/|$)' },
     },
     {
       // An error, not a warning, since WP2 deleted the last eight orphans
@@ -58,9 +117,12 @@ module.exports = {
     },
   ],
   options: {
+    // npm modules are kept as leaves, not dropped: the core rules above need
+    // to see them. Build output is excluded by its place in a package, not by
+    // a bare `dist`, which would also match every `node_modules/*/dist/` file.
     doNotFollow: { path: 'node_modules' },
     exclude: {
-      path: '(node_modules|dist|coverage-audit|\\.test\\.|\\.spec\\.)',
+      path: '^packages/[^/]+/(dist|dist-native|coverage-audit)/|\\.(test|spec)\\.',
     },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.depcruise.json' },

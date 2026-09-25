@@ -5,7 +5,7 @@
 //   node --test scripts/check-doc-citations.test.mjs
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, it } from 'node:test'
@@ -485,5 +485,72 @@ await describe('the CLI on a git repository', async () => {
     const r = check('missing.md')
     assert.equal(r.status, 2)
     assert.match(r.stderr, /cannot run/)
+  })
+})
+
+// During an unresolved merge `git ls-files` lists a conflicted path once per
+// stage (base, ours, theirs). The checker read that list as the tree, so a
+// conflicted document was checked and counted three times, and a conflicted
+// source file cited by a suffix matched itself three times.
+await describe('the CLI during an unresolved merge', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cite-check-merge-'))
+  after(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+  const ISOLATED = [
+    ['user.name', 'cite-check'],
+    ['user.email', 'cite-check@example.invalid'],
+    ['commit.gpgsign', 'false'],
+    ['core.hooksPath', '/dev/null'],
+    ['init.defaultBranch', 'main'],
+    ['merge.conflictStyle', 'merge'],
+  ].flatMap(([k, v]) => ['-c', `${k}=${v}`])
+  const git = (...args) =>
+    spawnSync('git', ['-C', dir, ...ISOLATED, ...args], { encoding: 'utf8' })
+  const check = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    })
+  const doc = (word) =>
+    `# Doc\n\n\`b.ts:13\` (\`beta\`) holds the ${word} answer.\n`
+
+  mkdirSync(join(dir, 'lib'))
+  git('init', '--quiet')
+  writeFileSync(join(dir, 'lib/b.ts'), SOURCE)
+  writeFileSync(join(dir, 'doc.md'), doc('first'))
+  git('add', '.')
+  git('commit', '--quiet', '-m', 'base')
+  git('checkout', '--quiet', '-b', 'side')
+  writeFileSync(join(dir, 'doc.md'), doc('side'))
+  writeFileSync(join(dir, 'lib/b.ts'), `${SOURCE}// side\n`)
+  git('commit', '--quiet', '-am', 'side')
+  git('checkout', '--quiet', 'main')
+  writeFileSync(join(dir, 'doc.md'), doc('main'))
+  writeFileSync(join(dir, 'lib/b.ts'), `${SOURCE}// main\n`)
+  git('commit', '--quiet', '-am', 'main')
+  const merge = git('merge', '--quiet', 'side')
+
+  await it('has both files in conflict, listed once per stage', () => {
+    assert.notEqual(merge.status, 0)
+    const listed = git('ls-files').stdout.split('\n').filter(Boolean)
+    assert.equal(listed.filter((f) => f === 'doc.md').length, 3)
+    assert.equal(listed.filter((f) => f === 'lib/b.ts').length, 3)
+  })
+
+  await it('checks a conflicted document once, and matches a conflicted file once', () => {
+    const r = check('--json')
+    const report = JSON.parse(r.stdout)
+    assert.deepEqual(
+      report.documents.map((d) => d.doc),
+      ['doc.md'],
+    )
+    // The conflict leaves both sides' copy of the one citation in the file,
+    // and each resolves to the one lib/b.ts, not to three.
+    assert.equal(report.checked, 2)
+    assert.deepEqual(
+      report.errors.map((e) => e.message),
+      [],
+    )
   })
 })

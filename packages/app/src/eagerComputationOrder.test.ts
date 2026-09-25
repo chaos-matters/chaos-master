@@ -316,7 +316,12 @@ const SYNC_CALLBACK_METHODS = new Set([
   'toSorted',
 ])
 
-const HOOK_NAME = /^useWorkspace[A-Z]\w*$/
+// The `stores/createWorkspace<Name>Store()` factories count as hooks: WP5's
+// design rule puts workspace state in them, and a factory that builds a memo
+// over a parameter runs it at the call exactly like a hook does. A forward
+// read planted through `createWorkspaceExportStore` was green before they
+// were added here (WP3b, 2026-09-23).
+const HOOK_NAME = /^(useWorkspace[A-Z]\w*|createWorkspace[A-Z]\w*Store)$/
 
 type FunctionNode =
   | ts.FunctionDeclaration
@@ -930,7 +935,16 @@ describe('hook arguments run while the hook runs', () => {
   it('finds the hooks it is meant to police, and a call for each', () => {
     // A rename that hides the hooks from the scan must not turn this green
     // by finding nothing to check.
-    expect(hooks.size).toBeGreaterThanOrEqual(11)
+    expect(hooks.size).toBeGreaterThanOrEqual(14)
+    expect(
+      [...hooks.keys()].filter((h) => h.startsWith('createWorkspace')).sort(),
+    ).toEqual(
+      expect.arrayContaining([
+        'createWorkspaceExportStore',
+        'createWorkspaceLayoutStore',
+        'createWorkspaceSelectionStore',
+      ]),
+    )
     const called = new Set<string>()
     for (const { ast } of parsed) {
       const walk = (n: ts.Node) => {
@@ -988,6 +1002,35 @@ describe('the hook-boundary scan itself', () => {
       const late = createSignal(0)[0]
       return result
     }`
+
+  it('treats a createWorkspace*Store factory as a hook, and nothing else named create*', () => {
+    const store = (name: string) => `
+      export function ${name}(probe: () => number) {
+        const memo = createMemo(() => probe())
+        return { memo }
+      }`
+    const call = (name: string) => `
+      export function Workspace() {
+        const store = ${name}(() => late())
+        const late = () => 1
+        return store
+      }`
+    const scanWith = (name: string) =>
+      scanHookCalls(
+        'caller.tsx',
+        parse('caller.tsx', call(name)),
+        eagerHookTable([
+          { file: 'store.ts', ast: parse('store.ts', store(name)) },
+        ]),
+      ).map((o) => `${o.hook}:${o.param}->${o.readName}`)
+    expect(scanWith('createWorkspaceProbeStore')).toEqual([
+      'createWorkspaceProbeStore:argument 1->late',
+    ])
+    // Only the store factories: a `createWorkspace*` that is not a store, and
+    // a store outside the workspace family, stay out of the table.
+    expect(scanWith('createWorkspaceHandoff')).toEqual([])
+    expect(scanWith('createConsoleStore')).toEqual([])
+  })
 
   it('flags the #98 pattern: an eager memo in the hook, the late read at the call site', () => {
     const hook = `

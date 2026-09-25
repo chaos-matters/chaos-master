@@ -11,7 +11,7 @@
     "flam3:compat": "node scripts/flam3-compat.mjs",
     "serve": "vite preview",
     "prod": "vite build && vite preview",
-    "e2e:serve": "VITE_GA_ID= vite build && vite preview --port 4173 --strictPort",
+    "e2e:serve": "VITE_GA_ID= vite build && vite preview --strictPort",
     "start": "vite",
     "test": "vitest",
     "test:scripts": "node --test scripts/gallery-poster-manifest.test.mjs scripts/synthesize-steps.test.mjs",

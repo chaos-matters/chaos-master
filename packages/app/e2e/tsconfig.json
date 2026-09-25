@@ -1,0 +1,13 @@
+// The headed-GPU Playwright specs, their helpers, and the config that runs
+// them (playwright.resilience.config.ts). `pnpm typecheck` checks this project
+// beside tests/tsconfig.json; the app's own tsconfig excludes e2e/ so its
+// program stays packages/app/src.
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    // Node, not the browser set the root config names: the specs run in Node
+    // and drive the page through Playwright.
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../playwright.resilience.config.ts"]
+}

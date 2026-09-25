@@ -18,17 +18,29 @@
 //                                              # ...unless the key is named
 //   node scripts/code-metrics.mjs --with-lint  # include eslint warning counts
 //                                              # (slow: runs the full lint)
+//   node scripts/code-metrics.mjs --lint-report=<file>
+//                                              # the same keys, read from a
+//                                              # JSON report ESLint already
+//                                              # wrote (CI's build job)
+//   node scripts/code-metrics.mjs --lower-caps # lower every per-file cap that
+//                                              # can go down; never raises one
+//
+// --check also holds every source file of 800 lines or more to its own cap in
+// docs/agent/code-metrics.file-caps.json (scripts/file-caps.mjs says how).
+// The caps file is edited by hand or by --lower-caps, never by --update.
 //
 // See docs/agent/METRICS.md for why these metrics and not others.
 // ============================================================
 
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, } from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { extname, join, relative, resolve } from 'node:path'
 import ts from 'typescript'
+import { atBucketEdge, CAP_FLOOR, capFailures, checkFileCaps, formatCaps, lowerCaps, } from './file-caps.mjs'
 
 const ROOT = process.cwd()
 const BASELINE = join(ROOT, 'docs/agent/code-metrics.baseline.json')
+const FILE_CAPS = join(ROOT, 'docs/agent/code-metrics.file-caps.json')
 const argv = process.argv.slice(2)
 const has = (f) => argv.includes(f)
 
@@ -202,30 +214,87 @@ for (const [prefix, file] of COVERAGE) {
   m[`${prefix}_branches_pct`] = c.branches.pct
 }
 
-if (has('--with-lint')) {
+// The lint keys come from a fresh ESLint run (--with-lint), or from the JSON
+// report an earlier run wrote (--lint-report=<file>). CI's lint job uses the
+// second: its lint step writes the report through
+// scripts/eslint-report-formatter.mjs, so the ratchet costs no second pass.
+const lintReportArg = argv.find((a) => a.startsWith('--lint-report='))
+const lintReport = lintReportArg?.slice('--lint-report='.length)
+const withLint = has('--with-lint') || lintReport !== undefined
+
+function lintFailed(why) {
+  console.error(`${why}; the lint metrics cannot be measured.`)
+  process.exit(2)
+}
+
+let lintResults
+if (lintReport !== undefined) {
+  // A missing, empty or unreadable report is no run, never a clean one.
+  // resolve, not join: an absolute path is taken as given.
+  const file = resolve(ROOT, lintReport)
+  if (!existsSync(file)) lintFailed(`no ESLint report at ${lintReport}`)
   try {
-    const out = execFileSync('pnpm', ['exec', 'eslint', '--format', 'json'], {
-      cwd: ROOT,
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-      env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=6144' },
-    })
-    const res = JSON.parse(out)
-    let warn = 0,
-      err = 0,
-      complexity = 0
-    for (const f of res) {
-      err += f.errorCount
-      warn += f.warningCount
-      complexity += f.messages.filter((x) => x.ruleId === 'complexity').length
-    }
-    m.eslint_errors = err
-    m.eslint_warnings = warn
-    m.eslint_complexity_warnings = complexity
+    lintResults = JSON.parse(readFileSync(file, 'utf8'))
   } catch {
-    console.error('eslint run failed; skipping lint metrics')
+    lintFailed(`${lintReport} is not an ESLint JSON report`)
+  }
+  if (!Array.isArray(lintResults) || lintResults.length === 0)
+    lintFailed(`${lintReport} lists no linted files`)
+} else if (has('--with-lint')) {
+  // ESLint exits 1 when it found an error and still prints its full report,
+  // so 0 and 1 are both a run to count. Only a crash (2, a signal, or output
+  // that is not the JSON report) is no run. This used to catch every non-zero
+  // exit and skip the lint keys, which let `eslint_errors` go from 0 to
+  // anything with a green check. Now a lint run that was asked for and did
+  // not happen fails the command.
+  const run = spawnSync('pnpm', ['exec', 'eslint', '--format', 'json'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=6144' },
+  })
+  try {
+    if (run.status !== 0 && run.status !== 1) throw new Error()
+    lintResults = JSON.parse(run.stdout)
+  } catch {
+    const tail = (run.stderr ?? '').slice(-2000)
+    lintFailed(
+      `eslint did not produce a report (exit ${run.status}, signal ` +
+        `${run.signal})\n${tail}`,
+    )
   }
 }
+
+if (lintResults !== undefined) {
+  let warn = 0,
+    err = 0,
+    complexity = 0,
+    maxComplexity = 0
+  for (const f of lintResults) {
+    err += f.errorCount
+    warn += f.warningCount
+    for (const x of f.messages) {
+      if (x.ruleId !== 'complexity') continue
+      complexity++
+      // "... has a complexity of 73. Maximum allowed is 20."
+      const n = Number(/complexity of (\d+)/.exec(x.message)?.[1] ?? 0)
+      if (n > maxComplexity) maxComplexity = n
+    }
+  }
+  m.eslint_errors = err
+  m.eslint_warnings = warn
+  m.eslint_complexity_warnings = complexity
+  // The worst function, not only how many are over the line: a count holds
+  // planGlide's 73 no better than a 21.
+  m.eslint_max_complexity = maxComplexity
+}
+
+// -- Per-file caps ------------------------------------------------------
+
+const counts = new Map(sorted.map((r) => [r.f.split('\\').join('/'), r.n]))
+const caps = existsSync(FILE_CAPS)
+  ? JSON.parse(readFileSync(FILE_CAPS, 'utf8'))
+  : null
 
 // -- Report -------------------------------------------------------------
 
@@ -247,6 +316,7 @@ const LOWER_IS_BETTER = new Set([
   'eslint_errors',
   'eslint_warnings',
   'eslint_complexity_warnings',
+  'eslint_max_complexity',
 ])
 const HIGHER_IS_BETTER = new Set([
   'test_files',
@@ -262,6 +332,36 @@ const HIGHER_IS_BETTER = new Set([
 
 if (has('--json')) {
   console.log(JSON.stringify(m, null, 2))
+  process.exit(0)
+}
+
+if (has('--lower-caps')) {
+  if (caps === null) {
+    console.error(`No caps file at ${relative(ROOT, FILE_CAPS)}.`)
+    process.exit(1)
+  }
+  const lowered = lowerCaps(counts, caps)
+  const changed = Object.keys(caps).filter((k) => lowered[k] !== caps[k])
+  writeFileSync(FILE_CAPS, formatCaps(lowered))
+  for (const k of changed) {
+    console.log(
+      k in lowered
+        ? `  lowered ${k}: ${caps[k]} -> ${lowered[k]}`
+        : `  removed ${k} (cap ${caps[k]})`,
+    )
+  }
+  console.log(
+    `${changed.length} cap(s) changed in ${relative(ROOT, FILE_CAPS)}. ` +
+      'Nothing was raised or added.',
+  )
+  const left = capFailures(checkFileCaps(counts, lowered))
+  if (left.length) {
+    console.error(
+      '\nStill failing, and only a hand edit or a split fixes it:\n',
+    )
+    for (const l of left) console.error(`  ${l}`)
+    process.exit(1)
+  }
   process.exit(0)
 }
 
@@ -307,6 +407,17 @@ for (const [k, v] of Object.entries(m)) console.log(`  ${pad(k, 30)}${v}`)
 console.log('\nLargest files\n')
 for (const r of sorted.slice(0, 10)) console.log(`  ${pad(r.n, 8)}${r.f}`)
 
+const edge = atBucketEdge(counts)
+if (edge.length) {
+  console.log('\nSitting exactly on a bucket edge (one more line crosses it)\n')
+  for (const r of edge) console.log(`  ${pad(r.lines, 8)}${r.file}`)
+}
+const cappedCount = [...counts.values()].filter((n) => n >= CAP_FLOOR).length
+console.log(
+  `\nPer-file caps: ${cappedCount} files of ${CAP_FLOOR} lines or more, ` +
+    `each held to its cap in ${relative(ROOT, FILE_CAPS)}`,
+)
+
 console.log('\nLargest logic file (largest_logic_file_loc)\n')
 console.log(`  ${pad(largestLogic.n, 8)}${largestLogic.f}`)
 console.log(
@@ -331,13 +442,34 @@ if (has('--check')) {
     if (HIGHER_IS_BETTER.has(k) && v < base[k])
       regressions.push(`${k}: ${base[k]} -> ${v}`)
   }
+  // Asked for the lint keys: every one the baseline tracks must have been
+  // measured, or the check would pass on keys it never compared.
+  if (withLint) {
+    for (const k of Object.keys(base).filter((x) => x.startsWith('eslint_'))) {
+      if (!(k in m)) regressions.push(`${k}: not measured by this run`)
+    }
+  }
+  const capProblems =
+    caps === null
+      ? [`no caps file at ${relative(ROOT, FILE_CAPS)}`]
+      : capFailures(checkFileCaps(counts, caps))
   if (regressions.length) {
     console.error('\nRatchet failed. These got worse:\n')
     for (const r of regressions) console.error(`  ${r}`)
     console.error(
       '\nFix them, or run --update and justify it in the commit message.',
     )
-    process.exit(1)
   }
-  console.log('\nRatchet OK: nothing tracked got worse.')
+  if (capProblems.length) {
+    console.error(
+      `\nPer-file caps failed (${relative(ROOT, FILE_CAPS)}, ` +
+        'scripts/file-caps.mjs):\n',
+    )
+    for (const r of capProblems) console.error(`  ${r}`)
+  }
+  if (regressions.length || capProblems.length) process.exit(1)
+  console.log(
+    '\nRatchet OK: nothing tracked got worse, and every file of ' +
+      `${CAP_FLOOR} lines or more is at its cap.`,
+  )
 }

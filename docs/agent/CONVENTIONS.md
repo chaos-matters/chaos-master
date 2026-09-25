@@ -113,11 +113,14 @@ WebGPU. Anything that can live there should, because it is the part of the
 tree that is trivially testable: it holds 16 test files against the app's 334,
 and 84.89% line coverage against the app's 53.22%.
 
-`pnpm arch` enforces the rule as `core-stays-pure` for imports of
-`packages/app`. It does not see npm packages today (the dependency-cruiser
-config excludes `node_modules` from the graph), and core does import `typegpu`
-in `math/affineTransform.ts`, `math/affineTransform3D.ts` and `utils/schemaUtil.ts`;
-see [CODE-HEALTH.md](CODE-HEALTH.md) §3. Do not add another.
+`pnpm arch` enforces it with three rules. `core-stays-pure` refuses Solid,
+`@webgpu/*` and any other workspace package. `core-declared-deps-only` refuses
+every import that is not one of core's declared `dependencies` (valibot,
+structurajs, typegpu): no dev dependency, no package only the root or the app
+declares, no Node built-in. `core-typegpu-frozen` keeps typegpu to the three
+core files that import it today, `math/affineTransform.ts`,
+`math/affineTransform3D.ts` and `utils/schemaUtil.ts`, until BUGS.md #33 is
+settled; see [CODE-HEALTH.md](CODE-HEALTH.md) §3. A fourth file is an error.
 
 A module in core with a twin in the app is re-exported by the app, not copied
 (`utils/easing.ts`, `utils/record.ts` and `utils/schemaUtil.ts` since #115).
@@ -147,18 +150,18 @@ remember: `alwaysOnTestList.test.ts` fails and names the list to add it to.
 
 **The guards.** Each one is a test or a CI check, not a review comment:
 
-| Guard                                 | What it holds                                                                                                                                            | Runs                          |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `moduleScopeComputations.test.ts`     | no Solid computation at module scope (§3)                                                                                                                | every test run                |
-| `eagerComputationOrder.test.ts`       | no eager computation reads a later binding, including across a `useWorkspace*` hook boundary (§3)                                                        | every test run                |
-| `lazyBoundaries.test.ts`              | no lazily loaded module is statically reachable (§4)                                                                                                     | every test run                |
-| `mainWorkspaceSize.test.ts`           | `MainWorkspace.tsx` has **exactly** `MAX_LINES` lines (4,546 at `9fc08078`): more fails, and fewer fails until `MAX_LINES` is lowered in the same change | every test run                |
-| `alwaysOnTestList.test.ts`            | every filesystem-reading test is on the always-on list                                                                                                   | every test run                |
-| `tests/kitchen-sink-mount.ci.spec.ts` | share links with every optional branch on mount with no page error                                                                                       | CI e2e                        |
-| `pnpm arch`                           | no import cycle, no orphan module, no `packages/app` import from core; all errors                                                                        | `health` job, PRs and main    |
-| `pnpm metrics:check`                  | no tracked metric regresses, including `largest_logic_file_loc` and the test floors (`test_files`, `test_cases`)                                         | `health` job, PRs and main    |
-| `pnpm docs:index:check`               | [INDEX.md](INDEX.md) matches the tree                                                                                                                    | `health` job, PRs and main    |
-| `pnpm docs:cite`                      | every `file:line` citation in a living doc still names its symbol (§9)                                                                                   | `citations` job, PRs and main |
+| Guard                                 | What it holds                                                                                                                                                                                                                    | Runs                                   |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `moduleScopeComputations.test.ts`     | no Solid computation at module scope (§3)                                                                                                                                                                                        | every test run                         |
+| `eagerComputationOrder.test.ts`       | no eager computation reads a later binding, including across a `useWorkspace*` hook boundary (§3)                                                                                                                                | every test run                         |
+| `lazyBoundaries.test.ts`              | no lazily loaded module is statically reachable (§4)                                                                                                                                                                             | every test run                         |
+| `mainWorkspaceSize.test.ts`           | `MainWorkspace.tsx` has **exactly** the lines its entry in `docs/agent/code-metrics.file-caps.json` names (4,546 at `9fc08078`): more fails, and fewer fails until the entry is lowered in the same change (`pnpm metrics:caps`) | every test run                         |
+| `alwaysOnTestList.test.ts`            | every filesystem-reading test is on the always-on list                                                                                                                                                                           | every test run                         |
+| `tests/kitchen-sink-mount.ci.spec.ts` | share links with every optional branch on mount with no page error                                                                                                                                                               | CI e2e                                 |
+| `pnpm arch`                           | no import cycle, no orphan module, no `packages/app` import from core; all errors                                                                                                                                                | `health` job, PRs and main             |
+| `pnpm metrics:check`                  | no tracked metric regresses, including `largest_logic_file_loc` and the test floors (`test_files`, `test_cases`)                                                                                                                 | `lint` and `health` jobs, PRs and main |
+| `pnpm docs:index:check`               | [INDEX.md](INDEX.md) matches the tree                                                                                                                                                                                            | `health` job, PRs and main             |
+| `pnpm docs:cite`                      | every `file:line` citation in a living doc still names its symbol (§9)                                                                                                                                                           | `citations` job, PRs and main          |
 
 `MainWorkspace.tsx` is where new code goes to hide: put new logic in a hook
 (`hooks/useWorkspace*`) or a component instead. The metrics ratchet only

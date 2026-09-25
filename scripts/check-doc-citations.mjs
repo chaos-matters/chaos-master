@@ -597,7 +597,10 @@ function gitLines(root, args) {
 }
 
 function workingTree(root) {
-  const files = gitLines(root, ['ls-files'])
+  // One entry per path. During an unresolved merge `git ls-files` lists a
+  // conflicted path once per stage, which checked a conflicted document three
+  // times and made a conflicted source file match its own suffix three times.
+  const files = [...new Set(gitLines(root, ['ls-files']))]
   const cache = new Map()
   return {
     files,
