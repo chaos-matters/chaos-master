@@ -400,15 +400,20 @@ export function mutateTransformVariations(
 }
 
 /**
- * Assign equal probabilities to all final surviving transforms.
+ * Assign equal probabilities to the user's surviving transforms. Symmetry
+ * copies are left alone: they carry `symmetryWeight` of the user transforms
+ * (flame/symmetry.ts), and `reweighSymmetryCopies` writes it once these are
+ * set.
  */
 export function normalizeTransformProbabilities(
   transforms: Record<string, unknown>,
 ): void {
-  const finalEntries = recordEntries(transforms)
-  if (finalEntries.length > 0) {
-    const p = 1 / finalEntries.length
-    for (const [, ft] of finalEntries) {
+  const userEntries = recordEntries(transforms).filter(
+    ([tid]) => !isSymmetryCopyId(tid),
+  )
+  if (userEntries.length > 0) {
+    const p = 1 / userEntries.length
+    for (const [, ft] of userEntries) {
       ;(ft as { probability: number }).probability = p
     }
   }

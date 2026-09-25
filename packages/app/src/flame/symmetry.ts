@@ -89,6 +89,20 @@ export function symmetryWeight(
   return Math.max(total, 1)
 }
 
+/**
+ * Gives every `_sym__` transform the weight `applySymmetryToFlame` would
+ * write for the flame's other transforms as they are now. For a writer that
+ * changes the user's probabilities and keeps the copies, as Mutate does.
+ */
+export function reweighSymmetryCopies(
+  transforms: FlameDescriptor['transforms'],
+): void {
+  const weight = symmetryWeight(transforms)
+  for (const [tid, transform] of Object.entries(transforms)) {
+    if (tid.startsWith('_sym__')) transform.probability = weight
+  }
+}
+
 /** One generated symmetry transform around `preAffine`. */
 export function symmetryTransform(
   preAffine: AffineTerms,
