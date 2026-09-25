@@ -22,7 +22,7 @@ engine itself beyond the tracks the arena writes into it, or `VariationPreview` 
 - `packages/app/src/commands/types.ts:56-135` — `ArenaFighterStats` and the optional `arena` facade shape
 - `packages/app/src/flame/schoolVariations.ts` — the variation lists behind the schools, and the type a variation counts as
 - `packages/app/src/flame/stats.ts` — grounded stats, school classification, deterministic combat resolution
-- `packages/app/src/flame/symmetry.ts` — `applySymmetryToFlame`, behind the C1–C8 pills
+- `packages/app/src/flame/symmetry.ts` — `applySymmetryToFlame`, behind the C1–C8 pills, and the builders it shares with the `flame.applySymmetry` command
 - `packages/app/src/flame/flameClashChoreography.ts` — the four-phase kinetic keyframe choreography
 - `packages/app/src/webmcp/tools/arenaArchetypes.ts` — the six archetypes, the four stances, `generateArchetypeOpponent`
 - `packages/app/src/webmcp/tools/createClashFlame.ts` — 2D/3D staging of two fighters into one descriptor
@@ -184,7 +184,7 @@ grounded stats and power level from the rewritten flame.
 _(`ArenaOverlay.tsx:429-460` (`handleApplySymmetry`), pill wiring at
 `ArenaOverlay/ArenaFighterCard.tsx:143-163` (`onApplySymmetry`), one card per fighter;
 `applySymmetryToFlame` deletes every existing `_sym__` transform before adding
-`folds - 1` new ones, `symmetry.ts:18-27` (`_sym__`).)_
+`folds - 1` new ones, `symmetry.ts:125-129` (`_sym__`).)_
 
 ### REQ-AA-014 — Grounded stats are derived from flame structure, not invented
 
@@ -213,12 +213,14 @@ _(`stats.ts:398-414` (`transforms`))_
 ### REQ-AA-016 — Explicit symmetry transforms outrank angle detection
 
 **If** the flame carries visible `_sym__`-prefixed transforms, **then** the symmetry
-order shall be `min(8, count + 1)`; otherwise it shall be inferred from the spread of
+order shall be `min(8, n)`, where n is the fold count of that set: the count plus one
+for a rotational set, and the count itself for a dihedral set, whose mirror is not a
+fold; otherwise it shall be inferred from the spread of
 pre-affine rotation angles, returning the largest `k ∈ {8,6,5,4,3,2}` whose `2π/k`
 spacing matches within `0.18` rad, and falling back to 2 when symmetry-family variations
 are present and 1 when they are not.
 
-_(`stats.ts:361-387` (`detectRotationalSymmetryOrder`), `:496-502` (`symTransformCount`))_
+_(`stats.ts:362-388` (`detectRotationalSymmetryOrder`), `:499-505` (`symTransforms`), `symmetryDetection.ts` (`detectSymmetryFolds`))_
 
 ### REQ-AA-017 — Only visible transforms contribute to grounded stats
 
