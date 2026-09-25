@@ -8,6 +8,7 @@
 
 import { scoreFlame as evaluateFlameFitness } from './fitness'
 import { drawnType, LINEAR_VARIATIONS, SYMMETRY_VARIATIONS, TIDE_VARIATIONS, VOID_VARIATIONS, VORTEX_VARIATIONS, } from './schoolVariations'
+import { detectSymmetryFolds } from './symmetryDetection'
 import type { FlameDescriptor } from './schema/flameSchema'
 
 export type FlameSchool =
@@ -493,12 +494,14 @@ export function calculateGroundedStats(
   )
 
   // Symmetry Order
-  const symTransformCount = Object.entries(flame.transforms ?? {}).filter(
-    ([k, t]) => k.startsWith('_sym__') && t.visible,
-  ).length
+  // The fold count of the visible generated set: a dihedral set's mirror is
+  // not one more fold.
+  const symTransforms = Object.entries(flame.transforms ?? {})
+    .filter(([k, t]) => k.startsWith('_sym__') && t.visible)
+    .map(([, t]) => t)
   const symmetryOrder =
-    symTransformCount > 0
-      ? Math.min(8, symTransformCount + 1)
+    symTransforms.length > 0
+      ? Math.min(8, detectSymmetryFolds(symTransforms))
       : detectRotationalSymmetryOrder(angles, hasSymmetryVars)
 
   // Beauty from fitness
