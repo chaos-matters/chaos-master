@@ -9,10 +9,20 @@ export const BENCHMARKS_PATH = '/benchmarks'
 export const EXPLORER_PATH = '/explore'
 
 /**
+ * The Flame Clash preview: reachable by its URL only, with no link from the
+ * editor while the clash is being built.
+ */
+export const CLASH_PATH = '/clash'
+
+/**
  * The routes served as pages of their own. Renaming a route here renames it
  * everywhere.
  */
-export const PAGE_ROUTES: readonly string[] = [BENCHMARKS_PATH, EXPLORER_PATH]
+export const PAGE_ROUTES: readonly string[] = [
+  BENCHMARKS_PATH,
+  EXPLORER_PATH,
+  CLASH_PATH,
+]
 
 /**
  * The page route a path shows, if any. Each route has three spellings: its
@@ -36,4 +46,8 @@ export function isBenchmarksPath(pathname: string): boolean {
 
 export function isExplorerPath(pathname: string): boolean {
   return pageRouteOf(pathname) === EXPLORER_PATH
+}
+
+export function isClashPath(pathname: string): boolean {
+  return pageRouteOf(pathname) === CLASH_PATH
 }

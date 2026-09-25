@@ -32,7 +32,7 @@ not a gap.
 - `packages/app/src/utils/audioWiringPresets.ts` — render-only and flame-aware presets
 - `packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx` — the wiring editor
   (connect/replace, defaults, its own undo stack, import/export, shortcuts)
-- `packages/app/src/flame/Flam3.tsx:563-615` (`deepClone`), `:1262-1269` (`isAutoFpsReady`) — where the timeline overlay is
+- `packages/app/src/flame/Flam3.tsx:551-603` (`deepClone`), `:1251-1258` (`isAutoFpsReady`) — where the timeline overlay is
   applied to the rendered flame and where playback advances
 - `packages/app/src/components/Timeline/hooks/useSeekScrubber.ts` — scrub gesture
 
@@ -373,7 +373,7 @@ consumer that overlays animated values onto the rendered flame shall gate on tha
 accessor rather than on `isPlaying()` alone — otherwise a frame reached by
 clicking or stepping renders its camera but not its transforms.
 
-_(`utils/timeline.ts:774-775` (`isDrivingView`); consumed at `Flam3.tsx:590-593` (`isActive`).)_
+_(`utils/timeline.ts:774-775` (`isDrivingView`); consumed at `Flam3.tsx:578-581` (`isActive`).)_
 
 ### REQ-TA-025 — A seeked frame outlives the gesture that reached it
 
@@ -397,7 +397,7 @@ time the current frame reaches target quality, and the timeline shall report the
 achieved rate as an exponential moving average (`0.8` prior, `0.2` new sample),
 reported as `undefined` whenever playback stops.
 
-_(`Flam3.tsx:591-614` (`createEffect`) and `:1262-1269` (`isAutoFpsReady`); `utils/timeline.ts:1437-1458` (`advanceFrame`), `:758-762` (`resetFpsMeter`).)_
+_(`Flam3.tsx:579-602` (`createEffect`) and `:1251-1258` (`isAutoFpsReady`); `utils/timeline.ts:1437-1458` (`advanceFrame`), `:758-762` (`resetFpsMeter`).)_
 
 ### REQ-TA-027 — Playback without loop stops at the end
 

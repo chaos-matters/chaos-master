@@ -175,6 +175,15 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
 
+  // Golden record of every IFS compute shader. The graph reaches the modules
+  // that write the shaders, but not the record: a regenerated record alone
+  // would otherwise go unchecked until main.
+  {
+    file: 'src/flame/ifsPipeline.wgslGolden.test.ts',
+    why: 'golden record of every IFS shader, the proof that a flame without clash teams compiles exactly as before; reads its fixtures through node:fs',
+    genre: 'filesystem',
+  },
+
   // Not a filesystem test. On the list because constructing the whole app
   // tree is the cheapest check that a change did not break mounting, and a
   // few seconds is worth it on every pull request.

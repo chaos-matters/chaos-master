@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isBenchmarksPath, isExplorerPath, PAGE_ROUTES, pageRouteOf, } from './appPath'
+import { isBenchmarksPath, isClashPath, isExplorerPath, PAGE_ROUTES, pageRouteOf, } from './appPath'
 
 describe('isBenchmarksPath', () => {
   it.each(['/benchmarks', '/benchmarks/', '/benchmarks/index.html'])(
@@ -29,6 +29,22 @@ describe('isExplorerPath', () => {
     'does not match %s',
     (pathname) => {
       expect(isExplorerPath(pathname)).toBe(false)
+    },
+  )
+})
+
+describe('isClashPath', () => {
+  it.each(['/clash', '/clash/', '/clash/index.html'])(
+    'matches %s',
+    (pathname) => {
+      expect(isClashPath(pathname)).toBe(true)
+    },
+  )
+
+  it.each(['/', '/clashes', '/clash/arena', '/arcade', '/explore'])(
+    'does not match %s',
+    (pathname) => {
+      expect(isClashPath(pathname)).toBe(false)
     },
   )
 })

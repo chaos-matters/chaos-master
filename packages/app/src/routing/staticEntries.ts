@@ -1,14 +1,14 @@
 /**
  * The files a plain static host needs to serve the app's path routes.
  *
- * On Cloudflare the Worker routes /benchmarks, /explore and /arcade, but a host
- * that only serves files (the Deno Deploy PR previews) answers them with a
- * 404. So the build writes a file for each: a copy of index.html in each page
- * route's folder, and a redirect page for /arcade. Such a host redirects
- * /explore to /explore/, one folder down, where the copy's relative asset URLs
- * would miss; they climb out of the folder instead, and the canonical link
- * names the route rather than the home page. The Vite plugin in
- * vite.config.ts emits the files; Cloudflare serves the same ones.
+ * On Cloudflare the Worker routes /benchmarks, /explore, /clash and /arcade,
+ * but a host that only serves files (the Deno Deploy PR previews) answers
+ * them with a 404. So the build writes a file for each: a copy of index.html
+ * in each page route's folder, and a redirect page for /arcade. Such a host
+ * redirects /explore to /explore/, one folder down, where the copy's relative
+ * asset URLs would miss; they climb out of the folder instead, and the
+ * canonical link names the route rather than the home page. The Vite plugin
+ * in vite.config.ts emits the files; Cloudflare serves the same ones.
  */
 import { PAGE_ROUTES } from './appPath'
 

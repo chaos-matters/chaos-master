@@ -231,7 +231,7 @@ after schema validation.
 > **Known deviation:** `packages/app/src/flame/stats.ts:428` (`visible`) — the loop reads
 > `if (!t.visible) continue`, so every transform of an unvalidated agent-supplied flame
 > is skipped and the fighter falls through to the REQ-AA-015 fallback block. The
-> schema materialises `visible: true` (`packages/core/src/schema/flameSchema.ts:261`)
+> schema materialises `visible: true` (`packages/core/src/schema/flameSchema.ts:275`)
 > only for flames that have been through `v.parse`, which `arena_get_stats`,
 > `simulate_clash` and `create_clash_flame` never do for a caller-supplied `flame`.
 > The sibling helper `calculateStructuralSymmetry` in `webmcp/tools/scoreFlame.ts` uses

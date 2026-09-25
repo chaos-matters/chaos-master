@@ -4,7 +4,9 @@
  * rebuild its IFS pipeline with the new code: once per edit, with no
  * structural edit, and not when the saved library loads before it renders.
  * An export keeps the code it started with until it ends, and a saved
- * library with a broken entry does not stop the next edit from showing.
+ * library with a broken entry does not stop the next edit from showing. The
+ * Flame Clash stage, which draws its fight flame through Flam3, shows an edit
+ * to a custom variation either fighter draws the same way.
  *
  * Flam3 is the real one, on a stand-in GPU root that records the compute
  * function of each IFS pipeline it compiles. Its render loops and its filter
@@ -16,12 +18,14 @@ import { createSignal } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { vec4f } from 'typegpu/data'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ClashStage } from '@/components/ClashStage/ClashStage'
 import { Camera3DContextProvider } from '@/lib/Camera3DContext'
 import { CameraContextProvider } from '@/lib/CameraContext'
 import { CanvasContextProvider } from '@/lib/CanvasContext'
 import { RootContextProvider } from '@/lib/RootContext'
 import { legacyRandomOutputSlot } from '@/shaders/random'
 import { recordEntries } from '@/utils/record'
+import { clashFighter } from './clash/fightFlame'
 import { examples } from './examples'
 import { Flam3 } from './Flam3'
 import { createIFSPipeline } from './ifsPipeline'
@@ -29,12 +33,14 @@ import { createIFSPipeline3D } from './ifsPipeline3D'
 import { setExportQuality } from './renderStats'
 import { generateVariationId } from './transformFunction'
 import { clearAllCustomVariations, createCustomVariation, deleteCustomVariation, loadCustomVariations, restoreCustomVariation, updateCustomVariation, } from './variations/custom'
-import type { Accessor, ComponentProps } from 'solid-js'
+import type { Accessor, ComponentProps, JSX, ParentProps } from 'solid-js'
 import type * as ColorGrading from './colorGrading'
 import type * as IfsPipeline from './ifsPipeline'
 import type * as IfsPipeline3D from './ifsPipeline3D'
 import type * as RenderDrivers from './renderDrivers'
 import type { FlameDescriptor } from './schema/flameSchema'
+import type * as AutoCanvasModule from '@/lib/AutoCanvas'
+import type * as Camera3DModule from '@/lib/Camera3D'
 
 vi.mock('./ifsPipeline', async (importOriginal) => {
   const original = await importOriginal<typeof IfsPipeline>()
@@ -64,6 +70,15 @@ vi.mock('./densityEstimationPipeline', () => ({
 }))
 vi.mock('./adaptiveBlurPipeline', () => ({
   createAdaptiveBlurPipeline: () => inert(),
+}))
+// The clash stage's own canvas and camera: Providers stands in for both.
+vi.mock('@/lib/AutoCanvas', async (importOriginal) => ({
+  ...(await importOriginal<typeof AutoCanvasModule>()),
+  AutoCanvas: (props: ParentProps) => <>{props.children}</>,
+}))
+vi.mock('@/lib/Camera3D', async (importOriginal) => ({
+  ...(await importOriginal<typeof Camera3DModule>()),
+  Default3DPreviewCamera: (props: ParentProps) => <>{props.children}</>,
 }))
 
 /** An object whose every method does nothing. */
@@ -151,22 +166,14 @@ type ExportProps = Pick<
   'exportDriver' | 'isExportRenderer'
 >
 
-/**
- * Mounts a Flam3 drawing `flame` on a recording root, as an open canvas, or
- * as an export's canvas with `exportProps`. An accessor plays frames.
- */
-function renderFlame(
-  flame: FlameDescriptor | Accessor<FlameDescriptor>,
-  exportProps: ExportProps = {},
-) {
-  const { root, compiled } = recordingRoot()
-  const current = typeof flame === 'function' ? flame : () => flame
-  render(() => (
+/** The GPU root, canvas and cameras a Flam3 reads, around `children`. */
+function Providers(props: { root: object; children: JSX.Element }) {
+  return (
     <RootContextProvider
       value={{
         adapter: {} as never,
         device: device as never,
-        root: root as never,
+        root: props.root as never,
         gpuReady: () => false,
       }}
     >
@@ -181,20 +188,56 @@ function renderFlame(
       >
         <CameraContextProvider value={camera as never}>
           <Camera3DContextProvider value={camera as never}>
-            <Flam3
-              quality={1}
-              pointCountPerBatch={64}
-              renderInterval={1}
-              adaptiveFilterEnabled={true}
-              animationEnabled={false}
-              flameDescriptor={current()}
-              edgeFadeColor={vec4f(0)}
-              {...exportProps}
-            />
+            {props.children}
           </Camera3DContextProvider>
         </CameraContextProvider>
       </CanvasContextProvider>
     </RootContextProvider>
+  )
+}
+
+/**
+ * Mounts a Flam3 drawing `flame` on a recording root, as an open canvas, or
+ * as an export's canvas with `exportProps`. An accessor plays frames.
+ */
+function renderFlame(
+  flame: FlameDescriptor | Accessor<FlameDescriptor>,
+  exportProps: ExportProps = {},
+) {
+  const { root, compiled } = recordingRoot()
+  const current = typeof flame === 'function' ? flame : () => flame
+  render(() => (
+    <Providers root={root}>
+      <Flam3
+        quality={1}
+        pointCountPerBatch={64}
+        renderInterval={1}
+        adaptiveFilterEnabled={true}
+        animationEnabled={false}
+        flameDescriptor={current()}
+        edgeFadeColor={vec4f(0)}
+        {...exportProps}
+      />
+    </Providers>
+  ))
+  return compiled
+}
+
+/** Mounts a Flame Clash stage, fighter `a` against `b`, on a recording root. */
+function renderClash(a: FlameDescriptor, b: FlameDescriptor) {
+  const { root, compiled } = recordingRoot()
+  render(() => (
+    <Providers root={root}>
+      <ClashStage
+        a={clashFighter(a)}
+        b={clashFighter(b)}
+        winner="A"
+        reducedMotion={false}
+        renderScale={1}
+        pointCountPerBatch={64}
+        onReducedMotionChange={() => {}}
+      />
+    </Providers>
   ))
   return compiled
 }
@@ -374,3 +417,33 @@ describe.each([
     expect(wgslOf(compiled.at(-1))).toContain('2.625')
   })
 })
+
+describe.each([
+  ['a 3D fighter', examples.example40],
+  ['a 2D fighter', examples.example2],
+] as const)(
+  'an open Flame Clash stage, %s drawing the custom variation',
+  (_fighter, base) => {
+    it('rebuilds once, with the new code, when the custom variation is edited', () => {
+      const made = createCustomVariation('Stretch', BEFORE)
+      if (!made.success) throw new Error(JSON.stringify(made.errors))
+      const compiled = renderClash(
+        flameUsing(made.def.id, base),
+        examples.example37,
+      )
+      expect(vi.mocked(createIFSPipeline3D)).toHaveBeenCalledTimes(1)
+      const before = wgslOf(compiled.at(-1))
+      // The team kernel's uniforms: the stage compiled a fight, not one flame.
+      expect(before).toContain('clashTeams')
+      expect(before).toContain('1.375')
+
+      const edited = updateCustomVariation(made.def.id, AFTER)
+      if (!edited.success) throw new Error(JSON.stringify(edited.errors))
+
+      expect(vi.mocked(createIFSPipeline3D)).toHaveBeenCalledTimes(2)
+      const after = wgslOf(compiled.at(-1))
+      expect(after).toContain('2.625')
+      expect(after).not.toContain('1.375')
+    })
+  },
+)
