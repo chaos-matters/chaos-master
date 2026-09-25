@@ -57,6 +57,11 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
   {
+    file: 'src/oldBrandStrings.test.ts',
+    why: 'walks all of src/ for the old brand name outside comments',
+    genre: 'filesystem',
+  },
+  {
     file: 'src/viewTransitionCallers.test.ts',
     why: 'walks all of src/ for document.startViewTransition calls that bypass lib/viewTransition',
     genre: 'filesystem',

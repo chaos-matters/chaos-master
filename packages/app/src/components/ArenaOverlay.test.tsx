@@ -263,7 +263,7 @@ describe('ArenaOverlay Component', () => {
     }
 
     // Winner presentation card appears in center
-    expect(screen.getByText(/Chaos Master • Arena Champion/i)).toBeDefined()
+    expect(screen.getByText(/Lumen Apeiron • Arena Champion/i)).toBeDefined()
     expect(
       screen.getByRole('button', { name: /Next Challenger/i }),
     ).toBeDefined()

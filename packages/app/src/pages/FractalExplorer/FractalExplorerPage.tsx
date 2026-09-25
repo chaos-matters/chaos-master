@@ -268,7 +268,7 @@ export function FractalExplorerPage() {
       </div>
 
       <header class={ui.hud}>
-        <a class={ui.iconButton} href="/" aria-label="Back to Chaos Master">
+        <a class={ui.iconButton} href="/" aria-label="Back to Lumen Apeiron">
           <ChevronLeft />
         </a>
         <div class={ui.titleBlock}>

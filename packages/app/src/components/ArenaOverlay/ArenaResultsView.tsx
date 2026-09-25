@@ -37,7 +37,7 @@ export function WinnerTrophyCard(props: WinnerTrophyCardProps) {
   return (
     <div class={ui.winnerTrophyCard}>
       <div class={ui.winnerTrophyHeader}>
-        <span class={ui.winnerTrophyTitle}>Chaos Master • Arena Champion</span>
+        <span class={ui.winnerTrophyTitle}>Lumen Apeiron • Arena Champion</span>
         <Show when={props.winStreak > 0}>
           <div class={ui.streakBadge} title="Current Arena Win Streak">
             <Star class={ui.streakFire} aria-hidden="true" />
