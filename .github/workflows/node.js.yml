@@ -36,12 +36,30 @@ jobs:
         node-version: 24.x
 
     - name: Install all dependencies
+      id: install
       run: |
         corepack enable
         pnpm install
 
+    # Also writes the full report to eslint-report.json, which the metrics
+    # step below reads to ratchet the eslint_* keys without a second
+    # type-aware pass (scripts/eslint-report-formatter.mjs). The log shows the
+    # usual stylish output.
     - name: Lint code
-      run: pnpm lint
+      run: pnpm lint --format ./scripts/eslint-report-formatter.mjs
+      env:
+        ESLINT_JSON_REPORT: eslint-report.json
+
+    # The metrics ratchet with the lint keys and the per-file caps, here
+    # because the report above exists only on this job's runner. A bucket
+    # count, a per-file cap, a new warning or a more complex function that got
+    # worse fails the pull request that did it (WP3b). It runs whatever the
+    # lint step concluded, so a lint error never hides a ratchet failure; a
+    # lint step that wrote no report fails this step too. The coverage keys
+    # are held in `health`.
+    - name: Check the code metrics ratchet, the lint keys and the per-file caps
+      if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      run: pnpm metrics:check --lint-report=eslint-report.json
 
   typecheck:
     runs-on: ubuntu-latest
@@ -178,7 +196,10 @@ jobs:
   # The code-health checks: the generated index, the metrics ratchet and the
   # module graph. On pull requests too since 2026-09-24 (about 25 s), so a
   # change that moves a ratchet sees it fail before the merge, not main after
-  # it. They sit in their own job so that a ratchet failure can never hide a
+  # it. The coverage run is the exception: it is the app suite again,
+  # instrumented (6.5 min on 2026-09-23's runners), so it runs on main and on a
+  # manual run only, and a pull request's ratchet here skips the coverage_*
+  # keys. They sit in their own job so that a ratchet failure can never hide a
   # test failure, and so the branch that fixes a ratchet is obvious from the
   # job that went red.
   health:
@@ -199,11 +220,31 @@ jobs:
         pnpm install
 
     # Both scripts walk packages/ and read files. Neither builds a TypeScript
-    # program, so the raised heap the build job needs is not needed here.
+    # program, so they do without the raised heap of the lint, typecheck and
+    # test jobs.
     - name: Check the generated agent index is current
       run: pnpm docs:index:check
 
-    - name: Check the code metrics ratchet
+    # Writes packages/{app,core}/coverage-audit/coverage-summary.json, which
+    # is what gives the six coverage_* keys a value. Without it the ratchet
+    # skips them, and nothing in CI held a coverage floor. The app suite
+    # builds the same program as the test jobs, so it gets the same heap.
+    # Instrumented, the whole-tree scans run slower: the first run of this step
+    # timed out eagerComputationOrder.test.ts's in-file scan at 5.5 s against
+    # vitest's 5 s default (1.5 s for the whole file without coverage), so
+    # `pnpm test:coverage` gives the app suite a 30 s test timeout.
+    - name: Measure coverage
+      if: ${{ github.event_name != 'pull_request' }}
+      run: pnpm test:coverage
+      env:
+        NODE_OPTIONS: --max-old-space-size=6144
+
+    # With the coverage summaries above, the six coverage_* keys are compared
+    # too; on a pull request there are none, and the ratchet skips those keys.
+    # The eslint_* keys are not measured here: `lint` holds them on every run,
+    # from its lint step's report, and a second type-aware pass here would cost
+    # 1m45s for the same numbers.
+    - name: Check the code metrics ratchet, coverage keys included
       run: pnpm metrics:check
 
     # dependency-cruiser over packages/app/src and packages/core/src

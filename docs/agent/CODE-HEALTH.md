@@ -18,14 +18,19 @@ pnpm docs:cite        # every file:line citation in the docs still names its sym
 pnpm verify:webgpu    # headed browser pass on real hardware
 ```
 
-**Where they run.** `pnpm docs:index:check`, `pnpm metrics:check` and
-`pnpm arch` run in CI in the `health` job, on every pull request, on pushes to
-main and on a manual `workflow_dispatch` (pull requests since 2026-09-24), in a
-job of their own so a ratchet failure can never mask a test failure.
-`pnpm docs:cite` runs in its own `citations` job, because a citation goes stale
-in the change that moves the code ([CONVENTIONS.md](CONVENTIONS.md) §9).
-`pnpm test:coverage` and `pnpm verify:webgpu` are local-only by design — see
-[METRICS.md](METRICS.md) §3.
+**Where they run.** On every pull request, push to main and manual
+`workflow_dispatch`. The `lint` job ends with
+`pnpm metrics:check --lint-report=eslint-report.json` (since WP3b, 2026-09-23):
+the ratchet with the per-file caps and the four `eslint_*` keys, read from the
+lint step's own report rather than from a second ESLint pass, and run even when
+the lint step failed, so neither hides the other. The `health` job runs
+`pnpm docs:index:check`, `pnpm metrics:check` and `pnpm arch` (on pull requests
+since 2026-09-24), in a job of its own so a ratchet failure can never mask a
+test failure; on main and on a manual run it first runs `pnpm test:coverage`,
+which adds the six coverage keys. `pnpm docs:cite` runs in its own `citations`
+job, because a citation goes stale in the change that moves the code
+([CONVENTIONS.md](CONVENTIONS.md) §9). `pnpm verify:webgpu` is local-only by
+design — see [METRICS.md](METRICS.md) §3.
 
 `pnpm arch` joined the `health` job in WP3 (#116, 2026-09-23). It stayed out
 while it was red on two import cycles (`flame/mutationOperators.ts <->
@@ -137,14 +142,23 @@ two cycles named above arrived afterwards, while `pnpm arch` was not in CI:
 `recorder/types.ts` back to `commands/types.ts` with #105 (2026-09-23). WP1
 (#114) broke both, and WP3 (#116) made the `health` job fail on the next one.
 
-**`core-stays-pure` cannot see an npm package.** `.dependency-cruiser.cjs`
-excludes every path matching `node_modules` from the graph, so the rule's
-`solid-js|typegpu|@webgpu` alternatives never meet a resolved module; only an
-import of `packages/app` could trip it. With that exclude narrowed (a probe
-config, not committed), the same run reports 5 errors: `@chaos-master/core`
-imports `typegpu` in `math/affineTransform.ts`, `math/affineTransform3D.ts` and
-(type-only) `utils/schemaUtil.ts`. It holds no DOM or Solid import. The config
-is not changed here; it is reported as a defect.
+**`core-stays-pure` could not see an npm package until WP3b.**
+`.dependency-cruiser.cjs` excluded every path matching `node_modules` from the
+graph, so the rule's `solid-js|typegpu|@webgpu` alternatives never met a
+resolved module; only an import of `packages/app`, or one that does not resolve
+at all, could trip it. With that exclude narrowed, the same run reported 5
+errors: `@chaos-master/core` imports `typegpu` in `math/affineTransform.ts`,
+`math/affineTransform3D.ts` and (type-only) `utils/schemaUtil.ts`. It holds no
+DOM or Solid import.
+
+Since WP3b (2026-09-23) npm modules stay in the graph as leaves, and core has
+two rules: `core-stays-pure` (Solid, `@webgpu/*`, other workspace packages) and
+`core-declared-deps-only` (nothing outside core's own `dependencies`: no dev
+dependency, no undeclared package, no Node built-in). typegpu is declared, so
+it passes that rule, and a third, `core-typegpu-frozen` (2026-09-24), keeps it
+to the three files above until BUGS.md #33 is settled. The graph is then 1,344
+modules and 7,189 dependencies, with no violations; the extra 34 modules are
+npm entry files.
 
 The 8 orphans were `utils/{usePointer,range,randomVec4u,isDefined,getPreferredColorScheme,enumerate}.ts`,
 `contexts/MobileContext.tsx` and `App.integration.mock.tsx`: pre-existing dead

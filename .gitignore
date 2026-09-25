@@ -33,6 +33,8 @@ playwright-report
 # Local security-audit scanner output (semgrep/gitleaks/nuclei/eslint telemetry)
 .audit_telemetry/
 coverage-audit/
+# CI's lint step writes it for the metrics step (scripts/eslint-report-formatter.mjs)
+eslint-report.json
 # Stryker mutation runs (pnpm mutation:core)
 .stryker-tmp/
 **/reports/mutation/

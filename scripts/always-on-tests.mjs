@@ -84,7 +84,7 @@ export const ALWAYS_ON = [
   // the test.
   {
     file: 'src/mainWorkspaceSize.test.ts',
-    why: 'reads MainWorkspace.tsx to hold its line count to a shrink-only ratchet',
+    why: 'reads MainWorkspace.tsx, and its cap in docs/agent/code-metrics.file-caps.json, to hold its line count to a shrink-only ratchet',
     genre: 'filesystem',
   },
   {

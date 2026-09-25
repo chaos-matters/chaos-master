@@ -414,7 +414,7 @@ instead. `wc -l` gives the current size.
 | `pnpm fmt:fix` | `prettier packages --write --log-level warn` |
 | `pnpm lint` | `NODE_OPTIONS="--max-old-space-size=4096" eslint` |
 | `pnpm lint:fix` | `NODE_OPTIONS="--max-old-space-size=4096" eslint --fix` |
-| `pnpm typecheck` | `pnpm --filter @chaos-master/core typecheck && pnpm --filter @chaos-master/mobile-runtime typecheck && NODE_OPTIONS="--max-old-space-size=8192" tsc --noEmit --project packages/app/tsconfig.json && pnpm --filter @chaos-master/landing check` |
+| `pnpm typecheck` | `pnpm --filter @chaos-master/core typecheck && pnpm --filter @chaos-master/mobile-runtime typecheck && NODE_OPTIONS="--max-old-space-size=8192" tsc --noEmit --project packages/app/tsconfig.json && tsc --noEmit --project tests/tsconfig.json && tsc --noEmit --project packages/app/e2e/tsconfig.json && pnpm --filter @chaos-master/landing check` |
 | `pnpm validate-wgsl` | `npx --yes tsx scripts/validate-wgsl-props.ts` |
 | `pnpm check` | `pnpm typecheck && pnpm lint:fix && pnpm fmt:fix && pnpm validate-wgsl` |
 | `pnpm docs:index` | `node scripts/gen-agent-index.mjs` |
@@ -424,11 +424,12 @@ instead. `wc -l` gives the current size.
 | `pnpm metrics:json` | `node scripts/code-metrics.mjs --json` |
 | `pnpm metrics:check` | `node scripts/code-metrics.mjs --check` |
 | `pnpm metrics:update` | `node scripts/code-metrics.mjs --update` |
+| `pnpm metrics:caps` | `node scripts/code-metrics.mjs --lower-caps` |
 | `pnpm mutation:core` | `pnpm --filter @chaos-master/core exec stryker run` |
 | `pnpm arch` | `depcruise --config .dependency-cruiser.cjs --output-type err packages/app/src packages/core/src` |
 | `pnpm arch:summary` | `depcruise --config .dependency-cruiser.cjs --output-type err-long packages/app/src packages/core/src` |
 | `pnpm verify:webgpu` | `node scripts/verify-webgpu-headed.mjs` |
-| `pnpm test:coverage` | `pnpm --filter chaos-master exec vitest run --coverage && pnpm --filter @chaos-master/core exec vitest run --coverage` |
+| `pnpm test:coverage` | `pnpm --filter chaos-master exec vitest run --coverage --testTimeout=30000 && pnpm --filter @chaos-master/core exec vitest run --coverage` |
 | `pnpm test` | `pnpm test:packages && pnpm test:app` |
 | `pnpm test:app` | `pnpm --filter chaos-master exec vitest run` |
 | `pnpm test:packages` | `pnpm --filter @chaos-master/core test && pnpm --filter @chaos-master/mobile-runtime test && pnpm --filter chaos-master test:scripts && pnpm test:scripts` |

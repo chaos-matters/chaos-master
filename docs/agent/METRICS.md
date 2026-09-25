@@ -20,6 +20,7 @@ pnpm metrics          # the table
 pnpm metrics:json     # same, machine-readable
 pnpm metrics:check    # ratchet: fail if a tracked number regressed
 pnpm metrics:update   # re-freeze the baseline
+pnpm metrics:caps     # lower the per-file caps of files that shrank
 ```
 
 ---
@@ -45,52 +46,107 @@ someone made on purpose, in writing, rather than a number quietly drifting.
 Metrics not listed as lower-is-better or higher-is-better in
 `scripts/code-metrics.mjs` are **informational only** and never fail the check.
 
-**Where the ratchet is enforced.** In CI, in the `health` job, on every pull
-request, on pushes to main and on a manual `workflow_dispatch` (pull requests
-since 2026-09-24; until then it ran on main only, on the reasoning that
-re-freezing inside a pull request turns a decision into a merge blocker).
-Alongside `pnpm docs:index:check`, and in a job of its own so a ratchet failure
-never masks a test failure. Re-freezing is still a decision someone makes on
-purpose, in writing; it is now made in the change that needs it, which sees the
-ratchet fail before the merge. Nothing runs the ratchet before CI — the
-pre-push hook is typecheck and lint — so run `pnpm metrics:check` yourself when
-a change adds files.
+**Where the ratchet is enforced.** On every pull request, push to main and
+manual `workflow_dispatch`, in two jobs. The `lint` job ends with
+`pnpm metrics:check --lint-report=eslint-report.json` (about 1 s, since WP3b,
+2026-09-23). The four `eslint_*` keys are part of it: the lint step writes its
+full report through `scripts/eslint-report-formatter.mjs` while printing the
+usual output, and the ratchet reads that report instead of running ESLint a
+second time, so a new warning or a more complex function fails the pull request
+that adds it. A missing or empty report fails the step, and the step runs even
+when the lint step failed, so neither hides the other. The `health` job runs
+`pnpm metrics:check` again, alongside `pnpm docs:index:check`, in a job of its
+own so a ratchet failure never masks a test failure; on main and on a manual
+run it first measures coverage, which gives the six `coverage_*` keys a value
+(a pull request's run skips them). Until WP3b the ratchet ran on main only, on
+the reasoning that re-freezing inside a pull request turns a decision into a
+merge blocker. The 2026-09-23 follow-up audit (decision D-5) moved it forward:
+the change that moves a ratchet is the one that should see it fail, not main
+after the merge. Re-freezing is still a decision someone makes on purpose, in
+writing, now in the change that needs it. Nothing runs the ratchet before CI
+(the pre-push hook is typecheck and lint), so run `pnpm metrics:check` yourself
+when a change adds or grows a file.
 
-The coverage keys are the exception. `--check` only compares keys the current
-run produced, and a CI run has no `coverage-audit/` summary to read, so
-`coverage_*_pct` are ratcheted **locally, after `pnpm test:coverage`, and never
-in CI**. The same asymmetry once meant `--update` dropped those keys without a
-word unless a coverage run preceded it. Since WP3 (2026-09-23) `--update`
-refuses to write a baseline that would lose a key the old one has: without a
-coverage run it stops and names the six `coverage_*` keys, and without
-`--with-lint` it names the `eslint_*` ones if the baseline carries them.
-Re-freeze with `pnpm test:coverage && pnpm metrics:update`. A metric removed on
-purpose is named explicitly, `pnpm metrics:update --drop=<key>[,<key>]`, and
-the commit message says why.
+On pushes to main and on a manual `workflow_dispatch`, the `health` job also
+measures what a pull request does not: it runs `pnpm test:coverage` (whose app
+run allows 30 s per test, since instrumented whole-tree scans outrun vitest's 5
+s default on a CI runner), then `pnpm metrics:check`, so the six `coverage_*`
+keys are compared too. `--check` only compares keys the current run produced,
+and until WP3b nothing in CI produced the coverage or the lint keys, so the
+coverage floors and the lint counts were held by nothing. With `--with-lint` or
+`--lint-report`, a lint key the baseline tracks and the run did not measure is
+itself a failure, and an ESLint run that crashed fails the command: the old
+script caught ESLint's exit code 1, which only means "found an error", and
+skipped the lint keys, so `eslint_errors` could rise from 0 with a green check.
+Locally the coverage keys are compared whenever a `pnpm test:coverage` has left
+its summaries behind. The same asymmetry once meant `--update` dropped those
+keys without a word unless a coverage run preceded it. Since WP3 (2026-09-23)
+`--update` refuses to write a baseline that would lose a key the old one has:
+without a coverage run it stops and names the six `coverage_*` keys, and
+without `--with-lint` it names the `eslint_*` ones if the baseline carries
+them. Re-freeze with `pnpm test:coverage && pnpm metrics:update`, but take the
+coverage numbers from the `health` job's log, not from that local run: CI
+measures a little lower. On 2026-09-23 the same commit gave 53.23 / 44.61 /
+50.64 (app lines / functions / branches) in CI and 53.28 / 44.61 / 50.67 on a
+workstation, so a baseline frozen locally can turn main red with nothing
+changed. A metric removed on purpose is named explicitly,
+`pnpm metrics:update --drop=<key>[,<key>]`, and the commit message says why.
 
-**One ratchet lives outside this script.** `MainWorkspace.tsx` is held to its
-exact line count by `packages/app/src/mainWorkspaceSize.test.ts`, which runs on
-every pull request rather than on main only: more lines fail, and fewer lines
-fail until the pinned count is lowered in the same change.
+**One ratchet also runs outside this script.** `MainWorkspace.tsx` is held to
+its exact line count by `packages/app/src/mainWorkspaceSize.test.ts`, which runs
+in every pull request's scoped suite: more lines fail, and fewer lines fail
+until the count is lowered in the same change. Since WP3b (2026-09-24) that
+test reads the count from MainWorkspace's entry in the per-file caps below,
+and fails if the entry is missing, so the file has one pin and a shrink lowers
+one number.
+
+**Per-file caps** (WP3b, 2026-09-23). The `files_over_*` buckets only notice a
+file that crosses an edge, which left two holes. Growth inside a file already
+over the edge was invisible: `BenchmarksPage.tsx` took 1,200 more lines and
+the check stayed green. And a file sitting exactly on an edge could grow only
+by shaving comments to stay on it: `recorder/recorder.ts` at 1,200,
+`commands/builtins/timeline.ts` and `flame/ifsPipeline.ts` at 800. So every
+source file of **800 lines or more** (at 800, not only over it, so the two
+parked there are held) carries a cap in
+`docs/agent/code-metrics.file-caps.json`, equal to its size, and
+`pnpm metrics:check` fails when:
+
+- a file grew past its cap. A cap is raised only by hand, with the reason in
+  the commit message;
+- a file shrank below its cap. Lower the cap in the same change, as
+  `mainWorkspaceSize.test.ts` asks for MainWorkspace, so the file cannot grow
+  back into the slack. `pnpm metrics:caps` lowers every cap that can go down,
+  removes the stale ones, and never raises or adds a cap;
+- a file of 800 lines or more has no cap. A rename moves its cap to the new
+  path; a new file that size is split, or capped by hand with a reason;
+- a cap names a file that is gone or has fallen under 800 lines. Remove it
+  (`pnpm metrics:caps` does); the buckets hold that file from there.
+
+The report prints the files sitting exactly on a bucket edge, so parking is
+visible in every run. What no line count can see is a file that shaves a
+comment to make room for a line of code at the same size; the cap stops the
+file growing, not the trade. The rules and their tests are in
+`scripts/file-caps.mjs` and `scripts/file-caps.test.mjs`. `--update` never
+touches the caps file.
 
 ---
 
 ## 2. What each metric is worth
 
-| Metric                             | Believe it?                   | What it is actually telling you                                                                                                                                                                                                                                                                             |
-| ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `source_loc`, `source_files`       | Context, not quality          | Size of the thing. Useful only as a denominator. A refactor that grows LOC is not automatically bad — extracting a function costs a signature and an import.                                                                                                                                                |
-| `mean_file_loc`                    | Weakly, and **not gated**     | Moves too slowly to guide a single change. Useful across a release. Reported only since 2026-09-23; see below the table for why.                                                                                                                                                                            |
-| `files_over_500` / `800` / `1200`  | **Yes**                       | The god-file count. This is the metric the 2026-07 refactor strategy was written to move. Buckets rather than a mean because the tail is what hurts: one 4,000-line file costs more than fifty 300-line files.                                                                                              |
-| `largest_file_loc`                 | Weakly                        | The largest file of any kind. Since 2026-09 that is `flame/examples/animations.ts`, 5,713 lines of literal animation presets, so it ratchets a data file and says nothing about code. Still gated; `largest_logic_file_loc` is the one to read.                                                             |
-| `largest_logic_file_loc`           | **Yes**                       | The largest file that is not data: a single number for "how bad is the worst case". Hard to game without genuinely splitting something. Data files are excluded by measurement, not by path; see below the table.                                                                                           |
-| `test_files`, `test_cases`         | Directionally                 | `test_cases` is counted **statically** by matching `it(` / `test(` at line start. It undercounts parameterized suites — the real vitest total is meaningfully higher. That is fine for a ratchet, where consistency matters more than absolute accuracy, but do not quote it as "the number of tests".      |
-| `test_file_ratio`                  | Weakly                        | Test files per source file. Catches a burst of new source with no new tests, which is the failure this repo actually had.                                                                                                                                                                                   |
-| `coverage_*_pct`                   | **With care**                 | Only present when a coverage run has written `coverage-audit/coverage-summary.json`. Coverage proves a line _executed_, never that anything _asserted_ on it. Treat a drop as a real signal and a rise as a weak one. See §3.                                                                               |
-| `coverage_core_*_pct`              | **With care**                 | `packages/core` on its own, from `packages/core/coverage-audit/`. Kept separate on purpose: merged into the app's number, core's gap disappears in the app's mass, which is how it went unmeasured until 2026-09.                                                                                           |
-| `missing_header_comment`           | **Yes, and it is actionable** | Files whose first non-blank line is not a comment. This is the ceiling on how useful the generated index can be: a file with no header comment shows as `(no header comment)` in [INDEX.md](INDEX.md), so the map cannot describe it. Unlike most metrics, the fix is mechanical and always an improvement. |
-| `todo_markers`                     | Weakly                        | `TODO`, `FIXME`, `XXX`, `HACK`. A rising count is worth a glance; the absolute number means little.                                                                                                                                                                                                         |
-| `eslint_*` (opt-in, `--with-lint`) | **Yes**                       | Errors must stay zero. Warnings are almost all `complexity`, which is the honest measure of "would a reviewer be able to hold this function in their head". Off by default because a full type-aware lint takes over a minute.                                                                              |
+| Metric                             | Believe it?                   | What it is actually telling you                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source_loc`, `source_files`       | Context, not quality          | Size of the thing. Useful only as a denominator. A refactor that grows LOC is not automatically bad — extracting a function costs a signature and an import.                                                                                                                                                                                                                                                                                    |
+| `mean_file_loc`                    | Weakly, and **not gated**     | Moves too slowly to guide a single change. Useful across a release. Reported only since 2026-09-23; see below the table for why.                                                                                                                                                                                                                                                                                                                |
+| `files_over_500` / `800` / `1200`  | **Yes**                       | The god-file count. This is the metric the 2026-07 refactor strategy was written to move. Buckets rather than a mean because the tail is what hurts: one 4,000-line file costs more than fifty 300-line files.                                                                                                                                                                                                                                  |
+| `largest_file_loc`                 | Weakly                        | The largest file of any kind. Since 2026-09 that is `flame/examples/animations.ts`, 5,713 lines of literal animation presets, so it ratchets a data file and says nothing about code. Still gated; `largest_logic_file_loc` is the one to read.                                                                                                                                                                                                 |
+| `largest_logic_file_loc`           | **Yes**                       | The largest file that is not data: a single number for "how bad is the worst case". Hard to game without genuinely splitting something. Data files are excluded by measurement, not by path; see below the table.                                                                                                                                                                                                                               |
+| `test_files`, `test_cases`         | Directionally                 | `test_cases` is counted **statically** by matching `it(` / `test(` at line start. It undercounts parameterized suites — the real vitest total is meaningfully higher. That is fine for a ratchet, where consistency matters more than absolute accuracy, but do not quote it as "the number of tests".                                                                                                                                          |
+| `test_file_ratio`                  | Weakly                        | Test files per source file. Catches a burst of new source with no new tests, which is the failure this repo actually had.                                                                                                                                                                                                                                                                                                                       |
+| `coverage_*_pct`                   | **With care**                 | Only present when a coverage run has written `coverage-audit/coverage-summary.json`. Coverage proves a line _executed_, never that anything _asserted_ on it. Treat a drop as a real signal and a rise as a weak one. See §3.                                                                                                                                                                                                                   |
+| `coverage_core_*_pct`              | **With care**                 | `packages/core` on its own, from `packages/core/coverage-audit/`. Kept separate on purpose: merged into the app's number, core's gap disappears in the app's mass, which is how it went unmeasured until 2026-09.                                                                                                                                                                                                                               |
+| `missing_header_comment`           | **Yes, and it is actionable** | Files whose first non-blank line is not a comment. This is the ceiling on how useful the generated index can be: a file with no header comment shows as `(no header comment)` in [INDEX.md](INDEX.md), so the map cannot describe it. Unlike most metrics, the fix is mechanical and always an improvement.                                                                                                                                     |
+| `todo_markers`                     | Weakly                        | `TODO`, `FIXME`, `XXX`, `HACK`. A rising count is worth a glance; the absolute number means little.                                                                                                                                                                                                                                                                                                                                             |
+| `eslint_*` (opt-in, `--with-lint`) | **Yes**                       | Errors must stay zero. Warnings are almost all `complexity`, which is the honest measure of "would a reviewer be able to hold this function in their head". `eslint_max_complexity` is the worst single function (73 on 2026-09-23), which a count of functions over the line cannot hold. Off by default locally because a full type-aware lint takes over a minute; CI's `lint` job reads them from its lint step's report (`--lint-report`). |
 
 **Why `mean_file_loc` is reported but not gated** (WP3, 2026-09-23). The
 ratchet compared the ROUNDED mean, total lines over files. Two things made it

@@ -17,12 +17,12 @@ the slowest one rather than for the sum:
 
 | Job         | What it runs                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lint`      | `pnpm lint`                                                                                                                                                                                 |
+| `lint`      | `pnpm lint`, then `pnpm metrics:check --lint-report=eslint-report.json`: the ratchet with the per-file caps and the `eslint_*` keys, read from the lint step's report                       |
 | `typecheck` | `pnpm typecheck`                                                                                                                                                                            |
 | `test`      | the full `pnpm test`, in four legs: the app suite in three vitest shards (`pnpm test:app --shard=N/3`), and `pnpm test:packages` (core, mobile-runtime and the `node --test` script suites) |
 | `build`     | the app build, the landing build, then `pnpm test:e2e:ci`                                                                                                                                   |
 | `citations` | `pnpm docs:cite`                                                                                                                                                                            |
-| `health`    | `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch`                                                                                                                                  |
+| `health`    | `pnpm docs:index:check`, `pnpm metrics:check`, `pnpm arch`; on main and on a manual run, `pnpm test:coverage` first, for the `coverage_*` keys                                              |
 
 `pnpm test` is exactly `pnpm test:packages && pnpm test:app`, so the four
 legs together run what it runs. A new suite goes into one of those two
@@ -144,16 +144,21 @@ everything left is green. Others hold the size of the tree
 Run `pnpm test:coverage` before `pnpm metrics:update`: the update refuses to write a baseline that lacks a key
 the old one tracked, and the coverage keys exist only after a coverage run.
 `mainWorkspaceSize.test.ts` is a ratchet of the same kind that runs on every
-pull request: `MainWorkspace.tsx` must have exactly the line count it names.
+pull request: `MainWorkspace.tsx` must have exactly the line count its entry in
+`docs/agent/code-metrics.file-caps.json` names.
 
 ## Browser tests: Playwright
 
 `tests/` holds Playwright only: the specs, their helpers (`helpers.ts`,
-`pilotLock.ts`) and a reporter. Nothing in it is a unit test. The config is
-the root `playwright.config.ts`. It builds the app and serves the production
-preview (`pnpm --filter chaos-master e2e:serve`, `vite preview` with a
-self-signed certificate on `https://localhost:4173`), then runs one of two
-projects, both on headless Chromium with swiftshader standing in for a GPU:
+`pilotLock.ts`) and a reporter. Nothing in it is a unit test, and all of it is
+type-checked by `pnpm typecheck` through `tests/tsconfig.json`. The headed-GPU
+specs in `packages/app/e2e/` are type-checked the same way, through
+`packages/app/e2e/tsconfig.json`. The config is the root `playwright.config.ts`.
+It builds the app and serves the production
+preview (`pnpm --filter chaos-master e2e:serve`, `vite preview --strictPort`
+with a self-signed certificate, on `https://localhost:4273` unless `E2E_PORT`
+says otherwise), then runs one of two projects, both on headless Chromium with
+swiftshader standing in for a GPU:
 
 | Project       | Specs                         | Runs                               | Today              |
 | ------------- | ----------------------------- | ---------------------------------- | ------------------ |
@@ -175,26 +180,32 @@ pass on real hardware against an already running server.
 
 ### Running e2e on a port of your own
 
-`playwright.config.ts` pins port 4173 and reuses a server already listening
-there. When 4173 belongs to someone else (a person's own preview, or another
-agent), serve the build on a private port and point a local config at it:
+Every run starts its own preview server, on port 4273 by default, and never
+uses one it did not start. If the port is taken, Playwright stops with
+`https://localhost:4273 is already used` instead of testing whatever answers
+there. Until 2026-09-23 the config pinned 4173, vite preview's default, and
+reused a server already listening on it, so a local run could quietly test a
+person's own preview, built from another checkout.
+
+Pick another port with `E2E_PORT`, for example when two runs share a machine or
+4273 belongs to someone else:
 
 ```bash
-# 1. Build once and serve it on a port of your own, say 4401.
+# Builds the app, serves it on 4401, runs the CI project, stops the server.
+E2E_PORT=4401 pnpm exec playwright test --project=chromium-ci
+
+# One spec.
+E2E_PORT=4401 pnpm exec playwright test --project=chromium-ci tests/smoke.ci.spec.ts
+```
+
+To iterate against a server you started yourself, build once, serve it on your
+own port, and opt in to reusing it with `E2E_REUSE_SERVER=1`. It is ignored on
+CI, which always starts a fresh server.
+
+```bash
 VITE_GA_ID= pnpm --filter chaos-master exec vite build
 pnpm --filter chaos-master exec vite preview --port 4401 --strictPort &
-
-# 2. playwright.private.config.ts, next to playwright.config.ts, not committed:
-#      import base from './playwright.config'
-#      export default {
-#        ...base,
-#        webServer: undefined,
-#        use: { ...base.use, baseURL: 'https://localhost:4401' },
-#      }
-
-# 3. Run one spec, or a project.
-pnpm exec playwright test --config playwright.private.config.ts \
-  --project=chromium-ci tests/smoke.ci.spec.ts
+E2E_PORT=4401 E2E_REUSE_SERVER=1 pnpm exec playwright test --project=chromium-ci
 ```
 
 Stop the preview server by its PID or its port (`fuser -k 4401/tcp`) when you
