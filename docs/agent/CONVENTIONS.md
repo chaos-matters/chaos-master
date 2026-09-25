@@ -155,9 +155,9 @@ remember: `alwaysOnTestList.test.ts` fails and names the list to add it to.
 | `mainWorkspaceSize.test.ts`           | `MainWorkspace.tsx` has **exactly** `MAX_LINES` lines (4,546 at `9fc08078`): more fails, and fewer fails until `MAX_LINES` is lowered in the same change | every test run                |
 | `alwaysOnTestList.test.ts`            | every filesystem-reading test is on the always-on list                                                                                                   | every test run                |
 | `tests/kitchen-sink-mount.ci.spec.ts` | share links with every optional branch on mount with no page error                                                                                       | CI e2e                        |
-| `pnpm arch`                           | no import cycle, no orphan module, no `packages/app` import from core; all errors                                                                        | `health` job, main            |
-| `pnpm metrics:check`                  | no tracked metric regresses, including `largest_logic_file_loc` and the test floors (`test_files`, `test_cases`)                                         | `health` job, main            |
-| `pnpm docs:index:check`               | [INDEX.md](INDEX.md) matches the tree                                                                                                                    | `health` job, main            |
+| `pnpm arch`                           | no import cycle, no orphan module, no `packages/app` import from core; all errors                                                                        | `health` job, PRs and main    |
+| `pnpm metrics:check`                  | no tracked metric regresses, including `largest_logic_file_loc` and the test floors (`test_files`, `test_cases`)                                         | `health` job, PRs and main    |
+| `pnpm docs:index:check`               | [INDEX.md](INDEX.md) matches the tree                                                                                                                    | `health` job, PRs and main    |
 | `pnpm docs:cite`                      | every `file:line` citation in a living doc still names its symbol (§9)                                                                                   | `citations` job, PRs and main |
 
 `MainWorkspace.tsx` is where new code goes to hide: put new logic in a hook
@@ -181,7 +181,7 @@ doc comment on the first export further down, does not count.
 
 999 of 1,157 source files have no header comment (`pnpm metrics`,
 `missing_header_comment`). The number is a ratchet, so a **new** file without
-one fails `pnpm metrics:check` on main; touching an old file is a good moment
+one fails `pnpm metrics:check` on its pull request; touching an old file is a good moment
 to give it one.
 
 ## 8. Duplication

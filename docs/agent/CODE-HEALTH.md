@@ -265,7 +265,7 @@ shows as undescribed until it opens with one. Header comments are still the
 cheapest large improvement available: `pnpm docs:index` builds the module map
 from them, and 86% of the tree cannot be described in [INDEX.md](INDEX.md) at
 all. `missing_header_comment` is a ratchet, so a new file without one fails
-`pnpm metrics:check` on main.
+`pnpm metrics:check` on its pull request.
 
 ## 9. Where the risk is concentrated
 

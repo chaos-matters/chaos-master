@@ -15,8 +15,17 @@
 //   node scripts/gen-agent-index.mjs --check   # CI: fail if stale
 //
 // Adapted from the same generator in the MercuryPitch repo. The design
-// decisions worth keeping are commented where they occur: LOC bucketing,
-// deterministic tie-breaks, and skipping dot-directories.
+// decisions worth keeping are commented where they occur: no counts,
+// unpadded tables, deterministic tie-breaks, and skipping dot-directories.
+//
+// The index carries no number that moves when an unrelated file changes: no
+// per-package file or line totals, no per-module or per-file line counts, and
+// every table is sorted by name. Those numbers changed on nearly every commit,
+// so nearly every open branch conflicted on this file and needed an extra merge
+// round. For sizes, run `pnpm metrics` (repo totals and the largest files) or
+// `wc -l`. A row changes only when its own module or file is added, removed,
+// renamed, re-described in its header comment, or crosses a table's size
+// threshold -- which is what `--check` is there to catch.
 // ============================================================
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, } from 'node:fs'
@@ -132,17 +141,23 @@ const rel = (f) => relative(ROOT, f)
 const href = (relPath) => relative(OUT_DIR, join(ROOT, relPath))
 const link = (text, relPath) => `[${text}](${href(relPath)})`
 
-// LOC are quantized before display AND sorting. Exact counts change on nearly
-// every commit, and a size-ordered generated file that shifts with every merged
-// PR is a standing merge conflict for every open branch. With 50/100-line
-// buckets a file has to genuinely grow before its row moves.
-const bucketLoc = (n) =>
-  n >= 1000 ? Math.round(n / 100) * 100 : Math.max(50, Math.round(n / 50) * 50)
+const byName = (a, b) => a.name.localeCompare(b.name)
 
-const fmtLoc = (n) => {
-  const b = bucketLoc(n)
-  return b >= 1000 ? `${(b / 1000).toFixed(1)}k` : String(b)
-}
+/**
+ * A markdown table prettier leaves alone. Prettier pads every cell of a table
+ * to its column's widest cell, so one longer row rewrites every other row of
+ * the table, and two branches that each touch one row conflict on all of
+ * them. Unpadded, a row's line depends on that row alone. GitHub renders the
+ * two the same.
+ */
+const table = (head, rows) =>
+  [
+    '<!-- prettier-ignore-start -->',
+    `| ${head.join(' | ')} |`,
+    `|${head.map(() => '---').join('|')}|`,
+    ...rows,
+    '<!-- prettier-ignore-end -->',
+  ].join('\n')
 
 /** Table of every subdirectory of `base` treated as a module. */
 function dirTable(base, label) {
@@ -154,27 +169,21 @@ function dirTable(base, label) {
       const files = walk(join(dir, name))
       if (!files.length) return null
       const entry = entryOf(files, name)
-      const total = files.reduce((s, f) => s + loc(f), 0)
-      return { name, entry: rel(entry), loc: total, blurb: blurb(entry) }
+      return { name, entry: rel(entry), blurb: blurb(entry) }
     })
     .filter(Boolean)
-    .sort(
-      (a, b) =>
-        bucketLoc(b.loc) - bucketLoc(a.loc) || a.name.localeCompare(b.name),
-    )
+    .sort(byName)
 
   if (!rows.length) return ''
-  const body = rows
-    .map(
-      (r) =>
-        `| \`${r.name}\` | ${link(basename(r.entry), r.entry)} | ${fmtLoc(r.loc)} | ${r.blurb || '_(no header comment)_'} |`,
-    )
-    .join('\n')
-  return `#### ${label}\n\n| Module | Entry point | LOC | What it is |\n|---|---|---|---|\n${body}\n`
+  const body = rows.map(
+    (r) =>
+      `| \`${r.name}\` | ${link(basename(r.entry), r.entry)} | ${r.blurb || '_(no header comment)_'} |`,
+  )
+  return `#### ${label}\n\n${table(['Module', 'Entry point', 'What it is'], body)}\n`
 }
 
 /** Table of loose files directly inside `base` (no subdir grouping). */
-function fileTable(base, label, { min = 0, limit = Infinity } = {}) {
+function fileTable(base, label, { min = 0 } = {}) {
   const dir = join(ROOT, base)
   if (!existsSync(dir)) return ''
   const rows = readdirSync(dir)
@@ -184,20 +193,14 @@ function fileTable(base, label, { min = 0, limit = Infinity } = {}) {
       return { name: n, path: rel(full), loc: loc(full), blurb: blurb(full) }
     })
     .filter((r) => r.loc >= min)
-    .sort(
-      (a, b) =>
-        bucketLoc(b.loc) - bucketLoc(a.loc) || a.name.localeCompare(b.name),
-    )
-    .slice(0, limit)
+    .sort(byName)
 
   if (!rows.length) return ''
-  const body = rows
-    .map(
-      (r) =>
-        `| ${link(r.name, r.path)} | ${fmtLoc(r.loc)} | ${r.blurb || '_(no header comment)_'} |`,
-    )
-    .join('\n')
-  return `#### ${label}\n\n| File | LOC | What it is |\n|---|---|---|\n${body}\n`
+  const body = rows.map(
+    (r) =>
+      `| ${link(r.name, r.path)} | ${r.blurb || '_(no header comment)_'} |`,
+  )
+  return `#### ${label}\n\n${table(['File', 'What it is'], body)}\n`
 }
 
 /** The workspace packages, so the first question an agent has is answered. */
@@ -207,31 +210,15 @@ function packageTable() {
       (n) => !skipDir(n) && statSync(join(ROOT, 'packages', n)).isDirectory(),
     )
     .map((name) => {
-      const dir = join(ROOT, 'packages', name)
-      const files = walk(dir)
-      const pkgPath = join(dir, 'package.json')
+      const pkgPath = join(ROOT, 'packages', name, 'package.json')
       const pkgName = existsSync(pkgPath)
         ? JSON.parse(readFileSync(pkgPath, 'utf8')).name
         : name
-      const tests = walk(dir, []).length
-      return {
-        name,
-        pkgName,
-        loc: files.reduce((s, f) => s + loc(f), 0),
-        files: tests,
-      }
+      return { name, pkgName }
     })
-    .sort(
-      (a, b) =>
-        bucketLoc(b.loc) - bucketLoc(a.loc) || a.name.localeCompare(b.name),
-    )
-  const body = rows
-    .map(
-      (r) =>
-        `| \`packages/${r.name}\` | \`${r.pkgName}\` | ${r.files} | ${fmtLoc(r.loc)} |`,
-    )
-    .join('\n')
-  return `| Directory | Package name | Source files | LOC |\n|---|---|---|---|\n${body}`
+    .sort(byName)
+  const body = rows.map((r) => `| \`packages/${r.name}\` | \`${r.pkgName}\` |`)
+  return table(['Directory', 'Package name'], body)
 }
 
 /** Files big enough that reading them whole is a context-budget decision. */
@@ -239,30 +226,26 @@ function heavyFiles(threshold = 1000) {
   const files = walk(join(ROOT, 'packages'))
     .map((f) => ({ path: rel(f), loc: loc(f) }))
     .filter((r) => r.loc >= threshold)
-    .sort(
-      (a, b) =>
-        bucketLoc(b.loc) - bucketLoc(a.loc) || a.path.localeCompare(b.path),
-    )
+    .sort((a, b) => a.path.localeCompare(b.path))
   if (!files.length) return ''
-  const body = files
-    .map((r) => `| ${link(r.path, r.path)} | ${fmtLoc(r.loc)} |`)
-    .join('\n')
+  const body = files.map((r) => `| ${link(r.path, r.path)} |`)
   return [
-    `Reading any of these end-to-end costs roughly ${fmtLoc(threshold)}+ lines of context.`,
-    `Grep for the symbol and read the surrounding range instead.`,
+    `Each of these is ${threshold.toLocaleString('en-US')} lines or more, so reading one end-to-end is a`,
+    `context-budget decision. Grep for the symbol and read the surrounding range`,
+    `instead. \`wc -l\` gives the current size.`,
     ``,
-    `| File | LOC |`,
-    `|---|---|`,
-    body,
+    table(['File'], body),
   ].join('\n')
 }
 
 function scriptTable() {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-  const body = Object.entries(pkg.scripts ?? {})
-    .map(([k, v]) => `| \`pnpm ${k}\` | \`${v}\` |`)
-    .join('\n')
-  return `| Script | Runs |\n|---|---|\n${body}`
+  // A `|` in a command would end its cell, code span or not (GFM), so it is
+  // escaped: `prepare` and `lines` used to spill into extra columns.
+  const body = Object.entries(pkg.scripts ?? {}).map(
+    ([k, v]) => `| \`pnpm ${k}\` | \`${v.replaceAll('|', '\\|')}\` |`,
+  )
+  return table(['Script', 'Runs'], body)
 }
 
 const A = 'packages/app/src'
