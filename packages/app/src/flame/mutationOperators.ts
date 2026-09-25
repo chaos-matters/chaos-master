@@ -79,20 +79,40 @@ export function resolveEffectiveMutationRates(
 }
 
 /**
- * Filter transform entries based on removal probability.
+ * Symmetry copies carry the reserved `_sym__` id prefix. They are generated
+ * from the symmetry settings, the transform list does not show them, and a
+ * mutation neither removes them nor counts them.
+ */
+export function isSymmetryCopyId(tid: string): boolean {
+  return tid.startsWith('_sym__')
+}
+
+/**
+ * The transform entries a mutation keeps: each targeted transform is removed
+ * at `removeChance`.
+ *
+ * One draw per targeted entry, symmetry copies included, so the draws that
+ * follow line up the same way whether or not a removal takes effect. A draw
+ * is refused, and the transform kept, when it would remove a symmetry copy
+ * or leave fewer user transforms than `minTransforms` (and never fewer than
+ * one, whatever the minimum says).
  */
 export function applyStructuralRemoval<T>(
   allEntries: [string, T][],
   targetIds: string[] | undefined,
   removeChance: number,
+  minTransforms = 1,
 ): [string, T][] {
-  if (removeChance > 0 && allEntries.length > 1) {
-    return allEntries.filter(([tid]) => {
-      if (targetIds && !targetIds.includes(tid)) return true
-      return random01() >= removeChance
-    })
-  }
-  return allEntries
+  if (removeChance <= 0 || allEntries.length <= 1) return allEntries
+  const floor = Math.max(1, minTransforms)
+  let userCount = allEntries.filter(([tid]) => !isSymmetryCopyId(tid)).length
+  return allEntries.filter(([tid]) => {
+    if (targetIds && !targetIds.includes(tid)) return true
+    const drawn = random01() < removeChance
+    if (!drawn || isSymmetryCopyId(tid) || userCount <= floor) return true
+    userCount--
+    return false
+  })
 }
 
 /**
