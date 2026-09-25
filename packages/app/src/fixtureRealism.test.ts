@@ -105,13 +105,6 @@ const EXCEPTIONS: readonly Exception[] = [
       "the migration's own tests: the two misspelled names it corrects are their input",
   },
   {
-    file: 'packages/app/src/flame/transformFunction3D.ts',
-    rule: 'd',
-    detail: /^VARIATION_2D_TO_3D_MAP: /,
-    reason:
-      'owned by the clash stage PR: 2D-to-3D conversion inside the clash only, legacy keys deleted there',
-  },
-  {
     file: 'packages/app/src/flame/variations/parametric/general/whirligigVar.tsx',
     rule: 'c',
     detail: /^whirligigVar$/,

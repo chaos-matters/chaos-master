@@ -113,6 +113,27 @@ export function createFlameWgsl({
   }
 }
 
+/**
+ * A pipeline's uniform record for a flame that may hold fewer transforms than
+ * the pipeline was built for: every key of `template` (the pipeline's own
+ * uniforms), taking the flame's value where it has one and the template at
+ * probability 0 where it does not, so TypeGPU's compiled writer never meets
+ * a missing field. Both IFS pipelines write their uniforms through this.
+ */
+export function uniformsForPipeline(
+  uniforms: Record<string, unknown>,
+  template: Record<string, unknown>,
+): Record<string, unknown> {
+  const safe: Record<string, unknown> = {}
+  for (const key of Object.keys(template)) {
+    safe[key] =
+      key in uniforms
+        ? uniforms[key]
+        : { ...(template[key] as Record<string, unknown>), probability: 0 }
+  }
+  return safe
+}
+
 export function extractFlameUniforms({
   transforms,
 }: Pick<FlameDescriptor, 'transforms'>) {

@@ -3,7 +3,7 @@
  * at the folder URL a static host redirects to and at the bare route URL.
  */
 import { describe, expect, it } from 'vitest'
-import { BENCHMARKS_PATH, EXPLORER_PATH } from './appPath'
+import { BENCHMARKS_PATH, CLASH_PATH, EXPLORER_PATH } from './appPath'
 import { nestedIndexHtml, redirectPageHtml, staticEntryFiles, withPageUrl, } from './staticEntries'
 
 const ORIGIN = 'https://example.test'
@@ -70,7 +70,7 @@ describe('staticEntryFiles', () => {
   const files = staticEntryFiles(BUILT_INDEX)
 
   it('writes the nested page into each page route folder', () => {
-    for (const route of [BENCHMARKS_PATH, EXPLORER_PATH]) {
+    for (const route of [BENCHMARKS_PATH, EXPLORER_PATH, CLASH_PATH]) {
       expect(files[`${route.slice(1)}/index.html`]).toBe(
         withPageUrl(nestedIndexHtml(BUILT_INDEX), route),
       )
@@ -98,6 +98,7 @@ describe('staticEntryFiles', () => {
     expect(Object.keys(files).sort()).toEqual([
       'arcade/index.html',
       'benchmarks/index.html',
+      'clash/index.html',
       'explore/index.html',
     ])
   })

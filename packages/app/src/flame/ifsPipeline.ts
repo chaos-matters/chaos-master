@@ -8,9 +8,11 @@ import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID, legacyRandomOutputSlot, rand
 import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
 import { AffineParams, transformAffine } from './affineTranform'
+import { clashKernel, clashTeamsOf, clashTeamsSignature, clashTeamsUniformEntries, clashTeamValues, } from './clashTeams'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { isPointInitMode2D, pointInitModeToImplFn } from './pointInitMode'
-import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
+import { shaderShapeOf } from './shaderShape'
+import { createFlameWgsl, extractFlameUniforms, uniformsForPipeline, } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_SATURATION_COUNT, Point, } from './types'
 import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuComputeFn, TgpuRoot } from 'typegpu'
@@ -110,28 +112,17 @@ export function createIFSPipeline(
   // Cache key contains only what is baked into the generated WGSL: transform
   // ids (struct member names), variation ids/types, loop count and init modes.
   // Uniform values flow through buffers and must not fragment the cache.
+  const clashTeams = clashTeamsOf(isBlending ? undefined : transforms)
+  const clashTeamsOn = clashTeams.enabled
   const sig = JSON.stringify({
+    ...clashTeamsSignature(clashTeams),
     insideShaderCount,
     plotsPerChain,
     customVariationsVersion: getCacheVersion(),
     colorInitType,
     pointInit,
-    transforms: recordEntries(transforms).map(([tid, tr]) => ({
-      tid,
-      variations: recordEntries(tr.variations).map(([vid, v]) => ({
-        vid,
-        type: v.type,
-      })),
-    })),
-    ...(isBlending && {
-      blendTransforms: recordEntries(blendTransforms).map(([tid, tr]) => ({
-        tid,
-        variations: recordEntries(tr.variations).map(([vid, v]) => ({
-          vid,
-          type: v.type,
-        })),
-      })),
-    }),
+    transforms: shaderShapeOf(transforms),
+    ...(isBlending && { blendTransforms: shaderShapeOf(blendTransforms) }),
   })
   // Slot values are baked into the compiled WGSL. The unresolved TypeGPU
   // definition above can be shared, but the compiled pipeline cannot.
@@ -421,9 +412,10 @@ export function createIFSPipeline(
       const keys = recordKeys(transforms)
       const FlameUniforms = struct(
         keys.length > 0
-          ? Object.fromEntries(
-              keys.map((tid) => [`flame${tid}`, flames[tid]!.Uniforms]),
-            )
+          ? Object.fromEntries([
+              ...keys.map((tid) => [`flame${tid}`, flames[tid]!.Uniforms]),
+              ...clashTeamsUniformEntries(clashTeams),
+            ])
           : { _dummy: f32 },
       )
 
@@ -465,7 +457,7 @@ export function createIFSPipeline(
       const colorInitMode = colorInitModeToImplFn[colorInitType]
       const pointInitMode = pointInitModeToImplFn[pointInit]
 
-      const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
+      let executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
         (point: Point) -> Point {
           let flameIndex = random();
           var probabilitySum = f32(0);
@@ -483,6 +475,12 @@ export function createIFSPipeline(
           return point;
         }
       `.$uses({ ...flamesObj, random, layout: bindGroupLayout })
+      // Two fighters: each walker keeps to its own team (flame/clashTeams.ts).
+      const kernel = clashKernel(clashTeams, Point, flamesObj, bindGroupLayout)
+      if (kernel) executeRandomFlame = kernel.executeRandomFlame
+      // Hashes a walker's index for its seed; the team kernel's also deals the
+      // walker its team.
+      const indexHash = kernel?.indexHash ?? hash
 
       const ifsCompute = tgpu.computeFn({
         in: {
@@ -503,7 +501,7 @@ export function createIFSPipeline(
           workgroupIndex * IFS_GROUP_SIZE + localInvocationIndex
         if (pointIndex >= arrayLength(pointRandomSeeds)) return
         const pointSeed = pointRandomSeeds[pointIndex]!
-        const seed = add(pointSeed, hash(pointIndex))
+        const seed = add(pointSeed, indexHash(pointIndex))
         setSeed(seed)
         let point = Point()
         // Cold start (after a settle/reset): seed the chain and pay the warmup
@@ -747,33 +745,17 @@ export function createIFSPipeline(
         }
         // Defensively merge with template so the compiled writer never
         // encounters a missing field when transform counts differ.
-        const safe: Record<string, unknown> = {}
-        for (const key of _uniformKeys) {
-          safe[key] =
-            key in uniforms
-              ? uniforms[key]
-              : {
-                  ...(_templateUniforms[key] as Record<string, unknown>),
-                  probability: 0,
-                }
-        }
-        flameUniformsBuffer.write(safe)
+        flameUniformsBuffer.write(
+          uniformsForPipeline(uniforms, _templateUniforms),
+        )
       } else if (_uniformKeys.length === 0) {
         // Pipeline was built with zero transforms — the struct is the
         // `{ _dummy }` placeholder, so write its field explicitly.
         flameUniformsBuffer.write({ _dummy: 0 })
       } else {
         const uniforms = extractFlameUniforms(flameDescriptor)
-        const safe: Record<string, unknown> = {}
-        for (const key of _uniformKeys) {
-          safe[key] =
-            key in uniforms
-              ? uniforms[key]
-              : {
-                  ...(_templateUniforms[key] as Record<string, unknown>),
-                  probability: 0,
-                }
-        }
+        const safe = uniformsForPipeline(uniforms, _templateUniforms)
+        if (clashTeamsOn) safe.clashTeams = clashTeamValues(flameDescriptor)
         flameUniformsBuffer.write(safe)
       }
       finalTransformBuffer.write(

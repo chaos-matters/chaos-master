@@ -1,0 +1,99 @@
+/*
+ * The Flame Clash preview page: the stage fills the screen; the loading and
+ * error line and the fighter picker float over it on glass.
+ */
+
+.page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--la-void);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+}
+
+.glass {
+  background: var(--la-glass-strong);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+}
+
+.status {
+  composes: glass;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  max-width: calc(100vw - 2 * var(--la-s-4));
+  margin: 0;
+  padding: var(--la-s-3) var(--la-s-4);
+  border-radius: var(--la-r-md);
+  text-align: center;
+}
+
+.picker {
+  composes: glass;
+  position: absolute;
+  top: calc(var(--la-safe-top) + var(--la-s-3) + var(--la-tap) + var(--la-s-3));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-s-3);
+  width: min(420px, calc(100vw - 2 * var(--la-s-3)));
+  padding: var(--la-s-4);
+  border-radius: var(--la-r-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-s-1);
+
+  & span {
+    font: var(--la-t-label);
+    letter-spacing: var(--la-t-label-track);
+    text-transform: uppercase;
+    color: var(--la-ink-3);
+  }
+
+  & select {
+    min-height: var(--la-tap);
+    padding: 0 var(--la-s-3);
+    border: 1px solid var(--la-hairline-strong);
+    border-radius: var(--la-r-sm);
+    background: var(--la-surface-2);
+    color: var(--la-ink);
+    font: var(--la-t-body-sm);
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--la-s-2);
+}
+
+.button {
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-4);
+  border: 1px solid var(--la-hairline-strong);
+  border-radius: var(--la-r-pill);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: var(--la-t-caption);
+  cursor: pointer;
+
+  &[data-primary] {
+    border-color: var(--la-accent-edge);
+    background: var(--la-accent);
+    color: var(--la-accent-ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: 2px;
+  }
+}

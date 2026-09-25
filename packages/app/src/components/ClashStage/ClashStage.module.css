@@ -1,0 +1,158 @@
+/*
+ * The Flame Clash stage: a full-bleed fight canvas under a light glass HUD
+ * (title and preview label, the two fighters with their team badges, the
+ * beat caption and the stage controls).
+ */
+
+.stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glass {
+  background: var(--la-glass);
+  backdrop-filter: var(--la-glass-blur);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+}
+
+.top {
+  position: absolute;
+  top: calc(var(--la-safe-top) + var(--la-s-3));
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+  right: calc(var(--la-safe-right) + var(--la-s-3));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-s-3);
+  pointer-events: none;
+}
+
+.title {
+  composes: glass;
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  margin: 0;
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-4);
+  border-radius: var(--la-r-pill);
+  font: var(--la-t-body-strong);
+}
+
+.preview {
+  padding: 2px var(--la-s-2);
+  border-radius: var(--la-r-pill);
+  background: var(--la-warn-wash);
+  color: var(--la-warn);
+  font: var(--la-t-label);
+  letter-spacing: var(--la-t-label-track);
+  text-transform: uppercase;
+}
+
+.fighters {
+  composes: glass;
+  display: flex;
+  gap: var(--la-s-4);
+  margin: 0;
+  padding: var(--la-s-2) var(--la-s-4);
+  border-radius: var(--la-r-pill);
+  list-style: none;
+
+  & li {
+    display: flex;
+    align-items: center;
+    gap: var(--la-s-2);
+    min-width: 0;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--team);
+  color: #111;
+  font: var(--la-t-label);
+  font-weight: 700;
+}
+
+.caption {
+  position: absolute;
+  left: var(--la-s-4);
+  right: var(--la-s-4);
+  bottom: calc(
+    var(--la-safe-bottom) + var(--la-s-3) + var(--la-tap) + var(--la-s-4)
+  );
+  margin: 0;
+  text-align: center;
+  font: var(--la-t-title);
+  letter-spacing: var(--la-t-title-track);
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px #000;
+  pointer-events: none;
+}
+
+.controls {
+  position: absolute;
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+  right: calc(var(--la-safe-right) + var(--la-s-3));
+  bottom: calc(var(--la-safe-bottom) + var(--la-s-3));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--la-s-2);
+}
+
+.button {
+  composes: glass;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-4);
+  border-radius: var(--la-r-pill);
+  color: var(--la-ink);
+  font: var(--la-t-caption);
+  cursor: pointer;
+
+  & svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover,
+  &[aria-pressed='true'],
+  &[data-done] {
+    color: var(--la-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: 2px;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
