@@ -1,4 +1,5 @@
-import { createEffect, createSignal, on } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup } from 'solid-js'
+import { setArenaShowing } from '@/arcade/editorCover'
 import { mutateFlame } from '@/flame/randomize'
 import { calculateGroundedStats } from '@/flame/stats'
 import { deepClone } from '@/utils/clone'
@@ -25,6 +26,12 @@ export function useWorkspaceArena(params: UseWorkspaceArenaParams) {
   } = params
 
   const [showArena, setShowArena] = createSignal(false)
+  // Mirrored for code outside the workspace that must not cover the Arena's
+  // own top bar, such as the auto-save question (arcade/editorCover.ts).
+  createEffect(() => {
+    setArenaShowing(showArena())
+  })
+  onCleanup(() => setArenaShowing(false))
   const [arenaP1Stats, setArenaP1Stats] =
     createSignal<ArenaFighterStats | null>(null)
   const [arenaP2Stats, setArenaP2Stats] =
