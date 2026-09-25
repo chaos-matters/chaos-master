@@ -36,6 +36,9 @@ test.describe('a reload during an agent duel', () => {
     })
     expect(started.isError).toBeUndefined()
 
+    // A take is recording, so a page that has been clicked asks "Leave site?"
+    // before it reloads. Nothing here clicks yet, but accept it if one comes.
+    page.once('dialog', (dialog) => void dialog.accept())
     await page.reload({ waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => 'webmcp' in window, undefined, {
       timeout: 20_000,

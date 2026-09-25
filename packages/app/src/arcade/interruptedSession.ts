@@ -1,4 +1,4 @@
-// An Arcade session a page reload cut short, remembered so the agent is told instead of editing the viewer's flame.
+// An Arcade session a page reload or a GPU failure cut short, remembered so the agent is told instead of editing the viewer's flame.
 import { createSignal } from 'solid-js'
 
 /**
@@ -21,7 +21,15 @@ export type InterruptedSession = {
   mode: string
   /** The session's title as the pilot knew it, e.g. "Duelling you". */
   title: string
+  /**
+   * What ended it. A page reload (the default, and the only cause a marker
+   * can carry), or the GPU failing to render the session's canvas, which ends
+   * it without a reload but leaves the agent just as unaware.
+   */
+  cause?: InterruptionCause
 }
+
+export type InterruptionCause = 'reload' | 'render'
 
 const ARCADE_SESSION_KEY = 'chaos-master:arcade-session'
 const CHANNEL_NAME = 'chaos-master:arcade-session'
@@ -243,6 +251,29 @@ export function markSessionClosed(): void {
 }
 
 /**
+ * The GPU could not render a running session, so the app ended it (see
+ * `endDuelOnRenderFailure`). No reload happened, but the agent is exactly as
+ * unaware as after one: its next `execute_command` would land on the viewer's
+ * flame. So the same hold applies, and the viewer gets the same kind of
+ * notice. Call it after the session has ended: ending clears the marker, not
+ * this.
+ */
+export function markSessionFailed(session: InterruptedSession): void {
+  setInterrupted({ ...session, cause: 'render' })
+  announceFailure(session)
+}
+
+/**
+ * Only the viewer's half, for a session no agent was playing (a solo duel):
+ * there is nobody to hold the tools for.
+ */
+export function announceFailure(session: InterruptedSession): void {
+  // Through undefined, so a second failure with the same words still shows.
+  setAnnouncement(undefined)
+  setAnnouncement(interruptionNotice({ ...session, cause: 'render' }))
+}
+
+/**
  * The agent has been told: release the tools and forget the marker. Only an
  * interruption is acknowledged; a status read during a running session must
  * leave that session's marker alone, or a reload after it goes unnoticed.
@@ -272,6 +303,14 @@ const MODE_NAME: Record<string, string> = {
 /** What the agent is told, in place of a tool's answer, until it acknowledges. */
 export function interruptionMessage(session: InterruptedSession): string {
   const kind = MODE_NAME[session.mode] ?? 'session'
+  if (session.cause === 'render') {
+    return [
+      `The Arcade ${kind} "${session.title}" ended because the viewer's GPU could not render it, and no Arcade session is active.`,
+      'Its recording was stopped.',
+      "Other tools would now act on the viewer's own flame, so they are held until you call arcade_status, which acknowledges this.",
+      `Another ${kind} on this device is likely to fail the same way.`,
+    ].join(' ')
+  }
   const start = START_TOOL[session.mode]
   const again = start ? ` To play again, call ${start}.` : ''
   return (
@@ -283,8 +322,11 @@ export function interruptionMessage(session: InterruptedSession): string {
   )
 }
 
-/** The viewer's half of the same news, for the launch toast. */
+/** The viewer's half of the same news, for a toast. */
 export function interruptionNotice(session: InterruptedSession): string {
   const kind = MODE_NAME[session.mode] ?? 'session'
+  if (session.cause === 'render') {
+    return `The ${kind} ended because your GPU could not render it. Your own flame is still in the editor.`
+  }
   return `The reload ended the agent's ${kind}. Its recording was not saved.`
 }

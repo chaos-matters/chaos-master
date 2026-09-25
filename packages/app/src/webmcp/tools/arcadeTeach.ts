@@ -71,7 +71,7 @@ export const arcadeStatus: WebMcpTool = {
         ? {
             mode: interrupted.mode,
             title: interrupted.title,
-            reason: 'reload',
+            reason: interrupted.cause ?? 'reload',
             message: interruptionMessage(interrupted),
           }
         : undefined,

@@ -217,7 +217,7 @@ file instead of rediscovering the architecture every session.
 | [duelActions.ts](../../packages/app/src/arcade/duelActions.ts) | _(no header comment)_ |
 | [duelHud.ts](../../packages/app/src/arcade/duelHud.ts) | _(no header comment)_ |
 | [duelJudge.ts](../../packages/app/src/arcade/duelJudge.ts) | _(no header comment)_ |
-| [interruptedSession.ts](../../packages/app/src/arcade/interruptedSession.ts) | An Arcade session a page reload cut short, remembered so the agent is told instead of editing the viewer's flame. |
+| [interruptedSession.ts](../../packages/app/src/arcade/interruptedSession.ts) | An Arcade session a page reload or a GPU failure cut short, remembered so the agent is told instead of editing the viewer's flame. |
 | [lockKeyGate.ts](../../packages/app/src/arcade/lockKeyGate.ts) | The screen lock's key gate: while the pilot owns the keyboard, no key listener of the page hears a key. |
 | [pilot.ts](../../packages/app/src/arcade/pilot.ts) | _(no header comment)_ |
 | [pilotActions.ts](../../packages/app/src/arcade/pilotActions.ts) | _(no header comment)_ |
