@@ -999,6 +999,19 @@ describe('worker frontend routing', () => {
     )
   })
 
+  it('redirects the trailing-slash explorer route, keeping the view', async () => {
+    // The view lives in the fragment, which never reaches the worker; the
+    // browser carries it across a redirect by itself.
+    const res = await worker.fetch(
+      new Request('https://x.test/explore/?from=menu'),
+      makeEnv(),
+      ctx,
+    )
+
+    expect(res.status).toBe(308)
+    expect(res.headers.get('location')).toBe('https://x.test/explore?from=menu')
+  })
+
   it.each(['/api', '/api/not-a-real-route'])(
     'keeps unknown API route %s as a JSON 404 response',
     async (pathname) => {

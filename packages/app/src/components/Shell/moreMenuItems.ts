@@ -1,4 +1,4 @@
-import { Book, Bookmark, Download, GaugeMax, Info, Menu, Share, SidebarPanel, Zap, } from '@/icons'
+import { Book, Bookmark, DeepZoom, Download, GaugeMax, Info, Menu, Share, SidebarPanel, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import type { Component } from 'solid-js'
 
@@ -7,8 +7,8 @@ import type { Component } from 'solid-js'
  * top bar, the phone's shell bar, the tablet's navigation rail - so an item
  * added here shows up wherever More is offered. An item whose handler is
  * absent is not offered: the host decides what this device can do (the
- * Benchmark Lab is a page of its own and web only, the desktop layout is not
- * a native option).
+ * Benchmark Lab and the deep-zoom explorer are pages of their own and web
+ * only, the desktop layout is not a native option).
  *
  * The Arcade is the exception, and defaults. It is reachable from every touch
  * surface and is the one destination this phase does not put in the bar, so
@@ -35,6 +35,7 @@ export interface MoreMenuHandlers {
   onOpenDocs?: () => void
   onOpenBenchmark?: () => void
   onOpenBenchmarkLab?: () => void
+  onOpenExplorer?: () => void
   onOpenSettings?: () => void
   onDesktopLayout?: () => void
 }
@@ -81,6 +82,7 @@ export function buildMoreMenu(
       Icon: GaugeMax,
       run: handlers.onOpenBenchmarkLab,
     },
+    { label: 'Deep zoom', Icon: DeepZoom, run: handlers.onOpenExplorer },
     { label: 'Settings and more', Icon: Info, run: handlers.onOpenSettings },
     { label: 'Desktop layout', Icon: Menu, run: handlers.onDesktopLayout },
   ]

@@ -9,7 +9,8 @@ import bundleAnalyzer from 'vite-bundle-analyzer'
 import { qrcode } from 'vite-plugin-qrcode'
 import solidPlugin from 'vite-plugin-solid'
 import solidSvg from 'vite-plugin-solid-svg'
-import type { ProxyOptions } from 'vite'
+import { staticEntryFiles } from './src/routing/staticEntries'
+import type { Plugin, ProxyOptions } from 'vite'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -60,6 +61,30 @@ const workerProxy: ProxyOptions = {
   },
 }
 
+// A static host with no Worker in front (the Deno Deploy PR previews) serves
+// only files, so the build writes one for each path the Worker routes; see
+// src/routing/staticEntries.ts. Cloudflare serves them too, through
+// html_handling in wrangler.jsonc.
+const staticEntries = (): Plugin => ({
+  name: 'chaos-master:static-entries',
+  apply: 'build',
+  // After vite:build-html, which adds the finished index.html to the bundle.
+  enforce: 'post',
+  generateBundle(_options, bundle) {
+    const index = bundle['index.html']
+    if (index?.type !== 'asset') {
+      this.error('index.html is missing from the bundle')
+    }
+    const html =
+      typeof index.source === 'string'
+        ? index.source
+        : new TextDecoder().decode(index.source)
+    for (const [fileName, source] of Object.entries(staticEntryFiles(html))) {
+      this.emitFile({ type: 'asset', fileName, source })
+    }
+  },
+})
+
 export default defineConfig(({ mode }) => ({
   plugins: [
     solidPlugin(),
@@ -69,6 +94,8 @@ export default defineConfig(({ mode }) => ({
     ssl(),
     qrcode(),
     ANALYZE_BUNDLE ? bundleAnalyzer() : undefined,
+    // The native shell opens index.html itself and has no paths to serve.
+    mode === 'native' ? undefined : staticEntries(),
   ],
   resolve: {
     alias: {

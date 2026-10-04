@@ -11,6 +11,7 @@ const LABELS = [
   'Documentation',
   'Quick GPU benchmark',
   'Benchmark Lab',
+  'Deep zoom',
   'Settings and more',
   'Desktop layout',
 ]
@@ -42,6 +43,7 @@ describe('buildMoreMenu', () => {
       onOpenDocs: vi.fn(),
       onOpenBenchmark: vi.fn(),
       onOpenBenchmarkLab: vi.fn(),
+      onOpenExplorer: vi.fn(),
       onOpenSettings: vi.fn(),
       onDesktopLayout: vi.fn(),
     }
