@@ -1,4 +1,5 @@
 import { batch } from 'solid-js'
+import { openExplorerAt } from '@/routing/pageLinks'
 import { deepClone } from '@/utils/clone'
 import { defaultConfig as defaultTimelineConfig } from '@/utils/timeline'
 import { useLoadFlameFromFile } from '@/utils/useLoadFlameFromFile'
@@ -44,6 +45,14 @@ export function useAppDragAndDrop(
   async function onDrop(file: File) {
     const result = await loadFlameFromFile(file)
     if (!result) return
+    // A deep-zoom picture opens the explorer at its place, in this tab, the
+    // way the editor's own link to the explorer does. Nothing here replaces
+    // the open document: the work on screen reaches Recents through the
+    // autosave's pagehide flush, as on any other way out of the editor.
+    if (result.explorer) {
+      openExplorerAt?.(result.explorer)
+      return
+    }
     // A bare .steps.json carries no flame: there is nothing to load, only a
     // session to offer against whatever is already open.
     if (!result.flame) {

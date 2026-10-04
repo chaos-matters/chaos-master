@@ -25,13 +25,13 @@ function dragEvent(type: string, transfer: FakeTransfer = {}): Event {
   return ev
 }
 
-function setup() {
+function setup(emptyMessage?: string) {
   const onDrop = vi.fn()
   // The zone tells the user when a drop arrives empty, so it needs the host.
   const { container } = render(() => (
     <ToastProvider>
       <ToastHost />
-      <Dropzone onDrop={onDrop}>
+      <Dropzone onDrop={onDrop} emptyMessage={emptyMessage}>
         <div data-testid="child">child</div>
       </Dropzone>
     </ToastProvider>
@@ -43,6 +43,13 @@ function setup() {
 
 describe('Dropzone', () => {
   afterEach(cleanup)
+
+  it('says what its page asks it to about an empty drop', async () => {
+    const { zone } = setup('Nothing came with that drop.')
+    zone.dispatchEvent(dragEvent('drop', { types: [] }))
+    expect(await screen.findByText('Nothing came with that drop.')).toBeTruthy()
+    expect(screen.queryByText(/Load Flame/)).toBeNull()
+  })
 
   it('says so on screen when a drop arrives with nothing in it', async () => {
     // The failure the user actually hit: four drops, four console warnings

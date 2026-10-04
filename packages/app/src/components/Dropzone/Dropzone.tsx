@@ -20,6 +20,8 @@ function preventDraggingAnyElement() {
 type DropzoneProps = {
   class?: string
   onDrop: (file: File) => void | Promise<void>
+  /** What an empty drop says, for a page with no Load Flame to point at. */
+  emptyMessage?: string
 }
 
 export function Dropzone(props: ParentProps<DropzoneProps>) {
@@ -56,7 +58,7 @@ export function Dropzone(props: ParentProps<DropzoneProps>) {
             'Dropzone: drop carried no file; types:',
             Array.from(ev.dataTransfer?.types ?? []),
           )
-          showToast(EMPTY_DROP_MESSAGE, 8000)
+          showToast(props.emptyMessage ?? EMPTY_DROP_MESSAGE, 8000)
           return
         }
         const report = (err: unknown) => {

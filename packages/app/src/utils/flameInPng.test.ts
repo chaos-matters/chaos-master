@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseFlameXml } from '@/flame/flameXml'
 import { calculateCRC32 } from './crc32'
-import { addFlameDataToPng, extractFlameFromPng, extractStepsFromPng, } from './flameInPng'
+import { addExplorerLocationToPng, addFlameDataToPng, EXPLORER_CHUNK_KEY_STRING, extractExplorerFromPng, extractFlameFromPng, extractStepsFromPng, } from './flameInPng'
 import { compressJsonQueryParam, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
+import type { ExplorerLocation } from '@chaos-master/core'
 
 const SIMPLE_FLAME_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <flame name="Simple Test" version="Apophysis 7X" size="800 600"
@@ -161,5 +162,128 @@ describe('flameInPng — embedded session (M5)', () => {
     expect(
       Object.keys((await extractFlameFromPng(bytes)).flame.transforms),
     ).toHaveLength(1)
+  })
+})
+
+describe('flameInPng: deep-zoom location', () => {
+  /** A deep split view in colours other than the defaults. */
+  const LOCATION: ExplorerLocation = {
+    kind: 'mandelbrot',
+    view: {
+      centerRe: '-0.743643887037158704752191506114774',
+      centerIm: '0.131825904205311970493132056385139',
+      zoomLog2: 98.5,
+    },
+    juliaC: { re: '-0.7436438870371587', im: '0.1318259042053119' },
+    maxIterations: 20000,
+    paletteId: 'fire-2',
+    colourCycle: 181,
+    colourShift: 0.255,
+    relief: 0.73,
+    split: true,
+    juliaView: { centerRe: '0.01', centerIm: '-0.02', zoomLog2: 4.25 },
+  }
+
+  function chunk(type: string, data: Uint8Array): Uint8Array {
+    const typeBytes = new TextEncoder().encode(type)
+    return concat([
+      u32be(data.length),
+      typeBytes,
+      data,
+      u32be(calculateCRC32(concat([typeBytes, data]))),
+    ])
+  }
+
+  /** Signature, IHDR, one IDAT and IEND: what a canvas encoder writes. */
+  const CANVAS_PNG = concat([
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', new Uint8Array(13)),
+    chunk('IDAT', new Uint8Array([1, 2, 3])),
+    chunk('IEND', new Uint8Array(0)),
+  ])
+
+  /** The chunk types in order, and each zTXt keyword. */
+  function chunks(bytes: Uint8Array): string[] {
+    const found: string[] = []
+    let at = 8
+    while (at < bytes.length) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset)
+      const length = view.getUint32(at)
+      const type = new TextDecoder().decode(bytes.subarray(at + 4, at + 8))
+      const data = bytes.subarray(at + 8, at + 8 + length)
+      found.push(
+        type === 'zTXt'
+          ? `zTXt:${new TextDecoder().decode(data.subarray(0, data.indexOf(0)))}`
+          : type,
+      )
+      at += 12 + length
+    }
+    return found
+  }
+
+  it('reads back the location it wrote, colours included', async () => {
+    const png = await addExplorerLocationToPng(CANVAS_PNG, LOCATION)
+    const bytes = new Uint8Array(await png.arrayBuffer())
+    expect(png.type).toBe('image/png')
+    expect(await extractExplorerFromPng(bytes)).toEqual(LOCATION)
+    // From the dropped file itself, too.
+    expect(await extractExplorerFromPng(png)).toEqual(LOCATION)
+  })
+
+  it('stores the link fragment under its own keyword, before the image data', async () => {
+    const bytes = new Uint8Array(
+      await (
+        await addExplorerLocationToPng(CANVAS_PNG, LOCATION)
+      ).arrayBuffer(),
+    )
+    expect(chunks(bytes)).toEqual([
+      'IHDR',
+      `zTXt:${EXPLORER_CHUNK_KEY_STRING}`,
+      'IDAT',
+      'IEND',
+    ])
+    expect(EXPLORER_CHUNK_KEY_STRING).toBe('ExplorerLocation')
+  })
+
+  it('finds no location in a flame PNG, and no flame in an explorer PNG', async () => {
+    const flamePng = new Uint8Array(
+      await addFlameDataToPng(
+        await compressJsonQueryParam(parseFlameXml(SIMPLE_FLAME_XML)),
+        CANVAS_PNG,
+      ).arrayBuffer(),
+    )
+    expect(await extractExplorerFromPng(flamePng)).toBeUndefined()
+    const explorerPng = new Uint8Array(
+      await (
+        await addExplorerLocationToPng(CANVAS_PNG, LOCATION)
+      ).arrayBuffer(),
+    )
+    await expect(extractFlameFromPng(explorerPng)).rejects.toThrow()
+  })
+
+  it('finds no location in a plain PNG or a file that is no PNG at all', async () => {
+    expect(await extractExplorerFromPng(CANVAS_PNG)).toBeUndefined()
+    expect(
+      await extractExplorerFromPng(new TextEncoder().encode('not a picture')),
+    ).toBeUndefined()
+  })
+
+  it('ignores a chunk under its keyword that holds no explorer link', async () => {
+    // After the signature and IHDR, as the writer would place it.
+    const afterHeader = 8 + 25
+    const notALink = concat([
+      CANVAS_PNG.subarray(0, afterHeader),
+      chunk(
+        'zTXt',
+        concat([
+          new TextEncoder().encode(`${EXPLORER_CHUNK_KEY_STRING}\0`),
+          new Uint8Array([0]),
+          await compressJsonQueryParam('https://example.com/'),
+        ]),
+      ),
+      CANVAS_PNG.subarray(afterHeader),
+    ])
+    expect(chunks(notALink)[1]).toBe(`zTXt:${EXPLORER_CHUNK_KEY_STRING}`)
+    expect(await extractExplorerFromPng(notALink)).toBeUndefined()
   })
 })

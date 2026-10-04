@@ -1,7 +1,9 @@
 import { useAlert } from '@/components/Modal/useAlert'
 import { MAX_SESSION_JSON_CHARS, parseSession, validateSession, } from '@/recorder/schema'
+import { openExplorerAt } from '@/routing/pageLinks'
 import { extractMetadataFromMp4 } from './flameInMp4'
-import { extractFlameFromPng, extractStepsFromPng } from './flameInPng'
+import { extractExplorerFromPng, extractFlameFromPng, extractStepsFromPng, } from './flameInPng'
+import type { ExplorerLocation } from '@chaos-master/core'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { RecordedSession } from '@/recorder/schema'
@@ -14,6 +16,9 @@ export type FlameLoadResult = {
   /** The session that produced this flame, when the PNG carries one — the
    *  caller can then offer to replay how it was made (M5). */
   session?: RecordedSession
+  /** A deep-zoom picture's location: the file opens the explorer, and
+   *  carries no flame to load. */
+  explorer?: ExplorerLocation
 }
 
 // Flame/animation files carry small embedded metadata; a legitimately large
@@ -63,6 +68,17 @@ export function useLoadFlameFromFile() {
         // fall through to error
       }
       await alert(`No flame metadata found in '${file.name}'.`)
+      return
+    }
+
+    // Before the flame: a deep-zoom picture carries no flame, and its own
+    // place is what dropping it should open.
+    const explorer = await extractExplorerFromPng(arrBuf)
+    if (explorer) {
+      if (openExplorerAt) return { explorer }
+      await alert(
+        `'${file.name}' is a deep-zoom picture. The explorer that opens it is in the web app.`,
+      )
       return
     }
 

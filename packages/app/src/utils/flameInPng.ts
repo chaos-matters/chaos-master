@@ -1,6 +1,14 @@
+/**
+ * What a saved PNG carries besides its pixels, in zTXt chunks: the flame
+ * (`FlameJson`), the recorded session that made it (`FlameSteps`), and for a
+ * deep-zoom picture the explorer location it shows (`ExplorerLocation`).
+ * One chunk writer and one reader serve all three keywords.
+ */
+import { formatExplorerHash, parseExplorerHash } from '@chaos-master/core'
 import { asciiBytes, readAsciiBytes, writeUint32BE } from './binaryReader'
 import { calculateCRC32 } from './crc32'
-import { coerceFlamePayload, concatBuffers, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
+import { coerceFlamePayload, compressJsonQueryParam, concatBuffers, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
+import type { ExplorerLocation } from '@chaos-master/core'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -10,6 +18,12 @@ const CHUNK_KEY_STRING = 'FlameJson'
  *  dropped PNG can offer "replay this creation" as well as "load this flame"
  *  (docs/plans/semantic-recorder-plan.md, M5). */
 export const STEPS_CHUNK_KEY_STRING = 'FlameSteps'
+/** Third zTXt keyword: a deep-zoom picture's explorer location, stored as
+ *  the link fragment (`formatExplorerHash`), so the PNG and the link share
+ *  one format. Dropping the PNG reopens the place it shows. */
+export const EXPLORER_CHUNK_KEY_STRING = 'ExplorerLocation'
+/** A fragment for a view at 1e1000, in both panes of a split, is under 8 KB. */
+const MAX_EMBEDDED_EXPLORER_BYTES = 64 * 1024
 const MAX_EMBEDDED_STEPS_BYTES = 8 * 1024 * 1024
 const CHUNK_TYPE_SIZE_IN_BYTES = 4
 const CHUNK_LENGTH_SIZE_IN_BYTES = 4
@@ -140,6 +154,11 @@ async function readZtxtChunk(
   return await decompressJsonValue(compressedData, maxOutputBytes)
 }
 
+const MAX_OUTPUT_BYTES_BY_KEYWORD: Partial<Record<string, number>> = {
+  [STEPS_CHUNK_KEY_STRING]: MAX_EMBEDDED_STEPS_BYTES,
+  [EXPLORER_CHUNK_KEY_STRING]: MAX_EMBEDDED_EXPLORER_BYTES,
+}
+
 /**
  * Scan for OUR zTXt chunk with this keyword and decode its payload.
  * Undefined when the PNG has no such chunk; other zTXt chunks are ignored,
@@ -173,9 +192,7 @@ async function findZtxtPayload(
           imagePos,
           chunkLength,
           imageData,
-          keyword === STEPS_CHUNK_KEY_STRING
-            ? MAX_EMBEDDED_STEPS_BYTES
-            : undefined,
+          MAX_OUTPUT_BYTES_BY_KEYWORD[keyword],
         )
       }
     }
@@ -230,4 +247,48 @@ export function addFlameDataToPng(
     )
   }
   return new Blob([newImageData], { type: 'image/png' })
+}
+
+/** A fragment the explorer wrote: `#mandelbrot?...` or `#julia?...`. */
+const EXPLORER_FRAGMENT = /^#(?:mandelbrot|julia)\?/
+
+/**
+ * The explorer's picture with its location embedded, so dropping the file
+ * on the explorer or the editor reopens that place in those colours.
+ */
+export async function addExplorerLocationToPng(
+  imageData: Uint8Array,
+  location: ExplorerLocation,
+): Promise<Blob> {
+  const encoded = await compressJsonQueryParam(formatExplorerHash(location))
+  return new Blob(
+    [insertZtxtChunk(imageData, encoded, EXPLORER_CHUNK_KEY_STRING)],
+    { type: 'image/png' },
+  )
+}
+
+/**
+ * The explorer location a PNG carries, or undefined: a flame PNG, a plain
+ * picture, a file that is no PNG at all, and a chunk that cannot be read
+ * all carry none.
+ */
+export async function extractExplorerFromPng(
+  image: Blob | Uint8Array,
+): Promise<ExplorerLocation | undefined> {
+  try {
+    const bytes =
+      image instanceof Uint8Array
+        ? // The chunk scan reads the whole buffer from offset 0.
+          image.byteOffset === 0
+          ? image
+          : image.slice()
+        : new Uint8Array(await image.arrayBuffer())
+    const fragment = await findZtxtPayload(bytes, EXPLORER_CHUNK_KEY_STRING)
+    if (typeof fragment !== 'string' || !EXPLORER_FRAGMENT.test(fragment)) {
+      return undefined
+    }
+    return parseExplorerHash(fragment)
+  } catch {
+    return undefined
+  }
 }

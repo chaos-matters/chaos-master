@@ -321,7 +321,7 @@ file instead of rediscovering the architecture every session.
 | [exportRequests.ts](../../packages/app/src/utils/exportRequests.ts) | Scripted export requests: the narrow, JSON-shaped options a script or an agent sends to `export.renderImage` / `export.renderAnimation`,... |
 | [flameImport.ts](../../packages/app/src/utils/flameImport.ts) | _(no header comment)_ |
 | [flameInMp4.ts](../../packages/app/src/utils/flameInMp4.ts) | _(no header comment)_ |
-| [flameInPng.ts](../../packages/app/src/utils/flameInPng.ts) | _(no header comment)_ |
+| [flameInPng.ts](../../packages/app/src/utils/flameInPng.ts) | What a saved PNG carries besides its pixels, in zTXt chunks: the flame (`FlameJson`), the recorded session that made it (`FlameSteps`), a... |
 | [jsonQueryParam.ts](../../packages/app/src/utils/jsonQueryParam.ts) | _(no header comment)_ |
 | [mathToWgsl.ts](../../packages/app/src/utils/mathToWgsl.ts) | Translate a math-notation expression (LaTeX-like) into a WGSL function body. |
 | [recentFlames.ts](../../packages/app/src/utils/recentFlames.ts) | _(no header comment)_ |

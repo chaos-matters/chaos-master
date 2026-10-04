@@ -14,6 +14,12 @@
  * the wider layout's, so no fractional width falls between the two.
  */
 
+/* The whole page takes a dropped picture (Dropzone draws the highlight). */
+.dropTarget {
+  position: fixed;
+  inset: 0;
+}
+
 .page {
   position: fixed;
   inset: 0;
@@ -112,8 +118,11 @@
 
 /* One row does not fit a phone: at 390px it wanted 427px of 366, and the
    settings button sat off the right edge, out of reach. The readouts take a
-   second row of their own, under the buttons; the ::after is the line break
-   before them, so the first row is the same at every phone width. */
+   second row, under the buttons, with undo and redo at its left; the ::after
+   is the line break before them, so the first row is the same at every phone
+   width. The title starts from no width and grows to its own: a wrapping row
+   moves an item that does not fit to the next line before it shrinks
+   anything, and at 320px the title would push the buttons off the row. */
 @media not all and (min-width: 680px) {
   .hud {
     flex-wrap: wrap;
@@ -127,9 +136,12 @@
   }
 
   .titleBlock {
+    flex: 1 1 0;
+    max-width: max-content;
     margin-right: auto;
   }
 
+  .history,
   .readouts {
     order: 2;
   }
@@ -169,9 +181,14 @@
   }
 
   /* The edge, not the glyph: accent on the 72% fill is 2.86:1 over white. */
-  &:hover,
+  &:hover:not(:disabled),
   &[aria-pressed='true'] {
     border-color: var(--la-accent);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   &:focus-visible {
@@ -180,14 +197,31 @@
   }
 }
 
+/* Undo and redo: in the header, after the title. On a phone they open the
+   second row, level with the readouts at its right. */
+.history {
+  display: flex;
+  flex: none;
+  gap: var(--la-s-2);
+}
+
 .titleBlock {
   composes: chrome from '@/styles/designSystem/glass.module.css';
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-width: 0;
   min-height: var(--la-tap);
   padding: 0 var(--la-s-4);
   border-radius: var(--la-r-pill);
+
+  /* Squeezed, the names shorten instead of wrapping, so the row stays one
+     control tall. */
+  & > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 .title {
