@@ -127,6 +127,7 @@ import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useAudioReactive } from './utils/useAudioReactive'
 import { useSonification } from './utils/useSonification'
 import type { AudioMapping } from './components/AudioReactivePanel/AudioReactivePanel'
+import type { OverwriteOccasion } from './components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { Palette } from './flame/colorMap'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
@@ -2758,19 +2759,17 @@ export function MainWorkspace(props: AppProps) {
 
   /**
    * The one question a save at the cap has to have an answer to: Recents is
-   * full, so storing this flame means destroying the oldest one the user
-   * kept. Asked by the two writes that are allowed to ask - the user's own
-   * Save for Later, and the flush at a document replacement, which is the
-   * last moment the open document's work exists anywhere
-   * (lib/documentLoad.ts).
+   * full, so storing this flame destroys the oldest one kept. Asked by the
+   * writes allowed to ask, each in its own words (useWorkspaceAutosave.ts).
    */
-  const confirmOverwriteOldest = async () => {
+  const confirmOverwriteOldest = async (occasion?: OverwriteOccasion) => {
     const oldestName = getOldestRecentFlame()?.name || 'Flame'
     return await _requestModal<boolean>({
       content: ({ respond }) => (
         <Suspense>
           <ConfirmOverwriteRecentModal
             oldestName={oldestName}
+            occasion={occasion}
             respond={respond}
           />
         </Suspense>

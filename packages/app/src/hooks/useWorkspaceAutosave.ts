@@ -1,9 +1,11 @@
 import { onCleanup } from 'solid-js'
 import { useOptionalToast } from '@/contexts/ToastContext'
+import { askBeforeLeavingForExplorer } from '@/routing/pageLinks'
 import { autosaveIntervalMin, autosaveRecents } from '@/utils/autosaveSettings'
 import { getOldestRecentFlame, MAX_RECENT_FLAMES, saveRecentFlame, upsertRecentFlame, } from '@/utils/recentFlames'
 import { createAutosaveQuestion } from './autosaveQuestion'
 import { createSaveReminder } from './saveReminder'
+import type { OverwriteOccasion } from '@/components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { FlushOutcome } from '@/lib/documentLoad'
 import type { RecentWriteOutcome } from '@/utils/recentFlames'
@@ -67,17 +69,18 @@ export interface UseWorkspaceAutosaveParams {
   ) => number
   /**
    * Put "Recents is full - may this replace the oldest flame?" to the user
-   * and resolve with their answer.
+   * and resolve with their answer. `occasion` words it for what they did.
    *
-   * Taken as a parameter rather than reached for, because only two callers
-   * here are ever allowed to ask: the user's own Save for Later, and the
-   * flush at a document replacement, which is the last moment the open
-   * document's work exists anywhere. The interval autosave and the two
+   * Taken as a parameter rather than reached for, because only three callers
+   * here are ever allowed to ask: the user's own Save for Later, the flush at
+   * a document replacement, which is the last moment the open document's
+   * work exists anywhere, and leaving for the explorer, the one departure
+   * with the user still there to answer. The interval autosave and the two
    * writers for a process that is ending - the pagehide flush and the pause
    * save - all have answers of their own (below), and none of them may raise
    * this.
    */
-  confirmOverwriteOldest: () => Promise<boolean>
+  confirmOverwriteOldest: (occasion?: OverwriteOccasion) => Promise<boolean>
   /**
    * Put "storage refused to save the open flame - open the other one
    * anyway?" to the user and resolve with their answer.
@@ -163,8 +166,8 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
    *
    * `force` is what gets a write past the guard that stops an automatic save
    * from deleting a flame the user kept (utils/recentFlames.ts), so it is
-   * never a default and never a convenience: the three callers that pass true
-   * all have a reason the guard was written for - a user who answered the
+   * never a default and never a convenience: the callers that pass true all
+   * have a reason the guard was written for - a user who answered the
    * question, and the two writers for a process that is about to end.
    */
   const writeToRecents = (force: boolean): RecentWriteOutcome => {
@@ -403,6 +406,27 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
       ...(evicted === undefined ? {} : { evicted }),
     }
   }
+
+  /**
+   * Leaving the editor for the explorer, by the menu link or by a dropped
+   * deep-zoom PNG (routing/pageLinks.ts).
+   *
+   * The pagehide flush would save the open document on the way out and, at
+   * a full shelf, force past the cap: right for a tab that is closing, with
+   * nobody to ask. This departure is the user's own click or drop, and they
+   * are still here to answer, so it asks first, exactly when leaving would
+   * push a kept flame off the shelf: the document holds unsaved work and has
+   * no place of its own there yet. A yes writes it now, over the oldest; a
+   * no stays, with nothing written. Every other case leaves as it always
+   * did, and the pagehide flush does what it always does.
+   */
+  const prepareLeaving = async (): Promise<boolean> => {
+    if (flushDirtyToRecents() !== 'full') return true
+    if (!(await confirmOverwriteOldest('leave'))) return false
+    flushDirtyToRecents(true)
+    return true
+  }
+  onCleanup(askBeforeLeavingForExplorer(prepareLeaving))
 
   window.addEventListener('pagehide', saveOnPagehide)
   onCleanup(() => {

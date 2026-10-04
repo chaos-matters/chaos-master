@@ -8,6 +8,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { createEffect } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addCustomPalette, paletteEntry } from '@/flame/colorMap'
+import { sessionHistory } from '@/test/sessionHistory'
 import { addExplorerLocationToPng, addFlameDataToPng, extractExplorerFromPng, } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { withMode } from './explorerModes'
@@ -486,6 +487,34 @@ describe('FractalExplorerPage drop', () => {
     expect(stubs.renderers[0]?.scene().view).toEqual(SAVED.view)
     expect(stubs.renderers[0]?.colour()).toMatchObject({ phase: 0.25 })
   })
+
+  it('goes Back from a dropped picture to the view before it, and Forward again', async () => {
+    const before: ExplorerLocation = { ...DEFAULT_LOCATION, view: zoomedTo(7) }
+    open(before)
+    const session = sessionHistory('/explore')
+    try {
+      // A drag not yet written when the picture lands.
+      stubs.renderers[0]!.setView(zoomedTo(8))
+      drop(await pictureOf(SAVED))
+      await vi.waitFor(() => {
+        expect(stubs.renderers[0]?.scene().kind).toBe('julia')
+      })
+      expect(session.entries()).toEqual([
+        formatExplorerHash({ ...before, view: zoomedTo(8) }),
+        formatExplorerHash(SAVED),
+      ])
+      session.back()
+      expect(stubs.renderers[0]?.scene()).toMatchObject({
+        kind: 'mandelbrot',
+        view: zoomedTo(8),
+      })
+      session.forward()
+      expect(stubs.renderers[0]?.scene().view).toEqual(SAVED.view)
+      expect(stubs.renderers[0]?.colour()).toMatchObject({ phase: 0.25 })
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
 })
 
 describe('FractalExplorerPage save', () => {
@@ -688,5 +717,54 @@ describe('FractalExplorerPage undo', () => {
     expect(document.activeElement).toBe(field)
     press('KeyZ')
     expect(view()).toEqual(zoomedTo(2))
+  })
+})
+
+describe('FractalExplorerPage back and forward', () => {
+  const view = () => stubs.renderers[0]?.scene().view
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('gives Home and a mode switch an entry each, and a drag none', () => {
+    open({ ...DEFAULT_LOCATION, view: zoomedTo(6) })
+    const session = sessionHistory('/explore')
+    const main = stubs.renderers[0]!
+    for (let i = 1; i <= 10; i += 1) main.setView(zoomedTo(6 + i / 10))
+    vi.advanceTimersByTime(1000)
+    expect(session.entries()).toHaveLength(1)
+    fireEvent.click(screen.getByText('Home'))
+    fireEvent.click(screen.getByRole('radio', { name: 'Julia' }))
+    vi.advanceTimersByTime(1000)
+    expect(session.entries()).toHaveLength(3)
+
+    session.back()
+    expect(stubs.renderers[0]?.scene()).toMatchObject({
+      kind: 'mandelbrot',
+      view: MANDELBROT_HOME,
+    })
+    session.back()
+    expect(view()).toEqual(zoomedTo(7))
+    // Undo from there walks the steps Back skipped: the drag before it.
+    fireEvent.click(historyButton('Undo'))
+    expect(view()).toEqual(zoomedTo(6))
+  })
+
+  it('keeps the entries as they are through undo and redo', () => {
+    open(DEFAULT_LOCATION)
+    const session = sessionHistory('/explore')
+    fireEvent.click(screen.getByRole('radio', { name: 'Julia' }))
+    fireEvent.click(historyButton('Undo'))
+    vi.advanceTimersByTime(1000)
+    fireEvent.click(historyButton('Redo'))
+    vi.advanceTimersByTime(1000)
+    expect(session.pushes()).toBe(1)
+    expect(session.index()).toBe(1)
+    expect(stubs.renderers[0]?.scene().kind).toBe('julia')
   })
 })

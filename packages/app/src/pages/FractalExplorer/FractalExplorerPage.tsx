@@ -9,7 +9,8 @@
  *
  * Save PNG embeds the location in the picture, and dropping such a picture
  * anywhere on the page goes back to it. Undo and redo step through the
- * places visited (explorerLocation.ts says what counts as a step).
+ * places visited; the browser's Back and Forward walk only the jumps among
+ * them (explorerLocation.ts says what counts as either).
  */
 import { formatMagnification } from '@chaos-master/core'
 import { batch, createMemo, createSignal, onCleanup, Show } from 'solid-js'
