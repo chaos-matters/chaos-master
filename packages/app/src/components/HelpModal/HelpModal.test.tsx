@@ -7,8 +7,9 @@ import { HelpModal } from './HelpModal'
 import type { RequestModalFn } from '../Modal/ModalContext'
 
 // The Haptics row is native-only. A getter, so each render reads the current
-// value and one file can cover both builds.
-const platform = { native: true }
+// value and one file can cover both builds. Hoisted with the mock: the layout
+// store the Glass panels row imports reads IS_NATIVE while it loads.
+const platform = vi.hoisted(() => ({ native: true }))
 vi.mock('@/lib/platform', () => ({
   get IS_NATIVE() {
     return platform.native

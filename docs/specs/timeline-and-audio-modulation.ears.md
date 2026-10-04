@@ -32,7 +32,7 @@ not a gap.
 - `packages/app/src/utils/audioWiringPresets.ts` — render-only and flame-aware presets
 - `packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx` — the wiring editor
   (connect/replace, defaults, its own undo stack, import/export, shortcuts)
-- `packages/app/src/flame/Flam3.tsx:551-603` (`deepClone`), `:1251-1258` (`isAutoFpsReady`) — where the timeline overlay is
+- `packages/app/src/flame/Flam3.tsx:540-592` (`deepClone`), `:1240-1247` (`isAutoFpsReady`) — where the timeline overlay is
   applied to the rendered flame and where playback advances
 - `packages/app/src/components/Timeline/hooks/useSeekScrubber.ts` — scrub gesture
 
@@ -373,7 +373,7 @@ consumer that overlays animated values onto the rendered flame shall gate on tha
 accessor rather than on `isPlaying()` alone — otherwise a frame reached by
 clicking or stepping renders its camera but not its transforms.
 
-_(`utils/timeline.ts:774-775` (`isDrivingView`); consumed at `Flam3.tsx:578-581` (`isActive`).)_
+_(`utils/timeline.ts:774-775` (`isDrivingView`); consumed at `Flam3.tsx:567-570` (`isActive`).)_
 
 ### REQ-TA-025 — A seeked frame outlives the gesture that reached it
 
@@ -386,7 +386,7 @@ or unmount; only `loadTracks`, `clearAllTracks` and the Home hand-off reset shal
 clear `previewHeld`.
 
 _(`utils/timeline.ts:1437-1505` (`advanceFrame`), `:1710-1711` (`clearAllTracks`), `:1755-1756` (`loadTracks`);
-`useSeekScrubber.ts:11-17` (`finishSeek`), `:33-36` (`finishSeek`), `:68-70` (`onCleanup`); `MainWorkspace.tsx:2400-2406` (`pause`).)_
+`useSeekScrubber.ts:11-17` (`finishSeek`), `:33-36` (`finishSeek`), `:68-70` (`onCleanup`); `MainWorkspace.tsx:2376-2382` (`pause`).)_
 
 ### REQ-TA-026 — Playback advances at the configured rate, or on quality with Auto FPS
 
@@ -397,7 +397,7 @@ time the current frame reaches target quality, and the timeline shall report the
 achieved rate as an exponential moving average (`0.8` prior, `0.2` new sample),
 reported as `undefined` whenever playback stops.
 
-_(`Flam3.tsx:579-602` (`createEffect`) and `:1251-1258` (`isAutoFpsReady`); `utils/timeline.ts:1437-1458` (`advanceFrame`), `:758-762` (`resetFpsMeter`).)_
+_(`Flam3.tsx:568-591` (`createEffect`) and `:1240-1247` (`isAutoFpsReady`); `utils/timeline.ts:1437-1458` (`advanceFrame`), `:758-762` (`resetFpsMeter`).)_
 
 ### REQ-TA-027 — Playback without loop stops at the end
 
@@ -488,7 +488,7 @@ microphone, both transport and modulation shall be gated on reactivity being
 enabled, so an idle mic capture is never held open.
 
 _(`useAudioReactive.ts:139-257` (`source`) for file mode — note the analyzer is consulted only
-at `:214` (`analyzer`); `:259-297` (`source`) for mic mode.)_
+at `:228` (`analyzer`); `:273-313` (`source`) for mic mode.)_
 
 ### REQ-TA-034 — Replay suspension freezes modulation and its clock
 
@@ -498,7 +498,7 @@ baseline, so the first tick after resuming uses a fresh `dt` rather than chargin
 the envelope for the whole suspended interval. The transport clock shall keep
 advancing.
 
-_(`useAudioReactive.ts:209-217` (`modulationSuspended`), `:267-271` (`modulationSuspended`); guarded by
+_(`useAudioReactive.ts:223-231` (`modulationSuspended`), `:282-286` (`modulationSuspended`); guarded by
 `useAudioReactive.test.ts:37` "freezes both the overlay and smoothing time while replay owns the document".)_
 
 ---

@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { declarationsFor, readCss } from '@/test/cssModule'
 
 /**
  * Stacking and hit testing live in the stylesheet, and the test DOM applies
@@ -8,25 +7,17 @@ import { describe, expect, it } from 'vitest'
  * invisible to every rendering test: the element was in the tree, correct,
  * and untappable.
  */
-const css = readFileSync(join(__dirname, 'ShellBar.module.css'), 'utf8')
+const css = readCss('components/Shell/ShellBar.module.css')
 
 /**
- * Every top-level rule as [selector, declarations], with comments stripped
- * and whitespace collapsed - so a selector prettier wrapped over three lines
- * is one string again, which is how the Android rules are written.
+ * The declarations of the rules whose selector is exactly `selector`, with
+ * whitespace folded - so a selector prettier wrapped over three lines is one
+ * string again, which is how the Android rules are written. Top-level rules
+ * only: a declaration moved into an @media block applies only sometimes,
+ * and must fail the guard that pins it.
  */
-const RULES = css
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
-  .replace(/\s+/g, ' ')
-  .split('}')
-  .map((chunk) => chunk.split('{'))
-  .filter((parts) => parts.length === 2)
-  .map((parts) => [parts[0]!.trim(), parts[1]!.trim()] as const)
-
-/** The declarations of the rule whose selector is exactly `selector`. */
-function declarations(selector: string): string {
-  return RULES.find(([candidate]) => candidate === selector)?.[1] ?? ''
-}
+const declarations = (selector: string) =>
+  declarationsFor(css, selector, { topLevel: true })
 
 describe('the shell bar stylesheet', () => {
   it('lifts the expanded capsule bar over the row beside it', () => {

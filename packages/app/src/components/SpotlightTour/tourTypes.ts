@@ -60,7 +60,8 @@ export interface TourGuide {
   steps: TourStep[]
   nextTourId?: string
   nextTourLabel?: string
-  /** When true, the backdrop overlay uses a dark tint only (no blur).
-   *  Useful for creation tours where the user needs to see the canvas clearly. */
+  /** When true, the dim around the highlighted element is lighter. Useful
+   *  for creation tours where the user needs to see the canvas clearly.
+   *  Named for the blur it once also skipped: no tour dim blurs now. */
   noBlur?: boolean
 }

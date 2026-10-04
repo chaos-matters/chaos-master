@@ -7,6 +7,7 @@
    rather than a solid pill — keeps the icons legible on the bright wheel without
    looking like a black box. */
 .tabs {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   position: absolute;
   top: var(--space-2, 6px);
   right: var(--space-2, 6px);
@@ -15,9 +16,8 @@
   gap: 2px;
   padding: 3px;
   border-radius: var(--space-2, 6px);
-  background: rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* The light scrim rather than frost's label fill, for the reason above. */
+  background: var(--la-scrim-dim);
 }
 
 .tab {

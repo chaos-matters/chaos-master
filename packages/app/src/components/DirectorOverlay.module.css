@@ -201,6 +201,7 @@
 }
 
 .fitnessBadge {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   position: absolute;
   top: 6px;
   left: 6px;
@@ -208,10 +209,8 @@
   border-radius: 12px;
   font-size: 0.65rem;
   font-weight: 700;
-  background: rgba(0, 0, 0, 0.75);
   color: #34d399;
   border: 1px solid rgba(52, 211, 153, 0.4);
-  backdrop-filter: blur(4px);
   z-index: 2;
 }
 

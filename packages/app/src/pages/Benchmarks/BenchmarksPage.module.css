@@ -58,6 +58,7 @@
 }
 
 .header {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   position: sticky;
   z-index: 30;
   top: 0;
@@ -66,9 +67,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px clamp(18px, 4vw, 52px);
+  /* A bar across the page rather than a floating pill: one hairline under
+     it, no shadow. */
+  border: 0;
   border-bottom: 1px solid var(--bench-line);
-  background: rgba(8, 10, 14, 0.86);
-  backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: none;
+  background: var(--la-glass-strong);
 }
 
 .brand {

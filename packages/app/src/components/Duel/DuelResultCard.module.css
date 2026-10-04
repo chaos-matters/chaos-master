@@ -429,6 +429,8 @@
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
+  /* Literal on purpose: the duel keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   color: rgba(244, 246, 255, 0.82);
   cursor: pointer;
@@ -531,6 +533,8 @@
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
+  /* Literal on purpose: the duel keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   color: rgba(244, 246, 255, 0.82);
   font-size: 14px;

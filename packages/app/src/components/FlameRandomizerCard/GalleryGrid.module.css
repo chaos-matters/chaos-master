@@ -55,6 +55,7 @@
 
 /* Subtle action chip, top-right, revealed on hover/focus (or tap on touch). */
 .actions {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   position: absolute;
   top: 4px;
   right: 4px;
@@ -62,8 +63,6 @@
   gap: 1px;
   padding: 2px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
   opacity: 0;
   transform: translateY(-3px);
   transition:

@@ -1,15 +1,31 @@
+/*
+ * The labelled range slider, written for the editor's opaque sidebar in the
+ * light and the dark theme.
+ *
+ * A surface of its own - the deep-zoom explorer's glass panel - sets these
+ * on an ancestor to restyle every slider inside it, whatever the theme:
+ *
+ *   --slider-ink            the label, the value and the thumb
+ *   --slider-ink-hover      the same while hovered or focused
+ *   --slider-ink-targeted   the label and the value of a targeted slider,
+ *                           whose edge and wash stay the accent
+ *   --slider-track-filled   the track up to the thumb
+ *   --slider-track-empty    the track past it
+ *
+ * Unset, which is everywhere else, each falls back to the theme's own value.
+ */
 .label {
-  --color: var(--neutral-600);
-  --hover-color: black;
-  --track-color-filled: var(--neutral-400);
-  --track-color-empty: var(--neutral-200);
+  --color: var(--slider-ink, var(--neutral-600));
+  --hover-color: var(--slider-ink-hover, black);
+  --track-color-filled: var(--slider-track-filled, var(--neutral-400));
+  --track-color-empty: var(--slider-track-empty, var(--neutral-200));
   position: relative;
 
   [data-theme='dark'] & {
-    --color: var(--neutral-400);
-    --hover-color: white;
-    --track-color-filled: var(--neutral-600);
-    --track-color-empty: var(--neutral-800);
+    --color: var(--slider-ink, var(--neutral-400));
+    --hover-color: var(--slider-ink-hover, white);
+    --track-color-filled: var(--slider-track-filled, var(--neutral-600));
+    --track-color-empty: var(--slider-track-empty, var(--neutral-800));
   }
 }
 
@@ -43,7 +59,7 @@
 }
 
 .label.targeted span {
-  color: var(--accent-color, #3b82f6);
+  color: var(--slider-ink-targeted, var(--accent-color, #3b82f6));
   font-weight: 500;
 }
 

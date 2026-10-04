@@ -184,6 +184,7 @@
 }
 
 .thumbnailBar {
+  composes: frostFade from '@/styles/designSystem/glass.module.css';
   position: absolute;
   bottom: 0;
   left: 0;
@@ -193,13 +194,6 @@
   justify-content: space-between;
   gap: 4px;
   padding: 2px 5px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.8) 0%,
-    rgba(0, 0, 0, 0.4) 70%,
-    transparent 100%
-  );
-  backdrop-filter: blur(4px);
   line-height: 1.3;
 }
 

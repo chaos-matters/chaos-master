@@ -1,4 +1,4 @@
-import { lazy, Show, Suspense } from 'solid-js'
+import { createSignal, lazy, Show, Suspense } from 'solid-js'
 import ui from '@/App.module.css'
 import { AudioReactivePanel } from '@/components/AudioReactivePanel/AudioReactivePanel'
 import { BlendFlameGallery } from '@/components/BlendFlameGallery/BlendFlameGallery'
@@ -17,6 +17,7 @@ import { CustomVariationsSection } from './CustomVariationsSection'
 import { RandomizerSection } from './RandomizerSection'
 import { RenderSettingsSection } from './RenderSettingsSection'
 import { TransformsSection } from './TransformsSection'
+import { useSidebarGlass } from './useSidebarGlass'
 import type { Accessor, Setter } from 'solid-js'
 import type { Vec3 } from 'wgpu-matrix'
 import type { AffineEditorSectionProps } from './AffineEditorSection'
@@ -178,6 +179,16 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
   let sidebarScrollRef: HTMLDivElement | undefined
   let savedScrollTop = 0
 
+  // With the Glass panels setting on, the sidebar floats over the canvas as
+  // glass, the way the tablet deck does (useSidebarGlass.ts).
+  const [element, setElement] = createSignal<HTMLDivElement>()
+  const sidebarGlass = useSidebarGlass({
+    element,
+    shown: () => props.showSidebar(),
+    isMobile: () => props.isMobile(),
+    overDuel: () => props.duelShowing() && props.duelSidebarOpen(),
+  })
+
   return (
     <Show when={props.showSidebar()}>
       <div
@@ -188,10 +199,12 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
           [ui.sidebarHidden as string]: props.sidebarHidden(),
           [ui.sidebarOverDuel as string]:
             props.duelShowing() && props.duelSidebarOpen(),
+          [ui.sidebarGlass as string]: sidebarGlass.glass(),
         }}
         style={{ '--sidebar-width': `${props.sidebarWidth()}rem` }}
         data-tour-target="sidebar"
         ref={(el) => {
+          setElement(el)
           if (props.setSidebarEl) props.setSidebarEl(el)
         }}
       >

@@ -1,11 +1,13 @@
-import { ErrorBoundary, Show, Suspense } from 'solid-js'
+import { createMemo, createSignal, ErrorBoundary, Show, Suspense, } from 'solid-js'
 import { vec4f } from 'typegpu/data'
 import ui from '@/App.module.css'
 import { duelShowing } from '@/arcade/duel'
 import { Button } from '@/components/Button/Button'
 import { ExportJobHost } from '@/components/ExportJobs/ExportJobHost'
 import { ExportJobTracker } from '@/components/ExportJobs/ExportJobTracker'
+import { usePrefersReducedMotion } from '@/components/Home/homePlayback'
 import { ProgressBar } from '@/components/ProgressBar/ProgressBar'
+import { SHEET_EASING, SHEET_TRANSITION_MS, } from '@/components/TouchSurface/detents'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { animationExportRunning, cameraDuringExportEnabled, exportAccumulationFraction, exportQuality, setCurrentQuality, setQualityPointCountLimit, } from '@/flame/renderStats'
@@ -13,8 +15,13 @@ import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { Menu } from '@/icons'
 import { workspaceIsVisible } from '@/lib/activeTab'
 import { AutoCanvas } from '@/lib/AutoCanvas'
+import { leadingCover } from '@/lib/canvasFraming'
+import { createEasedValue, cubicBezier } from '@/lib/easing'
+import { glassAllowed } from '@/lib/glass'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { useElementSize } from '@/utils/useElementSize'
+import { useViewFraming } from './useViewFraming'
 import type { Accessor, JSXElement, Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
@@ -26,6 +33,7 @@ import type { TransformVariationType } from '@/flame/variations'
 import type { CustomVariationDef } from '@/flame/variations/custom/types'
 import type { TransformVariationType3D } from '@/flame/variations3D'
 import type { BlendIntent } from '@/hooks/useWorkspaceBlendPick'
+import type { Covered } from '@/lib/canvasFraming'
 import type { ExportDimensions } from '@/utils/exportDimensions'
 
 /** The badge over a hovered partner tile, by what the gallery is picking
@@ -43,6 +51,40 @@ export const EDGE_FADE_COLOR = {
   dark: vec4f(0, 0, 0, 0.6),
 }
 
+/**
+ * No fade, as one value: the memo over edgeFadeColor compares by identity,
+ * and the covered shares change every frame while the rail's sheet eases,
+ * so a fresh zero each time would rewrite the renderer's uniform for the
+ * same colour (ClashStage keeps one the same way).
+ */
+export const NO_EDGE_FADE = vec4f(0)
+
+/**
+ * What the renderer fades the canvas's rim to: the theme's colour beside the
+ * sidebar, and none in full screen or while glass floating over the canvas
+ * covers part of it: the tablet deck, the glass desktop sidebar or the rail's
+ * glass sheet (`covered`, useViewFraming.ts). There the rim runs on under the
+ * glass, and the fade laid a band down it, dark or light with the theme, that
+ * the page beside the canvas never had; the canvas is then framed as it is in
+ * full screen.
+ */
+export function edgeFadeColor(
+  theme: 'light' | 'dark',
+  showSidebar: boolean,
+  covered: Covered,
+) {
+  return showSidebar &&
+    covered.left === 0 &&
+    covered.right === 0 &&
+    covered.bottom === 0
+    ? EDGE_FADE_COLOR[theme]
+    : NO_EDGE_FADE
+}
+
+/** A covered share for the box's style: unset rather than 0, like the
+ *  attribute on the canvas itself. */
+const coveredStyle = (share: number) => (share > 0 ? String(share) : undefined)
+
 export interface CanvasViewportProps {
   // Mobile / layout
   isMobile: Accessor<boolean>
@@ -50,7 +92,11 @@ export interface CanvasViewportProps {
   onCanvasClick: () => void
   onToggleMobileSidebar: () => void
   hideMobileSidebarToggle?: boolean
-  /** Px of viewport the editor rail's sheet covers; the canvas pans up by half. */
+  /**
+   * Px of viewport the editor rail's sheet covers above peek. The canvas
+   * slides up by half, or, while the sheet is glass, the camera frames the
+   * flame above it.
+   */
   railInset?: Accessor<number>
 
   // Flame / rendering
@@ -111,6 +157,57 @@ export interface CanvasViewportProps {
 }
 
 export function CanvasViewport(props: CanvasViewportProps) {
+  // With the Glass panels setting on, the tablet deck, the desktop sidebar
+  // and the rail's sheet float over this canvas and the cameras frame the
+  // flame in the part they leave visible. The shift is the view's alone: the
+  // document's camera stays what it is with the setting off, and every image
+  // taken off the canvas is cut to the part on show (useViewFraming.ts).
+  const [container, setContainer] = createSignal<HTMLDivElement>()
+  const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
+  const containerSize = useElementSize(container)
+  // The rail's sheet covers the canvas's foot past peek, and the flame is
+  // kept in view above it one of two ways. While the Glass panels setting
+  // applies, the sheet is glass (TouchSurface/EditorRail.tsx) and the canvas
+  // runs on under it, framed by the camera, the cover easing along the
+  // sheet's own transition as the slide does. Otherwise the opaque sheet
+  // hides the canvas's foot and the canvas slides up by half the cover
+  // (App.module.css, .canvas), as it did before there was glass. A switch
+  // between the two while the sheet is open runs both moves at once, and
+  // they cancel out.
+  const railInset = () => props.railInset?.() ?? 0
+  const sheetCover = createEasedValue(
+    () => (glassAllowed() ? railInset() : 0),
+    {
+      durationMs: SHEET_TRANSITION_MS,
+      easing: cubicBezier(SHEET_EASING),
+      instant: usePrefersReducedMotion(),
+    },
+  )
+  const railSlide = () => (glassAllowed() ? 0 : railInset())
+  const framing = useViewFraming({
+    width: () => containerSize()?.width,
+    height: () => containerSize()?.height,
+    bottom: sheetCover,
+    canvas,
+    exportDimensions: () => props.exportDimensions(),
+    onExportImage: () => props.onExportImage(),
+  })
+  const edgeFade = createMemo(() =>
+    edgeFadeColor(props.theme(), props.showSidebar(), framing.covered()),
+  )
+  // While the glass sidebar floats over the canvas, the box spans the
+  // sidebar's column as well (App.module.css, .underSidebar), and the bottom
+  // bar starts where the sidebar's cover ends, where it is with the setting
+  // off. Read from the sidebar's measure rather than from the framing, which
+  // drops the cover while an export sizes the canvas: the layout does not
+  // move for an export.
+  const underSidebar = () => leadingCover() > 0
+  // An export sizing the canvas itself renders a frame with the aspect of
+  // the part on show, not of the box spanning the sidebar's column: the box
+  // says so, and App.module.css draws the canvas in that part meanwhile.
+  const exportingUnderSidebar = () =>
+    underSidebar() && props.exportDimensions() !== undefined
+
   return (
     // Home and the Arcade cover the editor completely and it stays mounted
     // underneath, so everything in here is behind a full-screen layer: the
@@ -119,10 +216,21 @@ export function CanvasViewport(props: CanvasViewportProps) {
     // tab order and still announced. `inert` takes the subtree out of both
     // without unmounting the canvas or stopping a single frame.
     <div
+      ref={setContainer}
       class={ui.canvasContainer}
       data-tour-target="canvas"
-      classList={{ [ui.fullscreen as string]: !props.showSidebar() }}
-      style={{ '--rail-inset': `${props.railInset?.() ?? 0}px` }}
+      classList={{
+        [ui.fullscreen as string]: !props.showSidebar(),
+        [ui.underSidebar as string]: underSidebar(),
+        [ui.exporting as string]: exportingUnderSidebar(),
+      }}
+      // The hover badge centres on the part on show (App.module.css).
+      style={{
+        '--rail-inset': `${railSlide()}px`,
+        '--covered-left': coveredStyle(framing.covered().left),
+        '--covered-right': coveredStyle(framing.covered().right),
+        '--leading-cover': underSidebar() ? `${leadingCover()}px` : undefined,
+      }}
       inert={!workspaceIsVisible()}
       onClick={props.onCanvasClick}
     >
@@ -155,6 +263,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
         })()}
       </p>
       <AutoCanvas
+        ref={setCanvas}
         class={ui.canvas}
         data-replay-region="canvas"
         role="img"
@@ -203,6 +312,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
                   zoom={[props.effectiveZoom, props.setFlameZoom]}
                   position={[props.effectivePosition, props.setFlamePosition]}
                   rotation={props.effectiveRotation}
+                  viewShift={framing.viewShift}
                   interactive={() =>
                     !props.isPlaying() &&
                     (!animationExportRunning() || cameraDuringExportEnabled())
@@ -221,12 +331,8 @@ export function CanvasViewport(props: CanvasViewportProps) {
                     animationEnabled={props.animationEnabled()}
                     flameDescriptor={props.effectiveFlame()}
                     renderInterval={props.finalRenderInterval()}
-                    onExportImage={props.onExportImage()}
-                    edgeFadeColor={
-                      props.showSidebar()
-                        ? EDGE_FADE_COLOR[props.theme()]
-                        : vec4f(0)
-                    }
+                    onExportImage={framing.exportImage()}
+                    edgeFadeColor={edgeFade()}
                     setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
                     setQualityPointCountLimit={(fn) =>
                       setQualityPointCountLimit(() => fn)
@@ -247,6 +353,7 @@ export function CanvasViewport(props: CanvasViewportProps) {
                 roll={[props.effectiveRoll, props.setFlameRoll]}
                 flyMode={props.flyMode}
                 flySpeed={props.flySpeed}
+                viewShift={framing.viewShift}
                 // Not while a duel covers this canvas: this camera
                 // listens on `window` for the orbit keys, and the
                 // player's seat binds the same setters to its own
@@ -270,12 +377,8 @@ export function CanvasViewport(props: CanvasViewportProps) {
                   animationEnabled={props.animationEnabled()}
                   flameDescriptor={props.effectiveFlame()}
                   renderInterval={props.finalRenderInterval()}
-                  onExportImage={props.onExportImage()}
-                  edgeFadeColor={
-                    props.showSidebar()
-                      ? EDGE_FADE_COLOR[props.theme()]
-                      : vec4f(0)
-                  }
+                  onExportImage={framing.exportImage()}
+                  edgeFadeColor={edgeFade()}
                   setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
                   setQualityPointCountLimit={(fn) =>
                     setQualityPointCountLimit(() => fn)

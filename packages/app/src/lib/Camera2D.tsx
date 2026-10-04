@@ -6,9 +6,11 @@ import { mat3 } from 'wgpu-matrix'
 import { camera2DViewMatrix } from './camera2DView'
 import { CameraContextProvider } from './CameraContext'
 import { useCanvas } from './CanvasContext'
+import { NO_SHIFT } from './canvasFraming'
 import { useLiveRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { ViewShift } from './canvasFraming'
 
 export const Camera2DUniforms = struct({
   viewMatrix: mat3x3f,
@@ -77,6 +79,13 @@ type Camera2DProps = {
    * flame's own camera passes `camera.rotation ?? 0`.
    */
   rotation: number
+  /**
+   * Where the camera centre lands on the canvas, in clip units; the middle
+   * without one. Only the editor canvas passes it, to frame the flame beside
+   * the tablet deck floating over it (lib/canvasFraming.ts). It is the
+   * view's, never the flame's: nothing here writes it back.
+   */
+  viewShift?: ViewShift
 }
 
 export function Camera2D(props: ParentProps<Camera2DProps>) {
@@ -109,6 +118,7 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
       zoom: safeZoom,
       rotation,
       aspect,
+      shift: props.viewShift ?? NO_SHIFT,
     })
     const viewMatrixInverse = mat3.inverse(viewMatrix, mat3x3f())
     return {

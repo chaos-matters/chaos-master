@@ -1,12 +1,11 @@
 .backdrop {
+  composes: scrim from '@/styles/designSystem/glass.module.css';
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   animation: fadeIn 300ms ease-out;
 }
 
@@ -148,6 +147,7 @@
 }
 
 .thumbnailBar {
+  composes: frostFade from '@/styles/designSystem/glass.module.css';
   position: absolute;
   bottom: 0;
   left: 0;
@@ -157,13 +157,6 @@
   justify-content: space-between;
   gap: 4px;
   padding: 3px 6px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.75) 0%,
-    rgba(0, 0, 0, 0.35) 70%,
-    transparent 100%
-  );
-  backdrop-filter: blur(4px);
   line-height: 1.3;
 }
 

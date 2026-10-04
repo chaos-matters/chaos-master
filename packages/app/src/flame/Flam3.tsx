@@ -18,6 +18,7 @@ import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useLiveRootContext } from '../lib/RootContext'
 import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
+import { flameBackgroundColor } from './backgroundColor'
 import { clashTeamsOf, clashTeamsSignature } from './clashTeams'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
 import { createDensityEstimationPipeline } from './densityEstimationPipeline'
@@ -25,7 +26,6 @@ import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
 import { createIFSPipeline3D } from './ifsPipeline3D'
 import { createExportRenderDriver, createInteractiveRenderDriver, EXPORT_COUNT_SIGNAL_INTERVAL_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_PRESENT_INTERVAL_MS, } from './renderDrivers'
-import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
 import { shaderShapeOf } from './shaderShape'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
 import { customVariationsVersion } from './variations/custom'
@@ -134,19 +134,8 @@ export function Flam3(props: Flam3Props) {
     deepClone(props.flameDescriptor),
   )
 
-  const backgroundColorFinal = () => {
-    const bg = props.flameDescriptor.renderSettings.backgroundColor
-    const isPaint = props.flameDescriptor.renderSettings.drawMode !== 'light'
-
-    if (bg === undefined) {
-      return isPaint
-        ? vec3f(...backgroundColorDefaultWhite)
-        : vec3f(...backgroundColorDefault)
-    }
-
-    // User explicitly chose a color -- respect it, no auto-swap.
-    return vec3f(...bg)
-  }
+  const backgroundColorFinal = () =>
+    vec3f(...flameBackgroundColor(props.flameDescriptor.renderSettings))
 
   // Memo, not a plain function: renderTick reads this from the rAF callback,
   // which has no reactive owner. Solid wraps conditional JSX props (e.g.

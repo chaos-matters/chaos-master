@@ -18,7 +18,7 @@ import { startViewTransition } from '@/lib/viewTransition'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { duelShowing, duelSidebarOpen } from './arcade/duel'
-import { CanvasViewport } from './components/CanvasViewport'
+import { CanvasViewport, visibleCanvasAspect, visibleThumbnail, } from './components/CanvasViewport'
 import { DebugOverlay } from './components/DebugOverlay'
 import { Dropzone } from './components/Dropzone/Dropzone'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
@@ -33,8 +33,8 @@ import { ShellBar } from './components/Shell/ShellBar'
 import { AdvancedToolsDrawer, EditorRail, TabletInspectorDeck, TouchHUD, } from './components/TouchSurface'
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
-import { WorkspaceSidebar } from './components/WorkspaceSidebar'
-import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceBlendPick, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
+import { SIDEBAR_DRAWER_QUERY, WorkspaceSidebar, } from './components/WorkspaceSidebar'
+import { useWorkspaceAnimationGen, useWorkspaceArena, useWorkspaceArtDirector, useWorkspaceAutosave, useWorkspaceBlendPick, useWorkspaceCamera, useWorkspaceCommands, useWorkspaceGlassBusy, useWorkspacePalette, useWorkspaceReplay, useWorkspaceShortcuts, useWorkspaceTimelineBinding, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 import { deckFits, isTouchDevice } from './stores/workspaceLayoutStore'
 import type { MoreMenuHandlers } from './components/Shell/moreMenuItems'
@@ -426,7 +426,7 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     // The phone and tablet classes come from the layout store's one resize
     // listener now; this effect only keeps the sidebar's own breakpoint.
-    const mq = window.matchMedia('(max-width: 768px)')
+    const mq = window.matchMedia(SIDEBAR_DRAWER_QUERY)
 
     setIsMobile(mq.matches)
     if (mq.matches || isPhone()) setCompact(true)
@@ -1679,13 +1679,11 @@ export function MainWorkspace(props: AppProps) {
    * true of a publish: the document the recorder captures is the authored one,
    * frame by frame, whatever the music is doing to the canvas.
    */
-  useAudioReactive(
+  const audioModulating = useAudioReactive(
     audioEnabled,
     audioBuffer,
     audioMapping,
-    (values) => {
-      setAudioModulation(values)
-    },
+    setAudioModulation,
     liveAnalyzer,
     audioSource,
     playbackPaused,
@@ -1694,6 +1692,7 @@ export function MainWorkspace(props: AppProps) {
     fileAnalyzer,
     replaySuspendsAudioModulation,
   )
+  useWorkspaceGlassBusy({ timeline, history, exportStore, audioModulating })
 
   // Sonification loop: synthesizes audio in real-time from flame structure.
   const sonificationLifecycle = useSonification(
@@ -1913,7 +1912,7 @@ export function MainWorkspace(props: AppProps) {
           `.${ui.canvas}`,
         )
         if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-          return canvas.clientWidth / canvas.clientHeight
+          return visibleCanvasAspect(canvas)
         }
         return window.innerWidth / window.innerHeight
       },
@@ -2109,31 +2108,7 @@ export function MainWorkspace(props: AppProps) {
 
   function captureMainThumbnail(size: number): Promise<string | null> {
     const canvas = document.querySelector<HTMLCanvasElement>(`.${ui.canvas}`)
-    if (canvas === null) return Promise.resolve(null)
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob === null) {
-          resolve(null)
-          return
-        }
-        const url = URL.createObjectURL(blob)
-        const img = new Image()
-        img.onload = () => {
-          const offscreen = document.createElement('canvas')
-          offscreen.width = size
-          offscreen.height = size
-          const ctx = offscreen.getContext('2d')!
-          ctx.drawImage(img, 0, 0, size, size)
-          URL.revokeObjectURL(url)
-          resolve(offscreen.toDataURL('image/png'))
-        }
-        img.onerror = () => {
-          URL.revokeObjectURL(url)
-          resolve(null)
-        }
-        img.src = url
-      }, 'image/png')
-    })
+    return canvas ? visibleThumbnail(canvas, size) : Promise.resolve(null)
   }
 
   type RandomizeSettings = {
@@ -4492,9 +4467,7 @@ export function MainWorkspace(props: AppProps) {
               void showHelp()
             }}
             devCrashTest={devCrashTest}
-            touchLayoutPreference={touchLayoutPreference}
             setTouchLayoutPreference={setTouchLayoutPreference}
-            isTouchLayout={isTouchLayout}
             /* Every touch layout, not just the ones with the rail. Gated on
                `railLayout` this hid on the phone and on a narrow tablet and
                showed on the one layout that also mounts the NavRail: the

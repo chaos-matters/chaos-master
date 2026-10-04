@@ -199,6 +199,8 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.38);
   background: rgba(255, 255, 255, 0.04);
+  /* Literal on purpose: the duel keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   color: #fff;
   font-size: calc(var(--duel-dial-size) * 0.062);

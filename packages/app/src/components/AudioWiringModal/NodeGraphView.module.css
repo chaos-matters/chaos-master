@@ -90,9 +90,9 @@
   position: absolute;
   min-width: 160px;
   border-radius: 8px;
+  /* No blur: at 95% the graph behind shows too little to blur. */
   background: rgba(24, 24, 32, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   user-select: none;
   transition:

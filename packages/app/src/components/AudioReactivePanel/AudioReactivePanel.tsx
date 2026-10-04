@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Index, lazy, onCleanup, Show, Suspense, } from 'solid-js'
+import { Portal } from 'solid-js/web'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
 import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, PRESET_DESCRIPTIONS, PRESET_LABELS, randomizeMappings, RENDER_PRESET_IDS, RENDER_PRESETS, } from '@/utils/audioWiringPresets'
@@ -1240,25 +1241,31 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         </div>
       </div>
 
-      {/* Wiring modal overlay */}
+      {/* The wiring editor covers the whole window, from the body. Rendered
+          in place it sat inside the sidebar, which is a backdrop-filtered box
+          while it floats over the canvas as glass (App.module.css,
+          .sidebarGlass): a fixed box inside one is held to it and clipped,
+          so the editor opened as a strip the sidebar's size. */}
       <Show when={showWiringModal()}>
-        <Suspense>
-          <AudioWiringModal
-            mappings={props.audioMapping().mappings}
-            transforms={props.transforms}
-            presets={wiringPresets()}
-            featureLevels={liveFeatureLevels()}
-            liveAnalyzer={props.liveAnalyzer()}
-            onMappingsChange={(mappings) => {
-              props.onMappingChange({
-                preset: 'custom',
-                mappings,
-              })
-            }}
-            onMappingGestureBoundary={props.onMappingGestureBoundary}
-            onClose={() => setShowWiringModal(false)}
-          />
-        </Suspense>
+        <Portal>
+          <Suspense>
+            <AudioWiringModal
+              mappings={props.audioMapping().mappings}
+              transforms={props.transforms}
+              presets={wiringPresets()}
+              featureLevels={liveFeatureLevels()}
+              liveAnalyzer={props.liveAnalyzer()}
+              onMappingsChange={(mappings) => {
+                props.onMappingChange({
+                  preset: 'custom',
+                  mappings,
+                })
+              }}
+              onMappingGestureBoundary={props.onMappingGestureBoundary}
+              onClose={() => setShowWiringModal(false)}
+            />
+          </Suspense>
+        </Portal>
       </Show>
     </div>
   )

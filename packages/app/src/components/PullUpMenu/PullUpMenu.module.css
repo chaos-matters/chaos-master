@@ -21,6 +21,8 @@
 }
 
 .panel {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
   position: fixed;
   z-index: 150; /* above toolbar/timeline, below modal overlays (240+) */
   display: flex;
@@ -36,7 +38,6 @@
     background: rgba(26, 26, 32, 0.96);
     border-color: var(--neutral-700, #3a3a4e);
     box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
   }
 }
 

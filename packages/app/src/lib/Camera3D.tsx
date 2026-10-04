@@ -6,9 +6,11 @@ import { mat4, vec3 } from 'wgpu-matrix'
 import { Camera3DContextProvider } from './Camera3DContext'
 import { rolledUpVector } from './cameraMath'
 import { useCanvas } from './CanvasContext'
+import { NO_SHIFT, shiftClipTransform } from './canvasFraming'
 import { useLiveRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ViewShift } from './canvasFraming'
 
 export const Camera3DUniforms = struct({
   viewProjectionMatrix: mat4x4f,
@@ -50,6 +52,13 @@ type Camera3DProps = {
   fov: number
   /** Camera roll around the view direction, in radians (default 0). */
   roll?: number
+  /**
+   * Where the target lands on the canvas, in clip units; the middle without
+   * one. The editor canvas's framing beside the floating tablet deck
+   * (lib/canvasFraming.ts), applied after the projection so the vanishing
+   * point moves with the picture. View-only, like Camera2D's.
+   */
+  viewShift?: ViewShift
 }
 
 import type { Camera3DObj } from '@/flame/schema/flameSchema'
@@ -111,10 +120,9 @@ export function Camera3D(props: ParentProps<Camera3DProps>) {
       0.01,
       100,
     )
-    const viewProjectionMatrix = mat4.mul(
-      projectionMatrix,
-      viewMatrix,
-      mat4x4f(),
+    const viewProjectionMatrix = shiftClipTransform(
+      mat4.mul(projectionMatrix, viewMatrix, mat4x4f()),
+      props.viewShift ?? NO_SHIFT,
     )
 
     return {

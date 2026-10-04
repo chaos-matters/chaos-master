@@ -35,8 +35,9 @@
   padding: 10px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(10, 15, 29, 0.92);
-  backdrop-filter: blur(24px);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
   -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
 }
@@ -246,8 +247,9 @@
   padding: 12px 22px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(10, 15, 29, 0.92);
-  backdrop-filter: blur(24px);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
   -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
 }
@@ -340,8 +342,9 @@
   padding: 14px;
   border-radius: 14px;
   background: rgba(10, 15, 29, 0.9);
-  backdrop-filter: blur(20px);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1.5px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   transition:
@@ -1086,8 +1089,9 @@
   gap: 24px;
   padding: 14px 24px;
   background: rgba(14, 14, 20, 0.82);
-  backdrop-filter: blur(14px);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -1334,8 +1338,9 @@
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   background: rgba(10, 15, 29, 0.94);
-  backdrop-filter: blur(28px);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
   -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(28px);
   border-radius: 16px;
   border: 2px solid #fbbf24;
   box-shadow:

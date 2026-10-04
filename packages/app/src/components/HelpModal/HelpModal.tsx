@@ -12,6 +12,7 @@ import { Checkbox } from '../Checkbox/Checkbox'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { DataManagement } from '../DataManagement/DataManagement'
 import { useRequestModal } from '../Modal/ModalContext'
+import { GlassPanelsSetting } from './GlassPanelsSetting'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 import type { Theme } from '@/contexts/ThemeContext'
@@ -334,6 +335,7 @@ export function HelpModal(props: HelpModalProps) {
           />
         </label>
       </Show>
+      <GlassPanelsSetting />
       <div class={ui.pickerModeRow}>
         <span class={ui.pickerModeLabel}>Default mode</span>
         <div class={ui.pickerModeBtns}>

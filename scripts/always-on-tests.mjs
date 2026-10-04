@@ -76,6 +76,11 @@ export const ALWAYS_ON = [
     why: 'walks the app and core sources and the Playwright specs with the TypeScript AST for flame fixtures and variation tables no real flame matches',
     genre: 'filesystem',
   },
+  {
+    file: 'src/styles/designSystem/glassBlurs.test.ts',
+    why: 'walks every stylesheet and TSX file under src/ to ratchet literal blurs and pair each backdrop-filter with its -webkit- twin',
+    genre: 'filesystem',
+  },
 
   // Read a non-source file the graph has no edge to.
   {
@@ -98,18 +103,68 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
   {
+    file: 'src/styles/designSystem/glassGate.test.ts',
+    why: 'reads glass.module.css to check that the Glass panels gate decides every optionalPanel the same way',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/lib/optionalPanelGlass.test.ts',
+    why: 'reads the gate selector from glass.module.css and matches it against optionalPanelGlass for every setting and theme',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/WorkspaceSidebar/sidebarGlass.module.test.ts',
+    why: 'reads App.module.css to check the canvas box beside the glass sidebar and the hooks its captions read',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/styles/designSystem/glassContrast.test.ts',
+    why: 'reads the ink and glass tokens from lumen.css, and the focus ring from index.css and glass.module.css, to measure contrast on each fill and check that Reduce Transparency and More Contrast replace every see-through token',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/styles/designSystem/glassSurfaces.test.ts',
+    why: 'reads every stylesheet to check which surfaces compose which glass primitive, where literal blurs may stay, that no component redefines a glass token or a hook onGlass sets, and that a glass surface with a light fill takes the theme focus ring',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/styles/designSystem/glassHooks.test.ts',
+    why: 'reads glass.module.css with the card, Slider and PaletteSelector stylesheets whose hooks onGlass sets',
+    genre: 'filesystem',
+  },
+  {
     file: 'src/components/Shell/ShellBar.module.test.ts',
     why: 'reads ShellBar.module.css',
     genre: 'filesystem',
   },
   {
     file: 'src/components/TouchSurface/EditorRail.module.test.ts',
-    why: 'reads EditorRail.module.css',
+    why: "reads EditorRail.module.css, App.module.css for the canvas's slide under the sheet, and lumen.css for the sheet's easing",
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/SpotlightTour/SpotlightTour.module.test.ts',
+    why: 'reads SpotlightTour.module.css',
     genre: 'filesystem',
   },
   {
     file: 'src/components/TouchSurface/tokens.test.ts',
     why: 'readdirSync over the TouchSurface/ and Shell/ stylesheets',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/TouchSurface/TabletDeck.module.test.ts',
+    why: 'reads TabletDeck.module.css, App.module.css and lumen.css',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/ExportJobs/ExportJobTracker.module.test.ts',
+    why: 'reads ExportJobTracker.module.css and the blues in colors.css',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/TouchSurface/TouchSurface.module.test.ts',
+    why: 'reads TouchSurface.module.css and the Duel/ScrubField.module.css whose hooks it sets',
     genre: 'filesystem',
   },
   {
@@ -202,10 +257,14 @@ export const ALWAYS_ON = [
 /**
  * Tests the guard's detector flags that deliberately do NOT need to run on
  * every pull request -- a test that merely mentions `readFileSync` in a
- * fixture string, say. Empty today, and it should stay hard to add to: an
- * entry here is a promise that the module graph really does reach this test's
- * subject.
+ * fixture string, say. It should stay hard to add to: an entry here is a
+ * promise that the module graph really does reach this test's subject.
  *
  * @type {ReadonlyArray<ExemptEntry>}
  */
-export const EXEMPT = []
+export const EXEMPT = [
+  {
+    file: 'src/test/cssModule.test.ts',
+    why: 'flagged only because it imports test/cssModule.ts, which reads stylesheets for the tests that use it; this test reads no file, holds that module to fixtures written inline, and imports it directly, so the module graph selects it whenever the module changes',
+  },
+]

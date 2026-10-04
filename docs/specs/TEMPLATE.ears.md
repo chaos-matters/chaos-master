@@ -112,7 +112,7 @@ that is the next pattern.
 `sidebarLocked` presentation, so parameter edits cannot race the animated
 values the timeline is writing.
 
-_(`packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx:187` (`sidebarLocked`) —
+_(`packages/app/src/components/WorkspaceSidebar/WorkspaceSidebar.tsx:198` (`sidebarLocked`) —
 note the lock keys off `isPlaying()` alone, which is narrower than
 `isDrivingView()` at `packages/app/src/utils/timeline.ts:774`.)_
 

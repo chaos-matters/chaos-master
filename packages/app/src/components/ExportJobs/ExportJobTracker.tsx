@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { ChevronDown, Cross } from '@/icons'
 import { IS_NATIVE } from '@/lib/platform'
 import { isTouchLayout } from '@/stores/workspaceLayoutStore'
 import { downloadBlob } from '@/utils/blob'
@@ -67,7 +68,7 @@ export function ExportJobTracker() {
             class={ui.chevron}
             classList={{ [ui.chevronUp as string]: collapsed() }}
           >
-            ▾
+            <ChevronDown aria-hidden="true" />
           </span>
         </button>
         <Show when={!collapsed()}>
@@ -169,7 +170,7 @@ function JobCard(props: { job: ExportJob }) {
           title={job.status === 'rendering' ? 'Cancel and discard' : 'Dismiss'}
           aria-label="Dismiss"
         >
-          ✕
+          <Cross aria-hidden="true" />
         </button>
       </div>
 

@@ -34,6 +34,8 @@
   /* Quiet through the fill and the border, never by dimming the label: the
      text stays white and legible over a bright flame. */
   background: rgba(255, 255, 255, 0.05);
+  /* Literal on purpose: the duel keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
   backdrop-filter: blur(14px) saturate(1.1);
   color: #fff;
   font-size: calc(var(--chip-height) * 0.32);

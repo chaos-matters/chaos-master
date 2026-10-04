@@ -34,6 +34,7 @@
 }
 
 .bar {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   display: flex;
   align-items: center;
   flex: 1 1 auto;
@@ -42,10 +43,6 @@
   padding: 0 var(--la-s-1);
   border-radius: var(--la-r-pill);
   background: var(--la-glass-strong);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  box-shadow: var(--la-glass-shadow);
 }
 
 .item {
@@ -85,6 +82,7 @@
 }
 
 .more {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   flex: 0 0 auto;
   width: var(--la-shell-h);
   height: var(--la-shell-h);
@@ -92,10 +90,6 @@
   place-items: center;
   border-radius: var(--la-r-pill);
   background: var(--la-glass-strong);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  box-shadow: var(--la-glass-shadow);
   color: var(--la-ink-2);
   cursor: pointer;
   touch-action: manipulation;
@@ -173,8 +167,8 @@
   background: none;
   border: 0;
   box-shadow: none;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* No backdrop-filter on either: this dock lives inside the rail's sheet,
@@ -184,8 +178,8 @@
    every composited frame while the flame converged underneath. The cheap
    form is what the shutter beside it in the same row already uses. */
 .capsuleDock .bar {
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .capsuleDock:not(.expanded) .capsule {
@@ -232,8 +226,8 @@
   border-top: 1px solid var(--la-hairline);
   border-radius: 0;
   background: var(--la-surface);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: none;
 }
 
@@ -269,8 +263,8 @@
   border-top: 1px solid var(--la-hairline);
   background: var(--la-surface);
   box-shadow: none;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   height: calc(var(--la-shell-h-material) + var(--la-safe-bottom));
   padding-bottom: var(--la-safe-bottom);
 }

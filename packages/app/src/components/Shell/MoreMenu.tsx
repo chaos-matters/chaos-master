@@ -21,10 +21,14 @@ export interface MoreMenuProps {
  * stylesheets that had already drifted apart on width, elevation and icon.
  *
  * The backdrop stays with each host on purpose. The top bar's pill carries a
- * backdrop-filter and a centring transform, which make it the containing
- * block for a fixed child, so its backdrop has to be rendered outside the
- * header; the shell's lives inside the dock. One shared element would have to
- * be right in both places at once.
+ * backdrop-filter, which makes it the containing block for a fixed child, so
+ * the top bar renders its backdrop outside the header; the shell's lives
+ * inside the dock. One shared element would have to be right in both places
+ * at once.
+ *
+ * The top bar holds the list in a frame beside its glass pill, not inside
+ * it: the list is glass too, and glass inside a blurred element can only
+ * sample that element's fill (glass-panels.md, phase 1).
  */
 export function MoreMenu(props: MoreMenuProps) {
   createBackLayer(

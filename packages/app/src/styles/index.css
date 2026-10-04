@@ -23,14 +23,25 @@
 
   --font-display: 'Cinzel Decorative', 'Times New Roman', serif;
 
-  /* Keyboard-focus ring color: the app's indigo accent (light theme) replaces
-     the old violet default so the ring matches the rest of the UI. The dark
-     theme uses a lighter indigo (below) for contrast. */
-  --focus-ring-color: #6366f1;
+  /* Keyboard-focus ring colours. The theme's ring is the app's indigo
+     accent, which replaced the old violet default so the ring matches the
+     rest of the UI; the dark theme takes a lighter indigo (below). Glass
+     takes a lighter one still: it is dark in both themes and lets white-hot
+     art through, and on its thinnest fill only this one keeps the 3:1 a
+     focus indicator needs (glassContrast.test.ts). The ring is drawn in
+     --focus-ring-color. The glass classes set it to the glass ring
+     (styles/designSystem/glass.module.css), and a glass surface that keeps
+     a light fill sets it back to the theme's. */
+  --focus-ring-theme: #6366f1;
+  --focus-ring-glass: #a5b4fc;
+  --focus-ring-color: var(--focus-ring-theme);
 }
 
+/* --focus-ring-color is declared again so that it takes the dark theme's
+   ring: a custom property inherits its value, not the var() it names. */
 body[data-theme='dark'] {
-  --focus-ring-color: #818cf8;
+  --focus-ring-theme: #818cf8;
+  --focus-ring-color: var(--focus-ring-theme);
 }
 
 body {

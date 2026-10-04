@@ -3,6 +3,7 @@ import './styles/index.css'
 import { render } from 'solid-js/web'
 import { installLeaveSitePrompt } from './arcade/leaveSitePrompt'
 import { installLockKeyGate } from './arcade/lockKeyGate'
+import { applyGlassPanels } from './lib/glass'
 import { loadHaptics } from './lib/haptics'
 import { loadLifecycle } from './lib/lifecycle'
 import { IS_NATIVE, nativePlatform } from './lib/platform'
@@ -28,6 +29,10 @@ const platform = nativePlatform(IS_NATIVE, globalThis.navigator.userAgent)
 if (platform) {
   document.documentElement.dataset.platform = platform
 }
+
+// The Glass panels setting reaches the stylesheets the same way, before the
+// first paint so a panel never flashes the other look.
+applyGlassPanels()
 
 // Android 15 draws apps edge to edge. Capacitor's SystemBars then runs the
 // WebView under the status and navigation bars if the viewport asks for

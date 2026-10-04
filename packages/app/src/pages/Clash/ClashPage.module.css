@@ -13,11 +13,8 @@
 }
 
 .glass {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   background: var(--la-glass-strong);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  box-shadow: var(--la-glass-shadow);
 }
 
 .status {

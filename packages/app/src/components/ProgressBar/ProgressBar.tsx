@@ -1,5 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 import { animationExportCancel, animationExportProgress, setForceAnimationExportNow, } from '@/flame/renderStats'
+import { isTouchLayout } from '@/stores/workspaceLayoutStore'
 import { formatEta } from '@/utils/formatEta'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { ExportActions } from '../ExportJobs/ExportActions'
@@ -47,6 +48,7 @@ export function ProgressBar() {
   return (
     <div
       class={ui.overlay}
+      classList={{ [ui.touch!]: isTouchLayout() }}
       style={{ display: animProgress() ? 'block' : 'none' }}
     >
       <div class={ui.inner}>

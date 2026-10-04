@@ -1,14 +1,15 @@
 /* Crash modal — centered glassmorphic card (matches WelcomeScreen aesthetic) */
 
 .crash-overlay {
+  composes: scrim from '@/styles/designSystem/glass.module.css';
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(12px);
+  /* The heavy scrim: what is behind a crash may be half drawn. */
+  background: var(--la-scrim-heavy);
   animation: crashFadeIn 300ms ease-out;
 }
 

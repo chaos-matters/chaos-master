@@ -27,11 +27,12 @@
 
 /* Gem-only variant for editor canvas overlays. */
 .compact {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   gap: 0;
   padding: 3px;
   border-radius: 50%;
+  /* Its own fill, one per theme, over the frost blur. */
   background: color-mix(in srgb, var(--neutral-100) 72%, transparent);
-  backdrop-filter: blur(2px);
 
   [data-theme='dark'] & {
     background: color-mix(in srgb, var(--neutral-900) 72%, transparent);
