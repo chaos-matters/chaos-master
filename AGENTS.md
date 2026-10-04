@@ -28,10 +28,14 @@ merge, and user preferences.
 
 ## Guardrails
 
-1. **Never push to `upstream`.** `chaos-matters/chaos-master` is frozen
-   (`lock_branch` + `enforce_admins`): no pushes and no PR merges. Its push URL
-   is disabled locally. Feature branches go to `origin` — the fork
-   `Komediruzecki/chaos-master-fp` — and PRs target the fork's `main`.
+1. **Feature branches go to `origin`; upstream takes release branches.**
+   The hackathon freeze on `chaos-matters/chaos-master` was lifted on
+   2026-10-04. Feature branches go to `origin` (the fork,
+   `Komediruzecki/chaos-master-fp`) and PRs target the fork's `main`. The fork
+   is a standalone repository, not a GitHub fork, so work reaches upstream as
+   a `release/<version>` branch pushed to `upstream` with a same-repo PR,
+   landed by Rebase and merge, and only when the user asks for one. Never push
+   to upstream's `main`.
 2. **Never force-push.** `--force-with-lease` is acceptable for a rebase; plain
    `--force` is not.
 3. **Do not commit, push, or open a PR unless asked.** Write the code, report
