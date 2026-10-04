@@ -6,13 +6,20 @@
  * The split view puts the Julia set of a point beside the Mandelbrot set. A
  * second renderer draws it, and dragging the point (`JuliaMarker`) across
  * the Mandelbrot pane changes it as you watch.
+ *
+ * Save PNG embeds the location in the picture, and dropping such a picture
+ * anywhere on the page goes back to it. Undo and redo step through the
+ * places visited (explorerLocation.ts says what counts as a step).
  */
 import { formatMagnification } from '@chaos-master/core'
 import { batch, createMemo, createSignal, onCleanup, Show } from 'solid-js'
+import { Dropzone } from '@/components/Dropzone/Dropzone'
 import { useToast } from '@/contexts/ToastContext'
-import { ChevronLeft, Settings, SplitView } from '@/icons'
+import { ChevronLeft, Redo, Settings, SplitView, Undo } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { downloadBlob } from '@/utils/blob'
+import { addExplorerLocationToPng, extractExplorerFromPng, } from '@/utils/flameInPng'
+import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { ExplorerControls } from './ExplorerControls'
 import { explorerFileName } from './explorerFileName'
 import { createExplorerLocation } from './explorerLocation'
@@ -83,15 +90,25 @@ export function FractalExplorerPage() {
   onCleanup(() => {
     document.title = previousTitle
   })
-  const { location, update, link } = createExplorerLocation()
+  const { location, update, jump, undo, redo, canUndo, canRedo, link } =
+    createExplorerLocation()
   const [picked, setPicked] = createSignal<Palette | undefined>()
+  // Every palette picked here, by id: undo brings back a palette that a
+  // later pick replaced, and a flam3 palette, which gets a new id each time
+  // it loads, is found nowhere else.
+  const pickedById = new Map<string, Palette>()
   // Read from the location, so a link pasted into this tab brings its
   // palette along with its view. The id has a memo of its own: a custom
   // palette is parsed from storage into a new object on every lookup, and
   // each new object recolours both panes, so a pan or a move of the point
   // must not reach the lookup.
   const paletteId = createMemo(() => location().paletteId)
-  const palette = createMemo(() => resolvePalette(paletteId(), picked()))
+  const palette = createMemo(() => {
+    const id = paletteId()
+    const last = picked()
+    const remembered = id === undefined ? undefined : pickedById.get(id)
+    return resolvePalette(id, last?.id === id ? last : remembered)
+  })
   // The colour settings are part of the location too, so a link brings the
   // look along with the view. A memo each: a pan makes a new location, and
   // the colour pass must not hear about it.
@@ -147,9 +164,42 @@ export function FractalExplorerPage() {
     background: [0.05, 0.055, 0.07],
   }))
 
-  /** Moves to a location from explorerModes.ts; the same one is no change. */
+  /**
+   * Jumps to a location from explorerModes.ts, as an undo step of its own;
+   * the same one is no change.
+   */
   function go(next: ExplorerLocation) {
-    if (next !== location()) update(next)
+    if (next !== location()) jump(next)
+  }
+
+  useKeyboardShortcuts({
+    // Ctrl/Cmd+Z undoes and Ctrl/Cmd+Shift+Z redoes, as in the editor. A
+    // text field keeps its own undo: the shortcut hook leaves those keys to
+    // the browser while one has focus.
+    KeyZ: (ev) => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return false
+      if (ev.shiftKey) redo()
+      else undo()
+      return true
+    },
+    KeyY: (ev) => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey) return false
+      redo()
+      return true
+    },
+  })
+
+  /** A dropped picture: the place a deep-zoom PNG carries, or no change. */
+  async function openDropped(file: File) {
+    const dropped = await extractExplorerFromPng(file)
+    if (!dropped) {
+      showToast(
+        `'${file.name}' carries no deep-zoom location, so the view stays where it is.`,
+      )
+      return
+    }
+    go(dropped)
+    showToast(`Opened the view saved in '${file.name}'.`)
   }
 
   function setMode(next: ExplorerMode) {
@@ -175,10 +225,25 @@ export function FractalExplorerPage() {
     const sideBySide =
       !mainPane || !juliaPane || juliaPane.offsetLeft > mainPane.offsetLeft
     const canvas = drawShots(julia ? [main, julia] : [main], sideBySide)
-    // Named for the moment Save was pressed, not when the encoder finished.
-    const fileName = explorerFileName(location(), new Date())
+    // Named for the moment Save was pressed, not when the encoder finished,
+    // and carrying the location of that moment too.
+    const saved = location()
+    const fileName = explorerFileName(saved, new Date())
     canvas?.toBlob((blob) => {
-      if (blob) downloadBlob(blob, fileName)
+      if (!blob) return
+      void blob
+        .arrayBuffer()
+        .then((buffer) =>
+          addExplorerLocationToPng(new Uint8Array(buffer), saved),
+        )
+        // The picture is still worth having without its location.
+        .catch((err: unknown) => {
+          console.warn('[explorer] could not embed the location', err)
+          return blob
+        })
+        .then((png) => {
+          downloadBlob(png, fileName)
+        })
     }, 'image/png')
   }
 
@@ -191,175 +256,204 @@ export function FractalExplorerPage() {
   }
 
   return (
-    <div
-      class={ui.page}
-      data-split={split() ? '' : undefined}
-      data-panel={panelOpen() ? '' : undefined}
+    <Dropzone
+      class={ui.dropTarget}
+      onDrop={openDropped}
+      emptyMessage="That drop arrived empty, with no file in it, so the view stays where it is."
     >
-      <div class={ui.stage}>
-        <div ref={mainPane} class={ui.pane}>
-          <AutoCanvas
-            class={ui.canvas}
-            pixelRatio={window.devicePixelRatio || 1}
-            role="application"
-            ariaLabel={
-              split()
-                ? `Mandelbrot set. ${PAN_HINT} Move the ring, or drag with the right mouse button, to choose the Julia set beside it.`
-                : `Fractal view. ${PAN_HINT}`
-            }
-          >
-            <ExplorerRenderer
-              scene={scene}
-              setView={(view) => {
-                update({ view })
-              }}
-              colour={colour}
-              palette={palette}
-              pixelCap={pixelCap}
-              samples={samples}
-              onStatus={setStatus}
-              onReady={(api) => {
-                readers.main = api.readDisplay
-              }}
-            />
-            <Show when={split()}>
-              <JuliaMarker
-                view={() => location().view}
-                point={() => location().juliaC}
-                setPoint={(juliaC) => {
-                  update({ juliaC })
-                }}
-              />
-            </Show>
-          </AutoCanvas>
-          <ProgressBar value={progress()} />
-        </div>
-
-        <Show when={split()}>
-          <div ref={juliaPane} class={ui.pane}>
+      <div
+        class={ui.page}
+        data-split={split() ? '' : undefined}
+        data-panel={panelOpen() ? '' : undefined}
+      >
+        <div class={ui.stage}>
+          <div ref={mainPane} class={ui.pane}>
             <AutoCanvas
               class={ui.canvas}
               pixelRatio={window.devicePixelRatio || 1}
               role="application"
-              ariaLabel={`Julia set of the point. ${PAN_HINT}`}
+              ariaLabel={
+                split()
+                  ? `Mandelbrot set. ${PAN_HINT} Move the ring, or drag with the right mouse button, to choose the Julia set beside it.`
+                  : `Fractal view. ${PAN_HINT}`
+              }
             >
               <ExplorerRenderer
-                scene={juliaScene}
-                setView={(juliaView) => {
-                  update({ juliaView })
+                scene={scene}
+                setView={(view) => {
+                  update({ view })
                 }}
                 colour={colour}
                 palette={palette}
                 pixelCap={pixelCap}
                 samples={samples}
-                onStatus={setJuliaStatus}
+                onStatus={setStatus}
                 onReady={(api) => {
-                  readers.julia = api.readDisplay
+                  readers.main = api.readDisplay
                 }}
-                debugName="__explorerJuliaDebug"
               />
+              <Show when={split()}>
+                <JuliaMarker
+                  view={() => location().view}
+                  point={() => location().juliaC}
+                  setPoint={(juliaC) => {
+                    update({ juliaC })
+                  }}
+                />
+              </Show>
             </AutoCanvas>
-            <ProgressBar value={juliaStatus()?.progress ?? 0} />
-            <p class={ui.paneLabel}>
-              Julia set, c = {shortComplex(location().juliaC)}
-            </p>
+            <ProgressBar value={progress()} />
           </div>
+
+          <Show when={split()}>
+            <div ref={juliaPane} class={ui.pane}>
+              <AutoCanvas
+                class={ui.canvas}
+                pixelRatio={window.devicePixelRatio || 1}
+                role="application"
+                ariaLabel={`Julia set of the point. ${PAN_HINT}`}
+              >
+                <ExplorerRenderer
+                  scene={juliaScene}
+                  setView={(juliaView) => {
+                    update({ juliaView })
+                  }}
+                  colour={colour}
+                  palette={palette}
+                  pixelCap={pixelCap}
+                  samples={samples}
+                  onStatus={setJuliaStatus}
+                  onReady={(api) => {
+                    readers.julia = api.readDisplay
+                  }}
+                  debugName="__explorerJuliaDebug"
+                />
+              </AutoCanvas>
+              <ProgressBar value={juliaStatus()?.progress ?? 0} />
+              <p class={ui.paneLabel}>
+                Julia set, c = {shortComplex(location().juliaC)}
+              </p>
+            </div>
+          </Show>
+        </div>
+
+        <header class={ui.hud}>
+          <a class={ui.iconButton} href="/" aria-label="Back to Lumen Apeiron">
+            <ChevronLeft />
+          </a>
+          <div class={ui.titleBlock}>
+            <span class={ui.title}>Deep zoom</span>
+            <span class={ui.subtitle}>
+              {split()
+                ? 'Mandelbrot and Julia'
+                : location().kind === 'julia'
+                  ? 'Julia set'
+                  : 'Mandelbrot set'}
+            </span>
+          </div>
+          <div class={ui.history} role="group" aria-label="Undo and redo">
+            <button
+              type="button"
+              class={ui.iconButton}
+              aria-label="Undo"
+              title="Undo (Ctrl+Z)"
+              disabled={!canUndo()}
+              onClick={undo}
+            >
+              <Undo />
+            </button>
+            <button
+              type="button"
+              class={ui.iconButton}
+              aria-label="Redo"
+              title="Redo (Ctrl+Shift+Z)"
+              disabled={!canRedo()}
+              onClick={redo}
+            >
+              <Redo />
+            </button>
+          </div>
+          <dl class={ui.readouts}>
+            <div>
+              <dt>Zoom</dt>
+              <dd>{formatMagnification(location().view.zoomLog2)}</dd>
+            </div>
+            <div>
+              <dt>Done</dt>
+              <dd>{done()}</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            class={ui.iconButton}
+            aria-label="Show the Julia set of a point beside the Mandelbrot set"
+            aria-pressed={split()}
+            onClick={() => {
+              setMode(split() ? 'mandelbrot' : 'split')
+            }}
+          >
+            <SplitView />
+          </button>
+          <button
+            type="button"
+            class={ui.iconButton}
+            aria-label={panelOpen() ? 'Hide settings' : 'Show settings'}
+            aria-expanded={panelOpen()}
+            onClick={() => setPanelOpen((open) => !open)}
+          >
+            <Settings />
+          </button>
+        </header>
+
+        <Show when={panelOpen()}>
+          <aside class={ui.panel} aria-label="Explorer settings">
+            <ExplorerControls
+              location={location()}
+              mode={mode()}
+              status={status()}
+              palette={palette()}
+              period={colourCycle()}
+              phase={colourShift()}
+              relief={relief()}
+              quality={quality()}
+              onMode={setMode}
+              onJuliaC={(juliaC) => {
+                update({ juliaC })
+              }}
+              onJuliaHere={() => {
+                go(withJuliaFromCentre(location()))
+              }}
+              onIterations={(maxIterations) => {
+                update({ maxIterations })
+              }}
+              onPalette={(next) => {
+                pickedById.set(next.id, next)
+                // Together, or the old id is looked up again in between and
+                // both panes recolour twice.
+                batch(() => {
+                  setPicked(next)
+                  update({ paletteId: next.id })
+                })
+              }}
+              onPeriod={(colourCycle) => {
+                update({ colourCycle })
+              }}
+              onPhase={(colourShift) => {
+                update({ colourShift })
+              }}
+              onRelief={(relief) => {
+                update({ relief })
+              }}
+              onQuality={setQuality}
+              onHome={() => {
+                go(withHome(location()))
+              }}
+              onCopyLink={() => void copyLink()}
+              onSave={() => void savePicture()}
+            />
+          </aside>
         </Show>
       </div>
-
-      <header class={ui.hud}>
-        <a class={ui.iconButton} href="/" aria-label="Back to Lumen Apeiron">
-          <ChevronLeft />
-        </a>
-        <div class={ui.titleBlock}>
-          <span class={ui.title}>Deep zoom</span>
-          <span class={ui.subtitle}>
-            {split()
-              ? 'Mandelbrot and Julia'
-              : location().kind === 'julia'
-                ? 'Julia set'
-                : 'Mandelbrot set'}
-          </span>
-        </div>
-        <dl class={ui.readouts}>
-          <div>
-            <dt>Zoom</dt>
-            <dd>{formatMagnification(location().view.zoomLog2)}</dd>
-          </div>
-          <div>
-            <dt>Done</dt>
-            <dd>{done()}</dd>
-          </div>
-        </dl>
-        <button
-          type="button"
-          class={ui.iconButton}
-          aria-label="Show the Julia set of a point beside the Mandelbrot set"
-          aria-pressed={split()}
-          onClick={() => {
-            setMode(split() ? 'mandelbrot' : 'split')
-          }}
-        >
-          <SplitView />
-        </button>
-        <button
-          type="button"
-          class={ui.iconButton}
-          aria-label={panelOpen() ? 'Hide settings' : 'Show settings'}
-          aria-expanded={panelOpen()}
-          onClick={() => setPanelOpen((open) => !open)}
-        >
-          <Settings />
-        </button>
-      </header>
-
-      <Show when={panelOpen()}>
-        <aside class={ui.panel} aria-label="Explorer settings">
-          <ExplorerControls
-            location={location()}
-            mode={mode()}
-            status={status()}
-            palette={palette()}
-            period={colourCycle()}
-            phase={colourShift()}
-            relief={relief()}
-            quality={quality()}
-            onMode={setMode}
-            onJuliaC={(juliaC) => {
-              update({ juliaC })
-            }}
-            onJuliaHere={() => {
-              go(withJuliaFromCentre(location()))
-            }}
-            onIterations={(maxIterations) => {
-              update({ maxIterations })
-            }}
-            onPalette={(next) => {
-              // Together, or the old id is looked up again in between and
-              // both panes recolour twice.
-              batch(() => {
-                setPicked(next)
-                update({ paletteId: next.id })
-              })
-            }}
-            onPeriod={(colourCycle) => {
-              update({ colourCycle })
-            }}
-            onPhase={(colourShift) => {
-              update({ colourShift })
-            }}
-            onRelief={(relief) => {
-              update({ relief })
-            }}
-            onQuality={setQuality}
-            onHome={() => {
-              go(withHome(location()))
-            }}
-            onCopyLink={() => void copyLink()}
-            onSave={() => void savePicture()}
-          />
-        </aside>
-      </Show>
-    </div>
+    </Dropzone>
   )
 }

@@ -3,9 +3,10 @@
  * its page in this tab. The native build, where they are undefined, is a
  * build-time constant these tests do not rebuild.
  */
+import { DEFAULT_LOCATION, formatExplorerHash } from '@chaos-master/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BENCHMARKS_PATH, EXPLORER_PATH } from './appPath'
-import { openBenchmarkLab, openExplorer } from './pageLinks'
+import { openBenchmarkLab, openExplorer, openExplorerAt } from './pageLinks'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -21,5 +22,15 @@ describe('page links', () => {
     expect(open).toBeTypeOf('function')
     open?.()
     expect(assign).toHaveBeenCalledExactlyOnceWith(path)
+  })
+
+  it('opens the explorer at a location in this tab', () => {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { assign })
+    const julia = { ...DEFAULT_LOCATION, kind: 'julia' as const }
+    openExplorerAt?.(julia)
+    expect(assign).toHaveBeenCalledExactlyOnceWith(
+      `${EXPLORER_PATH}${formatExplorerHash(julia)}`,
+    )
   })
 })
