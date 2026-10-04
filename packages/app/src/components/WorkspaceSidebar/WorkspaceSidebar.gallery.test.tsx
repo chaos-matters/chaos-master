@@ -15,6 +15,7 @@ import { createRoot, createSignal } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
+import { ThemeContextProvider } from '@/contexts/ThemeContext'
 import { DEFAULT_BLEND_WEIGHT } from '@/flame/blend'
 import { examples } from '@/flame/examples'
 import { useWorkspaceBlendPick } from '@/hooks/useWorkspaceBlendPick'
@@ -152,8 +153,11 @@ function renderSidebar(workspace: Workspace, intent: Intent) {
       flameDescriptor: workspace.flame,
     } as WorkspaceSidebarProps['renderSettingsSectionProps'],
   }
+  // The sidebar reads the theme for its glass (useSidebarGlass.ts).
   const view = render(() => (
-    <WorkspaceSidebar {...(props as WorkspaceSidebarProps)} />
+    <ThemeContextProvider>
+      <WorkspaceSidebar {...(props as WorkspaceSidebarProps)} />
+    </ThemeContextProvider>
   ))
   return { ...view, opened, showBlendGallery, setShowSidebar }
 }

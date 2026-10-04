@@ -1,4 +1,29 @@
+/*
+ * The background exports, in a corner of the canvas.
+ *
+ * Chrome glass (docs/plans/glass-panels.md, phase 1) at the stronger
+ * --la-glass-strong fill, since it carries secondary text: the 86% fill
+ * keeps ink-2 at 5.9:1 over white-hot art even on a card's wash, where
+ * ink-3 falls to 4.0:1, so the text is ink and ink-2 only. Each text rule
+ * reads --tracker-ink or --tracker-ink-2 and falls back to the grey it had.
+ * The coloured text the 92% card carried falls short on the glass too:
+ * the error line takes --tracker-error, the error rose lifted toward ink
+ * (5.0:1 on a card's wash), and the labels on the blue and red buttons
+ * take ink (--export-action-ink, which ExportActions.module.css reads),
+ * their fills and edges keeping the colour. The job count is white on a
+ * blue pill, and white on the old blue is 3.68:1, under the 4.5:1 its
+ * small text needs: on the glass the pill takes the next blue down,
+ * --blue-600 (--tracker-count). The desktop's light theme unsets all five
+ * and keeps the card it had, dark in both themes before (the glass is
+ * dark-only, decision b); a touch layout is glass in both.
+ */
 .tracker {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  --tracker-ink: var(--la-ink);
+  --tracker-ink-2: var(--la-ink-2);
+  --tracker-error: color-mix(in srgb, var(--la-error) 70%, var(--la-ink));
+  --export-action-ink: var(--la-ink);
+  --tracker-count: var(--blue-600);
   position: fixed;
   top: 0.75rem;
   right: 0.75rem;
@@ -9,9 +34,18 @@
   flex-direction: column;
   border-radius: 0.6rem;
   overflow: hidden;
+  background: var(--la-glass-strong);
+}
+
+[data-theme='light'] .tracker:not(.trackerTouch) {
+  --tracker-ink: initial;
+  --tracker-ink-2: initial;
+  --tracker-error: initial;
+  --export-action-ink: initial;
+  --tracker-count: initial;
+  /* The card it had, on chrome's blur. */
   background: rgba(15, 15, 17, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.5),
     0 1px 2px rgba(0, 0, 0, 0.3);
@@ -32,7 +66,7 @@
   padding: 0.5rem 0.75rem;
   border: none;
   background: none;
-  color: var(--color-text, #eee);
+  color: var(--tracker-ink, var(--color-text, #eee));
   cursor: pointer;
   text-align: left;
 }
@@ -53,15 +87,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-color, #3b82f6);
+  background: var(--tracker-count, var(--accent-color, #3b82f6));
   color: #fff;
 }
 
+/* The chevron and the dismiss cross are the app's icons (@/icons), drawn
+   in currentColor. Typed as the characters they were, their shape and
+   weight came from whichever font had them. */
 .chevron {
   margin-left: auto;
-  font-size: 0.7rem;
-  color: var(--color-text-secondary, #999);
+  display: inline-flex;
+  color: var(--tracker-ink-2, var(--color-text-secondary, #999));
   transition: transform 0.15s ease;
+}
+
+.chevron svg,
+.dismiss svg {
+  display: block;
+  width: 0.75rem;
+  height: 0.75rem;
+  stroke-width: 2.5;
 }
 
 .chevronUp {
@@ -97,7 +142,7 @@
   flex: 1;
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--color-text, #eee);
+  color: var(--tracker-ink, var(--color-text, #eee));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -106,22 +151,20 @@
 .dismiss {
   border: none;
   background: none;
-  color: var(--color-text-secondary, #888);
-  font-size: 0.7rem;
-  line-height: 1;
+  color: var(--tracker-ink-2, var(--color-text-secondary, #888));
   cursor: pointer;
   padding: 0.15rem;
   border-radius: 0.25rem;
 }
 
 .dismiss:hover {
-  color: var(--color-text, #eee);
+  color: var(--tracker-ink, var(--color-text, #eee));
   background: rgba(255, 255, 255, 0.08);
 }
 
 .muted {
   font-size: 0.65rem;
-  color: var(--color-text-secondary, #888);
+  color: var(--tracker-ink-2, var(--color-text-secondary, #888));
   font-variant-numeric: tabular-nums;
 }
 
@@ -129,7 +172,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.65rem;
-  color: var(--color-text-secondary, #888);
+  color: var(--tracker-ink-2, var(--color-text-secondary, #888));
   font-variant-numeric: tabular-nums;
 }
 
@@ -137,7 +180,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.6rem;
-  color: var(--color-text-secondary, #777);
+  color: var(--tracker-ink-2, var(--color-text-secondary, #777));
   font-variant-numeric: tabular-nums;
 }
 
@@ -165,7 +208,7 @@
 
 .eta {
   font-size: 0.62rem;
-  color: var(--color-text-secondary, #777);
+  color: var(--tracker-ink-2, var(--color-text-secondary, #777));
   font-variant-numeric: tabular-nums;
 }
 
@@ -209,7 +252,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.4;
-  color: var(--color-text, #eee);
+  color: var(--tracker-ink, var(--color-text, #eee));
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -220,7 +263,7 @@
   font-weight: 600;
   text-decoration: none;
   background: rgba(59, 130, 246, 0.25);
-  color: #93bbfd;
+  color: var(--export-action-ink, #93bbfd);
   border: 1px solid rgba(59, 130, 246, 0.3);
   transition:
     background 0.15s ease,
@@ -234,5 +277,5 @@
 
 .error {
   font-size: 0.65rem;
-  color: #f87171;
+  color: var(--tracker-error, #f87171);
 }

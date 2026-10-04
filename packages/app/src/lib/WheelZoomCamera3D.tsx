@@ -7,10 +7,12 @@ import { Camera3D } from '@/lib/Camera3D'
 import { useCamera3D } from '@/lib/Camera3DContext'
 import { cameraBasis, rollAdjustLookDelta } from '@/lib/cameraMath'
 import { useCanvas } from '@/lib/CanvasContext'
+import { NO_SHIFT } from '@/lib/canvasFraming'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import type { Accessor, ParentProps, Signal } from 'solid-js'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ViewShift } from '@/lib/canvasFraming'
 
 const ORBIT_SENSITIVITY = 0.005
 const SCROLL_SENSITIVITY = 0.001
@@ -70,6 +72,12 @@ type WheelZoomCamera3DProps = {
   flySpeed?: Signal<number>
   /** Camera roll around the view direction (radians). Q/E adjust it in fly mode. */
   roll?: Signal<number>
+  /**
+   * The view's framing shift, in clip units (Camera3D.viewShift). Every
+   * gesture here moves the camera by pointer deltas, never by where the
+   * pointer is, so none of them needs to know it.
+   */
+  viewShift?: () => ViewShift
 }
 
 export function createSpherical(
@@ -101,6 +109,8 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   const { canvas } = useCanvas()
   const el = createMemo(() => props.eventTarget ?? canvas)
   const changeHistory = useChangeHistory()
+  // An accessor, not an inline `??` in the JSX (see WheelZoomCamera2D).
+  const viewShift = () => props.viewShift?.() ?? NO_SHIFT
 
   let _clipToWorld: ((pos: Vec3) => Vec3) | undefined
 
@@ -642,6 +652,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       target={props.target[0]()}
       fov={props.fov[0]()}
       roll={props.roll?.[0]() ?? 0}
+      viewShift={viewShift()}
     >
       {(() => {
         const { js } = useCamera3D()

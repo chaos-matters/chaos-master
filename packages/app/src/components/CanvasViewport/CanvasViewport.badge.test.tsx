@@ -32,10 +32,16 @@ function hover(intent: BlendIntent) {
     onCanvasClick: () => {},
     onToggleMobileSidebar: () => {},
     flameDescriptor: examples.example1,
+    effectiveFlame: () => examples.example1,
     hoveredVariationType: () => null,
     hoveredCustomVarDef: () => null,
     hoveredBlendName: () => 'Aurora',
     blendIntent: () => intent,
+    // Read by the view framing (useViewFraming.ts) and the edge fade as the
+    // viewport mounts.
+    exportDimensions: () => undefined,
+    onExportImage: () => undefined,
+    theme: () => 'dark',
   }
   render(() => (
     <CanvasViewport {...(props as unknown as CanvasViewportProps)} />

@@ -1,0 +1,18 @@
+/* The Glass panels row: HelpModal's settings row and label
+   (HelpModal.module.css), with a one-line hint under the label. */
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hint {
+  font-size: 0.72rem;
+  color: var(--neutral-600);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}

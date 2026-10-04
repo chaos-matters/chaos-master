@@ -70,6 +70,7 @@
 }
 
 .item-title {
+  composes: frostFade from '@/styles/designSystem/glass.module.css';
   position: absolute;
   width: 100%;
   bottom: 0;
@@ -78,13 +79,6 @@
   justify-content: space-between;
   gap: 4px;
   padding: 3px 8px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.4) 70%,
-    transparent 100%
-  );
-  backdrop-filter: blur(4px);
   font-size: 0.7rem;
   line-height: 1.3;
 }

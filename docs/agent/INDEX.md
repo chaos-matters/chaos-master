@@ -94,7 +94,6 @@ file instead of rediscovering the architecture every session.
 | `ArenaOverlay` | [ArenaResultsView.tsx](../../packages/app/src/components/ArenaOverlay/ArenaResultsView.tsx) | _(no header comment)_ |
 | `AudioReactivePanel` | [AudioReactivePanel.tsx](../../packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx) | _(no header comment)_ |
 | `AudioWiringModal` | [AudioWiringModal.tsx](../../packages/app/src/components/AudioWiringModal/AudioWiringModal.tsx) | _(no header comment)_ |
-| `BenchmarkButton` | [BenchmarkButton.tsx](../../packages/app/src/components/BenchmarkButton/BenchmarkButton.tsx) | _(no header comment)_ |
 | `BenchmarkModal` | [BenchmarkModal.tsx](../../packages/app/src/components/BenchmarkModal/BenchmarkModal.tsx) | _(no header comment)_ |
 | `BlendFlameGallery` | [BlendFlameGallery.tsx](../../packages/app/src/components/BlendFlameGallery/BlendFlameGallery.tsx) | _(no header comment)_ |
 | `BreedGallery` | [BreedGallery.tsx](../../packages/app/src/components/BreedGallery/BreedGallery.tsx) | _(no header comment)_ |
@@ -338,6 +337,7 @@ file instead of rediscovering the architecture every session.
 <!-- prettier-ignore-start -->
 | File | What it is |
 |---|---|
+| [canvasFraming.ts](../../packages/app/src/lib/canvasFraming.ts) | Framing the editor canvas around the chrome that floats over it: which part of the canvas is on show, and the view-only shift that centre... |
 | [galleryContent.ts](../../packages/app/src/lib/galleryContent.ts) | _(no header comment)_ |
 | [pauseSave.ts](../../packages/app/src/lib/pauseSave.ts) | _(no header comment)_ |
 | [WebgpuAdapter.ts](../../packages/app/src/lib/WebgpuAdapter.ts) | _(no header comment)_ |

@@ -95,7 +95,9 @@ Files: rewrite `components/TouchSurface/MobileBottomSurface.tsx`; `TouchHUD.tsx`
 the Home/Snapshot/More trio; `TouchControlSurface.tsx` becomes the sheet body; `TouchSurface.module.css` moves
 every 32 and 34 px target to 44 (48 on Android); `components/SoftwareVersion/SoftwareVersion.tsx` stops
 rendering its own floating button on touch, where it collides with the top bar; `MainWorkspace.tsx` mounts the
-new surface and hooks the camera offset into `effectivePosition`.
+new surface and hands the height the sheet covers to the canvas, which a CSS transform moves up by half of it
+(`--rail-inset` on `.canvas` in `App.module.css`). The pan the table above and the list below describe is that
+move of the canvas, not of the camera: `effectivePosition` and the flame are untouched.
 
 - [x] A detent controller: drag tracks the finger 1:1, no rubber band past large, release springs to the
       nearest detent or to the next one in the direction of travel above 0.5 pt/ms.
@@ -121,6 +123,14 @@ clipping a control or changing the rail's height.
 opaque trailing deck beside the canvas, with a draggable divider between 320 and 480 pt and a double-tap
 collapse. Below 900 pt the deck is not drawn and the phone rail and its sheet are used, with the navigation
 rail still present.
+
+The deck was designed opaque, a page beside the canvas rather than chrome over it, and it still is with
+the Glass panels setting off. The setting is on by default since 2026-09-24 (Settings, on every layout),
+and floats the deck over the canvas as glass, the plan's phase 2 (`docs/plans/glass-panels.md`): the canvas runs on under the
+deck, the camera frames the flame in the part the deck leaves visible, the controls inside keep their opaque
+surfaces, and the deck goes solid while the canvas presents every frame. Collapsed, the deck covers nothing
+and the flame is framed on the whole canvas, as it is with the setting off. The framing never reaches the
+document, an export or a share link. Device frame times decide whether the default stays on.
 
 **Acceptance, phone landscape:** the rail rotates to the leading edge as a vertical rail, the HUD collapses to
 three glyphs at the trailing edge, and a detent opens a 320 pt trailing panel rather than a bottom sheet.

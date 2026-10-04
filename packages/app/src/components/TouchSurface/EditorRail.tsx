@@ -2,6 +2,7 @@ import { children, createEffect, createMemo, createSignal, For, onCleanup, onMou
 import { CameraIcon, ColourWedge, ShapeTriangle, Shuffle, VariationSpiral, } from '@/icons'
 import { workspaceIsVisible } from '@/lib/activeTab'
 import { createBackLayer } from '@/lib/backStack'
+import { glassAllowed } from '@/lib/glass'
 import { haptic } from '@/lib/haptics'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createLongPress } from '@/utils/createLongPress'
@@ -289,7 +290,8 @@ export function EditorRail(props: EditorRailProps) {
         ref={sheetEl}
         classList={{
           [ui.dragging!]: dragHeight() !== null,
-          [ui.opaque!]: bodyShown(),
+          [ui.opaque!]: bodyShown() && !glassAllowed(),
+          [ui.glassPanel!]: bodyShown() && glassAllowed(),
         }}
         style={{ height: `${sheetHeight()}px` }}
         data-testid="editor-rail-sheet"

@@ -144,9 +144,9 @@ describe('TouchSurface Components', () => {
       screen.getByRole('button', { name: 'More' }).click()
       expect(screen.getByRole('menu')).toBeTruthy()
       const backdrop = screen.getByTestId('hud-popover-backdrop')
-      // The pill's blur and its centring transform make it the containing
-      // block for a fixed child, so a backdrop inside it covers the pill and
-      // nothing else: the canvas below stayed live and the menu never closed.
+      // The pill's blur makes it the containing block for a fixed child, so
+      // a backdrop inside it covers the pill and nothing else: the canvas
+      // below stayed live and the menu never closed.
       expect(screen.getByRole('banner').contains(backdrop)).toBe(false)
       backdrop.click()
       expect(screen.queryByRole('menu')).toBeNull()

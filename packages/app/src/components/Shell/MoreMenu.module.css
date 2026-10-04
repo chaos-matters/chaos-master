@@ -4,16 +4,15 @@
    Colour, radius, spacing, duration and easing come from the --la-* set. */
 
 .menu {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   display: flex;
   flex-direction: column;
   gap: var(--la-s-1);
   min-width: 232px;
   padding: var(--la-s-1);
   border-radius: var(--la-r-md);
+  /* A column of labels, so the stronger fill, and a popover's elevation. */
   background: var(--la-glass-strong);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
   box-shadow: var(--la-e-3);
   /* The shell's dock is pointer-events: none so the canvas stays reachable
      beside it; everything in it that has to be touched takes that back. */

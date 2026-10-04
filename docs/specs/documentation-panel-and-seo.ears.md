@@ -71,8 +71,8 @@ subsequent click retries the import instead of silently doing nothing.
 > (and `:75-97` (`showHelp`) for Help) — there is no `.catch` and no reset of
 > `instancePromise`, so the rejected promise is cached for the life of the page
 > and every later click resolves to the same rejection. The call sites discard
-> it: `packages/app/src/MainWorkspace.tsx:4492` is `void showDocumentation()`
-> and `:4495` is `void showHelp()`, neither wrapped. The button appears inert
+> it: `packages/app/src/MainWorkspace.tsx:4464` is `void showDocumentation()`
+> and `:4467` is `void showHelp()`, neither wrapped. The button appears inert
 > and only a full reload recovers. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
 
@@ -82,7 +82,7 @@ subsequent click retries the import instead of silently doing nothing.
 activated, the menu shall close before the launcher is invoked, so the expanded
 menu is never left behind the dialog.
 
-_(`SoftwareVersion.tsx:154-168` (`docsPill`) and `:170-186` (`aboutPill`) — each handler calls
+_(`SoftwareVersion.tsx:144-158` (`showDocs`) and `:160-176` (`showHelp`) — each handler calls
 `setOpen(false)` before `props.showDocs()` / `props.showHelp()`.)_
 
 ### REQ-DS-004 — The panel opens on Variations with tablist semantics

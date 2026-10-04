@@ -6,6 +6,8 @@
    every other surface is dimmed, and click-through so it never steals the
    transport or a takeover click. */
 .rail {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
   position: fixed;
   top: 12%;
   right: 12px;
@@ -23,7 +25,6 @@
     13px/1.4 system-ui,
     sans-serif;
   pointer-events: none;
-  backdrop-filter: blur(6px);
   box-shadow: 0 6px 24px oklch(0% 0 0 / 0.4);
 }
 

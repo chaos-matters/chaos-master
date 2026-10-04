@@ -815,7 +815,7 @@ _(`recorder/playWindows.ts:83-150` (`planPlayWindows`), `recorder/playWindowPace
 `:294-305` (`createPlayerPlayWindows`), `:339-346` (`preserveBaseline`), `:385-408` (`rejectAction`), `:455-470` (`runStep`), `:548-553` (`reset`), `:608-652` (`finish`),
 `:680-681` (`holdAt`), `:717-719` (`holdAt`), `:726-733` (`stop`), `recorder/timelineActions.ts:161-167` (`togglePlay`),
 `recorder/replayPlayback.ts:13-35` (`timelineReplayPlayback`), `recorder/replay.ts:171-184` (`playback`),
-`hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:595-604` (`createEffect`), `:1251-1258` (`isAutoFpsReady`),
+`hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:584-593` (`createEffect`), `:1240-1247` (`isAutoFpsReady`),
 `utils/timeline.ts:729-731` (`setIsPlaying`); guarded by `playWindows.test.ts`,
 `playWindowPace.test.ts`, and `playWindowReplay.test.ts:210` "plays five seconds
 as five seconds and lands on the Pause frame with no jump", `:254` "wraps a looping playback as often as the take did", `:290` "reproduces a render loop slower than the configured fps",
@@ -1002,7 +1002,7 @@ the load's own writes out of the take, so the take records the Pause (REQ-RR-040
 ahead of the load's timeline snapshot, and its replay shall stop the timeline
 there and run the rest of the take on the stopped playhead, as the viewer saw it.
 
-_(`MainWorkspace.tsx:2709-2712` (`withRecordingSuppressed`); guarded by `MainWorkspace.plainLoad.test.ts:17`
+_(`MainWorkspace.tsx:2678-2679` (`withRecordingSuppressed`); guarded by `MainWorkspace.plainLoad.test.ts:17`
 "stops playback through pause(), before the unrecorded block", `:23` "never stops it through the raw setter, which reports nothing", and
 `playWindowReplay.test.ts:793` "records the Pause, so the replay stops where the
 take did", `:818` "the raw setter it replaces left the replay playing (the bug)".)_

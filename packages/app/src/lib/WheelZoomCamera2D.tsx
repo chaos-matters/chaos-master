@@ -4,13 +4,16 @@ import { clamp, sub } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { CAMERA_UNDO_DEBOUNCE_MS } from '@/defaults'
 import { Camera2D } from '@/lib/Camera2D'
+import { zoomedPosition } from '@/lib/camera2DView'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
+import { NO_SHIFT } from '@/lib/canvasFraming'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import type { ParentProps, Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { ViewShift } from '@/lib/canvasFraming'
 
 const SCROLL_SENSITIVITY = 0.001
 
@@ -22,6 +25,14 @@ type WheelZoomCamera2DProps = {
    * Required for the reason `Camera2D.rotation` is — see its doc comment.
    */
   rotation: () => number
+  /**
+   * The view's framing shift, in clip units (Camera2D.viewShift). The
+   * gestures need nothing of it: a pan moves the flame by the world distance
+   * between two points both mapped through the shifted camera, and a zoom
+   * keeps the world point under the pointer, so both come out the same with
+   * the picture anywhere on the canvas (camera2DView.test.ts).
+   */
+  viewShift?: () => ViewShift
   eventTarget?: HTMLElement
   interactive?: () => boolean
 }
@@ -84,6 +95,10 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   const [position, setPosition] = props.position
   const el = createMemo(() => props.eventTarget ?? canvas)
   const changeHistory = useChangeHistory()
+  // An accessor rather than an inline `??` in the JSX below, which Solid
+  // would wrap in a memo of its own (Default3DPreviewCamera in Camera3D.tsx
+  // has the whole story).
+  const viewShift = () => props.viewShift?.() ?? NO_SHIFT
 
   let clipToWorld: (clip: v2f) => v2f | undefined
   let wheelDebounceTimer: ReturnType<typeof setTimeout> | undefined
@@ -146,9 +161,11 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       const actualRatio = oldZoom / newZoom
       if (!Number.isFinite(actualRatio)) return
       setPosition(({ x, y }) => {
-        const nx = x + (world.x - x) * (1 - actualRatio)
-        const ny = y + (world.y - y) * (1 - actualRatio)
-        return vec2f(Number.isFinite(nx) ? nx : x, Number.isFinite(ny) ? ny : y)
+        const next = zoomedPosition({ x, y }, world, actualRatio)
+        return vec2f(
+          Number.isFinite(next.x) ? next.x : x,
+          Number.isFinite(next.y) ? next.y : y,
+        )
       })
     })
   }
@@ -250,7 +267,12 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   })
 
   return (
-    <Camera2D position={position()} zoom={zoom()} rotation={props.rotation()}>
+    <Camera2D
+      position={position()}
+      zoom={zoom()}
+      rotation={props.rotation()}
+      viewShift={viewShift()}
+    >
       {(() => {
         const { js } = useCamera()
         // steal clipToWorld from the camera

@@ -426,6 +426,7 @@ function Plate(props: {
           <Show when={sourceUrl()}>
             {(href) => (
               <a
+                class={ui.plateLink}
                 href={href()}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -440,13 +441,14 @@ function Plate(props: {
               <Show
                 when={licenseUrl()}
                 fallback={
-                  <span class={ui.plateLicense} title={license()}>
+                  <span class={ui.plateLink} title={license()}>
                     {license()}
                   </span>
                 }
               >
                 {(href) => (
                   <a
+                    class={ui.plateLink}
                     href={href()}
                     target="_blank"
                     rel="noopener noreferrer"

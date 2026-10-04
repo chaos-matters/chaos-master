@@ -35,6 +35,14 @@ export const FLICK_MAX_AGE_MS = 100
 export const SHEET_TRANSITION_MS = 280
 
 /**
+ * The curve the sheet takes to a new detent. Mirrors --la-ease: the camera's
+ * framing above the glass sheet eases along it with the sheet
+ * (CanvasViewport.tsx). EditorRail.module.test.ts holds this, the duration
+ * and the sheet's own transition together.
+ */
+export const SHEET_EASING = [0.16, 1, 0.3, 1] as const
+
+/**
  * Where the rail rests, kept outside the component on purpose: crossing the
  * rail-or-deck threshold (a tablet rotating, an iPad resizing its Split View)
  * unmounts one surface and mounts the other, and a sheet the user had opened

@@ -43,6 +43,24 @@
     0 0 0 1px color-mix(in srgb, var(--la-accent) 35%, transparent),
     0 8px 28px color-mix(in srgb, var(--la-accent) 22%, transparent);
 
+  /* A control's fill: a chip, a row, a button, and the accent's when it is
+     selected. On an opaque surface it is the translucent wash. On glass a
+     control fills opaque with the explorer panel's surfaces instead, so
+     bright art does not show through a chip, a row or a field: the glass
+     surface composes solidControls (glass.module.css), which points the
+     three at the -on-glass values. A control's edge stays a hairline either
+     way, so edge and fill read as two colours. */
+  --la-control: var(--la-hairline);
+  --la-control-strong: var(--la-hairline-strong);
+  --la-control-accent: var(--la-accent-wash);
+  --la-control-on-glass: var(--la-surface-2);
+  --la-control-strong-on-glass: var(--la-surface-3);
+  --la-control-accent-on-glass: color-mix(
+    in srgb,
+    var(--la-accent) 14%,
+    var(--la-surface-2)
+  );
+
   --la-brand-paper: #f2f3f5; /* the Deep C band — never tinted */
   --la-brand-ember: #ff7448; /* the four Deep C pills */
 
@@ -61,21 +79,52 @@
   --la-error-wash: color-mix(in srgb, var(--la-error) 16%, transparent);
 
   /* ---------- 5. Glass and scrims ------------------------------------
-     ONE glass layer, and only where chrome overlaps the artwork: the HUD
-     pill, the bottom rail, the toast, the session pill. Never on a
-     Graphite page, never glass on glass, never glass on a card. */
+     One blurred layer, and only where it floats over the artwork. Every
+     surface takes its glass from styles/designSystem/glass.module.css,
+     which holds the rest of the rule so that no surface can break it:
+     glass nested in glass flattens itself, and the large panels go solid
+     while the canvas presents every frame, because sharp moving art behind
+     text reads worse than an opaque panel. Never on a Graphite page, never
+     on a card.
+
+     Text on glass keeps to the tier its fill allows over a white-hot flame
+     (docs/plans/glass-panels.md, decision c): on --la-glass ink only, on
+     --la-glass-panel ink and ink-2, on --la-glass-strong ink down to ink-3.
+     Accent needs a fill over 84% for 4.5:1, so on glass it marks fills and
+     edges, never text. glassContrast.test.ts measures these tiers from the
+     values below and fails when a change here moves one. */
   --la-glass: color-mix(in srgb, var(--la-ground) 72%, transparent);
+  /* Panels that carry text. ink-2 needs a fill over 75% to clear 4.5:1 over
+     a white-hot flame: this gives it 5.39:1, where --la-glass gives 3.99. */
+  --la-glass-panel: color-mix(in srgb, var(--la-ground) 80%, transparent);
   --la-glass-strong: color-mix(in srgb, var(--la-ground) 86%, transparent);
   --la-glass-solid: color-mix(in srgb, var(--la-ground) 96%, transparent);
   --la-glass-blur: blur(20px) saturate(1.4);
   --la-glass-edge: 1px solid rgba(242, 243, 245, 0.1);
   --la-glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 
+  /* Frost: a label or a small control laid over a thumbnail or a preview,
+     such as a name bar, a frame number or a badge (glass.module.css,
+     frost and frostFade). A light blur of the picture under it and a Void
+     fill; white text on --la-frost holds 6.3:1 over a white-hot picture.
+     It is not glass: no edge, no shadow, and nothing that flattens it. */
+  --la-frost: rgba(8, 10, 14, 0.65);
+  --la-frost-fade: linear-gradient(
+    to top,
+    rgba(8, 10, 14, 0.75) 0%,
+    rgba(8, 10, 14, 0.4) 70%,
+    transparent 100%
+  );
+  --la-frost-blur: blur(4px);
+
   /* Scrims are Void-tinted, not black: a pure-black scrim over a warm
      flame turns the render grey at the edges. */
   --la-scrim-dim: rgba(8, 10, 14, 0.35);
   --la-scrim-heavy: rgba(8, 10, 14, 0.8); /* Reduce Transparency substitute */
   --la-scrim-sheet: rgba(8, 10, 14, 0.55); /* behind a modal or sheet */
+  /* What a full-screen scrim does to the app behind it (glass.module.css,
+     scrim). Light enough that the app still reads as the place you are. */
+  --la-scrim-blur: blur(10px);
   --la-scrim-top: linear-gradient(
     to bottom,
     rgba(8, 10, 14, 0.55) 0%,
@@ -266,13 +315,6 @@
     'tnum' 1,
     'lnum' 1;
 }
-.la-glass {
-  background: var(--la-glass);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  box-shadow: var(--la-glass-shadow);
-}
 .la-on-art {
   text-shadow: 0 1px 2px rgba(8, 10, 14, 0.45);
 }
@@ -301,9 +343,15 @@
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --la-glass: var(--la-glass-solid);
+    --la-glass-panel: var(--la-glass-solid);
     --la-glass-strong: var(--la-glass-solid);
     --la-glass-blur: none;
+    --la-frost: var(--la-scrim-heavy);
+    --la-frost-fade: var(--la-scrim-heavy);
+    --la-frost-blur: none;
     --la-scrim-dim: var(--la-scrim-heavy);
+    --la-scrim-sheet: var(--la-scrim-heavy);
+    --la-scrim-blur: none;
   }
 }
 
@@ -331,15 +379,24 @@
     --la-hairline: rgba(242, 243, 245, 0.18);
     --la-hairline-strong: rgba(242, 243, 245, 0.32);
     --la-glass: var(--la-glass-solid);
+    --la-glass-panel: var(--la-glass-solid);
+    --la-glass-strong: var(--la-glass-solid);
     --la-glass-blur: none;
+    --la-frost: var(--la-scrim-heavy);
+    --la-frost-fade: var(--la-scrim-heavy);
+    --la-frost-blur: none;
   }
 }
 
 /* =====================================================================
-   Tablet. The breakpoints match the app's existing store exactly
-   (packages/app/src/stores/workspaceLayoutStore.ts: PHONE_MAX_WIDTH 680,
-   TABLET_MAX_WIDTH 1024), so the CSS and the Solid layout never disagree
-   about which device they are on.
+   Tablet. 680px is the app's PHONE_MAX_WIDTH
+   (packages/app/src/stores/workspaceLayoutStore.ts), but the two do not
+   measure the same thing. This query reads the window's width. The store
+   decides a device (the native app, or a coarse pointer) by its screen's
+   short edge, so a phone turned to landscape stays a phone there and gets
+   these sizes here; its TABLET_MAX_WIDTH (1024) applies only to a fine
+   pointer, and nothing here matches it. Where the layout matters, ask the
+   store, not this query.
    ===================================================================== */
 
 @media (min-width: 680px) {

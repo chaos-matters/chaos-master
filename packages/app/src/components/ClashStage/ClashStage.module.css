@@ -21,11 +21,7 @@
 }
 
 .glass {
-  background: var(--la-glass);
-  backdrop-filter: var(--la-glass-blur);
-  -webkit-backdrop-filter: var(--la-glass-blur);
-  border: var(--la-glass-edge);
-  box-shadow: var(--la-glass-shadow);
+  composes: chrome from '@/styles/designSystem/glass.module.css';
 }
 
 .top {

@@ -10,6 +10,7 @@ import { cleanup, render } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resetPilot, startPilot } from '@/arcade/pilot'
 import { createSpotlightTourState, SpotlightTourContext, } from '@/contexts/SpotlightTourContext'
+import { ThemeContextProvider } from '@/contexts/ThemeContext'
 import { SpotlightTour } from './SpotlightTour'
 import type { TourContext, TourGuide } from './tourTypes'
 
@@ -28,9 +29,11 @@ function mountTour() {
     restoreFlame: () => {},
   } as unknown as TourContext
   render(() => (
-    <SpotlightTourContext.Provider value={tour}>
-      <SpotlightTour tourContext={tourContext} />
-    </SpotlightTourContext.Provider>
+    <ThemeContextProvider>
+      <SpotlightTourContext.Provider value={tour}>
+        <SpotlightTour tourContext={tourContext} />
+      </SpotlightTourContext.Provider>
+    </ThemeContextProvider>
   ))
   tour.startTour(TOUR.id)
   return tour

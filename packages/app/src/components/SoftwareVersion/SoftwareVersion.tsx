@@ -1,8 +1,8 @@
 import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
-import { Book, DeepZoom, GridIcon, Info, Menu, SidebarPanel, Star, Zap, } from '@/icons'
+import { Book, DeepZoom, GridIcon, Info, SidebarPanel, Star, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { BENCHMARKS_PATH, EXPLORER_PATH } from '@/routing/appPath'
-import { isTouchLayout as globalIsTouchLayout, setTouchLayoutPreference as globalSetTouchLayoutPref, } from '@/stores/workspaceLayoutStore'
+import { setTouchLayoutPreference as globalSetTouchLayoutPref } from '@/stores/workspaceLayoutStore'
 import { DISPLAY_VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
 import ui from './SoftwareVersion.module.css'
@@ -12,9 +12,7 @@ export interface SoftwareVersionProps {
   showHelp: () => void
   showDocs: () => void
   showBenchmark: () => void
-  touchLayoutPreference?: () => TouchLayoutPreference
   setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
-  isTouchLayout?: () => boolean
   /**
    * True on every touch layout. Each one already offers this list from a More
    * menu of its own (Shell/moreMenuItems.ts), and the floating trigger has
@@ -27,8 +25,6 @@ export interface SoftwareVersionProps {
 
 export function SoftwareVersion(props: SoftwareVersionProps) {
   const [open, setOpen] = createSignal(false)
-  const isTouch = () =>
-    props.isTouchLayout ? props.isTouchLayout() : globalIsTouchLayout()
   const setTouchPref = (pref: TouchLayoutPreference) => {
     if (props.setTouchLayoutPreference) {
       props.setTouchLayoutPreference(pref)
@@ -50,27 +46,21 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
     })
   })
 
-  const renderMenuItems = (touch: boolean) => (
+  const renderMenuItems = () => (
     <>
       <button
         type="button"
         role="menuitem"
         class={`${ui.menuItem} ${ui.menuItemHighlight}`}
         onClick={() => {
-          setTouchPref(touch ? 'desktop' : 'touch')
+          setTouchPref('touch')
           setOpen(false)
         }}
       >
         <SidebarPanel class={ui.menuIcon} />
         <div class={ui.menuMeta}>
-          <span class={ui.menuLabel}>
-            {touch ? 'Switch to Desktop Layout' : 'Switch to Touch Studio'}
-          </span>
-          <span class={ui.menuSub}>
-            {touch
-              ? 'Sidebar, dock & inspector'
-              : 'Touch-optimized mobile/tablet UI'}
-          </span>
+          <span class={ui.menuLabel}>Switch to Touch Studio</span>
+          <span class={ui.menuSub}>Touch-optimized mobile/tablet UI</span>
         </div>
       </button>
       <Show when={props.onPickGallery}>
@@ -93,7 +83,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       <div class={ui.menuDivider} />
 
       <a
-        class={`${ui.menuItem} ${ui.arcadePill}`}
+        class={ui.menuItem}
         href="#arcade"
         aria-label="Open Lumen Arcade"
         onClick={(ev) => {
@@ -110,7 +100,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       </a>
 
       <a
-        class={`${ui.menuItem} ${ui.benchmarkLabPill}`}
+        class={ui.menuItem}
         href={BENCHMARKS_PATH}
         aria-label="Open Benchmark Lab"
         onClick={() => setOpen(false)}
@@ -153,7 +143,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
 
       <button
         type="button"
-        class={`${ui.menuItem} ${ui.docsPill}`}
+        class={ui.menuItem}
         role="menuitem"
         onClick={() => {
           setOpen(false)
@@ -169,7 +159,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
 
       <button
         type="button"
-        class={`${ui.menuItem} ${ui.aboutPill}`}
+        class={ui.menuItem}
         role="menuitem"
         onClick={() => {
           setOpen(false)
@@ -191,71 +181,36 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
     <div>
       <DebugPanel />
       <Show when={!props.hideTrigger?.()}>
-        <Show
-          when={isTouch()}
-          fallback={
-            <div class={ui.desktopContainer}>
-              <Show when={open()}>
-                <div
-                  class={ui.popoverBackdrop}
-                  onClick={() => setOpen(false)}
-                  aria-hidden="true"
-                />
-                <div
-                  class={ui.menuPopoverUp}
-                  role="menu"
-                  aria-label="Lumen Apeiron menu"
-                >
-                  {renderMenuItems(false)}
-                </div>
-              </Show>
-
-              <button
-                type="button"
-                class={ui.desktopTrigger}
-                classList={{ [ui.desktopTriggerActive as string]: open() }}
-                onClick={() => setOpen(!open())}
-                aria-expanded={open()}
-                aria-haspopup="menu"
-                aria-label={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
-                title={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
-              >
-                <Info class={ui.pillIcon} />
-                <span>v{DISPLAY_VERSION}</span>
-              </button>
-            </div>
-          }
-        >
-          <div class={ui.touchContainer}>
-            <Show when={open()}>
-              <div
-                class={ui.popoverBackdrop}
-                onClick={() => setOpen(false)}
-                aria-hidden="true"
-              />
-              <div
-                class={ui.menuPopover}
-                role="menu"
-                aria-label="Lumen Apeiron menu"
-              >
-                {renderMenuItems(true)}
-              </div>
-            </Show>
-
-            <button
-              type="button"
-              class={ui.menuTrigger}
-              classList={{ [ui.menuTriggerActive as string]: open() }}
-              onClick={() => setOpen(!open())}
-              aria-expanded={open()}
-              aria-haspopup="menu"
+        <div class={ui.desktopContainer}>
+          <Show when={open()}>
+            <div
+              class={ui.popoverBackdrop}
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+            />
+            <div
+              class={ui.menuPopoverUp}
+              role="menu"
               aria-label="Lumen Apeiron menu"
-              title="Lumen Apeiron menu"
             >
-              <Menu class={ui.triggerIcon} />
-            </button>
-          </div>
-        </Show>
+              {renderMenuItems()}
+            </div>
+          </Show>
+
+          <button
+            type="button"
+            class={ui.desktopTrigger}
+            classList={{ [ui.desktopTriggerActive as string]: open() }}
+            onClick={() => setOpen(!open())}
+            aria-expanded={open()}
+            aria-haspopup="menu"
+            aria-label={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
+            title={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
+          >
+            <Info class={ui.pillIcon} />
+            <span>v{DISPLAY_VERSION}</span>
+          </button>
+        </div>
       </Show>
     </div>
   )

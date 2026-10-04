@@ -10,15 +10,18 @@
 }
 
 .desktopTrigger {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem 0.3rem 0.5rem;
   border-radius: 999px;
+  /* The light theme keeps its own white pill over chrome's blur, and the
+     theme's focus ring; the dark theme's pill is chrome itself, below. */
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow: none;
+  --focus-ring-color: var(--focus-ring-theme);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -47,17 +50,18 @@
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
+/* A quiet label needs the strong fill: ink-3 holds 4.5:1 over white-hot art
+   there, where the plain chrome fill under a 45% white label gave 2.9:1. */
 [data-theme='dark'] .desktopTrigger {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.45);
+  border: var(--la-glass-edge);
+  background: var(--la-glass-strong);
+  color: var(--la-ink-3);
+  --focus-ring-color: var(--focus-ring-glass);
 }
 
 [data-theme='dark'] .desktopTrigger:hover {
   border-color: rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.7);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--la-ink-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -68,180 +72,13 @@
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
 }
 
-/* Shared pill style for the desktop buttons. */
-.aboutPill,
-.docsPill,
-.benchmarkLabPill,
-.arcadePill,
-.layoutPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.6rem 0.3rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  appearance: none;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
+/* The icon in the desktop trigger. */
 .pillIcon {
   width: 1rem;
   height: 1rem;
   opacity: 0.6;
   flex-shrink: 0;
   transition: opacity 0.2s ease;
-}
-
-.aboutPill:hover,
-.docsPill:hover,
-.benchmarkLabPill:hover,
-.arcadePill:hover,
-.layoutPill:hover {
-  border-color: rgba(0, 0, 0, 0.15);
-  background: rgba(255, 255, 255, 0.9);
-  color: rgba(0, 0, 0, 0.6);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.aboutPill:hover .pillIcon,
-.docsPill:hover .pillIcon,
-.benchmarkLabPill:hover .pillIcon,
-.arcadePill:hover .pillIcon,
-.layoutPill:hover .pillIcon {
-  opacity: 0.8;
-}
-
-.aboutPill:active,
-.docsPill:active,
-.benchmarkLabPill:active,
-.arcadePill:active,
-.layoutPill:active {
-  transform: translateY(0);
-}
-
-.aboutPill:focus-visible,
-.docsPill:focus-visible,
-.benchmarkLabPill:focus-visible,
-.arcadePill:focus-visible,
-.layoutPill:focus-visible {
-  outline: 2px solid var(--neutral-500);
-  outline-offset: 2px;
-}
-
-[data-theme='dark'] .aboutPill,
-[data-theme='dark'] .docsPill,
-[data-theme='dark'] .benchmarkLabPill,
-[data-theme='dark'] .arcadePill,
-[data-theme='dark'] .layoutPill {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.45);
-}
-
-[data-theme='dark'] .aboutPill:hover,
-[data-theme='dark'] .docsPill:hover,
-[data-theme='dark'] .benchmarkLabPill:hover,
-[data-theme='dark'] .arcadePill:hover,
-[data-theme='dark'] .layoutPill:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.7);
-  color: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.benchmarkLabPill:hover {
-  color: oklch(54% 0.18 35);
-}
-
-[data-theme='dark'] .benchmarkLabPill:hover {
-  color: oklch(76% 0.13 35);
-}
-
-.arcadePill:hover {
-  color: oklch(54% 0.18 300);
-}
-
-[data-theme='dark'] .arcadePill:hover {
-  color: oklch(78% 0.13 300);
-}
-
-.layoutPill:hover {
-  color: #38bdf8;
-}
-
-[data-theme='dark'] .layoutPill:hover {
-  color: #38bdf8;
-}
-
-/* Floating touch menu anchored top-left (tablet/mobile only) */
-.touchContainer,
-.versionContainer {
-  position: fixed;
-  left: max(8px, env(safe-area-inset-left));
-  top: max(8px, env(safe-area-inset-top));
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  font-family: inherit;
-}
-
-/* Collapsed Trigger Button (sleek circular hamburger button) */
-.menuTrigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(14, 18, 30, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: #cbd5e1;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: all 0.18s ease;
-  touch-action: manipulation;
-  user-select: none;
-}
-
-.menuTrigger:hover {
-  background: rgba(22, 28, 48, 0.95);
-  border-color: rgba(56, 189, 248, 0.45);
-  color: #38bdf8;
-  transform: scale(1.04);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-}
-
-.menuTriggerActive {
-  background: rgba(22, 28, 48, 0.98);
-  border-color: #38bdf8;
-  color: #38bdf8;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
-}
-
-.triggerIcon {
-  width: 16px;
-  height: 16px;
-  color: inherit;
-  stroke: currentColor;
-  fill: none;
-  flex-shrink: 0;
 }
 
 /* Invisible backdrop to dismiss popover when clicking outside */
@@ -252,40 +89,10 @@
   background: transparent;
 }
 
-/* Downward expanding popover menu */
-.menuPopover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  bottom: auto;
-  z-index: 52;
-  width: 250px;
-  max-width: calc(100vw - 20px);
-  padding: 6px;
-  border-radius: 12px;
-  background: #0d121f;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  contain: paint layout;
-  animation: popoverSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes popoverSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 /* Upward expanding popover menu for desktop bottom-right */
 .menuPopoverUp {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
@@ -378,7 +185,7 @@
 
 .menuSub {
   font-size: 0.68rem;
-  color: #94a3b8;
+  color: var(--la-ink-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

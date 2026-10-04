@@ -63,8 +63,9 @@
   border-right: 1px solid var(--home-line);
   min-width: 11rem;
   overflow-y: auto;
+  /* No blur: the rail is a column of its own and nothing scrolls behind it,
+     so a blur would only sample the page's still ambient light. */
   background: rgba(8, 10, 14, 0.55);
-  backdrop-filter: blur(18px) saturate(130%);
 }
 
 .rail-brand {
@@ -909,6 +910,7 @@
    gradient at the bottom, and `pointer-events: none` so it can never eat the
    second click it is asking for. */
 .plate-hint {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   position: absolute;
   top: var(--space-2);
   left: var(--space-2);
@@ -916,8 +918,6 @@
   z-index: 1;
   padding: 5px 10px;
   border-radius: 999px;
-  background: oklch(12% 0.02 250 / 0.72);
-  backdrop-filter: blur(6px);
   color: oklch(98% 0 0);
   font-size: 0.7rem;
   line-height: 1.35;
@@ -1006,26 +1006,6 @@
   gap: 2px;
   max-width: calc(100% - 2 * var(--space-2));
 
-  & a,
-  & .plate-license {
-    display: inline-flex;
-    align-items: center;
-    max-width: min(16rem, 100%);
-    min-height: 1.75rem;
-    padding: 0 0.55rem;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 999px;
-    background: oklch(12% 0.02 250 / 0.72);
-    backdrop-filter: blur(6px);
-    color: oklch(90% 0.015 250);
-    font-size: 0.65rem;
-    line-height: 1;
-    text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   & a:hover {
     border-color: rgba(255, 116, 72, 0.55);
     color: white;
@@ -1037,9 +1017,28 @@
   }
 }
 
+/* One credit in .plate-links: the Source link, the licence link, or the
+   licence as plain text where it has no page. */
+.plate-link {
+  composes: frost from '@/styles/designSystem/glass.module.css';
+  display: inline-flex;
+  align-items: center;
+  max-width: min(16rem, 100%);
+  min-height: 1.75rem;
+  padding: 0 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: oklch(90% 0.015 250);
+  font-size: 0.65rem;
+  line-height: 1;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (pointer: coarse) {
-  .plate-links a,
-  .plate-links .plate-license {
+  .plate-link {
     min-height: 2.75rem;
     padding-inline: 0.75rem;
   }

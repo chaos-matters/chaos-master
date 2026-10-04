@@ -63,7 +63,11 @@ Put it on the list. `scripts/always-on-tests.mjs` is data only, and
 `src/alwaysOnTestList.test.ts` enforces it: it walks every app test file, flags
 the ones using `readFileSync`, `readdirSync`, `globSync`, `readFile(`,
 `fs.promises` or `import.meta.glob`, and fails unless each one is on `ALWAYS_ON`
-or on `EXEMPT` with a written reason. The failure names the file and says which
+or on `EXEMPT` with a written reason. A read made in a helper the test imports
+counts as the test's: the detector follows imports of a `testUtils` module and
+of any module under `src/test/`, by a relative path or the `@/` alias. So a
+test that reads its stylesheet through `src/test/cssModule.ts`, the shared CSS
+reader, is flagged like one that calls `readFileSync` itself. The failure names the file and says which
 list to add it to, so you do not have to know any of this in advance — the test
 tells you.
 

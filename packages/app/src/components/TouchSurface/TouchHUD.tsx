@@ -64,11 +64,10 @@ export function TouchHUD(props: TouchHUDProps) {
 
   return (
     <>
-      {/* Outside the pill on purpose: the pill's backdrop-filter and its
-          centring transform make it the containing block for a fixed child,
-          so `inset: 0` inside it measured the pill and a tap on the canvas
-          never reached this. It sits under the pill and over everything
-          else. */}
+      {/* Outside the bar on purpose: the pill's backdrop-filter makes it the
+          containing block for a fixed child, so `inset: 0` inside it
+          measured the pill and a tap on the canvas never reached this. It
+          sits under the bar and over everything else. */}
       <Show when={showTitleTooltip() || moreMenuOpen()}>
         <div
           class={ui.popoverBackdrop}
@@ -77,86 +76,86 @@ export function TouchHUD(props: TouchHUDProps) {
         />
       </Show>
       {/* Behind Home and the Arcade while either is up: inert keeps the
-          pill's five controls out of the tab order and off the screen
-          reader without unmounting a thing. */}
+          pill's five controls and the More list out of the tab order and
+          off the screen reader without unmounting a thing. */}
       <header
-        class={ui.topHud}
+        class={ui.hudFrame}
         role="banner"
         aria-label="Touch Navigation HUD"
         inert={!workspaceIsVisible()}
       >
-        <button
-          type="button"
-          class={ui.hudButton}
-          onClick={() => {
-            props.onPickGallery?.()
-          }}
-          title="Library"
-          aria-label="Library"
-        >
-          <GridIcon class={ui.hudButtonIcon} />
-        </button>
-
-        <div class={ui.hudTitleWrapper}>
+        <div class={ui.topHud} data-testid="hud-pill">
           <button
             type="button"
-            class={ui.hudTitleBtn}
+            class={ui.hudButton}
             onClick={() => {
-              setShowTitleTooltip((prev) => !prev)
+              props.onPickGallery?.()
             }}
-            title={flameName()}
-            aria-label={`Flame title: ${flameName()}`}
+            title="Library"
+            aria-label="Library"
           >
-            <span class={ui.hudTitleText}>{flameName()}</span>
+            <GridIcon class={ui.hudButtonIcon} />
           </button>
 
-          <Show when={showTitleTooltip()}>
-            <div class={ui.titleTooltip} role="tooltip">
-              <strong>{flameName()}</strong>
-              <Show when={props.flame().metadata?.description}>
-                <div class={ui.titleTooltipBody}>
-                  {props.flame().metadata?.description}
-                </div>
-              </Show>
-            </div>
-          </Show>
-        </div>
+          <div class={ui.hudTitleWrapper}>
+            <button
+              type="button"
+              class={ui.hudTitleBtn}
+              onClick={() => {
+                setShowTitleTooltip((prev) => !prev)
+              }}
+              title={flameName()}
+              aria-label={`Flame title: ${flameName()}`}
+            >
+              <span class={ui.hudTitleText}>{flameName()}</span>
+            </button>
 
-        <button
-          type="button"
-          class={ui.hudButton}
-          title="Undo"
-          aria-label="Undo"
-          disabled={props.canUndo ? !props.canUndo() : false}
-          onPointerDown={() => {
-            haptic.impactLight()
-          }}
-          onClick={() => {
-            if (props.onUndo) props.onUndo()
-            else dispatch('history.undo')
-          }}
-        >
-          <Undo class={ui.hudButtonIcon} />
-        </button>
+            <Show when={showTitleTooltip()}>
+              <div class={ui.titleTooltip} role="tooltip">
+                <strong>{flameName()}</strong>
+                <Show when={props.flame().metadata?.description}>
+                  <div class={ui.titleTooltipBody}>
+                    {props.flame().metadata?.description}
+                  </div>
+                </Show>
+              </div>
+            </Show>
+          </div>
 
-        <button
-          type="button"
-          class={ui.hudButton}
-          title="Redo"
-          aria-label="Redo"
-          disabled={props.canRedo ? !props.canRedo() : false}
-          onPointerDown={() => {
-            haptic.impactLight()
-          }}
-          onClick={() => {
-            if (props.onRedo) props.onRedo()
-            else dispatch('history.redo')
-          }}
-        >
-          <Redo class={ui.hudButtonIcon} />
-        </button>
+          <button
+            type="button"
+            class={ui.hudButton}
+            title="Undo"
+            aria-label="Undo"
+            disabled={props.canUndo ? !props.canUndo() : false}
+            onPointerDown={() => {
+              haptic.impactLight()
+            }}
+            onClick={() => {
+              if (props.onUndo) props.onUndo()
+              else dispatch('history.undo')
+            }}
+          >
+            <Undo class={ui.hudButtonIcon} />
+          </button>
 
-        <div class={ui.moreMenuWrapper}>
+          <button
+            type="button"
+            class={ui.hudButton}
+            title="Redo"
+            aria-label="Redo"
+            disabled={props.canRedo ? !props.canRedo() : false}
+            onPointerDown={() => {
+              haptic.impactLight()
+            }}
+            onClick={() => {
+              if (props.onRedo) props.onRedo()
+              else dispatch('history.redo')
+            }}
+          >
+            <Redo class={ui.hudButtonIcon} />
+          </button>
+
           <button
             type="button"
             class={ui.hudButton}
@@ -167,16 +166,19 @@ export function TouchHUD(props: TouchHUDProps) {
           >
             <MoreDots class={ui.hudButtonIcon} />
           </button>
-
-          <MoreMenu
-            items={moreItems()}
-            open={moreMenuOpen()}
-            onClose={() => {
-              setMoreMenuOpen(false)
-            }}
-            menuClass={ui.moreMenuPopover!}
-          />
         </div>
+
+        {/* Beside the pill, not in it: glass inside the pill's blur could
+            only sample the pill, so the list would show no glass. The frame
+            around both is neither glass nor transformed. */}
+        <MoreMenu
+          items={moreItems()}
+          open={moreMenuOpen()}
+          onClose={() => {
+            setMoreMenuOpen(false)
+          }}
+          menuClass={ui.moreMenuPopover!}
+        />
       </header>
     </>
   )

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setActiveTab } from '@/lib/activeTab'
 import { backDepth, popBack } from '@/lib/backStack'
+import { setGlassPanels } from '@/lib/glass'
 import { haptic } from '@/lib/haptics'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { PEEK_HEIGHT, setRailDetent, SHEET_TRANSITION_MS } from './detents'
@@ -445,5 +446,29 @@ describe('EditorRail', () => {
 
     setActiveTab('workspace')
     expect(dock.hasAttribute('inert')).toBe(false)
+  })
+
+  it('is glass past peek only with the Glass panels setting on', () => {
+    try {
+      // Off, the open sheet is solid, as it always was.
+      setGlassPanels(false)
+      mount()
+      fireEvent.click(screen.getByRole('tab', { name: 'Shape' }))
+      expect(sheet().classList.contains('opaque')).toBe(true)
+      expect(sheet().classList.contains('glassPanel')).toBe(false)
+      cleanup()
+      setRailDetent('peek')
+
+      setGlassPanels(true)
+      mount()
+      // Peek is the top bar's kind of glass either way.
+      expect(sheet().classList.contains('glassPanel')).toBe(false)
+      fireEvent.click(screen.getByRole('tab', { name: 'Shape' }))
+      expect(sheet().classList.contains('glassPanel')).toBe(true)
+      expect(sheet().classList.contains('opaque')).toBe(false)
+    } finally {
+      // The setting's default.
+      setGlassPanels(true)
+    }
   })
 })

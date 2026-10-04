@@ -16,9 +16,13 @@
     border-color 0.15s ease;
 }
 
+/* The labels read --export-action-ink where a host sets it: the tracker
+   and the progress card, on glass, set ink, since the coloured labels fall
+   below 4.5:1 there over bright art. The fills and edges keep the colour.
+   The sidebar sets nothing and keeps these. */
 .stopButton {
   background: rgba(59, 130, 246, 0.25);
-  color: #93bbfd;
+  color: var(--export-action-ink, #93bbfd);
   border-color: rgba(59, 130, 246, 0.3);
 }
 
@@ -29,7 +33,7 @@
 
 .cancelButton {
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: var(--export-action-ink, #f87171);
   border-color: rgba(239, 68, 68, 0.25);
 }
 

@@ -2,6 +2,8 @@
    and the replay panel — see SessionReplayPanel.module.css for why nothing
    here is absolutely positioned. */
 .panel {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
   align-self: flex-start;
   margin: 0 0 var(--space-2) var(--space-2);
   width: min(30rem, calc(100vw - 2rem));
@@ -15,7 +17,6 @@
   border: 1px solid oklch(50% 0.08 240 / 0.6);
   color: oklch(88% 0.04 240);
   font-size: 0.72rem;
-  backdrop-filter: blur(6px);
   box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
 
   [data-theme='light'] & {

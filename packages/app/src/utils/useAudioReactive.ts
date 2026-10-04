@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
 import { resolveAudioMappingValues } from './audioAnalysis'
 import type { Accessor } from 'solid-js'
 import type { AudioAnalyzer, AudioTargetValue, LiveAudioAnalyzer, MappingSmoothingState, } from './audioAnalysis'
@@ -32,6 +32,10 @@ type PublishAudioModulation = (values: AudioTargetValue[] | undefined) => void
  *
  * Shared analyzer:
  * - `fileAnalyzer`: pre-built analyzer shared with waveform panel
+ *
+ * Returns whether modulation is running: the overlay is up and moving, so
+ * the canvas presents every frame. A paused track leaves its last values up,
+ * still, and that is not running.
  */
 export function useAudioReactive(
   audioEnabled: Accessor<boolean>,
@@ -45,7 +49,7 @@ export function useAudioReactive(
   onPlaybackTime: (seconds: number) => void,
   fileAnalyzer: Accessor<AudioAnalyzer | undefined>,
   modulationSuspended: Accessor<boolean> = () => false,
-): void {
+): Accessor<boolean> {
   // --- Closure-scope mutable state (persists across effect re-runs) ---
   let audioCtx: AudioContext | undefined
   let sourceNode: AudioBufferSourceNode | undefined
@@ -59,8 +63,16 @@ export function useAudioReactive(
   let lastTickTime: number | undefined
   /** Is an overlay up right now? See publishModulation / dropModulation. */
   let modulationPublished = false
+  /** The mic has no transport, so a paused file track cannot hold it still. */
+  let micRunning = false
+  const [modulating, setModulating] = createSignal(false)
 
   // ---- helpers ----
+
+  /** Up and moving: published, and not held on a paused file track. */
+  function syncModulating() {
+    setModulating(modulationPublished && (micRunning || !paused))
+  }
 
   /**
    * Publish this frame's values, unless nothing moved and an overlay is
@@ -75,6 +87,7 @@ export function useAudioReactive(
     if (!changed && modulationPublished) return
     modulationPublished = true
     onModulation(values)
+    syncModulating()
   }
 
   /**
@@ -88,6 +101,7 @@ export function useAudioReactive(
     if (!modulationPublished) return
     modulationPublished = false
     onModulation(undefined)
+    syncModulating()
   }
 
   function stopSource() {
@@ -263,6 +277,7 @@ export function useAudioReactive(
     // privacy surprise.
     if (source === 'mic' && mic && enabled) {
       const tickMs = 1000 / 30
+      micRunning = true
       interval = setInterval(() => {
         if (modulationSuspended()) {
           lastTickTime = undefined
@@ -292,6 +307,7 @@ export function useAudioReactive(
         clearInterval(interval)
         interval = undefined
         lastTickTime = undefined
+        micRunning = false
         dropModulation()
       })
     }
@@ -302,6 +318,7 @@ export function useAudioReactive(
   createEffect(() => {
     const shouldPause = playbackPaused()
     paused = shouldPause
+    syncModulating()
     if (!audioCtx) return
 
     if (shouldPause) {
@@ -328,4 +345,6 @@ export function useAudioReactive(
       void audioCtx.resume()
     }
   })
+
+  return modulating
 }

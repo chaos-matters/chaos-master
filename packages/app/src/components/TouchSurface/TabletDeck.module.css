@@ -1,6 +1,23 @@
-/* The tablet inspector deck: a page beside the canvas, not chrome over it,
-   so it is opaque --la-surface with no glass. Colour, radius, spacing,
-   duration and easing come from the --la-* set only. */
+/* The tablet inspector deck, in one of two modes. Colour, radius, spacing,
+   duration and easing come from the --la-* set only.
+
+   .page, while glass panels are off (the setting, or Reduce Transparency or
+   More Contrast; lib/glass.ts, glassAllowed): a page beside the canvas, not
+   chrome over it, so it is opaque --la-surface with no glass, in a grid
+   column of its own.
+
+   .floating, while they show, the default (docs/plans/glass-panels.md,
+   phase 2): chrome over the canvas. The canvas
+   spans the deck's column too (App.module.css, .tabletLayout) and the deck
+   sits over it in the same cell, as the glass primitive's panel, which the
+   component adds (glass.module.css; a composes cannot be switched off). It
+   is the one blurred layer: nothing inside it blurs again, and it goes solid
+   while the canvas presents every frame. The controls inside take opaque
+   fills of their own, as the explorer's panel's do, and no text inside is
+   lighter than ink-2 (decision c): see .floating below.
+
+   Either way the deck keeps its box, so opening, closing and resizing it
+   behave the same in both modes. */
 
 .deck {
   grid-area: inspector;
@@ -10,8 +27,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--la-surface);
-  border-left: 1px solid var(--la-hairline);
   padding-bottom: max(var(--la-s-2), var(--la-safe-bottom));
   box-sizing: border-box;
   contain: layout paint;
@@ -26,6 +41,11 @@
   .deck {
     animation: none;
   }
+}
+
+.page {
+  background: var(--la-surface);
+  border-left: 1px solid var(--la-hairline);
 }
 
 /* A 12px hit strip inside the deck's leading edge: wide enough for a finger,
@@ -140,4 +160,34 @@
   cursor: pointer;
   touch-action: manipulation;
   z-index: 20;
+}
+
+/* ---- Floating: the deck as glass over the canvas -------------------- */
+
+.floating {
+  /* The controls fill with the explorer panel's surfaces, through the
+     control tokens their own rules read, so bright art does not show
+     through a chip, a row or a button, and text on one is not on glass. The
+     hairlines stay translucent: a control's edge lies over its fill and
+     reads lighter, as on the page, and the lines on the glass itself, the
+     divider's grip and the header's rule, stay lighter than the glass over
+     bright art. */
+  composes: solidControls from '@/styles/designSystem/glass.module.css';
+
+  /* The primitive edges every side; only the leading one faces the canvas. */
+  border: 0;
+  border-left: var(--la-glass-edge);
+
+  /* Text on the glass itself, a caption or a section title, keeps to ink-2
+     at the least on the panel's 80% fill (decision c, lumen.css). */
+  --la-ink-3: var(--la-ink-2);
+}
+
+/* One blurred layer: the deck. A blur inside it would sample the deck's own
+   fill rather than the art, and cost a pass on every frame the canvas
+   presents. The primitive flattens glass inside glass; this also flattens
+   the blurs of the surfaces the deck hosts (a variation tile's name). */
+.deck.floating * {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
