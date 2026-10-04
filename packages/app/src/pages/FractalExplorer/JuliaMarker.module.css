@@ -1,0 +1,61 @@
+/*
+ * The split view's point: a ring with a centre dot, outlined so it reads on
+ * any colour, inside a hit area a fingertip can find.
+ */
+
+.marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  margin: calc(var(--la-tap) / -2) 0 0 calc(var(--la-tap) / -2);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  /* A finger drag moves the point instead of panning the picture. */
+  touch-action: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    border: 2px solid var(--la-ink);
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.6),
+      inset 0 0 0 1px rgb(0 0 0 / 0.6);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    margin: -2px 0 0 -2px;
+    border-radius: 50%;
+    background: var(--la-accent);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.6);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: none;
+
+    &::before {
+      border-color: var(--la-accent);
+    }
+  }
+
+  /* Off screen: the handle waits at the edge nearest the point. */
+  &[data-outside]::before {
+    border-style: dashed;
+  }
+}

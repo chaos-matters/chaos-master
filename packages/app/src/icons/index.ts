@@ -13,6 +13,7 @@ import ColourWedge from './colour-wedge.svg'
 import Copy from './copy.svg'
 import Create from './create.svg'
 import Cross from './cross.svg'
+import DeepZoom from './deep-zoom.svg'
 import Discord from './discord.svg'
 import Download from './download.svg'
 import Eye from './eye.svg'
@@ -54,6 +55,7 @@ import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
 import Speech from './speech.svg'
+import SplitView from './split-view.svg'
 import Star from './star.svg'
 import Stop from './stop.svg'
 import Swords from './swords.svg'
@@ -80,6 +82,7 @@ export {
   Copy,
   Create,
   Cross,
+  DeepZoom,
   Discord,
   Download,
   Eye,
@@ -129,4 +132,5 @@ export {
   TriangleAlert,
   VariationSpiral,
   Speech,
+  SplitView,
 }

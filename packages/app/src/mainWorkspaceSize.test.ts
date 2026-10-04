@@ -24,7 +24,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /** The line count of MainWorkspace.tsx today. Only ever lower it. */
-const MAX_LINES = 4551
+const MAX_LINES = 4546
 
 const lines = readFileSync(
   join(import.meta.dirname, 'MainWorkspace.tsx'),

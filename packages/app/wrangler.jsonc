@@ -23,9 +23,16 @@
   // (needed to inject OG/Twitter meta tags for shared links). `run_worker_first`
   // makes the Worker handle navigations + APIs while the hashed /assets/* files
   // stay static-first (served directly, no Worker invocation).
+  // `drop-trailing-slash` serves a folder's index.html without the slash: the
+  // build writes explore/index.html and benchmarks/index.html for hosts with
+  // no Worker (src/routing/staticEntries.ts), and here they answer /explore and
+  // /benchmarks, the URLs the Worker keeps canonical. The default,
+  // auto-trailing-slash, would redirect /explore to /explore/, which the
+  // Worker redirects straight back.
   "assets": {
     "directory": "dist",
     "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/*", "!/assets/*"],
   },

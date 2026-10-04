@@ -130,6 +130,7 @@ for (const [path, label] of [
   ['/', 'desktop-main'],
   ['/arcade', 'desktop-arcade'],
   ['/benchmarks', 'desktop-benchmarks'],
+  ['/explore', 'desktop-explorer'],
 ]) {
   const r = await visit(desktop, path, label)
   report.routes.push(r)

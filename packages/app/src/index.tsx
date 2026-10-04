@@ -4,7 +4,7 @@ import { render } from 'solid-js/web'
 import { loadHaptics } from './lib/haptics'
 import { loadLifecycle } from './lib/lifecycle'
 import { IS_NATIVE, nativePlatform } from './lib/platform'
-import { isBenchmarksPath } from './routing/appPath'
+import { isBenchmarksPath, isExplorerPath } from './routing/appPath'
 
 // Solid Devtools is opt-in: it instruments every component (a real dev-startup
 // cost) and must never ship to production. Enable with `VITE_DEVTOOLS=1 pnpm dev`.
@@ -61,8 +61,12 @@ import { initTelemetry } from './lib/telemetry'
 
 initTelemetry()
 
-const Entry = isBenchmarksPath(window.location.pathname)
+const { pathname } = window.location
+const Entry = isBenchmarksPath(pathname)
   ? (await import('./pages/Benchmarks/BenchmarksApp')).BenchmarksApp
-  : (await import('./App')).Wrappers
+  : isExplorerPath(pathname)
+    ? (await import('./pages/FractalExplorer/FractalExplorerApp'))
+        .FractalExplorerApp
+    : (await import('./App')).Wrappers
 
 render(() => <Entry />, root)
