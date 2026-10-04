@@ -46,8 +46,9 @@ file instead of rediscovering the architecture every session.
 
 ## 2. Guardrails — non-negotiable
 
-1. **Never push to `upstream`.** `chaos-matters/chaos-master` is frozen and its
-   push URL is disabled locally. Feature branches go to `origin` (the fork).
+1. **Feature branches go to `origin`** (the fork). Upstream's freeze was lifted
+   on 2026-10-04; it takes `release/<version>` branches with a same-repo PR,
+   when asked. Never push to upstream's `main`.
 2. **No Claude attribution anywhere** — no `Co-Authored-By`, no "Generated
    with", in commits, PR bodies, or any other artifact.
 3. **No emojis** in code, UI, logs, commits, or PR text. Use an SVG icon

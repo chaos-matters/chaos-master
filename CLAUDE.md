@@ -20,7 +20,9 @@ than grepping, and CI keeps it from going stale.
 The guardrails in full are in [AGENTS.md](AGENTS.md). The ones that must not
 wait for that read:
 
-- **Never push to `upstream`** — it is frozen. Fork branches go to `origin`.
+- **Feature branches go to `origin`.** Upstream is no longer frozen
+  (2026-10-04): it takes a `release/<version>` branch with a same-repo PR,
+  when asked. Never push to upstream's `main`.
 - **Never force-push.** `--force-with-lease` only, and only for a rebase.
 - **Do not commit, push, open a PR, or merge unless asked.**
 - **No Claude attribution** in commits, PR bodies, or any artifact.
