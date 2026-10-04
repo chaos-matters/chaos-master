@@ -48,9 +48,10 @@ export function useAppDragAndDrop(
     // A deep-zoom picture opens the explorer at its place, in this tab, the
     // way the editor's own link to the explorer does. Nothing here replaces
     // the open document: the work on screen reaches Recents through the
-    // autosave's pagehide flush, as on any other way out of the editor.
+    // autosave's pagehide flush, as on any other way out of the editor, and
+    // at a full Recents the link asks first (routing/pageLinks.ts).
     if (result.explorer) {
-      openExplorerAt?.(result.explorer)
+      await openExplorerAt?.(result.explorer)
       return
     }
     // A bare .steps.json carries no flame: there is nothing to load, only a

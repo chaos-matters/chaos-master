@@ -1,15 +1,30 @@
 /**
- * The explorer's location as a signal, kept in step with the URL fragment:
- * every change is written back (debounced, with `replaceState`, so history
- * does not fill with every drag), and editing the fragment by hand, or
- * following a pasted link, moves the view.
+ * The explorer's location as a signal, kept in step with the URL fragment,
+ * and the explorer's undo stack (core `explorerHistory.ts`) beside it.
  *
- * It also keeps the undo stack (core `explorerHistory.ts`). A continuous
- * move (`update`) becomes one entry when it settles, on the same 250 ms rest
- * that writes the fragment; a discrete jump (`jump`, and a followed link) is
- * an entry at once. Undo and redo show an entry without recording one.
+ * Two histories, two walks. Back and Forward walk the places you jumped to;
+ * Undo and Redo walk every step.
+ *
+ * - A continuous move or a colour change (`update`) is written to the
+ *   fragment once it rests (250 ms, debounced, with `replaceState`), so the
+ *   browser's history never fills with drags. The same rest makes it one
+ *   undo step.
+ * - A discrete jump (`jump`: a dropped picture, Home, a mode switch, the
+ *   Julia set of the view centre) is an undo step at once and a browser
+ *   entry at once (`pushState`). The place being left is written into its
+ *   own entry first, a drag not yet written included, so Back returns to
+ *   exactly where the jump began.
+ * - A history navigation (Back, Forward, a followed or hand-edited link)
+ *   fires `popstate`, then `hashchange`; it is handled once. When the place
+ *   it lands on is an entry of the undo stack, the stack moves there as
+ *   repeated undo or redo would, and records nothing. Otherwise it is a
+ *   followed link: a jump, with the entry the browser already made.
+ * - Undo and redo push and pop no browser entries. They show a step, and the
+ *   fragment of the current entry follows on the next rest.
+ *
+ * Back from the first entry leaves the explorer, as on any page.
  */
-import { canRedoExplorer, canUndoExplorer, createExplorerHistory, formatExplorerHash, jumpExplorerHistory, parseExplorerHash, redoExplorerHistory, settleExplorerHistory, undoExplorerHistory, } from '@chaos-master/core'
+import { canRedoExplorer, canUndoExplorer, createExplorerHistory, formatExplorerHash, jumpExplorerHistory, parseExplorerHash, redoExplorerHistory, seekExplorerHistory, settleExplorerHistory, undoExplorerHistory, } from '@chaos-master/core'
 import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
 import type { ExplorerHistory, ExplorerLocation } from '@chaos-master/core'
 
@@ -21,50 +36,84 @@ export function createExplorerLocation() {
   const [history, setHistory] = createSignal<ExplorerHistory>(
     createExplorerHistory(initial),
   )
+  /** The fragment the current browser entry holds, as this page last saw it. */
   let written = formatExplorerHash(initial)
+  /** The rest still pending, if any. */
   let timer: ReturnType<typeof setTimeout> | undefined
+
+  function writeFragment(fragment: string, entry: 'push' | 'replace') {
+    written = fragment
+    const { pathname, search } = window.location
+    const url = `${pathname}${search}${fragment}`
+    if (entry === 'push') window.history.pushState(null, '', url)
+    else window.history.replaceState(window.history.state, '', url)
+  }
+
+  /**
+   * `current` has come to rest: a step for the undo stack, and the fragment
+   * of the current entry. The undo stack hears every rest, even one back
+   * where the URL already is: a drag that ends where a jump not yet written
+   * began is still a step.
+   */
+  function rest(current: ExplorerLocation) {
+    clearTimeout(timer)
+    timer = undefined
+    setHistory((h) => settleExplorerHistory(h, current))
+    const fragment = formatExplorerHash(current)
+    if (fragment !== written) writeFragment(fragment, 'replace')
+  }
 
   createEffect(() => {
     const current = location()
-    const fragment = formatExplorerHash(current)
-    // A rest still pending is stale: superseded by the one below.
+    // A rest still pending is stale: superseded by this one.
     clearTimeout(timer)
     timer = setTimeout(() => {
-      // The undo stack hears every rest, even one back where the URL
-      // already is: a drag that ends where a jump not yet written began is
-      // still a step.
-      setHistory((h) => settleExplorerHistory(h, current))
-      if (fragment === written) return
-      written = fragment
-      const { pathname, search } = window.location
-      window.history.replaceState(
-        window.history.state,
-        '',
-        `${pathname}${search}${fragment}`,
-      )
+      rest(current)
     }, WRITE_DELAY_MS)
   })
 
-  /** Shows `next` as an entry of its own, after any move still pending. */
+  /**
+   * Shows `next` as an undo step and a browser entry of its own. A move
+   * still pending rests first, so the entry being left keeps it.
+   */
   function jump(next: ExplorerLocation) {
+    if (timer !== undefined) rest(location())
     batch(() => {
       setHistory((h) => jumpExplorerHistory(h, location(), next))
       setLocation(next)
     })
+    const fragment = formatExplorerHash(next)
+    if (fragment !== written) writeFragment(fragment, 'push')
   }
 
-  const onHashChange = () => {
-    if (window.location.hash === written) return
-    // The link that was followed wins over a drag not yet written.
+  /** Back, Forward, or a followed link: the browser has moved already. */
+  const onNavigate = () => {
+    const landed = window.location.hash
+    // The hashchange after a popstate already handled, or an entry that
+    // holds the place on screen.
+    if (landed === written) return
+    // The entry a pending rest belonged to is no longer the current one.
     clearTimeout(timer)
-    const next = parseExplorerHash(window.location.hash)
-    written = formatExplorerHash(next)
-    jump(next)
+    timer = undefined
+    written = landed
+    const target = parseExplorerHash(landed)
+    const sought = seekExplorerHistory(history(), location(), target)
+    batch(() => {
+      if (sought === undefined) {
+        setHistory((h) => jumpExplorerHistory(h, location(), target))
+        setLocation(target)
+      } else {
+        setHistory(sought)
+        setLocation(sought.present)
+      }
+    })
   }
-  window.addEventListener('hashchange', onHashChange)
+  window.addEventListener('popstate', onNavigate)
+  window.addEventListener('hashchange', onNavigate)
   onCleanup(() => {
     clearTimeout(timer)
-    window.removeEventListener('hashchange', onHashChange)
+    window.removeEventListener('popstate', onNavigate)
+    window.removeEventListener('hashchange', onNavigate)
   })
 
   /** A continuous move or a colour change: recorded when it settles. */

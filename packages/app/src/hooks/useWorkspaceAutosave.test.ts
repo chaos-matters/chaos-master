@@ -5,6 +5,8 @@ import { setArenaShowing } from '@/arcade/editorCover'
 import { examples } from '@/flame/examples'
 import { parseFlameXml } from '@/flame/flameXml'
 import { setActiveTab } from '@/lib/activeTab'
+import { EXPLORER_PATH } from '@/routing/appPath'
+import { openExplorer } from '@/routing/pageLinks'
 import { autosaveRecents, setAutosaveRecents, setSaveReminderDismissed, } from '@/utils/autosaveSettings'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { clearRecentFlames, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, } from '@/utils/recentFlames'
@@ -72,7 +74,7 @@ const keepUnsaved = () => Promise.resolve(false)
 const workspace = (
   options: {
     muted?: () => boolean
-    confirmOverwriteOldest?: () => Promise<boolean>
+    confirmOverwriteOldest?: (occasion?: 'save' | 'leave') => Promise<boolean>
     confirmDiscardUnsaved?: () => Promise<boolean>
   } = {},
 ) => {
@@ -751,5 +753,129 @@ describe('the save reminder over a view with its own top bar', () => {
     vi.advanceTimersByTime(90_000)
     expect(count(toasts)).toBe(1)
     dispose()
+  })
+})
+
+describe('leaving for the explorer when the shelf is full', () => {
+  /** The question, answered `answer`, and what it was asked about. */
+  const asks = (answer: boolean) => {
+    const occasions: (string | undefined)[] = []
+    const confirmOverwriteOldest = (occasion?: string) => {
+      occasions.push(occasion)
+      return Promise.resolve(answer)
+    }
+    return { occasions, confirmOverwriteOldest }
+  }
+  const leaving = () => {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { assign })
+    openExplorer?.()
+    return assign
+  }
+  /** Lets the question and the leaving that follows it run. */
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("asks before an unsaved flame takes a kept one's place, and stays on a no", async () => {
+    fillRecents()
+    const question = asks(false)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving()
+      await settle()
+
+      expect(question.occasions).toEqual(['leave'])
+      expect(assign).not.toHaveBeenCalled()
+      // Nothing written and nothing let go: the shelf is as it was.
+      const kept = loadRecentFlamesForRewrite()
+      expect(kept).toHaveLength(MAX_RECENT_FLAMES)
+      expect(kept.at(-1)?.id).toBe(`kept-${MAX_RECENT_FLAMES - 1}`)
+      expect(autosave.isFlameDirty()).toBe(true)
+      dispose()
+    })
+  })
+
+  it('saves the open flame over the oldest on a yes, then leaves', async () => {
+    fillRecents()
+    const question = asks(true)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving()
+      await settle()
+
+      expect(assign).toHaveBeenCalledExactlyOnceWith(EXPLORER_PATH)
+      const kept = loadRecentFlamesForRewrite()
+      expect(kept).toHaveLength(MAX_RECENT_FLAMES)
+      expect(kept[0]?.flame.metadata?.name).toBe('Unsaved work')
+      expect(kept.some((e) => e.id === `kept-${MAX_RECENT_FLAMES - 1}`)).toBe(
+        false,
+      )
+      dispose()
+    })
+  })
+
+  it('does not ask when the open flame only updates its own entry', async () => {
+    fillRecents()
+    // One short of full, so this session's own entry fills the shelf.
+    const shelf = JSON.parse(store.get('chaos-master-recent-flames')!) as []
+    store.set('chaos-master-recent-flames', JSON.stringify(shelf.slice(1)))
+    const question = asks(false)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'First edit')
+      expect(autosave.flushDirtyToRecents()).toBe('saved')
+      setOpen('metadata', 'name', 'Second edit')
+
+      const assign = leaving()
+      await settle()
+
+      expect(question.occasions).toEqual([])
+      expect(assign).toHaveBeenCalledOnce()
+      expect(loadRecentFlamesForRewrite()[0]?.flame.metadata?.name).toBe(
+        'Second edit',
+      )
+      dispose()
+    })
+  })
+
+  it('does not ask when there is nothing unsaved to put on the shelf', async () => {
+    fillRecents()
+    const question = asks(false)
+    await createRoot(async (dispose) => {
+      const { autosave } = workspace(question)
+      autosave.markLoadedBaseline()
+
+      const assign = leaving()
+      await settle()
+
+      expect(question.occasions).toEqual([])
+      expect(assign).toHaveBeenCalledOnce()
+      dispose()
+    })
+  })
+
+  it('asks nothing once the editor is gone', async () => {
+    fillRecents()
+    const question = asks(false)
+    createRoot((dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+      dispose()
+    })
+    const assign = leaving()
+    await settle()
+    expect(question.occasions).toEqual([])
+    expect(assign).toHaveBeenCalledOnce()
   })
 })

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { MANDELBROT_HOME } from './deepZoomView'
-import { canRedoExplorer, canUndoExplorer, createExplorerHistory, EXPLORER_HISTORY_CAP, jumpExplorerHistory, redoExplorerHistory, sameExplorerPlace, settleExplorerHistory, undoExplorerHistory, } from './explorerHistory'
+import { canRedoExplorer, canUndoExplorer, createExplorerHistory, EXPLORER_HISTORY_CAP, jumpExplorerHistory, redoExplorerHistory, sameExplorerPlace, seekExplorerHistory, settleExplorerHistory, undoExplorerHistory, } from './explorerHistory'
 import { DEFAULT_LOCATION } from './explorerUrl'
 import type { ExplorerLocation } from './explorerUrl'
 
@@ -176,5 +176,83 @@ describe('explorer history', () => {
     expect(sameExplorerPlace(A, B)).toBe(false)
     expect(sameExplorerPlace(A, { ...A, maxIterations: 2000 })).toBe(false)
     expect(sameExplorerPlace(A, { ...A, split: true })).toBe(false)
+  })
+})
+
+describe('seeking the explorer history (Back and Forward)', () => {
+  const D = at(4)
+  /** A then B then C then D, with D the present. */
+  const walked = () => {
+    let h = createExplorerHistory(A)
+    for (const next of [B, C, D]) h = settleExplorerHistory(h, next)
+    return h
+  }
+
+  it('goes back to an entry the way repeated undo would', () => {
+    const h = walked()
+    const sought = seekExplorerHistory(h, D, { ...B })!
+    expect(sought).toEqual(undoExplorerHistory(undoExplorerHistory(h, D)!, C))
+    expect(sought.present).toBe(B)
+    expect(sought.past).toEqual([A])
+    expect(sought.future).toEqual([C, D])
+  })
+
+  it('goes forward to an entry the way repeated redo would', () => {
+    const back = seekExplorerHistory(walked(), D, A)!
+    const sought = seekExplorerHistory(back, A, { ...C })!
+    expect(sought.present).toBe(C)
+    expect(sought.past).toEqual([A, B])
+    expect(sought.future).toEqual([D])
+  })
+
+  it('stays put, recording nothing, when the target is where the view is', () => {
+    const h = walked()
+    expect(seekExplorerHistory(h, D, { ...D })).toBe(h)
+  })
+
+  it('needs the colours to match as well as the place', () => {
+    const h = walked()
+    expect(seekExplorerHistory(h, D, { ...B, relief: 0.9 })).toBeUndefined()
+  })
+
+  it('finds nothing for a place the stack never held', () => {
+    expect(seekExplorerHistory(walked(), D, at(9))).toBeUndefined()
+  })
+
+  it('takes the nearest of two matching entries', () => {
+    // A, B, A, B, A: back from the last A to "B" is one step, not three.
+    let h = createExplorerHistory(A)
+    for (const next of [B, A, B, A]) h = settleExplorerHistory(h, next)
+    const sought = seekExplorerHistory(h, A, B)!
+    expect(sought.past).toHaveLength(3)
+    expect(sought.future).toEqual([A])
+  })
+
+  it('prefers going back when an entry is as near ahead as behind', () => {
+    // Back at B, with A one step back and A again one step ahead.
+    let h = createExplorerHistory(A)
+    h = settleExplorerHistory(h, B)
+    h = settleExplorerHistory(h, A)
+    h = undoExplorerHistory(h, A)!
+    const sought = seekExplorerHistory(h, B, A)!
+    expect(sought.past).toEqual([])
+    expect(sought.future).toEqual([B, A])
+  })
+
+  it('settles a move still pending first, as undo does', () => {
+    // C was dragged to and has not settled; Back to A keeps C as a step.
+    let h = createExplorerHistory(A)
+    h = settleExplorerHistory(h, B)
+    const sought = seekExplorerHistory(h, C, A)!
+    expect(sought.present).toBe(A)
+    expect(sought.future).toEqual([B, C])
+  })
+
+  it('shows the entry it finds, with the Julia constant it remembers', () => {
+    // A link to a Mandelbrot view does not carry c; the entry still has it.
+    const remembered = { ...A, juliaC: { re: '0.285', im: '0.01' } }
+    let h = createExplorerHistory(remembered)
+    h = settleExplorerHistory(h, B)
+    expect(seekExplorerHistory(h, B, A)?.present).toBe(remembered)
   })
 })

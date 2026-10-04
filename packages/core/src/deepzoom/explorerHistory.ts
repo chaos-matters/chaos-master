@@ -14,6 +14,11 @@
  * rest and `jumpExplorerHistory` for a discrete jump. Undo and redo take the
  * live location too: a move that has not settled yet is settled first, so
  * undo always returns to where that move began.
+ *
+ * `seekExplorerHistory` serves the browser's Back and Forward, which walk
+ * only the jumps (the page keeps one browser entry per jump): it moves the
+ * stack to the entry a history navigation landed on, as repeated undo or
+ * redo would, and records nothing.
  */
 import { formatExplorerHash } from './explorerUrl'
 import type { ExplorerLocation } from './explorerUrl'
@@ -174,4 +179,48 @@ export function redoExplorerHistory(
     present: next,
     future,
   }
+}
+
+/**
+ * The stack moved to the entry showing `target`, as repeated undo or redo
+ * would move it, or undefined when no entry shows it. What the browser's
+ * Back and Forward land on: an entry matches when it shows the same place in
+ * the same colours, and the nearest one wins, a step back before a step
+ * forward at the same distance (Back is the button pressed far more often).
+ *
+ * A move still pending in `live` is settled first, as undo settles it, so it
+ * stays a step of its own. A target where the view already is returns the
+ * settled history: nothing to move, and nothing recorded.
+ */
+export function seekExplorerHistory(
+  history: ExplorerHistory,
+  live: ExplorerLocation,
+  target: ExplorerLocation,
+): ExplorerHistory | undefined {
+  const settled = settleExplorerHistory(history, live)
+  const { past, present, future } = settled
+  const shows = (entry: ExplorerLocation) =>
+    sameExplorerPlace(entry, target) && sameColours(entry, target)
+  if (shows(present)) return settled
+  const reach = Math.max(past.length, future.length)
+  for (let step = 1; step <= reach; step += 1) {
+    const back = past.length - step
+    const behind = past[back]
+    if (behind !== undefined && shows(behind)) {
+      return {
+        past: past.slice(0, back),
+        present: behind,
+        future: [...past.slice(back + 1), present, ...future],
+      }
+    }
+    const ahead = future[step - 1]
+    if (ahead !== undefined && shows(ahead)) {
+      return {
+        past: [...past, present, ...future.slice(0, step - 1)],
+        present: ahead,
+        future: future.slice(step),
+      }
+    }
+  }
+  return undefined
 }

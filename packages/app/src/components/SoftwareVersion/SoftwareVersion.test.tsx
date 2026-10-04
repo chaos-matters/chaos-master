@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { askBeforeLeavingForExplorer } from '@/routing/pageLinks'
 import workspaceSource from '../../MainWorkspace.tsx?raw'
 import { SoftwareVersion } from './SoftwareVersion'
 
@@ -132,5 +133,65 @@ describe('where the version menu is offered', () => {
     expect(workspaceSource.replace(/\s+/g, ' ')).toContain(
       'hideVersionTrigger={isTouchLayout}',
     )
+  })
+})
+
+describe('the Deep zoom link', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  const openMenu = () => {
+    render(() => (
+      <SoftwareVersion
+        showHelp={vi.fn()}
+        showDocs={vi.fn()}
+        showBenchmark={vi.fn()}
+      />
+    ))
+    fireEvent.click(
+      screen.getByRole('button', { name: /lumen apeiron.*menu/i }),
+    )
+    return screen.getByRole('link', { name: 'Open the deep-zoom explorer' })
+  }
+
+  it('leaves by the same way as the touch menu, so the editor can ask first', async () => {
+    const ask = vi.fn(() => Promise.resolve(false))
+    const dispose = askBeforeLeavingForExplorer(ask)
+    try {
+      const assign = vi.fn()
+      vi.stubGlobal('location', { assign })
+      const link = openMenu()
+      expect(link.getAttribute('href')).toBe('/explore')
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+      link.dispatchEvent(click)
+      // The browser's own navigation would leave without asking.
+      expect(click.defaultPrevented).toBe(true)
+      await vi.waitFor(() => {
+        expect(ask).toHaveBeenCalledOnce()
+      })
+      expect(assign).not.toHaveBeenCalled()
+    } finally {
+      dispose()
+    }
+  })
+
+  it('leaves a click for a new tab to the browser', () => {
+    const ask = vi.fn(() => Promise.resolve(false))
+    const dispose = askBeforeLeavingForExplorer(ask)
+    try {
+      const link = openMenu()
+      const click = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: true,
+      })
+      link.dispatchEvent(click)
+      expect(click.defaultPrevented).toBe(false)
+      expect(ask).not.toHaveBeenCalled()
+    } finally {
+      dispose()
+    }
   })
 })
