@@ -28,6 +28,8 @@ export function budgetExhaustedMessage(mode: PilotMode): string {
       return 'Step budget exhausted. You cannot end a duel; the clock does. Call arcade_duel_ready with a title if you have not already, then wait for time to run out.'
     case 'cinema':
       return 'Step budget exhausted. Finish now with arcade_end_cinema.'
+    case 'beats':
+      return 'Step budget exhausted. Finish now with arcade_end_beats.'
     default:
       return 'Step budget exhausted. Finish now with arcade_end_lesson.'
   }
