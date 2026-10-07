@@ -56,6 +56,28 @@ describe('buildMoreMenu', () => {
     }
   })
 
+  it('gives every item an icon of its own', () => {
+    // The Quick GPU benchmark wore the Arcade's Zap, so two rows of the same
+    // list looked like one thing offered twice.
+    const handlers = Object.fromEntries(
+      [
+        'onSaveForLater',
+        'onOpenExportModal',
+        'onShare',
+        'onOpenDrawer',
+        'onOpenArcade',
+        'onOpenDocs',
+        'onOpenBenchmark',
+        'onOpenBenchmarkLab',
+        'onOpenExplorer',
+        'onOpenSettings',
+        'onDesktopLayout',
+      ].map((name) => [name, () => {}]),
+    )
+    const icons = buildMoreMenu(handlers).map((item) => item.Icon)
+    expect(new Set(icons).size).toBe(icons.length)
+  })
+
   it('keeps the order when only some handlers are there', () => {
     const items = buildMoreMenu({
       onDesktopLayout: () => {},

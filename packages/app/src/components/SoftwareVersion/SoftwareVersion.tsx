@@ -1,5 +1,5 @@
-import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
-import { Book, DeepZoom, GridIcon, Info, SidebarPanel, Star, Zap, } from '@/icons'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { Book, DeepZoom, GridIcon, Info, SidebarPanel, Star, Stopwatch, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { BENCHMARKS_PATH, EXPLORER_PATH } from '@/routing/appPath'
 import { openBenchmarkLab, openExplorer } from '@/routing/pageLinks'
@@ -158,7 +158,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
           props.showBenchmark()
         }}
       >
-        <Zap class={ui.menuIcon} />
+        <Stopwatch class={ui.menuIcon} />
         <div class={ui.menuMeta}>
           <span class={ui.menuLabel}>Quick GPU Benchmark</span>
           <span class={ui.menuSub}>Run hardware speed test</span>
@@ -192,7 +192,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       >
         <Info class={ui.menuIcon} />
         <div class={ui.menuMeta}>
-          <span class={ui.menuLabel}>Settings and More</span>
+          <span class={ui.menuLabel}>Settings and more</span>
           <span class={ui.menuSub}>
             Preferences, about & v{DISPLAY_VERSION}
           </span>
