@@ -90,9 +90,11 @@ export interface UseWorkspaceAutosaveParams {
    * the cap something of the user's gives way whichever answer they give and
    * they choose which, while a refusal offers nothing to trade - the work
    * cannot be stored at all, and the only thing left to decide is whether to
-   * walk away from it. Answering no keeps it, so no is the default.
+   * walk away from it. Answering no keeps it, so no is the default. `page`
+   * is set when the editor is being left for a page of its own rather than
+   * replaced by another flame, so the question can say which.
    */
-  confirmDiscardUnsaved: () => Promise<boolean>
+  confirmDiscardUnsaved: (page?: LeavingFor) => Promise<boolean>
   /**
    * Take a toast down by the id `showToast` returned. Defaults to the
    * ToastProvider's own, which is where MainWorkspace's `showToast` comes
@@ -418,13 +420,26 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
    * are still here to answer, so it asks first, exactly when leaving would
    * push a kept flame off the shelf: the document holds unsaved work and has
    * no place of its own there yet. A yes writes it now, over the oldest; a
-   * no stays, with nothing written. Every other case leaves as it always
-   * did, and the pagehide flush does what it always does.
+   * no stays, with nothing written.
+   *
+   * Storage refusing the write is the other way out of the editor that loses
+   * the work, and it gets the question a replacement gets
+   * (prepareDocumentReplacement): leaving only checked for a full shelf, so a
+   * blocked or over-quota store let the click go with nothing said, and the
+   * web has no restore to bring the flame back. A yes at the cap that still
+   * does not land is that same refusal. Once the user agrees to go, the work
+   * stops counting as unsaved, so the pagehide flush does not try a write
+   * they were never asked about.
    */
   const prepareLeaving = async (page: LeavingFor): Promise<boolean> => {
-    if (flushDirtyToRecents() !== 'full') return true
-    if (!(await confirmOverwriteOldest(page))) return false
-    flushDirtyToRecents(true)
+    const outcome = flushDirtyToRecents()
+    if (outcome === 'clean' || outcome === 'saved') return true
+    if (outcome === 'full') {
+      if (!(await confirmOverwriteOldest(page))) return false
+      if (flushDirtyToRecents(true) === 'saved') return true
+    }
+    if (!(await confirmDiscardUnsaved(page))) return false
+    dropUnsavedWork()
     return true
   }
   onCleanup(askBeforeLeaving(prepareLeaving))
