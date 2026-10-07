@@ -224,6 +224,10 @@ export function DataManagement() {
               <UsageRow label="Settings" bucket={u().settings} />
               <UsageRow label="Recent flames" bucket={u().recentFlames} />
               <UsageRow
+                label="Custom variations and palettes"
+                bucket={u().custom}
+              />
+              <UsageRow
                 label="Generated history"
                 bucket={u().generatedHistory}
               />
