@@ -1,6 +1,6 @@
 import { onCleanup } from 'solid-js'
 import { useOptionalToast } from '@/contexts/ToastContext'
-import { askBeforeLeavingForExplorer } from '@/routing/pageLinks'
+import { askBeforeLeaving } from '@/routing/pageLinks'
 import { autosaveIntervalMin, autosaveRecents } from '@/utils/autosaveSettings'
 import { getOldestRecentFlame, MAX_RECENT_FLAMES, saveRecentFlame, upsertRecentFlame, } from '@/utils/recentFlames'
 import { createAutosaveQuestion } from './autosaveQuestion'
@@ -8,6 +8,7 @@ import { createSaveReminder } from './saveReminder'
 import type { OverwriteOccasion } from '@/components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { FlushOutcome } from '@/lib/documentLoad'
+import type { LeavingFor } from '@/routing/pageLinks'
 import type { RecentWriteOutcome } from '@/utils/recentFlames'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
@@ -74,8 +75,8 @@ export interface UseWorkspaceAutosaveParams {
    * Taken as a parameter rather than reached for, because only three callers
    * here are ever allowed to ask: the user's own Save for Later, the flush at
    * a document replacement, which is the last moment the open document's
-   * work exists anywhere, and leaving for the explorer, the one departure
-   * with the user still there to answer. The interval autosave and the two
+   * work exists anywhere, and leaving for a page of its own, the one
+   * departure with the user still there to answer. The interval autosave and the two
    * writers for a process that is ending - the pagehide flush and the pause
    * save - all have answers of their own (below), and none of them may raise
    * this.
@@ -408,8 +409,8 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
   }
 
   /**
-   * Leaving the editor for the explorer, by the menu link or by a dropped
-   * deep-zoom PNG (routing/pageLinks.ts).
+   * Leaving the editor for a page of its own, the explorer or the Benchmark
+   * Lab, by a menu link or by a dropped deep-zoom PNG (routing/pageLinks.ts).
    *
    * The pagehide flush would save the open document on the way out and, at
    * a full shelf, force past the cap: right for a tab that is closing, with
@@ -420,13 +421,13 @@ export function useWorkspaceAutosave(params: UseWorkspaceAutosaveParams) {
    * no stays, with nothing written. Every other case leaves as it always
    * did, and the pagehide flush does what it always does.
    */
-  const prepareLeaving = async (): Promise<boolean> => {
+  const prepareLeaving = async (page: LeavingFor): Promise<boolean> => {
     if (flushDirtyToRecents() !== 'full') return true
-    if (!(await confirmOverwriteOldest('leave'))) return false
+    if (!(await confirmOverwriteOldest(page))) return false
     flushDirtyToRecents(true)
     return true
   }
-  onCleanup(askBeforeLeavingForExplorer(prepareLeaving))
+  onCleanup(askBeforeLeaving(prepareLeaving))
 
   window.addEventListener('pagehide', saveOnPagehide)
   onCleanup(() => {
