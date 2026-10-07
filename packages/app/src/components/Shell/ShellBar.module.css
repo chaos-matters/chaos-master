@@ -76,9 +76,13 @@
   place-items: center;
 }
 
+/* At the icon set's one stroke, as in the rail beside it: the Library grid is
+   drawn at 1.5 for the desktop and read lighter than Create's 1.8 next to
+   it. More's dots are filled and take no stroke. */
 .icon {
   width: var(--la-icon-box);
   height: var(--la-icon-box);
+  stroke-width: var(--la-icon-stroke);
 }
 
 .more {
@@ -150,8 +154,20 @@
   flex: 0 0 auto;
 }
 
+/* Expanded, the bar lies over the first chips, so its fill is opaque: the
+   glass's own hue with nothing through it. At --la-glass-strong 14% of what
+   is under it came through and the covered chip's label showed on both sides
+   of Library; even --la-glass-solid left a ghost of it. No leading padding:
+   the capsule is the bar's end cap, so the Create circle stays concentric
+   with the cap and where it was collapsed, instead of stepping 5px right and
+   leaving a crescent of fill beside it. The capsule's height, not the full
+   bar's: on a narrow phone the capsule is smaller (lumen.css), and a taller
+   bar anchored to its foot would stand 8px above the circles beside it. */
 .capsuleDock .bar {
   flex: 0 0 auto;
+  height: var(--la-capsule);
+  background: var(--la-ground);
+  padding-inline-start: 0;
 }
 
 .capsuleDock .capsule {
