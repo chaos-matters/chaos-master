@@ -449,7 +449,7 @@ export function ArcadeModePanel(props: {
                     [ui.chipActive!]: selectedArchetype().id === arch.id,
                   }}
                   onClick={() => setSelectedArchetype(arch)}
-                  title={`${arch.className} — School of ${arch.school}`}
+                  title={`${arch.className}, School of ${arch.school}`}
                 >
                   {arch.name} ({arch.school})
                 </button>
