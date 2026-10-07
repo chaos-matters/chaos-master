@@ -1199,7 +1199,7 @@ export function BenchmarksPage() {
   })
   onMount(() => {
     const previousTitle = document.title
-    document.title = 'Benchmark Lab — Lumen Apeiron'
+    document.title = 'Benchmark Lab · Lumen Apeiron'
 
     void loadBenchmarkResultHistory({ limit: 8 })
       .then(setHistory)

@@ -37,7 +37,7 @@ export function AdvancedToolsDrawer(props: AdvancedToolsDrawerProps) {
           {
             id: 'flame-gallery',
             title: 'Browse Flame Gallery',
-            subtitle: 'Search presets, curated catalog & community flames',
+            subtitle: 'Search presets, the catalog and community flames',
             icon: GridIcon,
             highlight: true,
             action: () => {
@@ -65,7 +65,7 @@ export function AdvancedToolsDrawer(props: AdvancedToolsDrawerProps) {
     {
       id: 'art-director',
       title: 'Art Director Mode',
-      subtitle: 'Evolutionary AI taste and flame curation',
+      subtitle: 'Breed new flames from the ones you pick',
       icon: Robot,
       action: () => {
         props.onArtDirector?.()
@@ -115,7 +115,7 @@ export function AdvancedToolsDrawer(props: AdvancedToolsDrawerProps) {
     {
       id: 'high-res-export',
       title: 'High-Res Export',
-      subtitle: 'Render and download master PNG render',
+      subtitle: 'Render and download a full-size PNG',
       icon: CameraIcon,
       action: () => {
         props.onExportPng?.()
