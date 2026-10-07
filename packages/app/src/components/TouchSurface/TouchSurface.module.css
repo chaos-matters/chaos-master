@@ -587,6 +587,10 @@
   box-sizing: border-box;
 }
 
+/* flex: 1 shares the footer's width out between its buttons. In the
+   variations panel, a column, the same flex: 1 is a height basis of 0 that
+   outranks the height, and "Browse Full Library" shrank to its 24px of text.
+   The minimum holds the tap token in either direction. */
 .actionPillBtn {
   flex: 1;
   display: inline-flex;
@@ -594,6 +598,7 @@
   justify-content: center;
   gap: var(--la-s-2);
   height: var(--la-tap);
+  min-height: var(--la-tap);
   border-radius: var(--la-r-sm);
   border: 1px solid var(--la-hairline);
   background: var(--la-control);
@@ -800,6 +805,20 @@
 .searchToggleBtn:hover,
 .searchToggleBtn:active {
   background: var(--la-control-accent);
+}
+
+/* Under a finger, the two controls drawn smaller than the tap token take its
+   height: the tablet deck's tabs, 40px for a trackpad, and the search
+   toggle, a line of small text 21px tall, whose header row grows to hold it.
+   Every other control in the deck is already the token's size. */
+@media (pointer: coarse) {
+  .tabChip {
+    height: var(--la-tap);
+  }
+
+  .searchToggleBtn {
+    min-height: var(--la-tap);
+  }
 }
 
 /* With the Glass panels setting on, these panels sit on glass (the rail's

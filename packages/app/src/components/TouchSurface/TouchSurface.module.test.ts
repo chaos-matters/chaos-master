@@ -19,7 +19,7 @@
  * import into class names. So it is registered in scripts/always-on-tests.mjs.
  */
 import { describe, expect, it } from 'vitest'
-import { blocksOf, hookReads, readCss } from '@/test/cssModule'
+import { blockOf, blocksOf, hookReads, readCss } from '@/test/cssModule'
 
 const css = readCss('components/TouchSurface/TouchSurface.module.css')
 const scrub = readCss('components/Duel/ScrubField.module.css')
@@ -107,6 +107,21 @@ describe('the touch inspector stylesheet', () => {
         /^1px solid var\(--la-hairline(-strong)?\)$/,
       )
     }
+  })
+
+  it('gives a finger the tap token on the small controls', () => {
+    // Measured with a coarse pointer at 375x812 and 1180x820: "Search All…"
+    // was 80x21, "Browse Full Library" 24px tall and the deck's tabs 40.
+    const coarse = blockOf(css, '@media (pointer: coarse)')
+    expect(coarse).toMatch(/\.tabChip\s*\{\s*height:\s*var\(--la-tap\);\s*\}/)
+    expect(coarse).toMatch(
+      /\.searchToggleBtn\s*\{\s*min-height:\s*var\(--la-tap\);\s*\}/,
+    )
+    // In the variations panel's column the button's flex: 1 is a height
+    // basis of 0, which outranks its height and does not outrank a minimum.
+    expect(value(rule(css, '.actionPillBtn'), 'min-height')).toBe(
+      'var(--la-tap)',
+    )
   })
 
   it('fills nothing else with a hairline or the accent wash', () => {
