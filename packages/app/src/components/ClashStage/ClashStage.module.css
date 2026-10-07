@@ -101,31 +101,38 @@
   font-weight: 700;
 }
 
-.caption {
-  position: absolute;
-  left: var(--la-s-4);
-  right: var(--la-s-4);
-  bottom: calc(
-    var(--la-safe-bottom) + var(--la-s-3) + var(--la-tap) + var(--la-s-4)
-  );
-  margin: 0;
-  text-align: center;
-  font: var(--la-t-title);
-  letter-spacing: var(--la-t-title-track);
-  text-transform: uppercase;
-  text-shadow: 0 2px 12px #000;
-  pointer-events: none;
-}
-
-.controls {
+/*
+ * The beat caption above the stage controls, in one column pinned to the
+ * bottom. At phone width the controls wrap into two rows; a caption placed a
+ * fixed row above the bottom then sat on the second one.
+ */
+.bottom {
   position: absolute;
   left: calc(var(--la-safe-left) + var(--la-s-3));
   right: calc(var(--la-safe-right) + var(--la-s-3));
   bottom: calc(var(--la-safe-bottom) + var(--la-s-3));
   display: flex;
+  flex-direction: column;
+  gap: var(--la-s-4);
+  pointer-events: none;
+}
+
+.caption {
+  margin: 0;
+  padding: 0 var(--la-s-1);
+  text-align: center;
+  font: var(--la-t-title);
+  letter-spacing: var(--la-t-title-track);
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px #000;
+}
+
+.controls {
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--la-s-2);
+  pointer-events: auto;
 }
 
 .button {

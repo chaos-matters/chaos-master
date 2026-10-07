@@ -183,6 +183,11 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
   {
+    file: 'src/components/ClashStage/ClashStage.test.tsx',
+    why: 'reads ClashStage.module.css for the caption stacked over the controls',
+    genre: 'filesystem',
+  },
+  {
     file: 'src/components/Duel/duelChipsCss.test.ts',
     why: 'reads DuelChips.module.css and DuelChips.tsx',
     genre: 'filesystem',
