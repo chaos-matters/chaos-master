@@ -365,6 +365,11 @@ export const arcadeSetAudioMapping: WebMcpTool = {
       return { error: 'Arguments must be an object with a mappings array.' }
     }
 
+    // A mapping spends a step like any execute_command call.
+    if (pilotStepsRemaining() <= 0) {
+      return { error: budgetExhaustedMessage(state.mode) }
+    }
+
     const raw = args as {
       preset?: unknown
       mappings?: unknown
