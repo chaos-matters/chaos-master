@@ -113,6 +113,27 @@ export function createFlameWgsl({
   }
 }
 
+/**
+ * A pipeline's uniform record for a flame that may hold fewer transforms than
+ * the pipeline was built for: every key of `template` (the pipeline's own
+ * uniforms), taking the flame's value where it has one and the template at
+ * probability 0 where it does not, so TypeGPU's compiled writer never meets
+ * a missing field. Both IFS pipelines write their uniforms through this.
+ */
+export function uniformsForPipeline(
+  uniforms: Record<string, unknown>,
+  template: Record<string, unknown>,
+): Record<string, unknown> {
+  const safe: Record<string, unknown> = {}
+  for (const key of Object.keys(template)) {
+    safe[key] =
+      key in uniforms
+        ? uniforms[key]
+        : { ...(template[key] as Record<string, unknown>), probability: 0 }
+  }
+  return safe
+}
+
 export function extractFlameUniforms({
   transforms,
 }: Pick<FlameDescriptor, 'transforms'>) {
@@ -137,27 +158,33 @@ export function extractFlameUniforms({
         return [
           `flame${tid}`,
           {
-            probability: isVisible ? probability / totalProbability : 0,
-            color: vec2f(color?.x ?? 0, color?.y ?? 0),
-            colorSpeed: colorSpeed ?? 0.4,
+            probability: isVisible
+              ? (Number.isFinite(probability) ? probability : 0) /
+                totalProbability
+              : 0,
+            color: vec2f(
+              Number.isFinite(color?.x) ? (color?.x ?? 0) : 0,
+              Number.isFinite(color?.y) ? (color?.y ?? 0) : 0,
+            ),
+            colorSpeed: Number.isFinite(colorSpeed) ? (colorSpeed ?? 0.4) : 0.4,
             preAffine: preAffine
               ? {
-                  a: preAffine.a ?? 1,
-                  b: preAffine.b ?? 0,
-                  c: preAffine.c ?? 0,
-                  d: preAffine.d ?? 0,
-                  e: preAffine.e ?? 1,
-                  f: preAffine.f ?? 0,
+                  a: Number.isFinite(preAffine.a) ? preAffine.a : 1,
+                  b: Number.isFinite(preAffine.b) ? preAffine.b : 0,
+                  c: Number.isFinite(preAffine.c) ? preAffine.c : 0,
+                  d: Number.isFinite(preAffine.d) ? preAffine.d : 0,
+                  e: Number.isFinite(preAffine.e) ? preAffine.e : 1,
+                  f: Number.isFinite(preAffine.f) ? preAffine.f : 0,
                 }
               : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
             postAffine: postAffine
               ? {
-                  a: postAffine.a ?? 1,
-                  b: postAffine.b ?? 0,
-                  c: postAffine.c ?? 0,
-                  d: postAffine.d ?? 0,
-                  e: postAffine.e ?? 1,
-                  f: postAffine.f ?? 0,
+                  a: Number.isFinite(postAffine.a) ? postAffine.a : 1,
+                  b: Number.isFinite(postAffine.b) ? postAffine.b : 0,
+                  c: Number.isFinite(postAffine.c) ? postAffine.c : 0,
+                  d: Number.isFinite(postAffine.d) ? postAffine.d : 0,
+                  e: Number.isFinite(postAffine.e) ? postAffine.e : 1,
+                  f: Number.isFinite(postAffine.f) ? postAffine.f : 0,
                 }
               : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
             ...Object.fromEntries(
@@ -185,8 +212,11 @@ export function extractFlameUniforms({
                     params?: Record<string, number>
                   }
                   const isVarVisible = varVisible !== false
+                  const rawWeight = Number.isFinite(rest.weight)
+                    ? rest.weight
+                    : 1
                   const typed: Record<string, unknown> = {
-                    weight: isVarVisible ? (rest.weight ?? 1) : 0,
+                    weight: isVarVisible ? rawWeight : 0,
                   }
                   const variationType = type
                   const isParametric = isParametricVariationType(variationType)
@@ -199,7 +229,7 @@ export function extractFlameUniforms({
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {
                         const val = rest.params[key]
-                        if (val !== undefined) {
+                        if (val !== undefined && Number.isFinite(val)) {
                           safe[key] = val
                         }
                       }
@@ -215,7 +245,11 @@ export function extractFlameUniforms({
                     typed.params = safe
                   } else {
                     if (rest.params) {
-                      typed.params = { ...rest.params }
+                      const safe: Record<string, number> = {}
+                      for (const [key, val] of Object.entries(rest.params)) {
+                        if (Number.isFinite(val)) safe[key] = val
+                      }
+                      typed.params = safe
                     } else if (Object.hasOwn(variation, 'params')) {
                       console.warn(
                         `[extractFlameUniforms] ${variationType} has params but NOT recognized as parametric. rest.params:`,

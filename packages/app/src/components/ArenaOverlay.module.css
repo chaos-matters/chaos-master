@@ -10,6 +10,233 @@
   color: var(--neutral-100, #f5f5f5);
   font-family: inherit;
   overflow: hidden;
+  background: radial-gradient(
+    circle at center,
+    rgba(3, 7, 18, 0.2) 0%,
+    rgba(3, 7, 18, 0.75) 100%
+  );
+  transition: background 0.5s ease;
+}
+
+.modal.isClashing {
+  background: radial-gradient(
+    circle at center,
+    rgba(3, 7, 18, 0.05) 0%,
+    rgba(3, 7, 18, 0.5) 100%
+  );
+}
+
+.topBarStrip {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 15, 29, 0.92);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.topBarCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.topRoundRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topRoundPill {
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+
+.territoryMiniTrack {
+  display: flex;
+  width: 260px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.territoryMiniA {
+  background: #22d3ee;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+
+.territoryMiniContested {
+  background: #64748b;
+  transition: width 0.4s ease;
+}
+
+.territoryMiniB {
+  background: #fb923c;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(251, 146, 60, 0.5);
+}
+
+.topCommentaryBox {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #fcd34d;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.symmetryRow {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.symmetryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.symmetryLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.symmetryBadge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.15);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.symmetryPills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.symmetryPill {
+  flex: 1;
+  min-width: 28px;
+  padding: 3px 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.symmetryPill:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.symmetryPillActive {
+  background: rgba(250, 204, 21, 0.22) !important;
+  border-color: #facc15 !important;
+  color: #fef08a !important;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.3);
+}
+
+.syncBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.12);
+  color: #67e8f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.syncBtn:hover:not(:disabled) {
+  background: rgba(6, 182, 212, 0.25);
+  border-color: #22d3ee;
+  color: #ffffff;
+}
+
+.galleryBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.galleryBtn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: #818cf8;
+  color: #ffffff;
 }
 
 .header {
@@ -17,13 +244,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(
-    90deg,
-    rgba(6, 182, 212, 0.06),
-    rgba(249, 115, 22, 0.06)
-  );
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 15, 29, 0.92);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
 }
 
@@ -58,7 +285,7 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
   color: #a3a3a3;
   cursor: pointer;
@@ -72,14 +299,15 @@
 }
 
 .body {
-  pointer-events: auto;
+  pointer-events: none;
   flex: 1;
   overflow-y: auto;
-  padding: 18px 24px;
+  padding: 14px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   min-height: 0;
+  position: relative;
 }
 
 /* Referee commentary box */
@@ -87,63 +315,111 @@
   pointer-events: auto;
   padding: 12px 18px;
   border-radius: 10px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   color: #fcd34d;
   font-size: 0.82rem;
   font-weight: 600;
   text-align: center;
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
 }
 
 /* Battle Arena grid: P1 vs P2 */
 .battlefield {
   display: grid;
-  grid-template-columns: 320px auto 320px;
-  justify-content: space-between;
+  grid-template-columns: 320px 1fr 320px;
   gap: 20px;
-  align-items: center;
+  align-items: start;
+  min-height: 0;
+  pointer-events: none;
 }
 
 .fighterCard {
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border-radius: 14px;
-  background: rgba(20, 20, 26, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.25s ease;
+  background: rgba(10, 15, 29, 0.9);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    filter 0.3s ease;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 320px;
+  flex-shrink: 0;
 }
 
 .p1Card {
-  border-color: rgba(6, 182, 212, 0.3);
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(6, 182, 212, 0.15);
 }
 
 .p1CardWinner {
   border-color: #22d3ee !important;
-  box-shadow: 0 0 30px rgba(6, 182, 212, 0.35);
+  box-shadow: 0 0 35px rgba(6, 182, 212, 0.45);
 }
 
 .p2Card {
-  border-color: rgba(249, 115, 22, 0.3);
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(249, 115, 22, 0.15);
 }
 
 .p2CardWinner {
   border-color: #fb923c !important;
-  box-shadow: 0 0 30px rgba(249, 115, 22, 0.35);
+  box-shadow: 0 0 35px rgba(249, 115, 22, 0.45);
+}
+
+/* Combat transparency dimming */
+.isClashing .fighterCard {
+  opacity: 0.28;
+  transform: scale(0.96);
+  filter: brightness(0.75);
+}
+
+.isClashing .fighterCard:hover {
+  opacity: 0.92;
+  transform: scale(1);
+  filter: brightness(1);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.85);
+}
+
+@keyframes previewShimmer {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.4;
+  }
 }
 
 .fighterPreview {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%;
-  min-height: 100px;
+  aspect-ratio: 16 / 9;
+  height: 164px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  background: #000000;
+  background: #070b14;
+  flex-shrink: 0;
 }
 
 .previewLayer {
@@ -157,6 +433,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(0, 0, 0, 0.8) 100%
+  );
+  animation: previewShimmer 2s ease-in-out infinite;
 }
 
 .fighterLabel {
@@ -191,6 +473,10 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
 }
 
 .p1Name {
@@ -207,6 +493,11 @@
   color: #737373;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  line-height: 1.2;
+  height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .loadBtn {
@@ -430,8 +721,10 @@
 }
 
 .streakFire {
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
   color: #f59e0b;
-  font-weight: 900;
 }
 
 .headerActions {
@@ -510,6 +803,12 @@
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.05);
   margin-top: 4px;
+  min-height: 52px;
+  max-height: 52px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .cardFooterActions {
@@ -623,4 +922,653 @@
   color: #64748b;
   text-align: center;
   margin-top: 4px;
+}
+
+.fighterTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-height: 28px;
+}
+
+.schoolBadge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+}
+
+.advantageBadge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #34d399;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.groundedMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.groundedMetricItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.groundedMetricKey {
+  font-size: 0.56rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.groundedMetricVal {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.exportCardBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(192, 132, 252, 0.2),
+    rgba(99, 102, 241, 0.2)
+  );
+  color: #e9d5ff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.exportCardBtn:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    rgba(192, 132, 252, 0.35),
+    rgba(99, 102, 241, 0.35)
+  );
+  border-color: #c084fc;
+  color: #ffffff;
+  box-shadow: 0 0 15px rgba(192, 132, 252, 0.4);
+}
+
+.battleLogSection {
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.battleLogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.04);
+  user-select: none;
+}
+
+.battleLogHeader:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.battleLogTitle {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.battleLogToggle {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.battleLogList {
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.battleLogItem {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+/* ── Spectator Theater Mode (Active Clash View) ── */
+.spectatorHud {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.spectatorTopBar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background: rgba(14, 14, 20, 0.82);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.spectatorFighterLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spectatorFighterRight {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.spectatorFighterHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spectatorHealthTrack {
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  position: relative;
+}
+
+.spectatorHealthFillLeft {
+  height: 100%;
+  background: linear-gradient(90deg, #06b6d4, #22d3ee);
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.6);
+}
+
+.spectatorHealthFillRight {
+  height: 100%;
+  background: linear-gradient(90deg, #fb923c, #f97316);
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.6);
+  margin-left: auto;
+}
+
+.spectatorCenterBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.spectatorRoundTag {
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+.spectatorEventTag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Arena Viewport Stage (Clear Center Window) */
+.spectatorStage {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Impact Shockwave VFX */
+.shockwaveRing {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid #22d3ee;
+  box-shadow:
+    0 0 35px #22d3ee,
+    inset 0 0 25px #f97316;
+  opacity: 1;
+  pointer-events: none;
+  animation: shockwaveExpand 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes shockwaveExpand {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(6.5);
+    opacity: 0;
+  }
+}
+
+/* Screen Shake */
+.shakeEffect {
+  animation: screenShake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes screenShake {
+  10%,
+  90% {
+    transform: translate3d(-3px, 2px, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(4px, -3px, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-5px, 4px, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(5px, -2px, 0);
+  }
+}
+
+/* Floating Combat Text */
+.combatFloater {
+  position: absolute;
+  font-size: 1.35rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+  animation: floatUp 0.85s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.75);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(-12px) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-45px) scale(1);
+    opacity: 0;
+  }
+}
+
+.spectatorControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: auto;
+}
+
+/* ── Center Area: Idle, Clashing & Immediate Winner Presentation ── */
+.centerColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  position: relative;
+  pointer-events: none;
+  width: 100%;
+}
+
+.clashActiveArea {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  position: relative;
+  padding: 10px 0;
+}
+
+.clashStage {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  pointer-events: none;
+}
+
+.clashBottomBar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ── Immediate Winner Champion Trophy Card ── */
+.centerWinnerContainer {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: winnerCardAppear 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 20;
+  width: 100%;
+  max-width: 460px;
+}
+
+@keyframes winnerCardAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.winnerTrophyCard {
+  width: 100%;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  background: rgba(10, 15, 29, 0.94);
+  /* Literal on purpose: the arena keeps its own glass, not the app's. */
+  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(28px);
+  border-radius: 16px;
+  border: 2px solid #fbbf24;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.9),
+    0 0 45px rgba(251, 191, 36, 0.35);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.winnerTrophyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.winnerTrophyTitle {
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.winnerArtContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #070b14;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.winnerCrownBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: #fbbf24;
+  color: #000000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.winnerSchoolBadgeOverlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+}
+
+.winnerInfoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.winnerBigName {
+  font-size: 1.3rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.winnerPowerBadge {
+  font-family: monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(34, 211, 238, 0.15);
+  border: 1px solid #22d3ee;
+  color: #38bdf8;
+}
+
+.winnerScoreBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.winnerFinalScore {
+  font-family: monospace;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #fbbf24;
+}
+
+.centerActionsBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.centerNextBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 10px;
+  border: 1px solid #22d3ee;
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+  transition: all 0.15s ease;
+}
+
+.centerNextBtn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.6);
+}
+
+.centerSubActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.centerReplayBtn,
+.centerLoadBtn {
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.centerReplayBtn:hover,
+.centerLoadBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.centerExportBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(192, 132, 252, 0.2),
+    rgba(99, 102, 241, 0.2)
+  );
+  color: #e9d5ff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.centerExportBtn:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    rgba(192, 132, 252, 0.35),
+    rgba(99, 102, 241, 0.35)
+  );
+  border-color: #c084fc;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.4);
+}
+
+@media (max-width: 1024px) {
+  .battlefield {
+    grid-template-columns: 280px 1fr 280px;
+    gap: 12px;
+  }
+  .fighterCard {
+    width: 280px;
+    padding: 10px;
+  }
+  .fighterPreview {
+    height: 146px;
+  }
+  .topBarStrip {
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .battlefield {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .fighterCard {
+    width: 100%;
+    max-height: none;
+  }
+  .centerColumn {
+    order: -1;
+  }
 }

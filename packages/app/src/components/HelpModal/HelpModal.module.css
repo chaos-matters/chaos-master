@@ -607,6 +607,47 @@
   }
 }
 
+/* A finger needs the full target; a mouse keeps the compact sizes. The
+   close button grows into the hero's corner, so the hero keeps that much
+   clear for it on the right, plus room for the icon row's hit areas.
+
+   The icon links stay 30px to the eye and reach --la-tap through an
+   invisible ::after, as ModalTitleBar's close does. Two such areas meet
+   without overlapping only when the gap between the icons is at least the
+   7px each one reaches out on both sides, so the row's gap rises from 6.4px
+   to --la-s-4 here. */
+@media (pointer: coarse) {
+  .hero-section {
+    padding-right: calc(var(--la-tap) + var(--la-s-4));
+  }
+
+  .icon-row {
+    gap: var(--la-s-4);
+  }
+
+  .icon-link,
+  .icon-btn {
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: calc((30px - var(--la-tap)) / 2);
+    }
+  }
+
+  .close-btn {
+    top: var(--la-s-1);
+    right: var(--la-s-1);
+    min-block-size: var(--la-tap);
+    min-inline-size: var(--la-tap);
+  }
+
+  .picker-mode-btn {
+    min-block-size: var(--la-tap);
+  }
+}
+
 .consoleActive {
   color: oklch(65% 0.16 240) !important;
   border-color: oklch(65% 0.16 240) !important;

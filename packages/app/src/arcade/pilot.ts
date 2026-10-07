@@ -1,6 +1,8 @@
 import { createSignal } from 'solid-js'
 import { DEFAULT_SEAT } from '@/seats/seatId'
+import { markSessionClosed, markSessionRunning } from './interruptedSession'
 import { clearPilotFocus } from './pilotFocus'
+import type { GlideSwitches } from '@/flame/glide/types'
 import type { RecordedSession } from '@/recorder/schema'
 import type { SeatId } from '@/seats/seatId'
 
@@ -39,6 +41,11 @@ export type PilotDriving = {
   lock: 'screen' | 'seat'
   /** Index into guard.QUALITY_ORDER when the session started. */
   qualityRankAtStart: number
+  /**
+   * The Glide switches as the viewer left them, for `finishPilot` to give
+   * back. Only the presentation modes hold them; a duel cannot change them.
+   */
+  glideAtStart?: GlideSwitches
 }
 
 export type PilotEnded = {
@@ -85,6 +92,18 @@ export function drivingSeat(): SeatId | undefined {
   return drivingState()?.seatId
 }
 
+/**
+ * Does the agent own the keyboard as well as the screen?
+ *
+ * Only under the screen lock, where the viewer is watching a take being made:
+ * a key they press must not edit, rewind or play it. A seat lock is a duel,
+ * and the viewer playing the other seat keeps their keyboard. Both keyboard
+ * dispatchers ask this one question, so the two cannot drift apart.
+ */
+export function pilotOwnsKeyboard(): boolean {
+  return drivingState()?.lock === 'screen'
+}
+
 export function appendPilotLog(kind: PilotLogKind, text: string): void {
   setPilotLog((log) => [
     ...log.slice(-(MAX_PILOT_LOG - 1)),
@@ -122,8 +141,11 @@ export function startPilot(
     seatId: input.seatId ?? DEFAULT_SEAT,
     lock: input.lock ?? 'screen',
     qualityRankAtStart: input.qualityRankAtStart,
+    glideAtStart: input.glideAtStart,
   })
   appendPilotLog('system', `${input.title} started`)
+  // Survives a reload, so the next page can tell the agent its session ended.
+  markSessionRunning({ mode: input.mode, title: input.title })
   return { ok: true }
 }
 
@@ -177,6 +199,7 @@ export function endPilot(
   }
   setLastPilotSession(extras.session)
   setPilot(ended)
+  markSessionClosed()
   appendPilotLog('system', `${ended.title}: ${reason}`)
   return ended
 }
@@ -190,6 +213,7 @@ export function notePilotSaveResult(saved: boolean): void {
 
 export function resetPilot(): void {
   setPilot({ phase: 'idle' })
+  markSessionClosed()
   clearPilotFocus()
   setPilotLog([])
   setLastPilotSession(undefined)

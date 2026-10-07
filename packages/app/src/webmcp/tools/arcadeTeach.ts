@@ -1,11 +1,13 @@
 import { describeAllowedCommands, SAMPLE_VARIATION_TYPES, SAMPLE_VARIATION_TYPES_3D, } from '@/arcade/commandHints'
 import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { qualityRank } from '@/arcade/guard'
+import { acknowledgeInterruption, interruptionMessage, } from '@/arcade/interruptedSession'
 import { clearNarration, narration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
-import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
-import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, TOPIC_IDS, } from '@/arcade/topics'
+import { budgetExhaustedMessage, finishPilot, takeOutcome, } from '@/arcade/pilotActions'
+import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, PRESENTATION_SWITCHES, TOPIC_IDS, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { captureGlideSwitches } from '@/flame/glide/runtime'
 import { variationTypes as registeredVariationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { anySessionRecording } from '@/recorder/recorder'
@@ -20,13 +22,16 @@ const NOT_READY = {
 export const arcadeStatus: WebMcpTool = {
   name: 'arcade_status',
   description:
-    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, the last narration, and — during a duel — the time left on the clock. Call it when unsure what to do next.',
+    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, the last narration, and — during a duel — the time left on the clock. Call it when unsure what to do next. After a reload ends a session it reports that once, which releases the other tools.',
   inputSchema: { type: 'object', properties: {} },
   annotations: { readOnlyHint: true },
   execute: () => {
     const state = pilot()
     const driving = state.phase === 'driving' ? state : undefined
     const duel = runningDuel()
+    // Reading the status is the acknowledgement: once said, the other tools
+    // are released.
+    const interrupted = acknowledgeInterruption()
     return {
       phase: state.phase,
       mode: state.phase === 'idle' ? undefined : state.mode,
@@ -62,6 +67,14 @@ export const arcadeStatus: WebMcpTool = {
         state.phase === 'ended'
           ? { reason: state.reason, sessionName: state.sessionName }
           : undefined,
+      interrupted: interrupted
+        ? {
+            mode: interrupted.mode,
+            title: interrupted.title,
+            reason: interrupted.cause ?? 'reload',
+            message: interruptionMessage(interrupted),
+          }
+        : undefined,
     }
   },
 }
@@ -75,11 +88,15 @@ export const arcadeStatus: WebMcpTool = {
  * defaults to the same registry.
  */
 function variationSample(ctx: CommandContext): string {
-  return renders3D(ctx) ? SAMPLE_VARIATION_TYPES_3D[1] : SAMPLE_VARIATION_TYPES[1]
+  return renders3D(ctx)
+    ? SAMPLE_VARIATION_TYPES_3D[1]
+    : SAMPLE_VARIATION_TYPES[1]
 }
 
 function variationCount(ctx: CommandContext): number {
-  return renders3D(ctx) ? variationTypes3D.length : registeredVariationTypes.length
+  return renders3D(ctx)
+    ? variationTypes3D.length
+    : registeredVariationTypes.length
 }
 
 function renders3D(ctx: CommandContext): boolean {
@@ -133,7 +150,10 @@ export const arcadeStartLesson: WebMcpTool = {
     if (!started.ok) {
       return { error: `Could not start recording: ${started.reason}` }
     }
-    const allowed = [...topic.allowed, ...ALWAYS_ALLOWED]
+    // Enforced, not advertised: the brief is described from `briefed`, and
+    // PRESENTATION_SWITCHES says why the switches stay out of it.
+    const briefed = [...topic.allowed, ...ALWAYS_ALLOWED]
+    const allowed = [...briefed, ...PRESENTATION_SWITCHES]
     const pilotResult = startPilot({
       mode: 'teach',
       topic: topic.id,
@@ -141,6 +161,7 @@ export const arcadeStartLesson: WebMcpTool = {
       stepBudget: topic.stepBudget,
       allowed,
       qualityRankAtStart: qualityRank(ctx.arcade.qualityPreset()),
+      glideAtStart: captureGlideSwitches(),
     })
     if (!pilotResult.ok) {
       ctx.recorder.cancel()
@@ -162,7 +183,7 @@ export const arcadeStartLesson: WebMcpTool = {
       topic: topic.id,
       goal: topic.goal,
       startFrom,
-      allowedCommands: describeAllowedCommands(allowed),
+      allowedCommands: describeAllowedCommands(briefed),
       stepBudget: topic.stepBudget,
       tips: [
         // A short sample list used to sit here, and it read as the whole
@@ -245,14 +266,21 @@ export const arcadeEndLesson: WebMcpTool = {
       summary: typeof raw.summary === 'string' ? raw.summary : undefined,
     })
     if ('error' in ended) return ended
+    const outcome = takeOutcome(ended, 'Lesson')
     return {
       ok: true,
       title: ended.title,
       sessionName: ended.sessionName,
       steps: ended.steps,
       durationMs: Math.round(ended.durationMs),
-      replayHint:
-        'The user can now replay the lesson from the end card or the Arcade library.',
+      ...outcome,
+      // The end card replays the take from memory, saved or not; only a
+      // saved one is in the library.
+      ...(ended.sessionName !== undefined && {
+        replayHint: outcome.saved
+          ? 'The user can now replay the lesson from the end card or the Arcade library.'
+          : 'The user can replay the lesson from the end card until they leave it; it is not in the Arcade library.',
+      }),
     }
   },
 }

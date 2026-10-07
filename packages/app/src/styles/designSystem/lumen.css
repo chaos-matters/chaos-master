@@ -1,0 +1,435 @@
+/* Lumen Apeiron design tokens, direction D2 "Ember Glass" (docs/plans/mobile-native/DESIGN.md, section 2).
+   Additive: nothing here overrides --neutral-* or --blue-*; the touch surfaces read these,
+   the rest of the app is restyled in a later phase. Values are px: inside native chrome
+   a 44px target must stay 44px at every OS text size. */
+
+/* Directions D1 and D3 and the light palette live in the research file, not here: the app
+   ships one direction, and the web's light theme is driven by body[data-theme] and is
+   untouched by this phase. For the same reason this file declares no `color-scheme` -
+   forcing dark on :root would repaint the web's light theme's scrollbars and form controls. */
+
+:root {
+  /* ---------- 1. Colour: grounds -------------------------------------
+     Void is the app ground and is already committed in three places that
+     cannot change cheaply: capacitor.config.ts `backgroundColor`, the
+     Android adaptive-icon background, and the Android 12+ splash. */
+  --la-void: #080a0e; /* app ground, behind the canvas, behind everything */
+  --la-ground: #0d1117; /* Graphite: pages that are not a canvas */
+  --la-surface: #151a23; /* card, list, sheet body */
+  --la-surface-2: #1d242f; /* raised inside a card: chip, input, segment */
+  --la-surface-3: #27303c; /* pressed / hovered state of surface-2 */
+  --la-hairline: rgba(242, 243, 245, 0.08);
+  --la-hairline-strong: rgba(242, 243, 245, 0.16);
+
+  /* ---------- 2. Colour: ink -----------------------------------------
+     Contrast against --la-void (WCAG 2.1 ratios, computed 2026-09-11):
+     ink 17.8:1 · ink-2 10.2:1 · ink-3 7.0:1 · ink-4 3.65:1 (disabled only). */
+  --la-ink: #f2f3f5; /* Paper: titles, primary labels, values */
+  --la-ink-2: #b4bcc7; /* secondary body, sublabels */
+  --la-ink-3: #929aa7; /* Instrument grey: captions, units, placeholders */
+  --la-ink-4: #626b78; /* disabled label only — never body text */
+  --la-ink-invert: #080a0e; /* text on any filled accent or on Paper */
+
+  /* ---------- 3. Colour: brand and action ----------------------------
+     Ember is the single action colour. It is the four pills in the app
+     icon on both platforms, so the first control the user touches is the
+     colour of the icon they tapped. Void-on-Ember is 7.4:1. */
+  --la-accent: #ff7448; /* Ember */
+  --la-accent-press: #ff8c66;
+  --la-accent-ink: var(--la-ink-invert); /* label on a filled accent */
+  --la-accent-wash: color-mix(in srgb, var(--la-accent) 14%, transparent);
+  --la-accent-edge: color-mix(in srgb, var(--la-accent) 45%, transparent);
+  --la-accent-glow:
+    0 0 0 1px color-mix(in srgb, var(--la-accent) 35%, transparent),
+    0 8px 28px color-mix(in srgb, var(--la-accent) 22%, transparent);
+
+  /* A control's fill: a chip, a row, a button, and the accent's when it is
+     selected. On an opaque surface it is the translucent wash. On glass a
+     control fills opaque with the explorer panel's surfaces instead, so
+     bright art does not show through a chip, a row or a field: the glass
+     surface composes solidControls (glass.module.css), which points the
+     three at the -on-glass values. A control's edge stays a hairline either
+     way, so edge and fill read as two colours. */
+  --la-control: var(--la-hairline);
+  --la-control-strong: var(--la-hairline-strong);
+  --la-control-accent: var(--la-accent-wash);
+  --la-control-on-glass: var(--la-surface-2);
+  --la-control-strong-on-glass: var(--la-surface-3);
+  --la-control-accent-on-glass: color-mix(
+    in srgb,
+    var(--la-accent) 14%,
+    var(--la-surface-2)
+  );
+
+  --la-brand-paper: #f2f3f5; /* the Deep C band — never tinted */
+  --la-brand-ember: #ff7448; /* the four Deep C pills */
+
+  /* ---------- 4. Colour: semantic ------------------------------------
+     Identical in all three directions. Each is used for one state and
+     nothing else, so a hue on screen is always a fact, never a mood. */
+  --la-live: #73d9ff; /* Signal cyan: live input (mic listening, render running) */
+  --la-job: #06d6c8; /* Flame teal: a background job (export, benchmark) */
+  --la-ok: #a3e635; /* Acid: success */
+  --la-warn: #f3a64b; /* Solar: warning, "this will cost you something" */
+  --la-error: #ff5e7e; /* Flame rose: error, destructive */
+  --la-live-wash: color-mix(in srgb, var(--la-live) 16%, transparent);
+  --la-job-wash: color-mix(in srgb, var(--la-job) 16%, transparent);
+  --la-ok-wash: color-mix(in srgb, var(--la-ok) 16%, transparent);
+  --la-warn-wash: color-mix(in srgb, var(--la-warn) 16%, transparent);
+  --la-error-wash: color-mix(in srgb, var(--la-error) 16%, transparent);
+
+  /* ---------- 5. Glass and scrims ------------------------------------
+     One blurred layer, and only where it floats over the artwork. Every
+     surface takes its glass from styles/designSystem/glass.module.css,
+     which holds the rest of the rule so that no surface can break it:
+     glass nested in glass flattens itself, and the large panels go solid
+     while the canvas presents every frame, because sharp moving art behind
+     text reads worse than an opaque panel. Never on a Graphite page, never
+     on a card.
+
+     Text on glass keeps to the tier its fill allows over a white-hot flame
+     (docs/plans/glass-panels.md, decision c): on --la-glass ink only, on
+     --la-glass-panel ink and ink-2, on --la-glass-strong ink down to ink-3.
+     Accent needs a fill over 84% for 4.5:1, so on glass it marks fills and
+     edges, never text. glassContrast.test.ts measures these tiers from the
+     values below and fails when a change here moves one. */
+  --la-glass: color-mix(in srgb, var(--la-ground) 72%, transparent);
+  /* Panels that carry text. ink-2 needs a fill over 75% to clear 4.5:1 over
+     a white-hot flame: this gives it 5.39:1, where --la-glass gives 3.99. */
+  --la-glass-panel: color-mix(in srgb, var(--la-ground) 80%, transparent);
+  --la-glass-strong: color-mix(in srgb, var(--la-ground) 86%, transparent);
+  --la-glass-solid: color-mix(in srgb, var(--la-ground) 96%, transparent);
+  --la-glass-blur: blur(20px) saturate(1.4);
+  --la-glass-edge: 1px solid rgba(242, 243, 245, 0.1);
+  --la-glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  /* Frost: a label or a small control laid over a thumbnail or a preview,
+     such as a name bar, a frame number or a badge (glass.module.css,
+     frost and frostFade). A light blur of the picture under it and a Void
+     fill; white text on --la-frost holds 6.3:1 over a white-hot picture.
+     It is not glass: no edge, no shadow, and nothing that flattens it. */
+  --la-frost: rgba(8, 10, 14, 0.65);
+  --la-frost-fade: linear-gradient(
+    to top,
+    rgba(8, 10, 14, 0.75) 0%,
+    rgba(8, 10, 14, 0.4) 70%,
+    transparent 100%
+  );
+  --la-frost-blur: blur(4px);
+
+  /* Scrims are Void-tinted, not black: a pure-black scrim over a warm
+     flame turns the render grey at the edges. */
+  --la-scrim-dim: rgba(8, 10, 14, 0.35);
+  --la-scrim-heavy: rgba(8, 10, 14, 0.8); /* Reduce Transparency substitute */
+  --la-scrim-sheet: rgba(8, 10, 14, 0.55); /* behind a modal or sheet */
+  /* What a full-screen scrim does to the app behind it (glass.module.css,
+     scrim). Light enough that the app still reads as the place you are. */
+  --la-scrim-blur: blur(10px);
+  --la-scrim-top: linear-gradient(
+    to bottom,
+    rgba(8, 10, 14, 0.55) 0%,
+    rgba(8, 10, 14, 0) 100%
+  );
+  --la-scrim-bottom: linear-gradient(
+    to top,
+    rgba(8, 10, 14, 0.6) 0%,
+    rgba(8, 10, 14, 0.6) 30%,
+    rgba(8, 10, 14, 0.35) 52%,
+    rgba(8, 10, 14, 0) 100%
+  );
+  --la-scrim-top-h: 44px; /* mandatory over a full-bleed canvas */
+  --la-scrim-bottom-h: 96px;
+
+  /* ---------- 6. Radius ---------------------------------------------- */
+  --la-r-xs: 6px; /* tag, badge, inline value pill */
+  --la-r-sm: 10px; /* chip, input, segment */
+  --la-r-md: 14px; /* card, list, plate */
+  --la-r-lg: 20px; /* tile, art thumbnail, Android sheet top */
+  --la-r-xl: 28px; /* Android dialog (M3), large tile */
+  --la-r-sheet: 34px; /* iOS inset floating sheet */
+  --la-r-pill: 999px; /* NEVER 100vh — it breaks inside a scroller */
+
+  /* ---------- 7. Spacing ---------------------------------------------
+     4px base, same as the app's existing --spacing: 0.25rem. */
+  --la-s-1: 4px;
+  --la-s-2: 8px;
+  --la-s-3: 12px;
+  --la-s-4: 16px;
+  --la-s-5: 20px;
+  --la-s-6: 24px;
+  --la-s-7: 32px;
+  --la-s-8: 40px;
+  --la-s-9: 48px;
+
+  --la-gutter: 20px; /* phone screen edge padding */
+  --la-gutter-tablet: 28px;
+  --la-float-inset: 12px; /* how far floating chrome sits off the screen edge */
+
+  /* ---------- 8. Elevation -------------------------------------------
+     Four steps and one upward step for sheets. Shadows are Void-black. */
+  --la-e-0: none;
+  --la-e-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --la-e-2: 0 6px 18px rgba(0, 0, 0, 0.42);
+  --la-e-3: 0 12px 36px rgba(0, 0, 0, 0.52);
+  --la-e-sheet: 0 -14px 48px rgba(0, 0, 0, 0.6);
+  --la-e-focus:
+    0 0 0 2px var(--la-accent),
+    0 0 0 5px color-mix(in srgb, var(--la-accent) 30%, transparent);
+
+  /* ---------- 9. Motion ----------------------------------------------
+     One arrival curve for the whole product. The spring is permitted on
+     exactly one element (a selected chip) and nowhere else. Durations and
+     the per-gesture haptics are specified in motion.md. */
+  --la-dur-press: 120ms; /* a button going down and coming back */
+  --la-dur-fast: 180ms; /* a chip, a toggle, a value readout */
+  --la-dur-base: 220ms; /* the standard transition */
+  --la-dur-sheet: 280ms; /* sheet present, dismiss and detent change */
+  --la-dur-screen: 320ms; /* a whole screen changing */
+  --la-dur-toast-in: 240ms;
+  --la-dur-toast-hold: 4000ms; /* 6000ms when the toast carries an action */
+
+  --la-ease: cubic-bezier(0.16, 1, 0.3, 1); /* arrival: the default */
+  --la-ease-in: cubic-bezier(0.4, 0, 1, 1); /* leaving the screen */
+  --la-ease-linear: cubic-bezier(0.2, 0, 0, 1); /* progress, scrubbing */
+  --la-ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1); /* chip select only */
+
+  /* ---------- 10. Type ------------------------------------------------
+     Inter for everything functional. 'Cinzel Decorative' 700 appears
+     exactly three times in the product (launch wordmark, Arena result
+     title, share-card title) and never on a control, a tab, a label or a
+     value. Sizes are phone; the tablet block in section 11 raises only the
+     display and title steps — body stays 17, because 17pt is the iOS body
+     size on every device and a tablet reader is not further away. */
+  --la-font-body:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --la-font-display: 'Cinzel Decorative', 'Times New Roman', Georgia, serif;
+  --la-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --la-t-wordmark: 700 28px/32px var(--la-font-display);
+  --la-t-wordmark-track: 0.06em;
+  --la-t-display: 600 34px/38px var(--la-font-body);
+  --la-t-display-track: -0.02em;
+  --la-t-title: 600 24px/30px var(--la-font-body);
+  --la-t-title-track: -0.01em;
+  --la-t-head: 600 20px/26px var(--la-font-body);
+  --la-t-head-track: -0.01em;
+  --la-t-body: 400 17px/24px var(--la-font-body);
+  --la-t-body-strong: 600 17px/24px var(--la-font-body);
+  --la-t-body-sm: 400 15px/20px var(--la-font-body);
+  --la-t-caption: 400 13px/18px var(--la-font-body);
+  --la-t-label: 500 11px/14px var(--la-font-body);
+  --la-t-label-track: 0.06em; /* with text-transform: uppercase */
+  --la-t-value: 500 15px/18px var(--la-font-body); /* always tabular, see .la-num */
+  --la-t-mono: 400 12px/16px var(--la-font-mono);
+  --la-t-tab: 500 10px/12px var(--la-font-body); /* iOS tab label */
+  --la-t-tab-android: 500 12px/16px var(--la-font-body);
+
+  /* ---------- 11. Targets and safe areas ------------------------------
+     40px is the floor on every tappable control; this set keeps 44, and
+     48dp on Android. index.tsx writes the platform attribute on <html> in
+     the native build (lib/platform.ts, nativePlatform). */
+  --la-tap: 44px;
+  --la-tap-icon: 44px; /* icon button box; the glyph inside is 24px */
+  --la-tap-row: 56px; /* a slider row on the phone */
+  --la-tap-row-tablet: 48px;
+  --la-thumb: 28px; /* slider thumb, visually */
+  --la-thumb-hit: 44px; /* its touch box, inflated with a ::before */
+  --la-track: 4px;
+
+  --la-safe-top: env(safe-area-inset-top, 0px);
+  --la-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --la-safe-left: env(safe-area-inset-left, 0px);
+  --la-safe-right: env(safe-area-inset-right, 0px);
+
+  --la-hud-h: 44px;
+  --la-rail-h: 64px; /* the rail's peek row: a 56px capsule and 8px under it */
+  --la-hud-top: max(var(--la-s-2), calc(var(--la-safe-top) + var(--la-s-2)));
+  /* Where the top bar ends. Everything that floats under it is placed from
+     here, so a bar that moves takes the tracker and the toasts with it. */
+  --la-hud-bottom: calc(var(--la-hud-top) + var(--la-hud-h));
+  --la-dock-bottom: max(
+    var(--la-s-2),
+    calc(var(--la-safe-bottom) + var(--la-s-2))
+  );
+  --la-dock-h: calc(var(--la-rail-h) + var(--la-dock-bottom));
+
+  /* The shell (components.md section 10). The floating iOS pill and the
+     Material bar are different heights on purpose: the pill is chrome over
+     the artwork and the bar is part of the page. */
+  --la-shell-h: 56px;
+  --la-shell-h-material: 64px;
+  --la-capsule: 56px; /* the collapsed shell, docked in the rail's peek row */
+
+  /* The shell is chrome over every destination, so it paints above Home
+     (2000) and above the editor the Arcade covers; below the version pill
+     (9999), the debug panel (10000) and the Arcade hub (10005), and far below
+     the toast region (100000), which stays on top of everything. */
+  --la-z-shell: 2100;
+
+  /* Tablet chrome (see components.md section 9) */
+  --la-navrail-w: 80px; /* leading navigation rail, both platforms */
+  --la-deck-w: 360px; /* trailing inspector deck, portrait */
+  --la-deck-w-land: 380px;
+
+  /* ---------- 12. Icons ----------------------------------------------- */
+  --la-icon-stroke: 1.8;
+  --la-icon-box: 24px;
+  --la-icon-cap: round;
+}
+
+/* Android raises the minimum target to 48dp and squares the tab label. */
+:root[data-platform='android'] {
+  --la-tap: 48px;
+  --la-tap-icon: 48px;
+  --la-tap-row: 60px;
+  --la-rail-h: 64px; /* M3 navigation bar height stays 64dp */
+}
+
+/* Narrow phones: anything under the iPhone's 375, which takes in the 360px
+   most Android phones report and the 320 of an iPhone SE with Display Zoom.
+   Two 56px circles took 112px of the rail's row: at 320 they left the four
+   tool chips 40px each, so the row scrolled and cut "Vary" off behind the
+   shutter, and at 360 "Variations" was still wider than its chip. At 48 the
+   circles are still a full Android target, and the capsule still holds its
+   label when it opens; the row keeps --la-rail-h, so the rail is the same
+   height (detents.ts, PEEK_HEIGHT). */
+@media (max-width: 374px) {
+  :root {
+    --la-capsule: 48px;
+  }
+}
+
+/* =====================================================================
+   Safe-area rules (not tokens — rules that must hold wherever they apply)
+
+   1. Never pad with a bare env(): always max(<minimum>, env(...)). On
+      Android, viewport-fit=cover is not set (index.html applies it on iOS
+      only) and every env() returns 0px, so a bare env() silently removes
+      the padding on half the fleet.
+   2. Height is 100dvh, never 100vh. The iOS URL-less WebView still reports
+      a stale 100vh through a keyboard show/hide cycle.
+   3. Landscape honours --la-safe-left / --la-safe-right on the leading
+      navigation rail and the trailing inspector deck, or the rail lands
+      under the notch on an iPhone held rotated.
+   4. A floating element uses --la-float-inset from the screen edge and
+      then the safe inset on top; they add, they do not substitute.
+   5. The scroll container inside a sheet gets
+      padding-bottom: calc(var(--la-safe-bottom) + var(--la-s-4)) so the
+      last row clears the home indicator.
+   ===================================================================== */
+
+/* =====================================================================
+   Utility classes the mock and the app both use. Keep this list closed:
+   a new class here is a new component, and belongs in components.md.
+   ===================================================================== */
+
+.la-num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
+}
+.la-on-art {
+  text-shadow: 0 1px 2px rgba(8, 10, 14, 0.45);
+}
+
+/* Crossing the rail-or-deck threshold (a tablet rotating, an iPad resizing a
+   Split View) unmounts one surface and mounts the other. The new one fades
+   in rather than appearing: the layout is the same app, not a new screen.
+   Global on purpose - a CSS module would scope the name, and both
+   EditorRail.module.css and TabletDeck.module.css need this one keyframe. */
+@keyframes la-surface-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* =====================================================================
+   Accessibility overrides. Both are real device settings, not theory:
+   Reduce Transparency is an iOS accessibility toggle that Safari exposes
+   through prefers-reduced-transparency, and Android's "Remove animations"
+   maps to prefers-reduced-motion.
+   ===================================================================== */
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --la-glass: var(--la-glass-solid);
+    --la-glass-panel: var(--la-glass-solid);
+    --la-glass-strong: var(--la-glass-solid);
+    --la-glass-blur: none;
+    --la-frost: var(--la-scrim-heavy);
+    --la-frost-fade: var(--la-scrim-heavy);
+    --la-frost-blur: none;
+    --la-scrim-dim: var(--la-scrim-heavy);
+    --la-scrim-sheet: var(--la-scrim-heavy);
+    --la-scrim-blur: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --la-dur-press: 1ms;
+    --la-dur-fast: 1ms;
+    --la-dur-base: 1ms;
+    --la-dur-sheet: 1ms;
+    --la-dur-screen: 1ms;
+    --la-dur-toast-in: 1ms;
+    --la-ease: linear;
+    --la-ease-spring: linear;
+  }
+  /* Duration alone is not the whole fallback: motion.md names, per
+     gesture, what replaces the movement (a cross-fade, an instant state
+     change, or nothing). Zeroing the duration without that leaves a
+     sheet appearing with no indication of where it came from. */
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --la-ink-2: #d4dae2;
+    --la-ink-3: #b4bcc7;
+    --la-hairline: rgba(242, 243, 245, 0.18);
+    --la-hairline-strong: rgba(242, 243, 245, 0.32);
+    --la-glass: var(--la-glass-solid);
+    --la-glass-panel: var(--la-glass-solid);
+    --la-glass-strong: var(--la-glass-solid);
+    --la-glass-blur: none;
+    --la-frost: var(--la-scrim-heavy);
+    --la-frost-fade: var(--la-scrim-heavy);
+    --la-frost-blur: none;
+  }
+}
+
+/* =====================================================================
+   Tablet. 680px is the app's PHONE_MAX_WIDTH
+   (packages/app/src/stores/workspaceLayoutStore.ts), but the two do not
+   measure the same thing. This query reads the window's width. The store
+   decides a device (the native app, or a coarse pointer) by its screen's
+   short edge, so a phone turned to landscape stays a phone there and gets
+   these sizes here; its TABLET_MAX_WIDTH (1024) applies only to a fine
+   pointer, and nothing here matches it. Where the layout matters, ask the
+   store, not this query.
+   ===================================================================== */
+
+@media (min-width: 680px) {
+  :root {
+    --la-gutter: var(--la-gutter-tablet);
+    --la-t-display: 600 44px/48px var(--la-font-body);
+    --la-t-title: 600 28px/34px var(--la-font-body);
+    --la-t-head: 600 22px/28px var(--la-font-body);
+    --la-t-wordmark: 700 34px/38px var(--la-font-display);
+    --la-tap-row: var(--la-tap-row-tablet);
+    --la-float-inset: 16px;
+    /* Body, small, caption, label and value do NOT change. A tablet is
+       held at the same distance as a phone; raising body text on it only
+       costs rows in the inspector deck. */
+  }
+}
+
+@media (min-width: 680px) and (orientation: landscape) {
+  :root {
+    --la-deck-w: var(--la-deck-w-land);
+  }
+}

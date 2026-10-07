@@ -1,15 +1,19 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
 import { Changelog, Discord, GitHub, Globe, Heart, Terminal, TriangleAlert, } from '@/icons'
+import { IS_NATIVE } from '@/lib/platform'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
+import { toursOffered } from '@/tours/offered'
 import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
-import { GIT_SHA, VERSION } from '@/version'
+import { BUILD_NUMBER, DISPLAY_VERSION, GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
+import { Checkbox } from '../Checkbox/Checkbox'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { DataManagement } from '../DataManagement/DataManagement'
 import { useRequestModal } from '../Modal/ModalContext'
+import { GlassPanelsSetting } from './GlassPanelsSetting'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 import type { Theme } from '@/contexts/ThemeContext'
@@ -126,7 +130,7 @@ function gatherFullDeviceInfo(
   const lines: string[] = []
   const { navigator: n, screen } = globalThis
 
-  lines.push(`App Version : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
+  lines.push(`App Version : ${DISPLAY_VERSION}`)
   lines.push(`User Agent  : ${n.userAgent}`)
   // eslint-disable-next-line @typescript-eslint/no-deprecated
   lines.push(`Platform    : ${n.platform}`)
@@ -171,7 +175,7 @@ function gatherFullDeviceInfo(
   return lines.join('\n')
 }
 
-type HelpModalProps = {
+export type HelpModalProps = {
   respond: () => void
   quickPickerMode: () => QuickPickerMode
   onQuickPickerModeChange: (mode: QuickPickerMode) => void
@@ -184,9 +188,11 @@ type HelpModalProps = {
   onInjectCrash?: () => void
   hardwareTier: () => HardwareTier | null
   onHardwareTierChange?: (tier: HardwareTier) => void
+  hapticsEnabled: () => boolean
+  onHapticsEnabledChange: (enabled: boolean) => void
 }
 
-function HelpModal(props: HelpModalProps) {
+export function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   const showChangelog = createShowChangelog()
   const [showConsole, setShowConsole] = createSignal(true)
@@ -293,16 +299,21 @@ function HelpModal(props: HelpModalProps) {
             </Show>
           </div>
           <div class={ui.badgeRow}>
-            <span class={ui.versionBadge}>v{VERSION}</span>
+            <span class={ui.versionBadge}>
+              v{VERSION}
+              {BUILD_NUMBER === '' ? '' : `-ci.${BUILD_NUMBER}`}
+            </span>
             {GIT_SHA ? <span class={ui.shaBadge}>{GIT_SHA}</span> : null}
           </div>
         </div>
         <button
+          type="button"
           class={ui.closeBtn}
           onClick={() => {
             props.respond()
           }}
           title="Close"
+          aria-label="Close"
         >
           <svg viewBox="0 0 24 24" width="14" height="14">
             <path
@@ -314,6 +325,20 @@ function HelpModal(props: HelpModalProps) {
       </div>
 
       <h2 class={ui.sectionTitle}>General Settings</h2>
+      {/* The web has no vibration motor worth the name; only the app offers it. */}
+      <Show when={IS_NATIVE}>
+        <label class={ui.pickerModeRow}>
+          <span class={ui.pickerModeLabel}>Haptics</span>
+          <Checkbox
+            aria-label="Haptics"
+            checked={props.hapticsEnabled()}
+            onChange={(checked) => {
+              props.onHapticsEnabledChange(checked)
+            }}
+          />
+        </label>
+      </Show>
+      <GlassPanelsSetting />
       <div class={ui.pickerModeRow}>
         <span class={ui.pickerModeLabel}>Default mode</span>
         <div class={ui.pickerModeBtns}>
@@ -322,6 +347,7 @@ function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'list',
             }}
+            aria-pressed={props.quickPickerMode() === 'list'}
             onClick={() => {
               props.onQuickPickerModeChange('list')
             }}
@@ -333,6 +359,7 @@ function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'gallery',
             }}
+            aria-pressed={props.quickPickerMode() === 'gallery'}
             onClick={() => {
               props.onQuickPickerModeChange('gallery')
             }}
@@ -351,6 +378,7 @@ function HelpModal(props: HelpModalProps) {
               [ui.pickerModeBtnActive!]:
                 props.sidebarLayoutMode() === 'compact',
             }}
+            aria-pressed={props.sidebarLayoutMode() === 'compact'}
             onClick={() => {
               props.onSidebarLayoutModeChange('compact')
             }}
@@ -362,6 +390,7 @@ function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.sidebarLayoutMode() === 'wide',
             }}
+            aria-pressed={props.sidebarLayoutMode() === 'wide'}
             onClick={() => {
               props.onSidebarLayoutModeChange('wide')
             }}
@@ -377,6 +406,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: !props.isCompact() }}
+            aria-pressed={!props.isCompact()}
             onClick={() => {
               props.onSetCompact(false)
             }}
@@ -386,6 +416,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.isCompact() }}
+            aria-pressed={props.isCompact()}
             onClick={() => {
               props.onSetCompact(true)
             }}
@@ -401,6 +432,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'dark' }}
+            aria-pressed={props.theme() === 'dark'}
             onClick={() => {
               props.onThemeChange('dark')
             }}
@@ -410,6 +442,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'light' }}
+            aria-pressed={props.theme() === 'light'}
             onClick={() => {
               props.onThemeChange('light')
             }}
@@ -429,6 +462,7 @@ function HelpModal(props: HelpModalProps) {
                 classList={{
                   [ui.pickerModeBtnActive!]: props.hardwareTier() === tier,
                 }}
+                aria-pressed={props.hardwareTier() === tier}
                 onClick={() => props.onHardwareTierChange?.(tier)}
                 style={{ 'text-transform': 'capitalize' }}
               >
@@ -482,63 +516,67 @@ function HelpModal(props: HelpModalProps) {
         </For>
       </div>
 
-      <h2 class={ui.sectionTitle}>Guided Tours</h2>
-      <div class={ui.tourButtons}>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=example1-creation'
-            props.respond()
-          }}
-        >
-          Example 1 Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=example2-creation'
-            props.respond()
-          }}
-        >
-          Example 2 Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=flame-creation'
-            props.respond()
-          }}
-        >
-          Flame Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=app'
-            props.respond()
-          }}
-        >
-          App Tour
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=sidebar'
-            props.respond()
-          }}
-        >
-          Sidebar Tour
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=timeline'
-            props.respond()
-          }}
-        >
-          Timeline Tour
-        </button>
-      </div>
+      {/* No tour on a touch layout: its surfaces carry none of the targets
+          the steps point at (tours/offered.ts). */}
+      <Show when={toursOffered()}>
+        <h2 class={ui.sectionTitle}>Guided Tours</h2>
+        <div class={ui.tourButtons}>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=example1-creation'
+              props.respond()
+            }}
+          >
+            Example 1 Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=example2-creation'
+              props.respond()
+            }}
+          >
+            Example 2 Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=flame-creation'
+              props.respond()
+            }}
+          >
+            Flame Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=app'
+              props.respond()
+            }}
+          >
+            App Tour
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=sidebar'
+              props.respond()
+            }}
+          >
+            Sidebar Tour
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=timeline'
+              props.respond()
+            }}
+          >
+            Timeline Tour
+          </button>
+        </div>
+      </Show>
 
       <div class={ui.gpuHeader}>
         <h2 class={ui.sectionTitle}>GPU / Device Info</h2>
@@ -637,9 +675,11 @@ export function createShowHelp(
   setCompact: (value: boolean) => void,
   theme: () => Theme,
   onThemeChange: (theme: Theme) => void,
-  onInjectCrash?: () => void,
-  hardwareTier?: () => HardwareTier | null,
-  onHardwareTierChange?: (tier: HardwareTier) => void,
+  onInjectCrash: (() => void) | undefined,
+  hardwareTier: () => HardwareTier | null,
+  onHardwareTierChange: ((tier: HardwareTier) => void) | undefined,
+  hapticsEnabled: () => boolean,
+  onHapticsEnabledChange: (enabled: boolean) => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -658,8 +698,10 @@ export function createShowHelp(
           theme={theme}
           onThemeChange={onThemeChange}
           onInjectCrash={onInjectCrash}
-          hardwareTier={hardwareTier ?? (() => null)}
+          hardwareTier={hardwareTier}
           onHardwareTierChange={onHardwareTierChange}
+          hapticsEnabled={hapticsEnabled}
+          onHapticsEnabledChange={onHapticsEnabledChange}
         />
       ),
     })

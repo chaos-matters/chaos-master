@@ -1,0 +1,14 @@
+// The Playwright specs, their helpers and reporter, and the config that runs
+// them. `pnpm typecheck` checks this project, so a spec that calls a matcher
+// Playwright does not have fails before CI runs it (77eb947b fixed four such
+// errors by hand). No other project covers these files: the app's program is
+// packages/app, and the root tsconfig.json is a base that nothing checks.
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Node, not the browser set the root config names: the specs run in Node
+    // and drive the page through Playwright (node:zlib, Buffer, process.env).
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}

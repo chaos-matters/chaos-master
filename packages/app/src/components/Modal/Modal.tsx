@@ -1,5 +1,6 @@
-import { createSignal, For, onMount } from 'solid-js'
+import { createSignal, For, onCleanup, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { pushBackHandler } from '@/lib/backStack'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
 import type { ParentProps } from 'solid-js'
@@ -91,23 +92,33 @@ export function Modal(props: ParentProps<ModalProps>) {
               config: { content: Content, class: class_ },
             } = instance
 
+            // Answered once, and the answer takes the dialog down there and
+            // then. It used to wait inside startViewTransition's callback, for
+            // a fade, and the browser runs that callback only once it has
+            // rendered a frame: while an export kept the GPU busy that took
+            // seconds, so the answered dialog stayed modal over the export
+            // tracker, and a Close pressed meanwhile was a second answer and
+            // did nothing.
+            let settled = false
+
             function respond(option: unknown) {
-              if ('startViewTransition' in document) {
-                const transition = document.startViewTransition(() => {
-                  resolve(option)
-                  setModalInstances((instances) =>
-                    instances.filter((ins) => ins !== instance),
-                  )
-                })
-                transition.ready.catch(() => {})
-                transition.finished.catch(() => {})
-              } else {
-                resolve(option)
-                setModalInstances((instances) =>
-                  instances.filter((ins) => ins !== instance),
-                )
-              }
+              if (settled) return
+              settled = true
+              resolve(option)
+              setModalInstances((instances) =>
+                instances.filter((ins) => ins !== instance),
+              )
             }
+
+            // A dialog is the topmost layer while it is up, so the Android
+            // back gesture closes it the way its own cancel does
+            // (lib/backStack.ts). Taking the dialog down disposes this scope,
+            // so the entry leaves with it: the stack never holds one for a
+            // dialog that is gone, nor lacks one for a dialog still on screen.
+            const dropBackEntry = pushBackHandler(() => {
+              respond(undefined)
+            }, 'modal')
+            onCleanup(dropBackEntry)
 
             return (
               <dialog

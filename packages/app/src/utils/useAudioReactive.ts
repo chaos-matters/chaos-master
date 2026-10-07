@@ -1,15 +1,25 @@
-import { createEffect, onCleanup } from 'solid-js'
-import { applyAudioMappingsToFlame } from './audioAnalysis'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { resolveAudioMappingValues } from './audioAnalysis'
 import type { Accessor } from 'solid-js'
-import type { AudioAnalyzer, LiveAudioAnalyzer, MappingSmoothingState, } from './audioAnalysis'
+import type { AudioAnalyzer, AudioTargetValue, LiveAudioAnalyzer, MappingSmoothingState, } from './audioAnalysis'
 import type { AudioMapping } from '@/components/AudioReactivePanel/AudioReactivePanel'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-
-type SetFlameDescriptor = (fn: (draft: FlameDescriptor) => void) => void
 
 /**
- * Audio-reactive effect hook: plays audio through AudioContext and drives
- * flame renderSettings at 30fps synced to playback time.
+ * Hand this frame's settled mapping values to the render-time overlay, or
+ * `undefined` to take the overlay down.
+ *
+ * Deliberately not a flame writer. Driving the document at 30fps left the
+ * authored flame as whatever frame the music stopped on — permanently, and
+ * out of undo's reach, because those writes were kept out of history on
+ * purpose. Modulation is something the renderer layers on now; the document
+ * stays the user's.
+ */
+type PublishAudioModulation = (values: AudioTargetValue[] | undefined) => void
+
+/**
+ * Audio-reactive effect hook: plays audio through AudioContext and publishes
+ * modulation values at 30fps synced to playback time. The values go to a
+ * render-time overlay, never to the flame document.
  *
  * Supports two modes:
  * - File mode: when `audioBuffer` is set, decodes and plays the file.
@@ -22,12 +32,16 @@ type SetFlameDescriptor = (fn: (draft: FlameDescriptor) => void) => void
  *
  * Shared analyzer:
  * - `fileAnalyzer`: pre-built analyzer shared with waveform panel
+ *
+ * Returns whether modulation is running: the overlay is up and moving, so
+ * the canvas presents every frame. A paused track leaves its last values up,
+ * still, and that is not running.
  */
 export function useAudioReactive(
   audioEnabled: Accessor<boolean>,
   audioBuffer: Accessor<AudioBuffer | undefined>,
   audioMapping: Accessor<AudioMapping>,
-  setFlameDescriptor: SetFlameDescriptor,
+  onModulation: PublishAudioModulation,
   liveAnalyzer: Accessor<LiveAudioAnalyzer | undefined>,
   audioSource: Accessor<'file' | 'mic'>,
   playbackPaused: Accessor<boolean>,
@@ -35,7 +49,7 @@ export function useAudioReactive(
   onPlaybackTime: (seconds: number) => void,
   fileAnalyzer: Accessor<AudioAnalyzer | undefined>,
   modulationSuspended: Accessor<boolean> = () => false,
-): void {
+): Accessor<boolean> {
   // --- Closure-scope mutable state (persists across effect re-runs) ---
   let audioCtx: AudioContext | undefined
   let sourceNode: AudioBufferSourceNode | undefined
@@ -47,8 +61,48 @@ export function useAudioReactive(
   let paused = false
   const smoothingState: MappingSmoothingState = new Map()
   let lastTickTime: number | undefined
+  /** Is an overlay up right now? See publishModulation / dropModulation. */
+  let modulationPublished = false
+  /** The mic has no transport, so a paused file track cannot hold it still. */
+  let micRunning = false
+  const [modulating, setModulating] = createSignal(false)
 
   // ---- helpers ----
+
+  /** Up and moving: published, and not held on a paused file track. */
+  function syncModulating() {
+    setModulating(modulationPublished && (micRunning || !paused))
+  }
+
+  /**
+   * Publish this frame's values, unless nothing moved and an overlay is
+   * already up to hold the previous ones.
+   *
+   * The `!modulationPublished` half is not belt-and-braces: the smoothing
+   * state survives a drop, so the first tick after modulation comes back can
+   * settle within the dirty threshold and report no change — and the overlay
+   * would stay down while modulation is plainly on.
+   */
+  function publishModulation(values: AudioTargetValue[], changed: boolean) {
+    if (!changed && modulationPublished) return
+    modulationPublished = true
+    onModulation(values)
+    syncModulating()
+  }
+
+  /**
+   * Take the overlay down, once. Edge-triggered because the reasons to be
+   * down — modulation off, no mappings wired, replay owning the document —
+   * are all conditions that hold for thousands of ticks, and republishing
+   * `undefined` on each of them would rebuild the derived flame every frame
+   * for nothing.
+   */
+  function dropModulation() {
+    if (!modulationPublished) return
+    modulationPublished = false
+    onModulation(undefined)
+    syncModulating()
+  }
 
   function stopSource() {
     if (!sourceNode) return
@@ -85,6 +139,7 @@ export function useAudioReactive(
     analyzer = undefined
     smoothingState.clear()
     lastTickTime = undefined
+    dropModulation()
   }
 
   // ---- main setup/teardown effect ----
@@ -167,9 +222,13 @@ export function useAudioReactive(
         // absence must not stop the clock above from advancing.
         if (modulationSuspended()) {
           lastTickTime = undefined
+          dropModulation()
           return
         }
-        if (!enabled || !analyzer) return
+        if (!enabled || !analyzer) {
+          dropModulation()
+          return
+        }
 
         const frame = Math.floor(currentTime * 30)
         const wrapped =
@@ -186,15 +245,16 @@ export function useAudioReactive(
           const frameData = analyzer.getFrameData(
             wrapped % analyzer.totalFrames,
           )
-          setFlameDescriptor((draft) => {
-            applyAudioMappingsToFlame(
-              draft,
-              frameData,
-              mappings,
-              smoothingState,
-              dt,
-            )
-          })
+          const { values, changed } = resolveAudioMappingValues(
+            frameData,
+            mappings,
+            smoothingState,
+            dt,
+          )
+          publishModulation(values, changed)
+        } else {
+          // Every mapping was unwired while the track kept playing.
+          dropModulation()
         }
       }, tickMs)
 
@@ -217,33 +277,38 @@ export function useAudioReactive(
     // privacy surprise.
     if (source === 'mic' && mic && enabled) {
       const tickMs = 1000 / 30
+      micRunning = true
       interval = setInterval(() => {
         if (modulationSuspended()) {
           lastTickTime = undefined
+          dropModulation()
           return
         }
         const mappings = audioMapping().mappings
-        if (mappings.length === 0) return
+        if (mappings.length === 0) {
+          dropModulation()
+          return
+        }
         const now = globalThis.performance.now()
         const dt =
           lastTickTime !== undefined ? (now - lastTickTime) / 1000 : 1 / 30
         lastTickTime = now
         const frameData = mic.getFrameData()
-        setFlameDescriptor((draft) => {
-          applyAudioMappingsToFlame(
-            draft,
-            frameData,
-            mappings,
-            smoothingState,
-            dt,
-          )
-        })
+        const { values, changed } = resolveAudioMappingValues(
+          frameData,
+          mappings,
+          smoothingState,
+          dt,
+        )
+        publishModulation(values, changed)
       }, tickMs)
 
       onCleanup(() => {
         clearInterval(interval)
         interval = undefined
         lastTickTime = undefined
+        micRunning = false
+        dropModulation()
       })
     }
   })
@@ -253,6 +318,7 @@ export function useAudioReactive(
   createEffect(() => {
     const shouldPause = playbackPaused()
     paused = shouldPause
+    syncModulating()
     if (!audioCtx) return
 
     if (shouldPause) {
@@ -279,4 +345,6 @@ export function useAudioReactive(
       void audioCtx.resume()
     }
   })
+
+  return modulating
 }

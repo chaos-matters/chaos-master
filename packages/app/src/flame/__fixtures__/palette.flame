@@ -1,0 +1,5 @@
+<flame name="Palette" size="800 600" center="0 0" scale="200" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="0.6" color="0" linear="1" coefs="1 0 0 1 0 0"/>
+  <xform weight="0.4" color="0.75" disc="1" coefs="0.7 0 0 0.7 0 0"/>
+  <palette count="4" format="RGB">ff0000 00ff00 0000ff ffff00</palette>
+</flame>

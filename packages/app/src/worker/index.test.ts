@@ -392,6 +392,108 @@ describe('worker — S-3 security headers', () => {
   })
 })
 
+describe('worker — review host is kept out of search', () => {
+  const get = (url: string) => new Request(url, { method: 'GET' })
+
+  /*
+   * The failure this guards against is silent and invisible in a browser:
+   * dev.lumenapeiron.com serves production's build, and left alone it answers
+   * /robots.txt from public/ — `Allow: /` plus a Sitemap: line handing a
+   * crawler production's whole URL list from a duplicate origin.
+   */
+  it('answers the review host with a Disallow, not the production robots.txt', async () => {
+    const res = await worker.fetch(
+      get('https://dev.lumenapeiron.com/robots.txt'),
+      makeEnv(),
+      ctx,
+    )
+    const body = await res.text()
+    expect(body).toContain('Disallow: /')
+    expect(body).not.toContain('Allow: /')
+    expect(body).not.toContain('Sitemap:')
+  })
+
+  it('leaves production robots.txt to the static assets', async () => {
+    const assets = vi.fn(() => Promise.resolve(new Response('User-agent: *')))
+    await worker.fetch(
+      get('https://lumenapeiron.com/robots.txt'),
+      makeEnv({ ASSETS: { fetch: assets } }),
+      ctx,
+    )
+    expect(assets).toHaveBeenCalledOnce()
+  })
+
+  // robots.txt only prevents the crawl. Anything already fetched — a link
+  // shared into a chat, a page a crawler saw before the disallow landed —
+  // needs the header to drop back out of the index.
+  it('marks every review-host response noindex, including the SPA', async () => {
+    for (const path of ['/', '/robots.txt', '/benchmarks']) {
+      const res = await worker.fetch(
+        get(`https://dev.lumenapeiron.com${path}`),
+        makeEnv(),
+        ctx,
+      )
+      expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+    }
+  })
+
+  it('never marks production noindex', async () => {
+    const res = await worker.fetch(
+      get('https://lumenapeiron.com/'),
+      makeEnv(),
+      ctx,
+    )
+    expect(res.headers.get('X-Robots-Tag')).toBeNull()
+  })
+})
+
+describe('worker — every non-production origin is kept out of search', () => {
+  const get = (url: string) => new Request(url, { method: 'GET' })
+
+  /*
+   * Written as a table so the next review origin cannot be missed. The PR
+   * preview is the one that slipped: `wrangler deploy --env preview` has no
+   * route, so it serves from *.workers.dev, and deploy.yml posts that URL on
+   * every public pull request.
+   */
+  const REVIEW_ORIGINS = [
+    'https://dev.lumenapeiron.com',
+    'https://about.dev.lumenapeiron.com',
+    'https://chaos-master-preview.komediruzecki.workers.dev',
+    'https://chaos-master.komediruzecki.workers.dev',
+  ]
+
+  it.each(REVIEW_ORIGINS)(
+    '%s never serves Allow: / or the production sitemap',
+    async (origin) => {
+      const res = await worker.fetch(
+        get(`${origin}/robots.txt`),
+        makeEnv(),
+        ctx,
+      )
+      const body = await res.text()
+      expect(body).toContain('Disallow: /')
+      expect(body).not.toContain('Allow: /')
+      expect(body).not.toContain('Sitemap:')
+    },
+  )
+
+  it.each(REVIEW_ORIGINS)('%s marks the SPA noindex', async (origin) => {
+    const res = await worker.fetch(get(`${origin}/`), makeEnv(), ctx)
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+  })
+
+  it('does not mistake a lookalike production host for a review host', async () => {
+    for (const origin of [
+      'https://lumenapeiron.com',
+      'https://notdev.lumenapeiron.com.example',
+    ]) {
+      const res = await worker.fetch(get(`${origin}/`), makeEnv(), ctx)
+      expect(res.headers.get('X-Robots-Tag')).toBeNull()
+    }
+  })
+})
+
 describe('worker OG meta injection — XSS escaping guard', () => {
   it('escapes a crafted OG title in the rendered <head>', async () => {
     const env = makeEnv()
@@ -895,6 +997,19 @@ describe('worker frontend routing', () => {
     expect(res.headers.get('location')).toBe(
       'https://x.test/benchmarks?suite=renderer',
     )
+  })
+
+  it('redirects the trailing-slash explorer route, keeping the view', async () => {
+    // The view lives in the fragment, which never reaches the worker; the
+    // browser carries it across a redirect by itself.
+    const res = await worker.fetch(
+      new Request('https://x.test/explore/?from=menu'),
+      makeEnv(),
+      ctx,
+    )
+
+    expect(res.status).toBe(308)
+    expect(res.headers.get('location')).toBe('https://x.test/explore?from=menu')
   })
 
   it.each(['/api', '/api/not-a-real-route'])(

@@ -75,7 +75,7 @@ export function watchDevice(device: GPUDevice): void {
   device.addEventListener('uncapturederror', (e) => {
     console.warn(
       '[landing] WebGPU uncaptured error (rendering continues):',
-      (e as GPUUncapturedErrorEvent).error.message,
+      e.error.message,
     )
   })
   device.lost

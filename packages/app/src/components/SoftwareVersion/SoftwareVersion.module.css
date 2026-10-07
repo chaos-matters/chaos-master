@@ -1,31 +1,27 @@
-/* Floating pills (Docs + version/About) anchored bottom-right. */
-
-.version-container {
+/* Desktop collapsed trigger anchored bottom-right */
+.desktopContainer {
   position: fixed;
   right: 0.5rem;
   bottom: 0.5rem;
   z-index: 9999;
-
   display: flex;
-  gap: 0.4rem;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-/* Shared pill style for the Docs and About buttons. */
-.about-pill,
-.docs-pill,
-.benchmark-lab-pill,
-.arcade-pill {
+.desktopTrigger {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem 0.3rem 0.5rem;
   border-radius: 999px;
+  /* The light theme keeps its own white pill over chrome's blur, and the
+     theme's focus ring; the dark theme's pill is chrome itself, below. */
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-
+  box-shadow: none;
+  --focus-ring-color: var(--focus-ring-theme);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -34,65 +30,169 @@
   transition: all 0.2s ease;
   font-family: inherit;
   appearance: none;
-  text-decoration: none;
   white-space: nowrap;
+  user-select: none;
+  touch-action: manipulation;
+}
 
-  & > svg {
-    width: 1rem;
-    height: 1rem;
-    opacity: 0.6;
-    flex-shrink: 0;
-    transition: opacity 0.2s ease;
+.desktopTrigger:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 0, 0, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.desktopTriggerActive {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #38bdf8;
+  color: #0284c7;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* A quiet label needs the strong fill: ink-3 holds 4.5:1 over white-hot art
+   there, where the plain chrome fill under a 45% white label gave 2.9:1. */
+[data-theme='dark'] .desktopTrigger {
+  border: var(--la-glass-edge);
+  background: var(--la-glass-strong);
+  color: var(--la-ink-3);
+  --focus-ring-color: var(--focus-ring-glass);
+}
+
+[data-theme='dark'] .desktopTrigger:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--la-ink-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .desktopTriggerActive {
+  background: rgba(22, 28, 48, 0.95);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+}
+
+/* The icon in the desktop trigger. */
+.pillIcon {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Invisible backdrop to dismiss popover when clicking outside */
+.popoverBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 51;
+  background: transparent;
+}
+
+/* Upward expanding popover menu for desktop bottom-right */
+.menuPopoverUp {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  top: auto;
+  z-index: 52;
+  width: 250px;
+  max-width: calc(100vw - 20px);
+  padding: 6px;
+  border-radius: 12px;
+  background: #0d121f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  contain: paint layout;
+  animation: popoverSlideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popoverSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
   }
-
-  &:hover {
-    border-color: rgba(0, 0, 0, 0.15);
-    background: rgba(255, 255, 255, 0.9);
-    color: rgba(0, 0, 0, 0.6);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-
-    & > svg {
-      opacity: 0.8;
-    }
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--neutral-500);
-    outline-offset: 2px;
-  }
-
-  [data-theme='dark'] & {
-    border-color: rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(8px);
-    color: rgba(255, 255, 255, 0.45);
-
-    &:hover {
-      border-color: rgba(255, 255, 255, 0.15);
-      background: rgba(0, 0, 0, 0.7);
-      color: rgba(255, 255, 255, 0.7);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
-.benchmark-lab-pill:hover {
-  color: oklch(54% 0.18 35);
-
-  [data-theme='dark'] & {
-    color: oklch(76% 0.13 35);
-  }
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+  box-sizing: border-box;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
 }
 
-.arcade-pill:hover {
-  color: oklch(54% 0.18 300);
+.menuItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
 
-  [data-theme='dark'] & {
-    color: oklch(78% 0.13 300);
-  }
+.menuItemHighlight {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.menuItemHighlight:hover {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.menuIcon {
+  width: 16px;
+  height: 16px;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.menuMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.menuLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menuSub {
+  font-size: 0.68rem;
+  color: var(--la-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menuDivider {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(255, 255, 255, 0.08);
 }

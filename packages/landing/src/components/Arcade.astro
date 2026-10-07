@@ -19,25 +19,9 @@ const icons = {
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="0.55" fill="currentColor" stroke="none"/></svg>`,
 }
 
-// The hub's other three cards. Taglines are the hub's own, so a visitor reads
+// The hub's other card. Tagline is the hub's own, so a visitor reads
 // the same sentence here and on the card itself.
-const soon = [
-  {
-    icon: 'musicNote',
-    name: 'Beats',
-    tag: 'The agent wires your flame to a song so it dances.',
-  },
-  {
-    icon: 'zap',
-    name: 'Arena',
-    tag: 'Flames clash on real stats; the winner gets a shareable card.',
-  },
-  {
-    icon: 'lineage',
-    name: 'Director',
-    tag: 'The agent learns your taste and evolves flames toward it.',
-  },
-]
+const soon: Array<{ icon: keyof typeof icons; name: string; tag: string }> = []
 
 const modes = [
   {
@@ -58,6 +42,24 @@ const modes = [
     tag: 'You + agent',
     body: 'Race the agent to the better flame, side by side against one clock. It gets its own seat with its own history; your half stays yours, keyboard and all. It cannot stop the clock — that is the pressure. Both takes are saved and a card names the winner.',
   },
+  {
+    icon: 'musicNote',
+    name: 'Beats',
+    tag: 'Agent drives',
+    body: 'Pick a track and a musical goal. The agent inspects your flame, maps audio frequency bands and beat onsets to affine matrices, variation weights, and color speed, and makes it dance.',
+  },
+  {
+    icon: 'lineage',
+    name: 'Director',
+    tag: 'Agent drives',
+    body: 'The agent inspects your taste profile, proposes a curated generation of candidates, and explains the geometry behind each. Rate them with Like or Dislike, select quick feedback tags, and watch your fractal lineage evolve toward what you love.',
+  },
+  {
+    icon: 'zap',
+    name: 'Arena',
+    tag: 'Agent clashes',
+    body: 'Flames clash in 3D territorial combat based on grounded geometric stats. Select a tactical stance, face procedural archetypes or let the AI coach and battle for you, and export a shareable champion card.',
+  },
 ]
 ---
 
@@ -76,7 +78,7 @@ const modes = [
       modes.map((m) => (
         <article class="mode">
           <div class="mode-top">
-            <span class="mode-icon" set:html={icons[m.icon]} />
+            <span class="mode-icon" set:html={icons[m.icon as keyof typeof icons]} />
             <span class="mode-tag">{m.tag}</span>
           </div>
           <h3>{m.name}</h3>
@@ -86,23 +88,25 @@ const modes = [
     }
   </div>
 
-  <div class="soon">
-    <p class="soon-label">On the horizon</p>
-    <div class="soon-grid">
-      {
-        soon.map((c) => (
-          <div class="soon-card">
-            <span class="soon-icon" set:html={icons[c.icon]} />
-            <div>
-              <div class="soon-name">{c.name}</div>
-              <div class="soon-tag">{c.tag}</div>
+  {
+    soon.length > 0 && (
+      <div class="soon">
+        <p class="soon-label">On the horizon</p>
+        <div class="soon-grid">
+          {soon.map((c) => (
+            <div class="soon-card">
+              <span class="soon-icon" set:html={icons[c.icon]} />
+              <div>
+                <div class="soon-name">{c.name}</div>
+                <div class="soon-tag">{c.tag}</div>
+              </div>
+              <span class="soon-badge">Soon</span>
             </div>
-            <span class="soon-badge">Soon</span>
-          </div>
-        ))
-      }
-    </div>
-  </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   <div class="run">
     <span class="run-icon" set:html={icons.robot} />

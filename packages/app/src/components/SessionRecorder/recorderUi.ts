@@ -113,3 +113,15 @@ export function clampRecorderOpacity(value: number): number {
   if (!Number.isFinite(value)) return 1
   return Math.min(1, Math.max(MIN_RECORDER_OPACITY, value))
 }
+
+/**
+ * Whether a replay glides between steps or cuts between them.
+ *
+ * A preference, so it survives a reload the way the follow-cam and agent-rail
+ * toggles do, and OFF by default: with it off every code path here is the one
+ * that ran before glides existed.
+ */
+export const [replayGlideEnabled, setReplayGlideEnabled] = persistentSignal(
+  'recorder/replayGlide',
+  false,
+)

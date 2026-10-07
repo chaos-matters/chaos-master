@@ -1,6 +1,6 @@
 {
   "name": "@chaos-master/landing",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Marketing landing page for Lumen Apeiron",
   "type": "module",
   "private": true,
@@ -9,27 +9,31 @@
     "start": "astro dev",
     "dev": "astro dev",
     "build": "astro build",
+    "build:review": "PUBLIC_REVIEW_DEPLOY=true astro build",
     "preview": "astro preview --port 4322",
     "check": "astro check",
-    "deploy:dev": "pnpm run build && pnpm exec wrangler deploy --env dev",
+    "deploy:dev": "pnpm run build:review && pnpm exec wrangler deploy --env dev",
     "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod"
   },
   "dependencies": {
-    "@astrojs/solid-js": "^5.1.0",
+    "@astrojs/solid-js": "^7.0.2",
+    "@chaos-master/core": "workspace:*",
     "@typegpu/color": "0.12.0",
     "@typegpu/noise": "0.12.0",
     "@typegpu/sdf": "0.12.0",
-    "astro": "^5.18.2",
+    "astro": "^7.2.8",
     "solid-js": "1.9.11",
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.4.0",
     "typegpu": "0.12.0",
-    "valibot": "1.2.0",
+    "valibot": "1.4.2",
     "wgpu-matrix": "3.4.2"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@webgpu/types": "^0.1.69",
+    "typescript": "^5.9.3",
     "unplugin-typegpu": "^0.12.1",
     "vite-plugin-qrcode": "^0.4.1",
     "wrangler": "^4.103.0"

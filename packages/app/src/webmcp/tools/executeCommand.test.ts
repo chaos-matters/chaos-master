@@ -1,11 +1,17 @@
 import '@/commands/builtins'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pilotLog, resetPilot, startPilot } from '@/arcade/pilot'
+import { finishPilot } from '@/arcade/pilotActions'
 import { clearPilotFocus, pilotFocus } from '@/arcade/pilotFocus'
+import { createGlideRuntime, restoreGlideSwitches, setGlideEnabled, setGlideRuntime, } from '@/flame/glide/runtime'
+import { GLIDE_DEADLINE_SLACK_MS } from '@/flame/glide/types'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
+import { deepClone } from '@/utils/clone'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { executeCommandTool } from './executeCommand'
+import type { PilotMode } from '@/arcade/pilot'
+import type { CommandContext } from '@/commands/types'
 
 describe('execute_command dispatch', () => {
   afterEach(() => {
@@ -243,5 +249,425 @@ describe('execute_command dispatch', () => {
     expect(pilotLog().find((e) => e.kind === 'command')?.text).toBe(
       'Open the sidebar',
     )
+  })
+})
+
+/**
+ * The glide option.
+ *
+ * Two properties beyond "it animates": the duration is PRESENTATION and must
+ * never reach the recorder's `args` — a session says what the person did, not
+ * how long it took to appear — and the call has to await the transition, or an
+ * agent firing twenty commands stacks twenty of them.
+ */
+describe('execute_command glides', () => {
+  afterEach(() => {
+    setGlideRuntime(undefined)
+    restoreGlideSwitches({ enabled: false, quality: 'auto' })
+    cancelSessionRecording()
+    clearWebMcpContext()
+  })
+
+  function mountRuntime(
+    ctx: CommandContext,
+    /** `stalledFrames`: a hidden tab, which never calls a frame back. */
+    options: { stalledFrames?: boolean } = {},
+  ) {
+    let time = 0
+    let pending: ((time: number) => void)[] = []
+    const runtime = createGlideRuntime({
+      readFlame: () => deepClone(ctx.flameDescriptor()),
+      writeFlame: (next) => {
+        ctx.setFlameDescriptor(() => deepClone(next))
+      },
+      now: () => time,
+      requestFrame: (callback) => {
+        if (options.stalledFrames === true) return 0
+        pending.push(callback)
+        return pending.length
+      },
+      cancelFrame: () => {
+        pending = []
+      },
+    })
+    setGlideRuntime(runtime)
+    return {
+      runtime,
+      advance: (ms: number) => {
+        time += ms
+        const due = pending
+        pending = []
+        for (const callback of due) callback(time)
+      },
+    }
+  }
+
+  it('animates when asked and keeps the duration out of the recording', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+
+    const call = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+      {},
+    )
+    // The command has already landed; what the viewer sees is the glide
+    // playing over the top, which starts back at the gamma it came from.
+    expect(world.runtime.isGliding()).toBe(true)
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(2.2)
+    world.advance(400)
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+    expect(await call).toEqual({ success: true, commandId: 'flame.setGamma' })
+
+    const session = stopSessionRecording()
+    expect(session?.actions.map((action) => [action.id, action.args])).toEqual([
+      ['flame.setGamma', [4]],
+    ])
+    expect(session?.actions[0]).not.toHaveProperty('glideMs')
+  })
+
+  it('does nothing when the mode is off and nothing is asked for', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    await executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4] },
+      {},
+    )
+    expect(world.runtime.isGliding()).toBe(false)
+  })
+
+  it('follows the workspace mode when no duration is given', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    setGlideEnabled(true)
+    const call = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4] },
+      {},
+    )
+    expect(world.runtime.isGliding()).toBe(true)
+    world.advance(5000)
+    await call
+  })
+
+  it('lets an explicit zero turn the mode off for one call', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    setGlideEnabled(true)
+    await executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 0 },
+      {},
+    )
+    expect(world.runtime.isGliding()).toBe(false)
+  })
+
+  it('leaves nothing running when the command changed nothing', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    const unchanged = ctx.flameDescriptor().renderSettings.gamma
+    await executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [unchanged], glideMs: 400 },
+      {},
+    )
+    // Nothing differs, so there is nothing to animate and the call returns
+    // rather than holding an agent for four hundred milliseconds of stillness.
+    expect(world.runtime.isGliding()).toBe(false)
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(unchanged)
+  })
+
+  it('returns on a deadline when the tab never animates, and says so', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+      // Our automation browser lives on a hidden Hyprland workspace, where
+      // Chrome stops running requestAnimationFrame entirely. That used to
+      // leave this call pending for as long as the tab stayed hidden.
+      const world = mountRuntime(ctx, { stalledFrames: true })
+
+      const call = executeCommandTool.execute(
+        { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+        {},
+      )
+      vi.advanceTimersByTime(400 + GLIDE_DEADLINE_SLACK_MS)
+      expect(world.runtime.isGliding()).toBe(false)
+      // Exactly the target, not the frame the stalled glide was left on.
+      expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+      expect(await call).toEqual({
+        success: true,
+        commandId: 'flame.setGamma',
+        glide: { completedBy: 'deadline' },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('says nothing about the glide when the animation ran it', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+
+    const call = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+      {},
+    )
+    world.advance(400)
+    expect(await call).toEqual({
+      success: true,
+      commandId: 'flame.setGamma',
+    })
+  })
+
+  it('settles the transition in flight before the next command, always', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+
+    const first = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+      {},
+    )
+    world.advance(200)
+    expect(world.runtime.isGliding()).toBe(true)
+
+    // A second command arriving mid-transition, asking for no glide of its
+    // own. The first change still has to land on ITS target before this one
+    // applies — a scripted step is a change, not a person editing what they
+    // can see, so the previous transition is completed rather than cancelled.
+    await executeCommandTool.execute(
+      { commandId: 'flame.setExposure', args: [0.9] },
+      {},
+    )
+    await first
+
+    expect(world.runtime.isGliding()).toBe(false)
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+    expect(ctx.flameDescriptor().renderSettings.exposure).toBe(0.9)
+  })
+
+  // A switch only chooses how later changes appear: flipping one mid-glide
+  // neither lands the glide early nor hands a playing replay back.
+  it.each([
+    ['glide.setQuality', 'full'],
+    ['glide.setEnabled', false],
+  ] as const)('lets a glide in flight finish through %s', async (id, value) => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const world = mountRuntime(ctx)
+    const first = executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+      {},
+    )
+    world.advance(200)
+    setGlideEnabled(true)
+
+    await executeCommandTool.execute({ commandId: id, args: [value] }, {})
+
+    expect(world.runtime.isGliding()).toBe(true)
+    expect(ctx.beforeCommand).toHaveBeenCalledTimes(1)
+    world.advance(400)
+    await first
+    expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+  })
+
+  it('offers the option in its schema so an agent can find it', () => {
+    const properties = (
+      executeCommandTool.inputSchema as {
+        properties: Record<string, { type: string }>
+      }
+    ).properties
+    expect(properties.glideMs?.type).toBe('number')
+    expect(properties.glideQuality?.type).toBe('string')
+  })
+
+  /**
+   * Inside an Arcade session.
+   *
+   * A duel is the one mode that refuses a transition, and for two reasons. Its
+   * clock is wall-clock, so a pilot spending five seconds of it on animation
+   * would be buying time rather than flying. And a duel points the tool bridge
+   * at the rival's seat while the only glide runtime belongs to the player's
+   * workspace, so a transition asked for there would read and write the
+   * viewer's own flame — the wrong document entirely.
+   *
+   * Teach, Cinema and Beats are presentations. There is no clock to buy, there
+   * is one seat, and a change the viewer is meant to watch is the thing a
+   * transition is for.
+   */
+  describe('inside an Arcade session', () => {
+    afterEach(() => {
+      resetPilot()
+    })
+
+    /** The modes that present rather than compete. */
+    const PRESENTING = ['teach', 'cinema', 'beats'] as const
+
+    function drive(mode: PilotMode, allowed: readonly string[] = ['flame.']) {
+      startPilot({
+        mode,
+        title: `Driving: ${mode}`,
+        stepBudget: 5,
+        allowed,
+        qualityRankAtStart: 1,
+      })
+    }
+
+    it('a duel takes the change at once, however the call asks to animate it', async () => {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+      const world = mountRuntime(ctx)
+      // Both routes to a glide at once: the workspace setting AND an explicit
+      // duration. Neither may reach the runtime under the clock.
+      setGlideEnabled(true)
+      drive('duel')
+
+      await executeCommandTool.execute(
+        { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+        {},
+      )
+
+      expect(world.runtime.isGliding()).toBe(false)
+      expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+    })
+
+    for (const mode of PRESENTING) {
+      it(`animates a change in ${mode}, which has no clock to buy`, async () => {
+        const ctx = createMockCommandContext()
+        setWebMcpContext(ctx)
+        const world = mountRuntime(ctx)
+        drive(mode)
+
+        const call = executeCommandTool.execute(
+          { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+          {},
+        )
+
+        // The command has already landed; what the viewer watches is the
+        // transition playing over the top, from the gamma it came from.
+        expect(world.runtime.isGliding()).toBe(true)
+        expect(ctx.flameDescriptor().renderSettings.gamma).toBe(2.2)
+        world.advance(400)
+        expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+        expect(await call).toMatchObject({ success: true, steps: 1 })
+      })
+    }
+
+    it('says a transition landed on the deadline in a presentation mode too', async () => {
+      vi.useFakeTimers()
+      try {
+        const ctx = createMockCommandContext()
+        setWebMcpContext(ctx)
+        const world = mountRuntime(ctx, { stalledFrames: true })
+        drive('cinema')
+
+        const call = executeCommandTool.execute(
+          { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+          {},
+        )
+        vi.advanceTimersByTime(400 + GLIDE_DEADLINE_SLACK_MS)
+
+        expect(world.runtime.isGliding()).toBe(false)
+        expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+        // The driving return path carries the field too, or an agent composing
+        // a Cinema take cannot tell that nobody watched the change arrive.
+        expect(await call).toMatchObject({
+          success: true,
+          glide: { completedBy: 'deadline' },
+        })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    /**
+     * The lock comes first, exactly as it does for an instant change.
+     *
+     * `guardCommand` and the step budget run before the glide is resolved, so
+     * a refusal cannot animate anything — a transition must never be the way a
+     * command the mode forbids reaches the document.
+     */
+    it('refuses a command the lesson does not allow before anything animates', async () => {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+      const world = mountRuntime(ctx)
+      drive('teach', ['camera.'])
+
+      const result = await executeCommandTool.execute(
+        { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+        {},
+      )
+
+      expect(result).toHaveProperty('error')
+      expect(world.runtime.isGliding()).toBe(false)
+      expect(ctx.flameDescriptor().renderSettings.gamma).toBe(2.2)
+    })
+
+    it('refuses a step the budget cannot pay for before anything animates', async () => {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+      const world = mountRuntime(ctx)
+      startPilot({
+        mode: 'teach',
+        title: 'Driving: teach',
+        stepBudget: 1,
+        allowed: ['flame.'],
+        qualityRankAtStart: 1,
+      })
+
+      const first = executeCommandTool.execute(
+        { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+        {},
+      )
+      world.advance(400)
+      await first
+
+      const second = await executeCommandTool.execute(
+        { commandId: 'flame.setExposure', args: [0.9], glideMs: 400 },
+        {},
+      )
+
+      expect(String((second as { error?: unknown }).error)).toContain(
+        'Step budget exhausted',
+      )
+      expect(world.runtime.isGliding()).toBe(false)
+      expect(ctx.flameDescriptor().renderSettings.exposure).not.toBe(0.9)
+    })
+
+    /**
+     * The viewer presses Stop while a transition is moving.
+     *
+     * Nothing else lands it: the tool call is still awaiting it, and the
+     * runtime's own wall-clock deadline is another 450 ms away. Ending the
+     * session has to leave the document on the flame the change asked for
+     * rather than on whichever frame the animation had reached, and has to
+     * give the render quality back.
+     */
+    it('leaving the mode mid-transition lands it, and gives the quality back', async () => {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+      const world = mountRuntime(ctx)
+      drive('teach')
+
+      const call = executeCommandTool.execute(
+        { commandId: 'flame.setGamma', args: [4], glideMs: 400 },
+        {},
+      )
+      world.advance(200)
+      expect(world.runtime.isGliding()).toBe(true)
+      expect(world.runtime.activeQuality()).toBeDefined()
+
+      await finishPilot(ctx, 'stopped')
+
+      expect(world.runtime.isGliding()).toBe(false)
+      expect(world.runtime.activeQuality()).toBeUndefined()
+      // Exactly the target, not the frame the transition was left on.
+      expect(ctx.flameDescriptor().renderSettings.gamma).toBe(4)
+      await call
+    })
   })
 })

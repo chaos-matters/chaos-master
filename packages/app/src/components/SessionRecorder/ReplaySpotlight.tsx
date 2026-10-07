@@ -1,5 +1,6 @@
 import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { COVERED_ATTRIBUTES, visibleClientRect, } from '@/components/CanvasViewport/visibleCanvas'
 import { focusSelectors, resolveFocusElement, revealFocusElement, } from '@/recorder/focus'
 import styles from './ReplaySpotlight.module.css'
 import type { RecordedAction } from '@/recorder/schema'
@@ -40,8 +41,11 @@ function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
   )
 }
 
-function clippedRect(element: Element, padding = 0): Rect | undefined {
-  const box = element.getBoundingClientRect()
+function clippedRect(
+  element: Element,
+  padding = 0,
+  box: DOMRect = element.getBoundingClientRect(),
+): Rect | undefined {
   const left = Math.max(0, box.left - padding)
   const top = Math.max(0, box.top - padding)
   const right = Math.min(window.innerWidth, box.right + padding)
@@ -109,6 +113,14 @@ export function ReplaySpotlight(props: {
   const mutationTouchesLayout = (records: MutationRecord[]) => {
     return records.some((record) => {
       if (mutationRoots.has(record.target) || layoutPeers.has(record.target)) {
+        return true
+      }
+      // Chrome opening or closing over the canvas moves no box: the canvas
+      // only says how much of it is covered (visibleCanvas.ts).
+      if (
+        record.attributeName !== null &&
+        COVERED_ATTRIBUTES.includes(record.attributeName)
+      ) {
         return true
       }
 
@@ -180,8 +192,10 @@ export function ReplaySpotlight(props: {
       (element) => element.getAttribute('data-replay-region') === 'transport',
     )
 
+    // Only the part of the canvas on show: with the Glass panels setting
+    // on, it runs on under the floating tablet deck, which is chrome.
     const nextCanvas = canvasElements
-      .map((element) => clippedRect(element))
+      .map((element) => clippedRect(element, 0, visibleClientRect(element)))
       .find((rect) => rect !== undefined)
     setCanvasRect((previous) =>
       sameRect(previous, nextCanvas) ? previous : nextCanvas,
@@ -296,6 +310,7 @@ export function ReplaySpotlight(props: {
           'data-tour-target',
           'data-parameter-path',
           'data-replay-region',
+          ...COVERED_ATTRIBUTES,
         ],
       })
     }

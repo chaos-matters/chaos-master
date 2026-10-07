@@ -1,13 +1,24 @@
+/**
+ * The command system's types: `FlameCommand`, what every registered command
+ * declares, and `CommandContext`, the workspace surface a command runs
+ * against (document, history, timeline, recorder, export and the rest), plus
+ * the director and arena state shapes that context carries.
+ */
+
 import type { Accessor, Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { BundledTrack } from '@/arcade/bundledTracks'
+import type { GlideDriver, GlideQualityPreference } from '@/flame/glide/types'
 import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
-import type { SessionRecordingStartResult } from '@/recorder/recorder'
+import type { FlameSchool, GroundedFlameStats } from '@/flame/stats'
 import type { RecordedSession, TransformColorSnapshot } from '@/recorder/schema'
 import type { SonificationSnapshot } from '@/recorder/sonificationState'
+import type { SessionRecordingStartResult } from '@/recorder/startResult'
 import type { SeatId } from '@/seats/seatId'
 import type { HistorySetter } from '@/utils/createStoreHistory'
+import type { NormalizedAnimationRender, NormalizedImageRender, } from '@/utils/exportRequests'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
 
@@ -17,6 +28,45 @@ type KeyframeValue =
   | string
   | [number, number, number]
   | [number, number, number, number]
+export interface DirectorCandidate {
+  flame: FlameDescriptor
+  fitness?: number
+  rationale?: string
+  reaction?: 'like' | 'dislike' | null
+  tags?: string[]
+}
+
+export interface DirectorState {
+  /** Keys this session's taste ratings; see RatedCandidate.sessionId. */
+  sessionId?: string | undefined
+  generation: number
+  steeringPrompt?: string
+  candidates: DirectorCandidate[]
+  lastFeedback?: {
+    selectedIndex?: number
+    candidates: Array<{
+      index: number
+      reaction: 'like' | 'dislike' | null
+      tags: string[]
+      rationale?: string
+    }>
+  }
+}
+
+export interface ArenaFighterStats {
+  name?: string
+  type?: string
+  school?: FlameSchool
+  powerLevel?: number
+  flame?: FlameDescriptor
+  groundedStats?: GroundedFlameStats
+  metrics?: {
+    complexity?: number
+    chaosLevel?: number
+    symmetryScore?: number
+    energyIntensity?: number
+  }
+}
 
 export interface CommandContext {
   /**
@@ -54,14 +104,8 @@ export interface CommandContext {
   director?: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
-    state: Accessor<{
-      generation: number
-      candidates: { fitness?: number; flame?: FlameDescriptor }[]
-    } | null>
-    setState: Setter<{
-      generation: number
-      candidates: { fitness?: number; flame?: FlameDescriptor }[]
-    } | null>
+    state: Accessor<DirectorState | null>
+    setState: Setter<DirectorState | null>
     selectCandidate: (index: number) => void
   }
   /**
@@ -72,55 +116,22 @@ export interface CommandContext {
   arena?: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
-    player1Stats: Accessor<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    setPlayer1Stats: Setter<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    player2Stats: Accessor<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
-    setPlayer2Stats: Setter<{
-      name?: string
-      type?: string
-      powerLevel?: number
-      flame?: FlameDescriptor
-      metrics?: {
-        complexity?: number
-        chaosLevel?: number
-        symmetryScore?: number
-        energyIntensity?: number
-      }
-    } | null>
+    player1Stats: Accessor<ArenaFighterStats | null>
+    setPlayer1Stats: Setter<ArenaFighterStats | null>
+    player2Stats: Accessor<ArenaFighterStats | null>
+    setPlayer2Stats: Setter<ArenaFighterStats | null>
     selectFighter?: (player: 1 | 2) => void
+    commentary?: Accessor<string | null>
+    setCommentary?: (text: string | null) => void
+    eventBanner?: Accessor<string | null>
+    setEventBanner?: (event: string | null) => void
+    stance?: Accessor<string>
+    setStance?: (stance: string) => void
+    startClash?: (options?: {
+      stance?: string
+      rounds?: number
+    }) => Promise<unknown>
+    gameState?: Accessor<'idle' | 'clashing' | 'results'>
   }
   timeline: {
     tracks: Accessor<TimelineTrack[]>
@@ -134,6 +145,13 @@ export interface CommandContext {
     /** Detach a held timeline frame when a replayed camera edit takes over. */
     setPreviewHeld?: Setter<boolean>
     play: () => void
+    /**
+     * Stop wall-clock playback. Optional as a group member for the same reason
+     * as `timeline.edit`: a sandbox has no transport. `timeline.playFor`
+     * refuses to start rather than start playback it cannot stop.
+     */
+    pause?: () => void
+    isPlaying?: () => boolean
     setLoop: (loop: boolean) => void
     setFps: (fps: number, coalesceId?: string) => void
     setAutoFps?: (enabled: boolean) => void
@@ -199,6 +217,12 @@ export interface CommandContext {
     setMapping: (mapping: AudioMapping) => void
     setEnabled: (enabled: boolean) => void
     setSource: (source: 'file' | 'mic') => void
+    /**
+     * Fetch, decode and adopt a bundled track as the file source, exactly as
+     * loading a file in the audio panel does. Optional because replay and
+     * export contexts have no audio resources to load into.
+     */
+    loadBundledTrack?: (track: BundledTrack) => Promise<void>
   }
   /**
    * Reproducible Sonification-panel state. AudioContext/device lifetime and
@@ -260,6 +284,27 @@ export interface CommandContext {
     openReplay: (session: RecordedSession) => void
     actionCount: () => number
   }
+  /**
+   * Background export as a script drives it, with no modal in the way.
+   *
+   * The commands validate the caller's options; everything else an export job
+   * needs — the palette in force, the blend flame, the timeline's tracks and
+   * config, the recorded session to embed — is ambient workspace state that
+   * only the workspace can supply, which is why this is a seam rather than a
+   * direct `enqueue*Job` call from the command. Optional as a group like
+   * `recorder?`: sandboxes have no export host, and `export.render*` reports
+   * that instead of pretending to queue.
+   */
+  exportJobs?: {
+    /** Queue an offscreen PNG render of the current flame. */
+    renderImage: (request: NormalizedImageRender) => void
+    /**
+     * Queue an offscreen animation render of the current flame and timeline.
+     * An omitted frame range resolves to the one the export modal would have
+     * offered (see `resolveExportFrameRange`).
+     */
+    renderAnimation: (request: NormalizedAnimationRender) => void
+  }
   /** Arcade hub and pilot affordances the tools may drive. */
   arcade?: {
     openHub: (mode?: 'teach' | 'cinema' | 'duel' | 'beats') => void
@@ -267,6 +312,23 @@ export interface CommandContext {
     toast: (text: string) => void
     qualityPreset: () => string
   }
+  /** A replay world's own Glide switches (the artwork export, the synthesize
+   *  sandbox), so a take's never reach the viewer's. Absent: the viewer's. */
+  glideSwitches?: {
+    setEnabled: (enabled: boolean) => void
+    setQuality: (quality: GlideQualityPreference) => void
+  }
+  /** Its own glide runtime, for `glide.toFlame`: none, so a take's glide
+   *  never animates the live canvas. Absent: the workspace's. */
+  glideRuntime?: () => GlideDriver | undefined
+}
+
+/** Where a command that glides itself keeps its glide's duration. */
+export type SelfGlide = {
+  /** The duration the args name, or `undefined` when they name none. */
+  durationMs: (args: readonly unknown[]) => number | undefined
+  /** The args, naming `durationMs` in place of any duration they named. */
+  withDurationMs: (args: readonly unknown[], durationMs: number) => unknown[]
 }
 
 export type ReplayArgsValidator = (
@@ -280,16 +342,50 @@ export interface FlameCommand {
   /** False for wall-clock/device transport that cannot be serialized. */
   recordable?: boolean
   /**
+   * False for a step only a recording writes: a session may replay it, but
+   * `execute_command` refuses it live. `timeline.setPlaying` is the case — as
+   * a step it runs between two recorded moments and ends where the take
+   * ended, but a script calling it would start playback nothing stops, which
+   * is why `timeline.play` is refused and `timeline.playFor` exists.
+   */
+  agentCallable?: boolean
+  /**
    * False when a command must never be accepted from an untrusted session.
    * Every other command is still denied unless it declares
    * `validateReplayArgs` or the registry owns an explicit safe signature for
    * its id.
    */
   replayable?: boolean
-  /** This command only opens export UI and must not detach the most recently
-   *  recorded steps from the document they describe. All other commands are
-   *  conservatively treated as replay-state changes. */
+  /**
+   * This command changes nothing a replay reproduces: not the document, the
+   * timeline, the audio wiring or the view a take's snapshot holds. The
+   * export commands are the case: two open the export dialog, two queue a
+   * background render of a snapshot, and one reads the queue; the two Glide
+   * switches only choose how later changes appear. None detaches the latest
+   * recorded steps from their document or is, to a paused replay, the viewer
+   * taking over; one also `recordable: false` is no step a take missed. All
+   * other commands are conservatively treated as replay-state changes.
+   */
   preservesFinishedSession?: boolean
+  /** A switch that shapes only LATER changes (the two Glide switches). A live
+   *  run skips `beforeCommand`, so a playing replay plays on at the new
+   *  setting, and `execute_command` lets a glide in flight finish. Any other
+   *  live command, the export ones included, hands a playing replay back. */
+  presentationSwitch?: true
+  /**
+   * This command animates its own change through the glide runtime
+   * (`glide.toFlame`), whatever the Glide switch says.
+   *
+   * A caller that glides the changes it runs (`execute_command` with Glide on
+   * or `glideMs`, a replay with its Glide switch on) must not glide this one
+   * again. It used to, and two glides of one change left the runtime with the
+   * second, which settled on the flame the change started from (code audit
+   * 2026-09-23, F1). Such a caller neither settles nor glides around this
+   * command: it passes the duration it would have used down through the
+   * command's own arguments, and only where they name none, so the command's
+   * glide is the one glide and the take records its length.
+   */
+  glidesItself?: SelfGlide
   shortcut?: string
   /**
    * Resolve args to their canonical, replayable form BEFORE recording and
@@ -342,4 +438,15 @@ export interface FlameCommand {
    */
   focus?: (args: unknown[]) => string | undefined
   execute: (ctx: CommandContext, ...args: unknown[]) => void
+  /**
+   * What the agent surface hands back as `result` after this command ran.
+   *
+   * Runs AFTER `execute`, on the normalized args, and is never recorded and
+   * never replayed: a session file replays writes, and a read has none. It
+   * exists for the commands that only queue work — a script that cannot see
+   * its own export job has to guess when the file is ready, and guessing is
+   * how a poller ends up collecting a half-encoded video. Must not throw and
+   * must stay small: tool results are kept to about 1.5 KB of JSON.
+   */
+  report?: (ctx: CommandContext, ...args: unknown[]) => unknown
 }

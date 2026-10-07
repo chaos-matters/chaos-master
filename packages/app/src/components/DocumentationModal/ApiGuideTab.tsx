@@ -1,3 +1,4 @@
+import { For } from 'solid-js'
 import { CodeBlock } from './CodeBlock'
 import ui from './DocumentationModal.module.css'
 
@@ -10,6 +11,43 @@ let ripple = sin(r * 8.0) * 0.5 + 0.5;
 let newR = r + ripple * 0.2 * varInfo.weight;
 return vec2f(newR * cos(theta), newR * sin(theta));`
 
+const ENVIRONMENT_BINDINGS = [
+  {
+    name: 'pos',
+    type: 'vec2f',
+    desc: 'The current 2D coordinate (x, y) arriving at this stage.',
+  },
+  {
+    name: 'varInfo',
+    type: 'struct',
+    desc: 'Transform contextual data; varInfo.weight is this variation’s weight.',
+  },
+  {
+    name: 'PI, EPS',
+    type: 'f32',
+    desc: 'Standard math constants: π ≈ 3.14159265 and numerical epsilon.',
+  },
+]
+
+const FUNCTION_CATEGORIES = [
+  {
+    category: 'Trigonometric',
+    functions: ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2'],
+  },
+  {
+    category: 'Hyperbolic',
+    functions: ['sinh', 'cosh', 'tanh'],
+  },
+  {
+    category: 'Exponential & Power',
+    functions: ['pow', 'exp', 'log', 'sqrt'],
+  },
+  {
+    category: 'Vector & Math Utilities',
+    functions: ['abs', 'min', 'max', 'clamp', 'length', 'distance', 'dot'],
+  },
+]
+
 /**
  * Static reference for authoring custom variations in the Custom Variation
  * Editor (JS subset transpiled to WGSL at runtime).
@@ -17,44 +55,55 @@ return vec2f(newR * cos(theta), newR * sin(theta));`
 export function ApiGuideTab() {
   return (
     <div class={ui.guide}>
-      <h3 class={ui.guideTitle}>API &amp; custom variations</h3>
-      <p>
-        The <strong>Custom Variation Editor</strong> lets you program your own
-        variation in a subset of JavaScript that is transpiled to WebGPU Shading
-        Language (WGSL) at runtime.
-      </p>
+      <header class={ui.guideHero}>
+        <h3 class={ui.guideTitle}>API &amp; Custom Variations</h3>
+        <p class={ui.guideIntro}>
+          The <strong>Custom Variation Editor</strong> allows authoring custom
+          non-linear flame transformations in a safe mathematical JavaScript
+          subset that is transpiled to high-performance WebGPU Shading Language
+          (WGSL) at runtime.
+        </p>
+      </header>
 
-      <h4>Environment bindings</h4>
-      <p>A custom variation body runs as a function of two arguments:</p>
-      <ul>
-        <li>
-          <code>pos</code> — a <code>vec2f</code> with the current coordinate{' '}
-          <code>(x, y)</code>.
-        </li>
-        <li>
-          <code>varInfo</code> — a struct; <code>varInfo.weight</code> is this
-          variation's weight in the transform.
-        </li>
-        <li>
-          <code>PI</code>, <code>EPS</code> — standard math constants;{' '}
-          <code>vec2f</code> and <code>f32</code> constructors are also
-          available.
-        </li>
-      </ul>
+      <section class={ui.guideSection}>
+        <h4 class={ui.guideSectionTitle}>Environment Bindings</h4>
+        <div class={ui.bindingGrid}>
+          <For each={ENVIRONMENT_BINDINGS}>
+            {(b) => (
+              <div class={ui.bindingCard}>
+                <div class={ui.bindingNameRow}>
+                  <code class={ui.bindingName}>{b.name}</code>
+                  <span class={ui.bindingType}>{b.type}</span>
+                </div>
+                <p class={ui.bindingDesc}>{b.desc}</p>
+              </div>
+            )}
+          </For>
+        </div>
+      </section>
 
-      <h4>WGSL example</h4>
-      <CodeBlock code={CUSTOM_VARIATION_EXAMPLE} />
+      <section class={ui.guideSection}>
+        <h4 class={ui.guideSectionTitle}>WGSL Implementation Example</h4>
+        <CodeBlock code={CUSTOM_VARIATION_EXAMPLE} language="wgsl" />
+      </section>
 
-      <h4>Supported built-in functions</h4>
-      <p>
-        Standard WGSL math functions may be called: <code>sin</code>,{' '}
-        <code>cos</code>, <code>tan</code>, <code>asin</code>, <code>acos</code>
-        , <code>atan</code>, <code>atan2</code>, <code>sinh</code>,{' '}
-        <code>cosh</code>, <code>tanh</code>, <code>pow</code>, <code>exp</code>
-        , <code>log</code>, <code>sqrt</code>, <code>abs</code>,{' '}
-        <code>min</code>, <code>max</code>, <code>clamp</code>,{' '}
-        <code>length</code>, <code>distance</code>, and <code>dot</code>.
-      </p>
+      <section class={ui.guideSection}>
+        <h4 class={ui.guideSectionTitle}>Supported Built-in WGSL Functions</h4>
+        <div class={ui.fnCategoryGrid}>
+          <For each={FUNCTION_CATEGORIES}>
+            {(c) => (
+              <div class={ui.fnCategoryCard}>
+                <span class={ui.fnCategoryName}>{c.category}</span>
+                <div class={ui.fnChipGroup}>
+                  <For each={c.functions}>
+                    {(fnName) => <code class={ui.fnChip}>{fnName}</code>}
+                  </For>
+                </div>
+              </div>
+            )}
+          </For>
+        </div>
+      </section>
     </div>
   )
 }

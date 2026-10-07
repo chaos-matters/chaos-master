@@ -10,7 +10,13 @@ import { createSignal } from 'solid-js'
 export type AppTab = 'home' | 'workspace' | 'arcade'
 
 /** The Arcade panels a deep link (or a tool) can open the hub on. */
-export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
+export type ArcadeMode =
+  | 'teach'
+  | 'cinema'
+  | 'duel'
+  | 'beats'
+  | 'director'
+  | 'arena'
 
 /**
  * The tab lives in the URL fragment (`#home`, `#arcade`, `#arcade=teach`)
@@ -23,7 +29,14 @@ export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
  */
 const HOME_HASH = '#home'
 const ARCADE_HASH = '#arcade'
-const ARCADE_MODES: readonly ArcadeMode[] = ['teach', 'cinema', 'duel', 'beats']
+const ARCADE_MODES: readonly ArcadeMode[] = [
+  'teach',
+  'cinema',
+  'duel',
+  'beats',
+  'director',
+  'arena',
+]
 
 // The parameter is named `fragment` rather than `hash` because the security
 // lint rule reads any comparison against a "hash" as a timing attack.
@@ -54,6 +67,12 @@ const [arcadeMode, setArcadeModeSignal] = createSignal<ArcadeMode | undefined>(
 
 export { activeTab, arcadeMode }
 
+/** The fragment the view on screen stands for, whatever the address bar says
+ *  this instant: a history navigation the screen lock holds
+ *  (lib/historyHold.ts) puts the address bar back to it. */
+let shown = globalThis.location?.hash ?? ''
+export const shownFragment = (): string => shown
+
 function hashFor(tab: AppTab, mode?: ArcadeMode): string {
   if (tab === 'home') return HOME_HASH
   if (tab === 'arcade') return mode ? `${ARCADE_HASH}=${mode}` : ARCADE_HASH
@@ -63,6 +82,7 @@ function hashFor(tab: AppTab, mode?: ArcadeMode): string {
 export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
   setActiveTabSignal(tab)
   setArcadeModeSignal(tab === 'arcade' ? mode : undefined)
+  shown = hashFor(tab, mode)
   const { location, history } = globalThis
   if (!location || !history) return
   // Preserve the query string: a share link (`?s=`, `?flame=`, `?cv=`) must
@@ -79,6 +99,7 @@ export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
 // link into an already-open tab. Follow it rather than letting the UI and the
 // address bar disagree.
 globalThis.addEventListener?.('hashchange', () => {
+  shown = globalThis.location.hash
   setActiveTabSignal(tabFromHash())
   setArcadeModeSignal(arcadeModeFromHash())
 })

@@ -1,0 +1,193 @@
+/* The tablet inspector deck, in one of two modes. Colour, radius, spacing,
+   duration and easing come from the --la-* set only.
+
+   .page, while glass panels are off (the setting, or Reduce Transparency or
+   More Contrast; lib/glass.ts, glassAllowed): a page beside the canvas, not
+   chrome over it, so it is opaque --la-surface with no glass, in a grid
+   column of its own.
+
+   .floating, while they show, the default (docs/plans/glass-panels.md,
+   phase 2): chrome over the canvas. The canvas
+   spans the deck's column too (App.module.css, .tabletLayout) and the deck
+   sits over it in the same cell, as the glass primitive's panel, which the
+   component adds (glass.module.css; a composes cannot be switched off). It
+   is the one blurred layer: nothing inside it blurs again, and it goes solid
+   while the canvas presents every frame. The controls inside take opaque
+   fills of their own, as the explorer's panel's do, and no text inside is
+   lighter than ink-2 (decision c): see .floating below.
+
+   Either way the deck keeps its box, so opening, closing and resizing it
+   behave the same in both modes. */
+
+.deck {
+  grid-area: inspector;
+  position: relative;
+  height: 100%;
+  width: var(--la-deck-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: max(var(--la-s-2), var(--la-safe-bottom));
+  box-sizing: border-box;
+  contain: layout paint;
+  z-index: 20;
+  /* The threshold between the phone rail and this deck is a cross-fade, never
+     a reload (DESIGN.md section 4). `global(...)` keeps the keyframe in
+     lumen.css reachable: a CSS module renames a bare animation name. */
+  animation: global(la-surface-enter) var(--la-dur-fast) var(--la-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck {
+    animation: none;
+  }
+}
+
+.page {
+  background: var(--la-surface);
+  border-left: 1px solid var(--la-hairline);
+}
+
+/* A 12px hit strip inside the deck's leading edge: wide enough for a finger,
+   narrow enough that the 3px visual grip stays a hairline. Inside, because
+   the deck's paint containment clips anything hanging over the edge out of
+   hit testing: half a strip that straddled it was not touchable. It covers
+   the body's own 12px gutter, so no control sits under it. */
+.divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 3px;
+  height: 44px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--la-hairline-strong);
+}
+
+.header {
+  height: 72px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  /* 24px to the deck's edge, the same gutter the body's content sits at. */
+  padding: 0 var(--la-s-6);
+  border-bottom: 1px solid var(--la-hairline);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 600 20px/26px var(--la-font-body);
+  color: var(--la-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconButton {
+  /* The title truncates; the buttons keep their target. */
+  flex-shrink: 0;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--la-ink);
+  border-radius: var(--la-r-pill);
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.iconButton:disabled {
+  color: var(--la-ink-4);
+  cursor: default;
+}
+
+.iconButtonIcon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* The surface inside is itself a flex column whose panel scrolls and whose
+   footer is the action bar, so the deck gives it the height and stays put:
+   scrolling here instead would carry the action bar off the screen. The 12px
+   meets the panel's own 12px, so content sits at the header's 24px gutter. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--la-s-3);
+}
+
+.body > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* What is left of the deck when it is collapsed, and the way back in. */
+.edgeTab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--la-tap);
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border: var(--la-glass-edge);
+  border-right: 0;
+  border-radius: var(--la-r-md) 0 0 var(--la-r-md);
+  background: var(--la-glass);
+  color: var(--la-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  z-index: 20;
+}
+
+/* ---- Floating: the deck as glass over the canvas -------------------- */
+
+.floating {
+  /* The controls fill with the explorer panel's surfaces, through the
+     control tokens their own rules read, so bright art does not show
+     through a chip, a row or a button, and text on one is not on glass. The
+     hairlines stay translucent: a control's edge lies over its fill and
+     reads lighter, as on the page, and the lines on the glass itself, the
+     divider's grip and the header's rule, stay lighter than the glass over
+     bright art. */
+  composes: solidControls from '@/styles/designSystem/glass.module.css';
+
+  /* The primitive edges every side; only the leading one faces the canvas. */
+  border: 0;
+  border-left: var(--la-glass-edge);
+
+  /* Text on the glass itself, a caption or a section title, keeps to ink-2
+     at the least on the panel's 80% fill (decision c, lumen.css). */
+  --la-ink-3: var(--la-ink-2);
+}
+
+/* One blurred layer: the deck. A blur inside it would sample the deck's own
+   fill rather than the art, and cost a pass on every frame the canvas
+   presents. The primitive flattens glass inside glass; this also flattens
+   the blurs of the surfaces the deck hosts (a variation tile's name). */
+.deck.floating * {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

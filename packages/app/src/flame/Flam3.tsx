@@ -8,30 +8,35 @@ import { accumulatedPointCount, animationExportProgress, animationExportRunning,
 import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID } from '@/shaders/random'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
-import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
-import { isAppleWebKit } from '@/utils/platform'
-import { recordEntries } from '@/utils/record'
+import { exportTickIterations } from '@/utils/motionBlur'
+import { advancePlaybackTick } from '@/utils/playbackTick'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { vramTrack } from '@/utils/vramLog'
 import { Camera3DContext } from '../lib/Camera3DContext'
 import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useLiveRootContext } from '../lib/RootContext'
-import { createAnimationFrame } from '../utils/createAnimationFrame'
 import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
+import { flameBackgroundColor } from './backgroundColor'
+import { clashTeamsOf, clashTeamsSignature } from './clashTeams'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
 import { createDensityEstimationPipeline } from './densityEstimationPipeline'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
 import { createIFSPipeline3D } from './ifsPipeline3D'
-import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
+import { createExportRenderDriver, createInteractiveRenderDriver, EXPORT_COUNT_SIGNAL_INTERVAL_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_PRESENT_INTERVAL_MS, } from './renderDrivers'
+import { shaderShapeOf } from './shaderShape'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
+import { customVariationsVersion } from './variations/custom'
 import type { v4f } from 'typegpu/data'
 import type { Palette } from './colorMap'
+import type { ExportImageType } from './exportImageType'
+import type { CompletedPointCountInfo, RenderTickResult } from './renderDrivers'
 import type { FlameDescriptor } from './schema/flameSchema'
-import type { ExportImageType } from '@/App'
 import type { RendererRandomImplementationId } from '@/shaders/random'
+
+export type { CompletedPointCountInfo }
 
 const { sqrt } = Math
 const { performance } = globalThis
@@ -44,51 +49,6 @@ const OUTPUT_INTERVAL_BATCH_INDEX = 10
 // quality cap and blowing out brightness. The camera may zoom closer; only the
 // normalization is held here.
 const MIN_DENSITY_NORM_RADIUS = 0.01
-
-// Export driver tuning. During exports the render loop is driven by a
-// self-scheduling async loop instead of requestAnimationFrame: rAF cadence is
-// owned by the browser compositor, which Chrome collapses under sustained GPU
-// queue pressure (and stops entirely in background tabs) — that stalled long
-// ultra-quality exports. The export loop submits one bounded chunk at a time
-// and awaits queue.onSubmittedWorkDone(), so the GPU queue stays shallow and
-// the chunk wall time is an accurate measure of its GPU cost.
-// Chunk sizing: in visible Chrome tabs, onSubmittedWorkDone resolution is
-// aligned to the compositor, giving every await a fixed latency floor of one
-// vsync period (~16.7ms at 60Hz, ~33ms at 30Hz) regardless of chunk size.
-// The controller therefore targets a tick time well above that floor and
-// never divides it per-iteration: grow fast while clearly latency-bound,
-// creep upward inside the band, shrink proportionally only when the chunk
-// itself overshoots. Hidden tabs / Firefox have no floor and settle near the
-// target.
-const EXPORT_TARGET_TICK_MS = 32
-const EXPORT_TICK_GROW_BELOW_MS = 24
-const EXPORT_TICK_SHRINK_ABOVE_MS = 48
-const EXPORT_INITIAL_ITERATIONS = 2
-const EXPORT_MAX_ITERATIONS = 512
-const EXPORT_IDLE_DELAY_MS = 8
-const EXPORT_PRESENT_INTERVAL_MS = 250
-// Telemetry: periodic throughput line + slow-tick events, timestamped so
-// stalls can be correlated with tab switches / window occlusion.
-const EXPORT_LOG_INTERVAL_MS = 2000
-const EXPORT_SLOW_TICK_MS = 300
-// During export, the global point counter (quality pills, speed readout)
-// updates at this interval instead of every tick — per-tick signal writes fan
-// out to UI subscribers and that main-thread work competes with the export
-// while the tab is visible.
-const EXPORT_COUNT_SIGNAL_INTERVAL_MS = 100
-
-type RenderTickResult = {
-  iterations: number
-  presented: boolean
-  hadWork: boolean
-}
-
-export type CompletedPointCountInfo = {
-  /** Cumulative plotted-point count captured for this exact submission. */
-  count: number
-  /** Queue-fenced completion time from `performance.now()`. */
-  completedAtMs: number
-}
 
 type Flam3Props = {
   quality: number
@@ -110,6 +70,19 @@ type Flam3Props = {
    *  export signals). Used by the offscreen export-job renderer so it runs the
    *  fast loop without flipping the main workspace renderer into export mode. */
   exportDriver?: boolean
+  /** Offscreen export driver only. While set, accumulation resets when this key
+   *  changes and on nothing else, so the sub-frames of one output frame (motion
+   *  blur) accumulate into one buffer instead of each flame change starting it
+   *  over. The main workspace renderer gets the same behaviour from the global
+   *  animationExportRunning signal; an offscreen job cannot use that, because it
+   *  would also freeze the live view's resets while the job runs. */
+  exportFrameKey?: number
+  /** Export motion blur: stop accumulating at this fraction of the quality
+   *  point limit, and never let one export tick run past it. The export loop
+   *  raises it sub-frame by sub-frame. Without it the export driver sizes a
+   *  tick to reach the whole limit at once, so the first sub-frame took the
+   *  entire budget and the rest accumulated nothing. Undefined = whole limit. */
+  accumulationFraction?: number
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
   palette?: () => Palette | undefined
@@ -161,19 +134,8 @@ export function Flam3(props: Flam3Props) {
     deepClone(props.flameDescriptor),
   )
 
-  const backgroundColorFinal = () => {
-    const bg = props.flameDescriptor.renderSettings.backgroundColor
-    const isPaint = props.flameDescriptor.renderSettings.drawMode !== 'light'
-
-    if (bg === undefined) {
-      return isPaint
-        ? vec3f(...backgroundColorDefaultWhite)
-        : vec3f(...backgroundColorDefault)
-    }
-
-    // User explicitly chose a color -- respect it, no auto-swap.
-    return vec3f(...bg)
-  }
+  const backgroundColorFinal = () =>
+    vec3f(...flameBackgroundColor(props.flameDescriptor.renderSettings))
 
   // Memo, not a plain function: renderTick reads this from the rAF callback,
   // which has no reactive owner. Solid wraps conditional JSX props (e.g.
@@ -183,7 +145,8 @@ export function Flam3(props: Flam3Props) {
   // Creating the memo here makes all camera reads happen under this owner.
   const bucketProbabilityInv = createMemo(() => {
     const size = canvasSize()
-    const height = size.height
+    const height =
+      Number.isFinite(size.height) && size.height > 0 ? size.height : 512
     const dimensions = animatedFlame().renderSettings.dimensions ?? 2
     if (dimensions === 3 && camera3D) {
       // 3D equivalent of the 2D zoom-based area calculation.
@@ -206,16 +169,23 @@ export function Flam3(props: Flam3Props) {
       const fovRad = (camera3D.fov() * Math.PI) / 180
       const tanHalfFov = Math.tan(fovRad / 2) || 1
       const scale = height / (2 * radius * tanHalfFov)
-      return scale * scale
+      return Math.max(1, scale * scale)
     }
-    const unitSquareArea = (height ** 2 * camera!.zoom() ** 2) / 4
-    return unitSquareArea
+    const rawZoom = camera?.zoom()
+    const safeZoom =
+      Number.isFinite(rawZoom) && (rawZoom ?? 0) > 0 ? rawZoom! : 1
+    const unitSquareArea = (height ** 2 * safeZoom ** 2) / 4
+    return Math.max(1, unitSquareArea)
   })
 
   /** u32-safe point cap: prevents per-bucket atomic overflow at high quality */
   const safeQualityCap = () => {
     const size = canvasSize()
-    const totalBuckets = size.width * size.height
+    const width =
+      Number.isFinite(size.width) && size.width > 0 ? size.width : 512
+    const height =
+      Number.isFinite(size.height) && size.height > 0 ? size.height : 512
+    const totalBuckets = width * height
     const MAX_U32 = 0xffffffff
     const maxPointsPerBucket = Math.floor(
       MAX_U32 / BUCKET_FIXED_POINT_MULTIPLIER,
@@ -226,9 +196,14 @@ export function Flam3(props: Flam3Props) {
   }
 
   const qualityPointCountLimit = () => {
-    const q = props.quality
-    const rawLimit = bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
-    return Math.min(rawLimit, safeQualityCap())
+    const q = Number.isFinite(props.quality) ? props.quality : 0.85
+    const inv = bucketProbabilityInv()
+    const safeInv = Number.isFinite(inv) && inv > 0 ? inv : 10000
+    const denom = Math.max(1e-9, q ** 2 - 2 * q + 1)
+    const rawLimit = safeInv / denom
+    const cap = safeQualityCap()
+    const safeCap = Number.isFinite(cap) && cap > 0 ? cap : 10000000
+    return Math.max(100, Math.min(rawLimit, safeCap))
   }
 
   const [instanceAccumulatedPointCount, setInstanceAccumulatedPointCount] =
@@ -388,6 +363,21 @@ export function Flam3(props: Flam3Props) {
     }
   })
 
+  /*
+   * The draw mode alone, not the flame it came from.
+   *
+   * `colorGradingPipeline` below builds a real GPU pipeline, and it used to
+   * read `props.flameDescriptor.renderSettings.drawMode` inline. That reads
+   * one store path while the workspace hands over the store proxy, but a
+   * whole new object whenever the flame is derived — a hovered variation, or
+   * audio modulation at 30fps — and the pipeline was then rebuilt for every
+   * one of those frames. Memoizing the mode gives the pipeline a dependency
+   * that changes when the draw mode does and not before.
+   */
+  const drawModeImpl = createMemo(
+    () => drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
+  )
+
   const colorGradingPipeline = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -410,7 +400,7 @@ export function Flam3(props: Flam3Props) {
         ? typedPostprocessBuffer
         : typedAccumulationBuffer,
       canvasFormat,
-      drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
+      drawModeImpl(),
       props.palette?.(),
     )
   })
@@ -477,9 +467,13 @@ export function Flam3(props: Flam3Props) {
     filter.densityPipeline.setEstimatorCurve(estimatorCurve)
   })
 
+  /** Where accumulation stops: the quality limit, or this step's share of it. */
+  const accumulationStop = () =>
+    qualityPointCountLimit() * (props.accumulationFraction ?? 1)
+
   const continueRendering = (accumulatedPointCount: number) => {
     if (props.disableQualityLimit) return true
-    return accumulatedPointCount <= qualityPointCountLimit()
+    return accumulatedPointCount <= accumulationStop()
   }
 
   // True while an export (animation or still) should drive this renderer via
@@ -498,6 +492,18 @@ export function Flam3(props: Flam3Props) {
     'colorGradingMs',
   ])
 
+  // The custom variations' version this renderer's pipeline follows. An
+  // export keeps the code it started with: while the export driver runs, the
+  // version stays where it was when the export began, read without tracking,
+  // so an edit or a rename partway through neither restarts a still nor
+  // changes an animation's later frames. Reading it untracked alone would not
+  // do: every new animation frame re-runs the fingerprint below. The canvas
+  // takes the change when the export ends.
+  const pipelineVariationsVersion = createMemo<number>((atExportStart) => {
+    if (!exportDriverActive()) return customVariationsVersion()
+    return atExportStart ?? untrack(customVariationsVersion)
+  })
+
   // Also returns the flame snapshot so the pipeline creation uses the exact same
   // value — re-reading untrack(animatedFlame) separately can return a different
   // flame when outputTextures() memo re-evaluation causes nested effect flushes.
@@ -505,22 +511,12 @@ export function Flam3(props: Flam3Props) {
     const flame = animatedFlame()
     const bf = props.blendFlame
     return JSON.stringify({
-      transforms: recordEntries(flame.transforms).map(([tid, t]) => ({
-        tid,
-        variations: recordEntries(t.variations).map(([vid, v]) => ({
-          vid,
-          type: v.type,
-        })),
-      })),
-      ...(bf && {
-        blendTransforms: recordEntries(bf.transforms).map(([tid, t]) => ({
-          tid,
-          variations: recordEntries(t.variations).map(([vid, v]) => ({
-            vid,
-            type: v.type,
-          })),
-        })),
-      }),
+      ...clashTeamsSignature(clashTeamsOf(flame.transforms)),
+      // Editing a custom variation keeps its type and changes its code, so
+      // nothing below changes: the version makes the canvas show the edit.
+      customVariationsVersion: pipelineVariationsVersion(),
+      transforms: shaderShapeOf(flame.transforms),
+      ...(bf && { blendTransforms: shaderShapeOf(bf.transforms) }),
       dimensions: flame.renderSettings.dimensions ?? 2,
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
@@ -587,10 +583,12 @@ export function Flam3(props: Flam3Props) {
    * pass `false`, so only the instance that owns the animation drives it.
    */
   createEffect(() => {
+    // A replay pacing a play window moves the playhead itself.
     if (
       !timeline ||
       !props.animationEnabled ||
       !timeline.isPlaying() ||
+      timeline.pacedPlayback() ||
       timeline.config().autoFps
     ) {
       return
@@ -599,9 +597,7 @@ export function Flam3(props: Flam3Props) {
     const cfg = timeline.config()
     const intervalMs = 1000 / cfg.fps
     const intervalId = window.setInterval(() => {
-      for (let i = 0; i < cfg.timeScale; i++) {
-        timeline.advanceFrame()
-      }
+      advancePlaybackTick(timeline, cfg.timeScale)
     }, intervalMs)
 
     onCleanup(() => {
@@ -722,25 +718,22 @@ export function Flam3(props: Flam3Props) {
     // Tunable via VITE_PERSIST_RESEED_INTERVAL — lower it to make skipIters /
     // warmup read more strongly and reduce settle flicker, at a throughput cost.
     let dispatchesSincePersistReseed = 0
-    // Interactive estimator state: last iteration count, used to cap growth.
+    // Estimator state: last iteration count, used to cap growth.
     let lastInteractiveIterationCount = 1
-    // Export driver state: chunk size adapted from measured chunk wall time,
-    // and the wall-clock time of the last canvas present.
-    let exportIterationCount = EXPORT_INITIAL_ITERATIONS
     let lastPresentMs = 0
     let lastCountSignalMs = 0
     // Reused by the rAF pressure limiter, export driver, timestamp reader, and
     // benchmark completion callback. Keeping one fence per submission avoids
     // asking the queue for several equivalent promises.
     let latestQueueFence: Promise<void> = Promise.resolve()
-    // Wakes the export driver when reactive work arrives (next frame's
-    // descriptor, forced redraw). Keeps the idle wait event-driven: timers are
-    // clamped to 1Hz by Chrome in hidden or occluded windows, signals are not.
-    let notifyExportWork: (() => void) | undefined
+    const drivers: {
+      interactive?: ReturnType<typeof createInteractiveRenderDriver>
+      export?: ReturnType<typeof createExportRenderDriver>
+    } = {}
 
     function requestRedraw() {
-      rafLoop?.redraw()
-      notifyExportWork?.()
+      drivers.interactive?.redraw()
+      drivers.export?.wake()
     }
 
     // Re-blit the current color-graded accumulation to the canvas without doing
@@ -795,12 +788,18 @@ export function Flam3(props: Flam3Props) {
       pipeline.setStochasticFilterRadius(radius)
     })
 
+    // An export loop owns accumulation resets -- the global main-canvas export,
+    // or this instance's exportFrameKey -- rather than ordinary edits.
+    const exportOwnsResets = () =>
+      animationExportRunning() || props.exportFrameKey !== undefined
+
     const accumulationFingerprint = createMemo(() => {
       const flame = animatedFlame()
       const bf = props.blendFlame
       return JSON.stringify({
         dimensions: flame.renderSettings.dimensions ?? 2,
         transforms: flame.transforms,
+        clash: flame.renderSettings.clash,
         finalTransform: flame.finalTransform,
         colorInitMode: flame.renderSettings.colorInitMode,
         pointInitMode: flame.renderSettings.pointInitMode,
@@ -813,9 +812,12 @@ export function Flam3(props: Flam3Props) {
 
     // Reset accumulation when any structural or rendering parameter changes
     // (weights, affine, colors, etc.) but ignore color grading post-processing.
+    // During animation export, accumulation resets are driven explicitly by export frame change.
     createEffect(() => {
       accumulationFingerprint()
-      resetAccumulation()
+      if (!exportOwnsResets()) {
+        resetAccumulation()
+      }
     })
 
     // Reset accumulation on animation frame change whenever the timeline drives
@@ -826,7 +828,10 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       if (!timeline) return
       timeline.currentFrame()
-      if (timeline.isDrivingView()) {
+      // An export steps the playhead once per motion-blur sub-frame, so a reset
+      // here would keep only the last sub-frame. Exports reset once per output
+      // frame themselves: the export-frame effect below, or exportFrameKey.
+      if (timeline.isDrivingView() && !exportOwnsResets()) {
         resetAccumulation()
       }
     })
@@ -839,7 +844,7 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       camera?.update()
       camera3D?.update()
-      if (!animationExportRunning()) resetAccumulation()
+      if (!exportOwnsResets()) resetAccumulation()
     })
 
     // Reset accumulation on export frame index change.
@@ -855,6 +860,11 @@ export function Flam3(props: Flam3Props) {
       } else {
         lastExportFrame = undefined
       }
+    })
+
+    // Offscreen export: a new output frame, signalled by this instance's key.
+    createEffect(() => {
+      if (props.exportFrameKey !== undefined) resetAccumulation()
     })
 
     function resetAccumulation() {
@@ -913,12 +923,7 @@ export function Flam3(props: Flam3Props) {
     let consecutiveGpuNotReadyBails = 0
     let consecutivePipelineUndefinedBails = 0
 
-    function renderTick(frameId: number): RenderTickResult {
-      // Halt immediately when the device is gone. Without this, a device loss
-      // with many live previews (e.g. the VariationSelector gallery) lets every
-      // Flam3's rAF loop keep submitting to the dead device — a flood of
-      // "Buffer is invalid" errors that jams the main thread before the reactive
-      // poster swap can flush. Mirrors the colorGradingPipeline bail below.
+    function validatePreconditions(): boolean {
       if (!gpuReady()) {
         consecutiveGpuNotReadyBails++
         consecutivePipelineUndefinedBails = 0
@@ -931,16 +936,11 @@ export function Flam3(props: Flam3Props) {
             `[Flam3] renderTick bailing: gpuReady=false (${consecutiveGpuNotReadyBails} consecutive frames)`,
           )
         }
-        return { iterations: 0, presented: false, hadWork: false }
+        return false
       }
       consecutiveGpuNotReadyBails = 0
 
-      const currentExportCb = props.onExportImage
-      const exportMode = exportDriverActive()
-
-      const pointCountPerBatch = props.pointCountPerBatch
-      const colorGradingPipeline_ = colorGradingPipeline()
-      if (colorGradingPipeline_ === undefined) {
+      if (colorGradingPipeline() === undefined) {
         consecutivePipelineUndefinedBails++
         if (
           DEBUG_MODE &&
@@ -954,64 +954,164 @@ export function Flam3(props: Flam3Props) {
               `${consecutivePipelineUndefinedBails} consecutive frames)`,
           )
         }
-        return { iterations: 0, presented: false, hadWork: false }
+        return false
       }
       consecutivePipelineUndefinedBails = 0
+      return true
+    }
 
-      const timings = timestampQuery.average()
+    function estimateIterations(
+      exportMode: boolean,
+      timings: ReturnType<typeof timestampQuery.average>,
+      periodicPresentDue: boolean,
+    ): number {
+      if (!continueRendering(accumulatedPointCount_)) return 0
+      if (exportMode) {
+        const planned =
+          drivers.export?.getExportIterationCount() ?? EXPORT_INITIAL_ITERATIONS
+        if (props.accumulationFraction === undefined) return planned
+        // Motion blur: a tick may not run past this sub-frame's share.
+        return exportTickIterations(
+          planned,
+          accumulationStop() - accumulatedPointCount_,
+          props.pointCountPerBatch * plotsPerChainBaked,
+        )
+      }
+      if (timings) {
+        const estimated = estimateIterationCount(
+          timings,
+          forceDrawToScreen || periodicPresentDue,
+        )
+        const maxIterations = isInteractive() ? 8 : 1000
+        const result = Math.min(
+          estimated,
+          maxIterations,
+          Math.max(4, Math.ceil(lastInteractiveIterationCount * 1.5)),
+        )
+        lastInteractiveIterationCount = result
+        return result
+      }
+      return 1
+    }
 
-      // Periodic preview cadence: batch-indexed when vsync paced (interactive),
-      // wall-clock during exports (the export loop tick rate varies with chunk
-      // size, so batch counting would present far too often).
+    function recordAccumulationPass(
+      encoder: GPUCommandEncoder,
+      iterationCount: number,
+      timestampWrites: { ifsMs?: GPUComputePassTimestampWrites },
+    ): void {
+      const passDesc: GPUComputePassDescriptor = timestampWrites.ifsMs
+        ? { timestampWrites: timestampWrites.ifsMs }
+        : {}
+
+      const pass = encoder.beginComputePass(passDesc)
+      if (iterationCount > 0) {
+        const pipeline = ifsPipeline3D ?? ifsPipeline!
+        const persistChains =
+          props.persistChains ??
+          (visibleTransformCount() >= 2 && plotsPerChainBaked > 1)
+        if (
+          persistChains &&
+          !resetPointStatePending &&
+          dispatchesSincePersistReseed >= PERSIST_RESEED_INTERVAL
+        ) {
+          resetPointStatePending = true
+        }
+        const reseeding = !persistChains || resetPointStatePending
+        pipeline.setResetPoints(reseeding ? 1 : 0)
+        if (reseeding) {
+          dispatchesSincePersistReseed = 0
+        } else {
+          dispatchesSincePersistReseed += iterationCount
+        }
+        if (persistChains) resetPointStatePending = false
+        for (let i = 0; i < iterationCount; i++) {
+          pipeline.run(pass, props.pointCountPerBatch)
+        }
+      }
+      pass.end()
+    }
+
+    function recordColorGradingPass(
+      encoder: GPUCommandEncoder,
+      pipeline: NonNullable<ReturnType<typeof colorGradingPipeline>>,
+      timestampWrites: {
+        adaptiveFilterMs?: GPUComputePassTimestampWrites
+        colorGradingMs?: GPURenderPassTimestampWrites
+      },
+    ): void {
+      lastPresentMs = performance.now()
+      const skipItersFactor =
+        1 + animatedFlame().renderSettings.skipIters * 0.05
+      const pts = Math.max(1, accumulatedPointCount_)
+      const rawInv = (bucketProbabilityInv() / pts) * skipItersFactor
+      currentAveragePointCountPerBucketInv =
+        Number.isFinite(rawInv) && rawInv > 0 ? rawInv : 0
+      writeColorGradingUniforms()
+      if (props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) {
+        const passDesc: GPUComputePassDescriptor =
+          timestampWrites.adaptiveFilterMs
+            ? { timestampWrites: timestampWrites.adaptiveFilterMs }
+            : {}
+        const pass = encoder.beginComputePass(passDesc)
+        runAdaptiveFilter()?.run(pass)
+        pass.end()
+      }
+
+      const passDesc: GPURenderPassDescriptor = {
+        ...(timestampWrites.colorGradingMs
+          ? { timestampWrites: timestampWrites.colorGradingMs }
+          : {}),
+        colorAttachments: [
+          {
+            loadOp: 'clear',
+            storeOp: 'store',
+            view: context
+              .getCurrentTexture()
+              .createView({ label: 'flam3CanvasView' }),
+          },
+        ],
+      }
+      const pass = encoder.beginRenderPass(passDesc)
+      pipeline.run(pass)
+      pass.end()
+    }
+
+    interface TickStatus {
+      iterationCount: number
+      accumulatedAfter: number
+      isExportReady: boolean
+      isQualityReached: boolean
+      isAutoFpsReady: boolean
+      shouldRenderFinalImage: boolean
+      hadWork: boolean
+    }
+
+    function evaluateTickStatus(
+      exportMode: boolean,
+      timings: ReturnType<typeof timestampQuery.average>,
+      currentExportCb: typeof props.onExportImage,
+    ): TickStatus {
       const periodicPresentDue = exportMode
         ? performance.now() - lastPresentMs >= EXPORT_PRESENT_INTERVAL_MS
         : batchIndex < OUTPUT_EVERY_FRAME_BATCH_INDEX ||
           batchIndex % OUTPUT_INTERVAL_BATCH_INDEX === 0
 
-      let iterationCount = 0
-      if (continueRendering(accumulatedPointCount_)) {
-        if (exportMode) {
-          iterationCount = exportIterationCount
-        } else if (timings) {
-          // Cap growth at 1.5x per tick: without GPU timestamps the ifsMs
-          // fallback measures submit→completion wall latency, which on an
-          // empty queue under-reports the true cost and would otherwise slam
-          // the iteration count straight to the maximum, saturating the GPU
-          // queue (Chrome reacts by collapsing the rAF cadence).
-          const estimated = estimateIterationCount(
-            timings,
-            forceDrawToScreen || periodicPresentDue,
-          )
-          const maxIterations = isInteractive() ? 8 : 1000
-          iterationCount = Math.min(
-            estimated,
-            maxIterations,
-            Math.max(4, Math.ceil(lastInteractiveIterationCount * 1.5)),
-          )
-          lastInteractiveIterationCount = iterationCount
-        } else {
-          iterationCount = 1
-        }
-      }
+      const iterationCount = estimateIterations(
+        exportMode,
+        timings,
+        periodicPresentDue,
+      )
 
-      // Each dispatched chain (thread) plots PLOTS_PER_CHAIN points after its
-      // warmup, so plotted points = threads × PLOTS_PER_CHAIN × dispatches.
       const accumulatedAfter =
         accumulatedPointCount_ +
-        pointCountPerBatch * plotsPerChainBaked * iterationCount
-
-      // Export readiness is decided with the post-accumulation count so the
-      // final color-graded render and the capture happen in the same
-      // submission — the captured canvas can never lag the accumulation.
-      const isExportReady =
-        currentExportCb !== undefined && !continueRendering(accumulatedAfter)
+        props.pointCountPerBatch * plotsPerChainBaked * iterationCount
 
       const isQualityReached = !continueRendering(accumulatedAfter)
-      const isAutoFpsReady =
-        timeline &&
-        timeline.isPlaying() &&
-        timeline.config().autoFps &&
-        isQualityReached
+      const isExportReady = currentExportCb !== undefined && isQualityReached
+      const isAutoFpsActive = Boolean(
+        timeline?.isPlaying() && timeline.config().autoFps,
+      )
+      const isAutoFpsReady = isAutoFpsActive && isQualityReached
 
       const shouldRenderFinalImage =
         forceDrawToScreen ||
@@ -1022,156 +1122,85 @@ export function Flam3(props: Flam3Props) {
       const hadWork =
         clearRequested || iterationCount > 0 || shouldRenderFinalImage
 
-      if (!hadWork) {
-        // Nothing to submit — still report state so export capture, progress
-        // and cancellation keep flowing while the export driver idles.
-        const finalImageReady =
-          isExportReady &&
-          lastExportRenderedPointCount === accumulatedPointCount_
-        if (DEBUG_MODE && finalImageReady && untrack(animationExportRunning)) {
-          console.info(
-            `[Flam3 ${logTime()}] !hadWork emit finalImageReady=TRUE at ${accumulatedPointCount_} pts (no new IFS work this tick) — capture gate may grab a STALE frame`,
-          )
-        }
-        currentExportCb?.(canvas, { finalImageReady })
-        return { iterations: 0, presented: false, hadWork: false }
+      return {
+        iterationCount,
+        accumulatedAfter,
+        isExportReady,
+        isQualityReached,
+        isAutoFpsReady,
+        shouldRenderFinalImage,
+        hadWork,
       }
+    }
 
-      const encoder = device.createCommandEncoder()
+    function handleNoWorkTick(
+      isExportReady: boolean,
+      currentExportCb: typeof props.onExportImage,
+    ): RenderTickResult {
+      const finalImageReady =
+        isExportReady && lastExportRenderedPointCount === accumulatedPointCount_
+      if (DEBUG_MODE && finalImageReady && untrack(animationExportRunning)) {
+        console.info(
+          `[Flam3 ${logTime()}] !hadWork emit finalImageReady=TRUE at ${accumulatedPointCount_} pts (no new IFS work this tick) — capture gate may grab a STALE frame`,
+        )
+      }
+      currentExportCb?.(canvas, {
+        finalImageReady,
+        fence: latestQueueFence,
+      })
+      return { iterations: 0, presented: false, hadWork: false }
+    }
 
+    function recordTickPasses(
+      encoder: GPUCommandEncoder,
+      status: TickStatus,
+      colorGradingPipeline_: NonNullable<
+        ReturnType<typeof colorGradingPipeline>
+      >,
+      timestampWrites: ReturnType<typeof timestampQuery.timestampWrites>,
+    ): void {
       if (clearRequested) {
         clearRequested = false
         encoder.clearBuffer(accumulationBuffer.buffer)
       }
 
-      // Only the main workspace renderer reports debug timings. Offscreen
-      // export jobs (and previews) share these global stats but must not write
-      // them, or the DebugPanel's "ms IFS" readout would track the offscreen
-      // render instead of the visible one.
-      if (timings && (props.isExportRenderer ?? false)) {
-        setRenderTimings({
-          ...timings,
-          adaptiveFilterMs:
-            props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
-              ? timings.adaptiveFilterMs
-              : 0,
-        })
-      }
+      recordAccumulationPass(encoder, status.iterationCount, timestampWrites)
+      accumulatedPointCount_ = status.accumulatedAfter
 
-      const timestampWrites = timestampQuery.timestampWrites(frameId)
-
-      {
-        const passDesc: GPUComputePassDescriptor = timestampWrites.ifsMs
-          ? { timestampWrites: timestampWrites.ifsMs }
-          : {}
-
-        const pass = encoder.beginComputePass(passDesc)
-        if (iterationCount > 0) {
-          const pipeline = ifsPipeline3D ?? ifsPipeline!
-          // Pay the warmup only on the first tick after a settle; subsequent
-          // ticks continue the persisted chains. Ordered before the dispatch in
-          // this submission (queue.writeBuffer then queue.submit).
-          // Re-seed every dispatch unless persisting chains. Persistence is only
-          // safe for a real chaos game (2+ transforms); a single-map flame would
-          // collapse onto its attractor (shape contraction) if its chains
-          // continued. The persistChains prop can force either way.
-          // Plots/Chain = 1 is "classic" mode: re-warm every dispatch so each
-          // plotted point sits at exactly depth skipIters and the slider fully
-          // controls convergence. Persistence would re-converge it otherwise.
-          const persistChains =
-            props.persistChains ??
-            (visibleTransformCount() >= 2 && plotsPerChainBaked > 1)
-          // Force a periodic re-seed so a slow-mixing flame's chains can't
-          // drift far enough off the invariant measure to darken the image.
-          if (
-            persistChains &&
-            !resetPointStatePending &&
-            dispatchesSincePersistReseed >= PERSIST_RESEED_INTERVAL
-          ) {
-            resetPointStatePending = true
-          }
-          const reseeding = !persistChains || resetPointStatePending
-          pipeline.setResetPoints(reseeding ? 1 : 0)
-          if (reseeding) {
-            dispatchesSincePersistReseed = 0
-          } else {
-            dispatchesSincePersistReseed += iterationCount
-          }
-          if (persistChains) resetPointStatePending = false
-          for (let i = 0; i < iterationCount; i++) {
-            pipeline.run(pass, pointCountPerBatch)
-          }
-        }
-        pass.end()
-
-        accumulatedPointCount_ = accumulatedAfter
-      }
-
-      if (shouldRenderFinalImage) {
-        if (isExportReady || isAutoFpsReady) {
+      if (status.shouldRenderFinalImage) {
+        if (status.isExportReady || status.isAutoFpsReady) {
           lastExportRenderedPointCount = accumulatedPointCount_
-          if (DEBUG_MODE && isExportReady && untrack(animationExportRunning)) {
+          if (
+            DEBUG_MODE &&
+            status.isExportReady &&
+            untrack(animationExportRunning)
+          ) {
             console.info(
               `[Flam3 ${logTime()}] rendered FRESH export image at ${accumulatedPointCount_} pts`,
             )
           }
         }
-        lastPresentMs = performance.now()
-        const skipItersFactor =
-          1 + animatedFlame().renderSettings.skipIters * 0.05
-        currentAveragePointCountPerBucketInv =
-          (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor
-        writeColorGradingUniforms()
-        if (props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) {
-          const passDesc: GPUComputePassDescriptor =
-            timestampWrites.adaptiveFilterMs
-              ? { timestampWrites: timestampWrites.adaptiveFilterMs }
-              : {}
-          const pass = encoder.beginComputePass(passDesc)
-          runAdaptiveFilter()?.run(pass)
-          pass.end()
-        }
-
-        {
-          const passDesc: GPURenderPassDescriptor = {
-            ...(timestampWrites.colorGradingMs
-              ? { timestampWrites: timestampWrites.colorGradingMs }
-              : {}),
-            colorAttachments: [
-              {
-                loadOp: 'clear',
-                storeOp: 'store',
-                view: context
-                  .getCurrentTexture()
-                  .createView({ label: 'flam3CanvasView' }),
-              },
-            ],
-          }
-          const pass = encoder.beginRenderPass(passDesc)
-          colorGradingPipeline_.run(pass)
-          pass.end()
-        }
+        recordColorGradingPass(encoder, colorGradingPipeline_, timestampWrites)
       }
+    }
 
-      timestampQuery.write(encoder, Math.max(iterationCount, 1))
-      device.queue.submit([encoder.finish()])
+    function handlePostSubmit(
+      exportMode: boolean,
+      status: TickStatus,
+      currentExportCb: typeof props.onExportImage,
+      frameId: number,
+    ): void {
       const completedCount = accumulatedPointCount_
       if (!props.isExportRenderer && props.setCurrentQuality !== undefined) {
         setInstanceAccumulatedPointCount(completedCount)
       }
       latestQueueFence = device.queue.onSubmittedWorkDone()
 
-      // Signal the accumulated count only AFTER the submit. Consumers
-      // (e.g. the benchmark / hardware-tier detector) may synchronously tear
-      // this renderer down from the callback — doing it before submit would
-      // destroy the pipeline's buffers while the just-encoded command buffer
-      // still references them ("used in submit while destroyed").
       if (props.isExportRenderer ?? false) {
-        // Ready ticks always write so the capture gate sees a fresh count.
         const nowMs = performance.now()
         if (
           !exportMode ||
-          isExportReady ||
+          status.isExportReady ||
           nowMs - lastCountSignalMs >= EXPORT_COUNT_SIGNAL_INTERVAL_MS
         ) {
           lastCountSignalMs = nowMs
@@ -1183,8 +1212,9 @@ export function Flam3(props: Flam3Props) {
       if (currentExportCb) {
         currentExportCb(canvas, {
           finalImageReady:
-            isExportReady &&
+            status.isExportReady &&
             lastExportRenderedPointCount === accumulatedPointCount_,
+          fence: latestQueueFence,
         })
       }
 
@@ -1206,238 +1236,79 @@ export function Flam3(props: Flam3Props) {
       batchIndex += 1
       forceDrawToScreen = false
 
-      if (timeline && timeline.isPlaying() && timeline.config().autoFps) {
-        if (isQualityReached) {
-          timeline.advanceFrame()
-        }
+      if (
+        status.isAutoFpsReady &&
+        timeline?.isPlaying() &&
+        !timeline.pacedPlayback() &&
+        timeline.config().autoFps
+      ) {
+        timeline.advanceFrame()
+      }
+    }
+
+    function renderTick(frameId: number): RenderTickResult {
+      if (!validatePreconditions()) {
+        return { iterations: 0, presented: false, hadWork: false }
       }
 
+      const colorGradingPipeline_ = colorGradingPipeline()!
+      const currentExportCb = props.onExportImage
+      const exportMode = exportDriverActive()
+      const timings = timestampQuery.average()
+
+      const status = evaluateTickStatus(exportMode, timings, currentExportCb)
+      if (!status.hadWork) {
+        return handleNoWorkTick(status.isExportReady, currentExportCb)
+      }
+
+      const encoder = device.createCommandEncoder()
+      if (timings && (props.isExportRenderer ?? false)) {
+        setRenderTimings({
+          ...timings,
+          adaptiveFilterMs:
+            props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
+              ? timings.adaptiveFilterMs
+              : 0,
+        })
+      }
+
+      const timestampWrites = timestampQuery.timestampWrites(frameId)
+      recordTickPasses(encoder, status, colorGradingPipeline_, timestampWrites)
+
+      timestampQuery.write(encoder, Math.max(status.iterationCount, 1))
+      device.queue.submit([encoder.finish()])
+
+      handlePostSubmit(exportMode, status, currentExportCb, frameId)
+
       return {
-        iterations: iterationCount,
-        presented: shouldRenderFinalImage,
+        iterations: status.iterationCount,
+        presented: status.shouldRenderFinalImage,
         hadWork: true,
       }
     }
 
-    const rafLoop = createAnimationFrame(
-      (frameId) => {
-        renderTick(frameId)
-      },
-      () =>
-        continueRendering(accumulatedPointCount_)
-          ? props.renderInterval
-          : Infinity,
-      () => latestQueueFence,
-      // Tear the rAF loop down entirely when an export takes over OR when the
-      // device is lost. The `!gpuReady()` read is reactive, so a device loss
-      // disposes every preview's loop on the spot (no more requestAnimationFrame,
-      // no more onSubmittedWorkDone holds against a dead queue).
-      () => exportDriverActive() || !gpuReady(),
-    )
-
-    // Present pump (Apple WebKit only): a WebGPU canvas that isn't drawn every
-    // frame shows stale swapchain buffers. The interactive loop above only
-    // presents when an IFS batch completes — on a slow GPU that can be
-    // 100-200ms apart during a load, long enough for WebKit to flash the
-    // previous flame between presents. Re-present the current image every frame
-    // while the flame is still accumulating so no gap is ever visible.
-    //
-    // Scoped tightly, because a re-blit is not free — it submits a full-screen
-    // color-grading pass into the same queue the IFS uses:
-    //  - WebKit only. On Blink/Gecko the pump buys nothing, and its cost lands
-    //    in `ifsMs` (the no-timestamp fallback measures the whole queue
-    //    draining), which shrinks the estimated iteration count and slows
-    //    accumulation for everyone.
-    //  - Main visible canvas only (previews/gallery tiles excluded).
-    //  - Never during an export — that driver owns the canvas.
-    //  - Only while the main renderer is actually running: at
-    //    `renderInterval === Infinity` a modal gallery has deliberately taken
-    //    the GPU, and the accumulation buffer is frozen, so pumping would
-    //    re-blit an identical image at 60Hz against the very previews the
-    //    pause exists to feed.
-    createAnimationFrame(
-      () => {
-        if (!gpuReady() || exportDriverActive()) return
-        // Skip the pre-first-present window (no accumulation yet — avoid a black
-        // flash) and stop once quality is reached (swapchain already warm).
-        if (
-          accumulatedPointCount_ <= 0 ||
-          !continueRendering(accumulatedPointCount_)
-        ) {
-          return
-        }
-        presentToCanvas()
-      },
-      0,
-      undefined,
-      () =>
-        !isAppleWebKit() ||
-        exportDriverActive() ||
-        !gpuReady() ||
-        !Number.isFinite(props.renderInterval) ||
-        !(props.isExportRenderer ?? false),
-    )
-
-    // When the render interval drops from Infinity (modal closed) back to a
-    // finite rate, force an immediate redraw so the first frame appears without
-    // waiting for the next rAF delta-time check. On iOS Safari this also helps
-    // recover from any transient GPU-queue stall during the modal transition.
-    // Gate on the Infinity -> finite transition only: every flame load already
-    // redraws via resetAccumulation(), so redrawing on every finite interval
-    // change (e.g. entering/leaving export at interval 0) would be redundant.
-    // Seed with untrack() so this outer (pipeline-building) scope does not
-    // subscribe to renderInterval — only the inner effect below should.
-    let renderIntervalWasFinite = untrack(() =>
-      Number.isFinite(props.renderInterval),
-    )
-    createEffect(() => {
-      const finite = Number.isFinite(props.renderInterval)
-      const resumedFromStall = finite && !renderIntervalWasFinite
-      renderIntervalWasFinite = finite
-      if (resumedFromStall) {
+    drivers.interactive = createInteractiveRenderDriver({
+      renderTick,
+      renderInterval: () => props.renderInterval,
+      continueRendering: () => continueRendering(accumulatedPointCount_),
+      hasAccumulatedPoints: () => accumulatedPointCount_ > 0,
+      latestQueueFence: () => latestQueueFence,
+      exportDriverActive,
+      gpuReady,
+      presentToCanvas,
+      isExportRenderer: () => props.isExportRenderer ?? false,
+      onStallResumed: () => {
         requestRedraw()
-      }
+      },
     })
 
-    // Export driver: replaces the rAF loop while an export runs. The loop
-    // awaits each submission, so at most one chunk is in flight — the browser
-    // compositor never sees a deep GPU queue (no rAF collapse in Chrome), the
-    // export keeps running in background tabs, and chunk wall time is a valid
-    // measurement to size the next chunk with.
-    createEffect(() => {
-      // Stop driving on device loss too: a reactive !gpuReady() re-runs this
-      // effect, fires onCleanup (disposed = true) and breaks the export loop.
-      if (!exportDriverActive() || !gpuReady()) return
-
-      let disposed = false
-      onCleanup(() => {
-        disposed = true
-        notifyExportWork = undefined
-      })
-
-      exportIterationCount = EXPORT_INITIAL_ITERATIONS
-      let exportFrameId = 0
-
-      // Telemetry — timestamped so stalls can be correlated with tab
-      // switches, window moves and occlusion. Chrome fires visibilitychange
-      // (-> hidden) also when the window is fully covered by another window.
-      let windowStartMs = performance.now()
-      let windowPoints = 0
-      let windowTickMs = 0
-      let windowTicks = 0
-      let idleSinceMs: number | undefined
-
-      if (DEBUG_MODE) {
-        const onVisibilityChange = () => {
-          console.info(
-            `[ExportDriver ${logTime()}] document became ${document.visibilityState}`,
-          )
-        }
-        document.addEventListener('visibilitychange', onVisibilityChange)
-        onCleanup(() => {
-          document.removeEventListener('visibilitychange', onVisibilityChange)
-        })
-      }
-
-      const loop = async () => {
-        // Leave the effect's tracking scope before the first tick so signal
-        // reads inside renderTick don't become dependencies of this effect.
-        await Promise.resolve()
-
-        while (!disposed) {
-          const startMs = performance.now()
-          const tick = renderTick(exportFrameId++)
-
-          if (!tick.hadWork) {
-            // Waiting for a capture or the next frame's descriptor.
-            // Event-driven wake (requestRedraw) with a timer backstop; the
-            // timer alone could be clamped to 1Hz in hidden/occluded windows.
-            idleSinceMs ??= startMs
-            await new Promise<void>((resolve) => {
-              notifyExportWork = resolve
-              setTimeout(() => {
-                resolve()
-              }, EXPORT_IDLE_DELAY_MS)
-            })
-            notifyExportWork = undefined
-            continue
-          }
-
-          if (idleSinceMs !== undefined) {
-            const idleMs = startMs - idleSinceMs
-            if (DEBUG_MODE && idleMs > 1000) {
-              console.info(
-                `[ExportDriver ${logTime()}] resumed work after ${(idleMs / 1000).toFixed(1)}s idle`,
-              )
-            }
-            idleSinceMs = undefined
-          }
-
-          try {
-            await latestQueueFence
-          } catch {
-            // Device lost — stop driving; the app-level handler takes over.
-            break
-          }
-
-          const tickMs = performance.now() - startMs
-          windowPoints +=
-            tick.iterations * props.pointCountPerBatch * plotsPerChainBaked
-          windowTickMs += tickMs
-          windowTicks += 1
-
-          if (DEBUG_MODE && tickMs > EXPORT_SLOW_TICK_MS) {
-            console.info(
-              `[ExportDriver ${logTime()}] slow tick: ${tickMs.toFixed(0)}ms for a ${tick.iterations}-iteration chunk${tick.presented ? ' (presented)' : ''}`,
-            )
-          }
-
-          const nowMs = performance.now()
-          if (nowMs - windowStartMs >= EXPORT_LOG_INTERVAL_MS) {
-            if (DEBUG_MODE) {
-              const seconds = (nowMs - windowStartMs) / 1000
-              const avgTickMs = windowTickMs / Math.max(windowTicks, 1)
-              console.info(
-                `[ExportDriver ${logTime()}] ${formatPointCount(windowPoints / seconds)} pts/s | ${windowTicks} ticks, avg ${avgTickMs.toFixed(1)}ms | chunk=${exportIterationCount} iters`,
-              )
-            }
-            windowStartMs = nowMs
-            windowPoints = 0
-            windowTickMs = 0
-            windowTicks = 0
-          }
-
-          if (tick.iterations > 0 && !tick.presented) {
-            // Dual-rate controller (presentation ticks are skipped: their
-            // wall time includes the filter/grading passes and would skew it).
-            if (tickMs < EXPORT_TICK_GROW_BELOW_MS) {
-              // Clearly latency-bound — the fixed await floor dominates, so
-              // more iterations are effectively free. Double.
-              exportIterationCount = Math.min(
-                exportIterationCount * 2,
-                EXPORT_MAX_ITERATIONS,
-              )
-            } else if (tickMs <= EXPORT_TICK_SHRINK_ABOVE_MS) {
-              // Inside the band (e.g. sitting exactly on a vsync floor that
-              // is >= the grow threshold) — creep upward to find the point
-              // where GPU time, not latency, sets the pace.
-              exportIterationCount = Math.min(
-                Math.ceil(exportIterationCount * 1.25),
-                EXPORT_MAX_ITERATIONS,
-              )
-            } else {
-              // The chunk itself overshot the budget — shrink proportionally.
-              exportIterationCount = Math.max(
-                Math.ceil(
-                  exportIterationCount * (EXPORT_TARGET_TICK_MS / tickMs),
-                ),
-                1,
-              )
-            }
-          }
-        }
-      }
-      void loop()
+    drivers.export = createExportRenderDriver({
+      exportDriverActive,
+      gpuReady,
+      renderTick,
+      latestQueueFence: () => latestQueueFence,
+      pointCountPerBatch: () => props.pointCountPerBatch,
+      plotsPerChainBaked: () => plotsPerChainBaked,
     })
 
     // When quality changes (up or down), force a redraw so the interval function

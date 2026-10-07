@@ -4,39 +4,21 @@ import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
-import { closeDuelView, duelActive, duelShowing, runningDuel, startDuel, stopDuel, } from './duel'
+import { closeDuelView, duel, duelActive, duelShowing, runningDuel, startDuel, stopDuel, } from './duel'
 import { duelJudge } from './duelJudge'
-import { newDuelId, showDuelResult } from './duelResult'
+import { clearDuelResult, duelResult, newDuelId, showDuelResult, } from './duelResult'
 import { qualityRank } from './guard'
+import { announceFailure, markSessionFailed } from './interruptedSession'
 import { clearNarration } from './narration'
-import { agentDriving, appendPilotLog, endPilot, notePilotSaveResult, startPilot, } from './pilot'
+import { agentDriving, appendPilotLog, drivingState, endPilot, notePilotSaveResult, startPilot, } from './pilot'
 import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from './topics'
 import type { DuelVerdict } from './duelJudge'
 import type { PilotEndReason } from './pilot'
+import type { DuelOpponent, DuelStartFrom } from './types'
 import type { CommandContext } from '@/commands/types'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
-/**
- * Who is in the other seat.
- *
- * `none` opens the split screen with nobody driving it. Everything else is
- * the same duel — the same clock, the same dial, the same chips, the same
- * ending — so the interface can be looked at, and changed, without a chat
- * connected and a model round trip between every edit. It is a development
- * affordance, not a game mode: there is no opponent, so there is nothing to
- * win, and the hub only offers it where `SOLO_DUEL_AVAILABLE` says so.
- */
-export type DuelOpponent = 'ai' | 'none'
-
-/**
- * What the viewer's side starts as.
- *
- * `current` is the flame they have loaded, which is the only thing a duel
- * could start from before. The two random options exist because a duel is
- * started by the agent, on whatever the viewer happens to have open — so
- * without this, wanting a 3D duel meant loading a 3D flame by hand first and
- * hoping the agent asked at the right moment.
- */
-export type DuelStartFrom = 'current' | 'random-2d' | 'random-3d'
+export type { DuelOpponent, DuelStartFrom }
 
 /**
  * The one way a duel starts, whoever is in the other seat.
@@ -62,8 +44,10 @@ export function beginDuel(
   }
   if (duelActive()) return { error: 'A duel is already running.' }
   // A result card left on screen is not a running duel, but its seat is still
-  // alive; starting over takes the old screen down first.
-  if (duelShowing()) closeDuelView()
+  // alive; starting over takes the old screen down first, the card with it.
+  // Closing only the view left the card up over the new duel, covering its
+  // End button.
+  if (duelShowing() || duelResult()) clearDuelResult()
   // Through the registry, so the replacement is one recorded step the viewer
   // can undo — and so the duel's own take begins from a state that exists.
   if (opts.startFrom === 'random-2d' || opts.startFrom === 'random-3d') {
@@ -144,6 +128,65 @@ export type DuelOutcome = {
   savedTakes: number
 }
 
+async function saveDuelRecordedTakes(
+  recorder: CommandContext['recorder'],
+  sessions: ReturnType<typeof stopDuel>,
+  title: string,
+): Promise<number> {
+  let saved = 0
+  let attempted = 0
+  const takes = [
+    [`Duel: ${title} — your flame`, sessions.player],
+    [`Duel: ${title} — the agent's flame`, sessions.rival],
+  ] as const
+
+  for (const [name, session] of takes) {
+    if (!session) continue
+    attempted++
+    try {
+      await recorder?.save(session, name)
+      saved++
+    } catch (error) {
+      console.warn('[arcade] could not save a duel take', error)
+      appendPilotLog('error', `Could not save "${name}" to the library`)
+    }
+  }
+  if (attempted > 0) notePilotSaveResult(saved === attempted)
+  return saved
+}
+
+function presentDuelResult(params: {
+  readonly verdict: DuelVerdict
+  readonly reason: PilotEndReason
+  readonly playerFlame: FlameDescriptor
+  readonly rivalNameFallback?: string
+  readonly winnerFlame: FlameDescriptor
+  readonly durationMs: number
+  readonly savedTakes: number
+}): void {
+  const {
+    verdict,
+    reason,
+    playerFlame,
+    rivalNameFallback,
+    winnerFlame,
+    durationMs,
+    savedTakes,
+  } = params
+
+  showDuelResult({
+    verdict,
+    reason,
+    playerName: playerFlame.metadata?.name?.trim() || 'You',
+    rivalName: rivalNameFallback?.trim() || 'The agent',
+    winnerFlame,
+    archetype: calculateFlameStats(winnerFlame).type,
+    durationMs,
+    id: newDuelId(),
+    savedTakes,
+  })
+}
+
 /**
  * The one way a duel ends — the End button, the clock, Escape twice, and the
  * end tool all come through here.
@@ -160,7 +203,16 @@ export type DuelOutcome = {
 export async function finishDuel(
   ctx: CommandContext,
   reason: PilotEndReason,
-  opts: { title?: string; summary?: string } = {},
+  opts: {
+    title?: string
+    summary?: string
+    /**
+     * Take the split screen down as the duel ends, with no result card. For
+     * an ending the stage itself cannot survive: the card renders a still of
+     * the winner on the same GPU that just failed.
+     */
+    closeView?: boolean
+  } = {},
 ): Promise<DuelOutcome | { error: string }> {
   const state = runningDuel()
   if (!state) return { error: 'No duel is running.' }
@@ -183,38 +235,24 @@ export async function finishDuel(
     sessionName: sessions.player ? playerName : undefined,
     session: sessions.player,
   })
-  let saved = 0
-  let attempted = 0
-  for (const [name, session] of [
-    [playerName, sessions.player],
-    [`Duel: ${title} — the agent's flame`, sessions.rival],
-  ] as const) {
-    if (!session) continue
-    attempted++
-    try {
-      await ctx.recorder?.save(session, name)
-      saved++
-    } catch (error) {
-      console.warn('[arcade] could not save a duel take', error)
-      appendPilotLog('error', `Could not save "${name}" to the library`)
-    }
+  if (opts.closeView) closeDuelView()
+  const saved = await saveDuelRecordedTakes(ctx.recorder, sessions, title)
+  // The save takes time, and in it the agent can start a rematch or the
+  // viewer can close the stage. The card belongs to this duel's result
+  // screen only; over a newer duel it would hide the End button, and
+  // dismissing it would close that duel.
+  const now = duel()
+  if (now.phase === 'result' && now.rival === state.rival) {
+    presentDuelResult({
+      verdict,
+      reason,
+      playerFlame,
+      rivalNameFallback: state.ready?.title,
+      winnerFlame,
+      durationMs: state.durationMs,
+      savedTakes: saved,
+    })
   }
-  if (attempted > 0) notePilotSaveResult(saved === attempted)
-  // The card is the report. A toast as well would say the same thing twice,
-  // in the corner, over a screen that is now entirely about the result.
-  showDuelResult({
-    verdict,
-    reason,
-    // The card names the winner and only falls back to who they are. The
-    // take names above are a filename convention and stay as they are.
-    playerName: playerFlame.metadata?.name?.trim() || 'You',
-    rivalName: state.ready?.title?.trim() || 'The agent',
-    winnerFlame,
-    archetype: calculateFlameStats(winnerFlame).type,
-    durationMs: state.durationMs,
-    id: newDuelId(),
-    savedTakes: saved,
-  })
   return {
     ok: true,
     title,
@@ -224,4 +262,47 @@ export async function finishDuel(
     rivalScore: verdict.rivalScore,
     savedTakes: saved,
   }
+}
+
+/**
+ * A duel seat's renderer threw — a GPU buffer that could not be allocated or
+ * written, a pipeline that could not be built — so the duel is over.
+ *
+ * Without this the error climbed to the app's own boundary and replaced the
+ * whole editor with the crash screen, for a failure in a surface that exists
+ * only for the duel. The split screen is taken down rather than left up with
+ * a hole in it, which also gives the GPU back its memory; the takes are still
+ * stopped and saved the way any ending saves them.
+ *
+ * The agent is held exactly as after a reload (`markSessionFailed`): the
+ * bridge target is back on the viewer's seat, and an agent that still thinks
+ * it is duelling would otherwise edit the viewer's flame with its next call.
+ */
+export async function endDuelOnRenderFailure(
+  ctx: CommandContext,
+  side: 'player' | 'rival',
+  error: unknown,
+): Promise<void> {
+  console.error(
+    `[arcade] the ${side} seat could not render; ending the duel`,
+    error,
+  )
+  const driving = drivingState()
+  const agentDuel = driving?.mode === 'duel' ? driving : undefined
+  const session = { mode: 'duel', title: agentDuel?.title ?? 'Duel' }
+  if (!runningDuel()) {
+    // Under the result card: the duel is already over and its takes saved.
+    // Only the screen has to go.
+    if (duelShowing()) {
+      clearDuelResult()
+      closeDuelView()
+      announceFailure(session)
+    }
+    return
+  }
+  // Before the ending, which runs the save: from here on no tool call may
+  // reach the viewer's flame unannounced.
+  if (agentDuel) markSessionFailed(session)
+  else announceFailure(session)
+  await finishDuel(ctx, 'error', { closeView: true })
 }

@@ -86,7 +86,7 @@ const comingSoon = [
       features.map((f, i) => (
         <article class="feat">
           <div class="feat-top">
-            <span class="feat-icon" set:html={icons[f.icon]} />
+            <span class="feat-icon" set:html={icons[f.icon as keyof typeof icons]} />
             <div class="idx">{String(i + 1).padStart(2, '0')}</div>
           </div>
           <h3>{f.title}</h3>
@@ -102,7 +102,7 @@ const comingSoon = [
       {
         comingSoon.map((c) => (
           <div class="soon-card">
-            <span class="soon-icon" set:html={icons[c.icon]} />
+            <span class="soon-icon" set:html={icons[c.icon as keyof typeof icons]} />
             <div>
               <div class="soon-name">{c.name}</div>
               <div class="soon-tag">{c.tag}</div>

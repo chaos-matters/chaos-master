@@ -1,3 +1,4 @@
+import { batch, createSignal, untrack } from 'solid-js'
 import * as v from '@/valibot'
 import { transformVariations, variationTypes } from '../index'
 import { compileCustomVariationCode } from './runtimeCompiler'
@@ -9,7 +10,19 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 const STORAGE_KEY = 'chaos-master-custom-variations'
 const CUSTOM_TYPE_PREFIX = 'custom_'
 
-let cacheVersion = 0
+/**
+ * Bumped on every change to the registered custom variations: one created,
+ * edited or renamed, duplicated, deleted, restored, loaded, imported from a
+ * link or saved from one, always after the change is saved. A live preview
+ * does not bump it. Flam3 reads it reactively, so every open renderer
+ * rebuilds its IFS pipeline after a change, except while an export drives
+ * it; the pipeline caches read it untracked, as part of their keys.
+ */
+const [version, setVersion] = createSignal(0)
+
+function bumpVersion() {
+  setVersion((current) => current + 1)
+}
 
 function generateId(): string {
   return `${CUSTOM_TYPE_PREFIX}${window.crypto
@@ -75,8 +88,14 @@ export function isCustomVariationRegistered(id: string): boolean {
   return !!rec?.fn
 }
 
+/** The custom variations' version. A reactive read: rebuild on any change. */
+export function customVariationsVersion(): number {
+  return version()
+}
+
+/** The same version for a cache key, read without subscribing to it. */
 export function getCacheVersion(): number {
-  return cacheVersion
+  return untrack(version)
 }
 
 function persist() {
@@ -120,10 +139,12 @@ function register(def: CustomVariationDef, fn?: TgpuFn, skipPersist = false) {
   if (fn) {
     addToGlobal(def, fn)
   }
-  cacheVersion++
+  // Saved before the renderers hear of it: a rebuild that throws must not
+  // lose the change.
   if (!skipPersist) {
     persist()
   }
+  bumpVersion()
 }
 
 function unregister(id: string): boolean {
@@ -131,8 +152,8 @@ function unregister(id: string): boolean {
   if (!record) return false
   delete customVariationRecords[id]
   removeFromGlobal(id)
-  cacheVersion++
   persist()
+  bumpVersion()
   return true
 }
 
@@ -281,22 +302,27 @@ export function loadCustomVariations(): void {
     if (!raw) return
     const store = JSON.parse(raw) as Record<string, unknown>
     if (!store?.variations) return
-    for (const def of Object.values(store.variations) as CustomVariationDef[]) {
-      if (!def.id || !def.wgsl || !def.name || typeof def.name !== 'string')
-        continue
-      if (!def.id.startsWith(CUSTOM_TYPE_PREFIX)) continue
-      const compileResult = compileCustomVariationCode(def.wgsl)
-      if (!compileResult.valid) {
-        console.warn(
-          `[CustomVariationRegistry] Failed to compile "${def.name}" (${def.id}):`,
-          compileResult.errors.map((e) => e.message).join(', '),
-        )
-        register(def, undefined, true)
-      } else {
-        register(def, compileResult.fn, true)
+    const entries: unknown[] = Object.values(store.variations)
+    // One change for the whole library, so an open renderer rebuilds once.
+    // Nothing in it may throw: a throw inside a batch drops the renderers'
+    // pending updates, and they would miss the next edit too.
+    batch(() => {
+      for (const def of entries) {
+        if (!isDefShape(def) || !def.id || !def.wgsl || !def.name) continue
+        if (!def.id.startsWith(CUSTOM_TYPE_PREFIX)) continue
+        const compileResult = compileCustomVariationCode(def.wgsl)
+        if (!compileResult.valid) {
+          console.warn(
+            `[CustomVariationRegistry] Failed to compile "${def.name}" (${def.id}):`,
+            compileResult.errors.map((e) => e.message).join(', '),
+          )
+          register(def, undefined, true)
+        } else {
+          register(def, compileResult.fn, true)
+        }
       }
-    }
-    persist() // Save once after loading all
+      persist() // Save once after loading all, before the renderers hear of it
+    })
   } catch (err) {
     console.warn(
       '[CustomVariationRegistry] Failed to load custom variations:',
@@ -307,9 +333,11 @@ export function loadCustomVariations(): void {
 
 export function clearAllCustomVariations(): void {
   const ids = Object.keys(customVariationRecords)
-  for (const id of ids) {
-    unregister(id)
-  }
+  batch(() => {
+    for (const id of ids) {
+      unregister(id)
+    }
+  })
 }
 
 // ── Sharing: collect / import / persist ──────────────────────────────────────
@@ -379,7 +407,8 @@ function findByWgsl(
   return undefined
 }
 
-function isValidSharedDefShape(def: unknown): def is CustomVariationDef {
+/** An object with a string id, name and code: saved, or from a link. */
+function isDefShape(def: unknown): def is CustomVariationDef {
   return (
     !!def &&
     typeof def === 'object' &&
@@ -392,7 +421,7 @@ function isValidSharedDefShape(def: unknown): def is CustomVariationDef {
 function registerTransient(def: CustomVariationDef, fn: TgpuFn) {
   transientSharedRecords[def.id] = { def, fn }
   addToGlobal(def, fn)
-  cacheVersion++
+  bumpVersion()
 }
 
 /**
@@ -414,63 +443,80 @@ export function importSharedVariations(
   const remap: Record<string, string> = {}
   const rejected: { name: string; errors: CompileError[] }[] = []
 
-  for (const raw of defs) {
-    if (!isValidSharedDefShape(raw)) {
-      rejected.push({
-        name: 'unknown',
-        errors: [{ message: 'Malformed custom variation definition' }],
-      })
-      continue
-    }
-    const incoming = raw
-    if (!incoming.id.startsWith(CUSTOM_TYPE_PREFIX)) {
-      rejected.push({
+  // One change for the whole link, so an open renderer rebuilds once.
+  batch(() => {
+    for (const raw of defs) {
+      if (!isDefShape(raw)) {
+        rejected.push({
+          name: 'unknown',
+          errors: [{ message: 'Malformed custom variation definition' }],
+        })
+        continue
+      }
+      const incoming = raw
+      if (!incoming.id.startsWith(CUSTOM_TYPE_PREFIX)) {
+        rejected.push({
+          name: incoming.name,
+          errors: [{ message: 'Invalid custom variation id' }],
+        })
+        continue
+      }
+
+      const compileResult = compileCustomVariationCode(incoming.wgsl)
+      if (!compileResult.valid) {
+        rejected.push({ name: incoming.name, errors: compileResult.errors })
+        continue
+      }
+
+      // Identical code already present (saved or imported this session), matched by
+      // WGSL regardless of id: don't duplicate. Point the flame at the existing
+      // copy and, if it's saved, report it as already-owned. Never overwrite.
+      const match = findByWgsl(incoming.wgsl)
+      if (match) {
+        if (match.id !== incoming.id) {
+          remap[incoming.id] = match.id
+        }
+        if (match.saved && !alreadyOwned.some((d) => d.id === match.id)) {
+          alreadyOwned.push(match.def)
+        }
+        continue
+      }
+
+      const now = Date.now()
+      // Re-key on id collision (same id, different code) so we never clobber the
+      // recipient's version.
+      const idTaken = lookupDef(incoming.id) !== undefined
+      const id = idTaken ? generateId() : incoming.id
+      if (idTaken) {
+        remap[incoming.id] = id
+      }
+      const def: CustomVariationDef = {
+        id,
         name: incoming.name,
-        errors: [{ message: 'Invalid custom variation id' }],
-      })
-      continue
-    }
-
-    const compileResult = compileCustomVariationCode(incoming.wgsl)
-    if (!compileResult.valid) {
-      rejected.push({ name: incoming.name, errors: compileResult.errors })
-      continue
-    }
-
-    // Identical code already present (saved or imported this session), matched by
-    // WGSL regardless of id: don't duplicate. Point the flame at the existing
-    // copy and, if it's saved, report it as already-owned. Never overwrite.
-    const match = findByWgsl(incoming.wgsl)
-    if (match) {
-      if (match.id !== incoming.id) {
-        remap[incoming.id] = match.id
+        wgsl: incoming.wgsl,
+        createdAt: now,
+        updatedAt: now,
       }
-      if (match.saved && !alreadyOwned.some((d) => d.id === match.id)) {
-        alreadyOwned.push(match.def)
-      }
-      continue
+      registerTransient(def, compileResult.fn)
+      imported.push(def)
     }
-
-    const now = Date.now()
-    // Re-key on id collision (same id, different code) so we never clobber the
-    // recipient's version.
-    const idTaken = lookupDef(incoming.id) !== undefined
-    const id = idTaken ? generateId() : incoming.id
-    if (idTaken) {
-      remap[incoming.id] = id
-    }
-    const def: CustomVariationDef = {
-      id,
-      name: incoming.name,
-      wgsl: incoming.wgsl,
-      createdAt: now,
-      updatedAt: now,
-    }
-    registerTransient(def, compileResult.fn)
-    imported.push(def)
-  }
+  })
 
   return { imported, alreadyOwned, remap, rejected }
+}
+
+/**
+ * Load the saved library, then import a link's variations against it, so the
+ * collision checks see the library. One change, so an open renderer rebuilds
+ * once, not once for the load and again for the import.
+ */
+export function loadAndImportSharedVariations(
+  defs: readonly unknown[],
+): SharedImportResult {
+  return batch(() => {
+    loadCustomVariations()
+    return importSharedVariations(defs)
+  })
 }
 
 /**
@@ -478,12 +524,14 @@ export function importSharedVariations(
  * recipient accepts them. Ids not present in the transient set are ignored.
  */
 export function persistSharedVariations(ids: readonly string[]): void {
-  for (const id of ids) {
-    const record = transientSharedRecords[id]
-    if (!record) continue
-    delete transientSharedRecords[id]
-    register(record.def, record.fn) // moves into the saved library + persists
-  }
+  batch(() => {
+    for (const id of ids) {
+      const record = transientSharedRecords[id]
+      if (!record) continue
+      delete transientSharedRecords[id]
+      register(record.def, record.fn) // moves into the saved library + persists
+    }
+  })
 }
 
 /**

@@ -1,3 +1,4 @@
+import { restoreGlideSwitches, settleGlideOnArcadeEnd, } from '@/flame/glide/runtime'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { setWebMcpTarget } from '@/webmcp/contextBridge'
 import { clearNarration } from './narration'
@@ -27,8 +28,31 @@ export function budgetExhaustedMessage(mode: PilotMode): string {
       return 'Step budget exhausted. You cannot end a duel; the clock does. Call arcade_duel_ready with a title if you have not already, then wait for time to run out.'
     case 'cinema':
       return 'Step budget exhausted. Finish now with arcade_end_cinema.'
+    case 'beats':
+      return 'Step budget exhausted. Finish now with arcade_end_beats.'
     default:
       return 'Step budget exhausted. Finish now with arcade_end_lesson.'
+  }
+}
+
+/**
+ * What an end tool tells the agent about the take, from finishPilot's result:
+ * in the library, a save that failed (storage full, no IndexedDB), or nothing
+ * recorded to save. Never "saved" on faith.
+ */
+export function takeOutcome(
+  ended: PilotEnded,
+  label: string,
+): { saved: boolean; message: string } {
+  if (ended.saved === true) {
+    return { saved: true, message: `${label} completed and saved to library.` }
+  }
+  return {
+    saved: false,
+    message:
+      ended.saved === false
+        ? `${label} ended, but the take could not be saved to the library.`
+        : `${label} ended. Nothing was recorded, so nothing was saved.`,
   }
 }
 
@@ -56,6 +80,10 @@ export function sessionNameFor(
  * tools and the overlay's Stop button so a stopped take is kept, not thrown
  * away — the point of the lock is that the human can always take over without
  * losing the work the agent already did.
+ *
+ * The result carries `saved` once the write settles, so an end tool can say
+ * whether the take reached the library; it stays unset when nothing was
+ * recorded and so nothing was saved.
  */
 export async function finishPilot(
   ctx: CommandContext,
@@ -64,6 +92,12 @@ export async function finishPilot(
 ): Promise<PilotEnded | { error: string }> {
   const state = drivingState()
   if (!state) return { error: 'No active Arcade session.' }
+  // Before the recorder stops, so a take cannot end part-way through a
+  // transition a presentation mode started and nothing else would land.
+  settleGlideOnArcadeEnd()
+  // Then the switches, and only then: the transition in flight belongs to the
+  // take, and the editor after it is the viewer's again, set as they left it.
+  if (state.glideAtStart) restoreGlideSwitches(state.glideAtStart)
   const title =
     (opts.title ?? '').trim().slice(0, 80) || defaultPilotTitle(state)
   const session = ctx.recorder?.stop()
@@ -85,7 +119,8 @@ export async function finishPilot(
   })
   if (!ended) return { error: 'No active Arcade session.' }
   let saved = true
-  if (session && sessionName !== undefined) {
+  const recorded = session !== undefined && sessionName !== undefined
+  if (recorded) {
     try {
       await ctx.recorder?.save(session, sessionName)
     } catch (error) {
@@ -93,8 +128,8 @@ export async function finishPilot(
       console.warn('[arcade] could not save the session', error)
       appendPilotLog('error', 'Could not save the session to the library')
     }
+    notePilotSaveResult(saved)
   }
-  if (session && sessionName !== undefined) notePilotSaveResult(saved)
   ctx.arcade?.toast(
     sessionName === undefined
       ? `${title} ended`
@@ -102,5 +137,5 @@ export async function finishPilot(
         ? `Saved "${sessionName}"`
         : `Could not save "${sessionName}" to your library`,
   )
-  return ended
+  return recorded ? { ...ended, saved } : ended
 }

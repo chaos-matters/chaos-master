@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ember-drift",
+    "name": "Ember Drift",
+    "artist": "Lumen Studio (CC0)",
+    "bpm": 100,
+    "duration": 12,
+    "url": "/audio/ember-drift.wav",
+    "description": "Warm ambient synth chords with deep sub-bass pulse at 100 BPM."
+  },
+  {
+    "id": "cyber-pulse",
+    "name": "Cyber Pulse",
+    "artist": "Lumen Studio (CC0)",
+    "bpm": 120,
+    "duration": 10,
+    "url": "/audio/cyber-pulse.wav",
+    "description": "Driving electronic rhythm with punchy bass arpeggio at 120 BPM."
+  }
+]

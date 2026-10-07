@@ -1,0 +1,447 @@
+/*
+ * Deep-zoom explorer: a full-bleed canvas under glass HUD and panel, or in
+ * split view two panes, the Mandelbrot set and the Julia set of its point.
+ *
+ * Text on glass keeps to the tier its fill allows over bright art (lumen.css,
+ * section 5): the HUD pills are chrome at 72% and carry ink only, the panel
+ * is panel at 80% and carries nothing below ink-2. Text on the opaque inner
+ * surfaces - inputs, segments, actions - is not on glass. Accent marks
+ * edges and fills here, never text or a glyph.
+ *
+ * Under 680px is a phone, as in the app (PHONE_MAX_WIDTH,
+ * stores/workspaceLayoutStore.ts): the panel becomes a bottom sheet. The
+ * phone rules are `not all and (min-width: 680px)`, the exact complement of
+ * the wider layout's, so no fractional width falls between the two.
+ */
+
+/* The whole page takes a dropped picture (Dropzone draws the highlight). */
+.dropTarget {
+  position: fixed;
+  inset: 0;
+}
+
+.page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--la-void);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+
+.page[data-split] .stage {
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--la-hairline);
+}
+
+/* A portrait screen stacks the panes. */
+@media (orientation: portrait) {
+  .page[data-split] .stage {
+    grid-template-columns: none;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+
+/* Beside the side panel rather than under it, so the Julia pane stays whole. */
+@media (min-width: 680px) {
+  .page[data-split][data-panel] .stage {
+    right: calc(
+      var(--la-safe-right) + 2 * var(--la-s-3) +
+        min(340px, calc(100vw - 2 * var(--la-s-3)))
+    );
+  }
+}
+
+.pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--la-void);
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  outline: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: -2px;
+  }
+}
+
+.progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--la-accent);
+  transform-origin: left center;
+  transition:
+    transform var(--la-dur-fast) var(--la-ease-linear),
+    opacity var(--la-dur-base) var(--la-ease);
+  pointer-events: none;
+
+  &[data-done] {
+    opacity: 0;
+  }
+}
+
+.hud {
+  position: absolute;
+  top: calc(var(--la-safe-top) + var(--la-s-3));
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+  right: calc(var(--la-safe-right) + var(--la-s-3));
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-3);
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto;
+  }
+}
+
+/* One row does not fit a phone: at 390px it wanted 427px of 366, and the
+   settings button sat off the right edge, out of reach. The readouts take a
+   second row, under the buttons, with undo and redo at its left; the ::after
+   is the line break before them, so the first row is the same at every phone
+   width. The title starts from no width and grows to its own: a wrapping row
+   moves an item that does not fit to the next line before it shrinks
+   anything, and at 320px the title would push the buttons off the row. */
+@media not all and (min-width: 680px) {
+  .hud {
+    flex-wrap: wrap;
+    row-gap: var(--la-s-1);
+
+    &::after {
+      content: '';
+      order: 1;
+      flex-basis: 100%;
+    }
+  }
+
+  .titleBlock {
+    flex: 1 1 0;
+    max-width: max-content;
+    margin-right: auto;
+  }
+
+  .history,
+  .readouts {
+    order: 2;
+  }
+}
+
+.paneLabel {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  position: absolute;
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+  bottom: calc(var(--la-safe-bottom) + var(--la-s-3));
+  max-width: calc(100% - 2 * var(--la-s-3));
+  margin: 0;
+  padding: var(--la-s-1) var(--la-s-3);
+  border-radius: var(--la-r-pill);
+  font: var(--la-t-mono);
+  color: var(--la-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.iconButton {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  border-radius: var(--la-r-pill);
+  color: var(--la-ink);
+  cursor: pointer;
+
+  & svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* The edge, not the glyph: accent on the 72% fill is 2.86:1 over white. */
+  &:hover:not(:disabled),
+  &[aria-pressed='true'] {
+    border-color: var(--la-accent);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Undo and redo: in the header, after the title. On a phone they open the
+   second row, level with the readouts at its right. */
+.history {
+  display: flex;
+  flex: none;
+  gap: var(--la-s-2);
+}
+
+.titleBlock {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-4);
+  border-radius: var(--la-r-pill);
+
+  /* Squeezed, the names shorten instead of wrapping, so the row stays one
+     control tall. */
+  & > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.title {
+  font: var(--la-t-body-strong);
+}
+
+.subtitle {
+  font: var(--la-t-label);
+  color: var(--la-ink);
+  letter-spacing: var(--la-t-label-track);
+  text-transform: uppercase;
+}
+
+.readouts {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  display: flex;
+  gap: var(--la-s-4);
+  margin: 0 0 0 auto;
+  min-height: var(--la-tap);
+  padding: 0 var(--la-s-4);
+  border-radius: var(--la-r-pill);
+  align-items: center;
+
+  & div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  & dt {
+    font: var(--la-t-label);
+    color: var(--la-ink);
+    text-transform: uppercase;
+    letter-spacing: var(--la-t-label-track);
+  }
+
+  & dd {
+    margin: 0;
+    font: var(--la-t-value);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* The shared Slider and PaletteSelector are written for the editor's opaque
+   sidebar, in two themes. On this glass, dark in both themes, onGlass gives
+   them the panel's tiers: text at ink-2 or ink, never lower, and the dark
+   look's lines in either theme. */
+.panel {
+  composes: panel onGlass from '@/styles/designSystem/glass.module.css';
+  position: absolute;
+  top: calc(var(--la-safe-top) + var(--la-s-3) + var(--la-tap) + var(--la-s-3));
+  right: calc(var(--la-safe-right) + var(--la-s-3));
+  bottom: calc(var(--la-safe-bottom) + var(--la-s-3));
+  width: min(340px, calc(100vw - 2 * var(--la-s-3)));
+  border-radius: var(--la-r-md);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media not all and (min-width: 680px) {
+  .panel {
+    top: auto;
+    left: calc(var(--la-safe-left) + var(--la-s-3));
+    width: auto;
+    max-height: 55dvh;
+  }
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-s-2);
+  padding: var(--la-s-4);
+  border-bottom: 1px solid var(--la-hairline);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 3px;
+  border-radius: var(--la-r-pill);
+  background: var(--la-surface-2);
+}
+
+.segment {
+  min-height: 36px;
+  border: none;
+  border-radius: var(--la-r-pill);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: var(--la-t-caption);
+  cursor: pointer;
+
+  &[aria-checked='true'] {
+    background: var(--la-surface);
+    color: var(--la-ink);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+  }
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--la-s-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-s-1);
+  min-width: 0;
+}
+
+.fieldLabel {
+  font: var(--la-t-label);
+  color: var(--la-ink-2);
+  text-transform: uppercase;
+  letter-spacing: var(--la-t-label-track);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--la-s-2);
+  border: 1px solid var(--la-hairline);
+  border-radius: var(--la-r-sm);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: var(--la-t-mono);
+  /* Sideways drags scrub the value; vertical ones still scroll the panel. */
+  touch-action: pan-y;
+
+  &:not(:focus) {
+    cursor: ew-resize;
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--la-error);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: -1px;
+  }
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+
+  & .input {
+    text-align: center;
+    font: var(--la-t-value);
+    font-variant-numeric: tabular-nums;
+  }
+
+  & .iconButton {
+    width: 36px;
+    height: 36px;
+    box-shadow: none;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-s-2);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  min-height: 36px;
+  padding: 0 var(--la-s-3);
+  border: 1px solid var(--la-hairline);
+  border-radius: var(--la-r-pill);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: var(--la-t-caption);
+  cursor: pointer;
+
+  & svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    border-color: var(--la-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+  }
+}
+
+.status {
+  margin: 0;
+  font: var(--la-t-mono);
+  color: var(--la-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 0;
+  font: var(--la-t-caption);
+  color: var(--la-ink-2);
+}

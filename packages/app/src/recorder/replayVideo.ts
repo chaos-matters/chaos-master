@@ -5,22 +5,32 @@ import '@/commands/builtins'
 import { vec2f } from 'typegpu/data'
 import { executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { qualityPresets } from '@/components/Quality/QualityPresets'
+import { planGlide } from '@/flame/glide/plan'
+import { glideFrameQuality, resolveGlideQuality } from '@/flame/glide/quality'
+import { APART_FROM_LIVE_GLIDE } from '@/flame/glide/runtime'
+import { sampleGlide } from '@/flame/glide/sample'
+import { isGlideRefusal } from '@/flame/glide/types'
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { defaultTimelineConfig } from '@/flame/schema/timeline'
 import { deepClone } from '@/utils/clone'
 import { applyTracksToFlame, getUserEndFrame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
+import { glideMsForAction, glideOptionsByStep } from './glide'
 import { closingHoldMs, stepGapMs } from './player'
+import { createPlayheadPacer } from './playWindowPace'
+import { planPlayWindows } from './playWindows'
 import { paletteRestoreColorsAfterReplayCommand } from './replayPaletteState'
 import { validateSession } from './schema'
+import type { ReplayGlideOptions } from './glide'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, TransformColorSnapshot, } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
 import type { CommandContext } from '@/commands/types'
 import type { Palette } from '@/flame/colorMap'
+import type { GlidePlan, GlideQualityTier } from '@/flame/glide/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { HistorySetter } from '@/utils/createStoreHistory'
-import type { AnimationJobSpec } from '@/utils/exportJobs'
+import type { AnimationJobSpec, ReplayVideoSpec } from '@/utils/exportJobs'
 
 export const REPLAY_VIDEO_FPS = 24
 /**
@@ -55,18 +65,30 @@ export const MAX_REPLAY_VIDEO_DURATION_MS = 300_000
 // would therefore depend on whichever local registry happens to render it.
 const CUSTOM_VARIATION_TYPE_PREFIX = 'custom_'
 
-export type ReplayVideoSpec = {
-  version: 1
-  playbackSpeed: number
-  leadInMs: number
-  tailMs: number
-}
+export type { ReplayVideoSpec }
 
 export type ReplayVideoSchedule = {
   fps: number
   actionTimesMs: number[]
   /** One distinct output frame per authored step, even for zero-gap actions. */
   actionFrames: number[]
+  /**
+   * How many frames after each step's own frame are INTERMEDIATE frames of the
+   * glide into it. Zero means that step is a cut, which is every step when
+   * glides are off — and then this whole file behaves as it always has.
+   *
+   * Always at least one frame short of the step's run, so the settled state is
+   * seen before the next step arrives.
+   */
+  glideFrames: number[]
+  /** Each glide's length and tier, as the live replay plans it. */
+  glideMs: number[]
+  glideTiers: GlideQualityTier[]
+  /** Whether the take played in the run after each step, and each step's
+   *  take time: inside a play window every frame shows its own moment. */
+  playing: boolean[]
+  stepTakeMs: number[]
+  playbackSpeed: number
   durationMs: number
   totalFrames: number
   /**
@@ -87,12 +109,33 @@ export type ReplayVideoFrameState = {
   stochasticFilter: boolean
   action: RecordedAction | undefined
   actionIndex: number
+  /** Where in the glide into this step the frame sits. 1 = settled. */
+  glideT: number
+  /** The timeline frame the flame is posed at, when the take animates. */
+  playhead: number | undefined
+}
+
+/** Which state an output frame shows: a step, how far into its glide, and
+ *  inside a play window the take time the playhead is at. */
+export type ReplayVideoStateAt = {
+  actionIndex: number
+  glideT: number
+  takeMs?: number
 }
 
 export type ReplayVideoDriver = {
   readonly session: RecordedSession
-  /** State after action `index`; -1 is the recorded baseline. */
-  advanceTo: (index: number) => ReplayVideoFrameState
+  /**
+   * State after action `index`; -1 is the recorded baseline. `glideT` below 1
+   * returns the flame partway through the transition INTO that action, which
+   * is a pure function of the pair — the same plan sampled twice is identical,
+   * so two exports of one session produce the same frames.
+   */
+  advanceTo: (
+    index: number,
+    glideT?: number,
+    takeMs?: number,
+  ) => ReplayVideoFrameState
   reset: () => ReplayVideoFrameState
 }
 
@@ -111,6 +154,10 @@ export function replayVideoVisualFingerprint(
     blendWeight: state.blendWeight,
     adaptiveFilter: state.adaptiveFilter,
     stochasticFilter: state.stochasticFilter,
+    // Without this, a glide whose frames differ below JSON precision would be
+    // read as "nothing changed" and one bitmap would be reused for the whole
+    // transition.
+    glideT: state.glideT,
   })
 }
 
@@ -232,29 +279,28 @@ function writeTimelineValue(
   path: string,
   value: TimelineSnapshotValue,
 ): void {
+  // A few first-level settings are intentionally generic in the editor and
+  // are newer than applyTracksToFlame's explicit list. Preserve those too.
+  if (path === 'blendWeight' && typeof value === 'number') {
+    flame.renderSettings.blendWeight = value
+  } else if (!path.includes('.') && path in flame.renderSettings) {
+    ;(flame.renderSettings as unknown as Record<string, unknown>)[path] =
+      deepClone(value)
+  }
+
   // Reuse the renderer's canonical path application for camera, transform,
-  // variation and final-transform tracks.
+  // variation and final-transform tracks. Last, so that its schema projection
+  // holds the write above to the domain the live write-through keeps.
   applyTracksToFlame(
     [
       {
         parameterPath: path,
-        keyframes: [{ frame: 0, value }],
+        keyframes: [{ frame: 0, value: deepClone(value) }],
       },
     ],
     flame,
     0,
   )
-
-  // A few first-level settings are intentionally generic in the editor and
-  // are newer than applyTracksToFlame's explicit list. Preserve those too.
-  if (path === 'blendWeight' && typeof value === 'number') {
-    flame.renderSettings.blendWeight = value
-    return
-  }
-  if (!path.includes('.') && path in flame.renderSettings) {
-    ;(flame.renderSettings as unknown as Record<string, unknown>)[path] =
-      deepClone(value)
-  }
 }
 
 function applyTimelinePose(
@@ -264,15 +310,9 @@ function applyTimelinePose(
   const posed = deepClone(base)
   if (!timeline.animationEnabled || !timeline.previewHeld) return posed
   const frame = timeline.currentFrame ?? timeline.config.startFrame
-  applyTracksToFlame(
-    timeline.tracks,
-    posed,
-    frame,
-    loopOptsFromConfig(timeline.config, timeline.tracks),
-  )
-
   // Keep generic first-level render settings and blendWeight in sync with the
-  // live editor. applyTracksToFlame owns the structured path vocabulary.
+  // live editor. applyTracksToFlame owns the structured path vocabulary, and
+  // runs last so its schema projection covers these writes too.
   for (const track of timeline.tracks) {
     if (track.parameterPath.includes('.')) continue
     const value = resolveLoopValue(
@@ -290,6 +330,12 @@ function applyTimelinePose(
       ] = deepClone(value)
     }
   }
+  applyTracksToFlame(
+    timeline.tracks,
+    posed,
+    frame,
+    loopOptsFromConfig(timeline.config, timeline.tracks),
+  )
   return posed
 }
 
@@ -378,6 +424,7 @@ function buildScheduleSpec(
   playbackSpeed: number,
   leadInMs = REPLAY_VIDEO_LEAD_IN_MS,
   tailMs = REPLAY_VIDEO_TAIL_MS,
+  glide?: ReplayGlideOptions,
 ): ReplayVideoSpec {
   if (!Number.isFinite(playbackSpeed) || playbackSpeed <= 0) {
     throw new Error('Replay video speed must be greater than zero')
@@ -387,6 +434,7 @@ function buildScheduleSpec(
     playbackSpeed,
     leadInMs,
     tailMs,
+    ...(glide === undefined ? {} : { glide }),
   }
 }
 
@@ -396,11 +444,21 @@ export function createReplayVideoSchedule(
   fps = REPLAY_VIDEO_FPS,
   leadInMs = REPLAY_VIDEO_LEAD_IN_MS,
   tailMs = REPLAY_VIDEO_TAIL_MS,
+  glide: ReplayGlideOptions = { enabled: false },
 ): ReplayVideoSchedule {
   if (!Number.isFinite(fps) || fps <= 0) {
     throw new Error('Replay video FPS must be greater than zero')
   }
   const spec = buildScheduleSpec(playbackSpeed, leadInMs, tailMs)
+  // The same number the live player uses, from the same function, for the same
+  // reason the gap rule is shared, at the tier the take has in force there.
+  const stepGlides = glideOptionsByStep(session, glide)
+  const glideMs = session.actions.map((action, index) =>
+    glideMsForAction(action, stepGlides[index]!),
+  )
+  const playing = planPlayWindows(session.actions).after.map(
+    (window) => window !== undefined,
+  )
   let cursor = spec.leadInMs
   const actionTimesMs: number[] = []
   const actionFrames: number[] = []
@@ -411,7 +469,13 @@ export function createReplayVideoSchedule(
     // The same rule the live player uses, not a copy of it: the interface
     // exporter validates this schedule and then screen-records the player, so
     // the two drifting apart overruns the capture budget.
-    cursor += stepGapMs(previous, action, spec.playbackSpeed)
+    cursor += stepGapMs(
+      previous,
+      action,
+      spec.playbackSpeed,
+      index > 0 ? glideMs[index - 1]! : 0,
+      index > 0 && playing[index - 1]!,
+    )
     // Two companion commands can share a timestamp. A video cannot represent
     // both on one frame, so advance at least one frame and never silently skip
     // an authored step/caption.
@@ -440,46 +504,105 @@ export function createReplayVideoSchedule(
       `Replay video is ${Math.ceil(durationMs / 1000)}s; the current limit is ${MAX_REPLAY_VIDEO_DURATION_MS / 1000}s. Choose a faster replay speed, shorten authored holds, or split the take — steps are paced to be watchable, so a long take runs longer than it was recorded.`,
     )
   }
+  const totalFrames = Math.max(
+    1,
+    (actionFrames.at(-1) ?? -1) + 1,
+    Math.ceil((durationMs * fps) / 1000),
+  )
+  // Second pass, because a step's glide can never be longer than the run it
+  // lives in: the settled state has to be on screen before the next step, or
+  // the viewer never sees where the transition arrived.
+  const glideFrames = actionFrames.map((frame, index) => {
+    const runEnd = actionFrames[index + 1] ?? totalFrames
+    const run = Math.max(1, runEnd - frame)
+    const wanted = Math.round((glideMs[index]! * fps) / 1000)
+    return Math.max(0, Math.min(wanted, run - 1))
+  })
   return {
     fps,
     actionTimesMs,
     actionFrames,
+    glideFrames,
+    glideMs,
+    glideTiers: stepGlides.map((options) => options.tier),
+    playing,
+    stepTakeMs: session.actions.map((action) => action.t),
+    playbackSpeed: spec.playbackSpeed,
     durationMs,
     tailMs: effectiveTailMs,
     // Keep the final authored action representable even when a future caller
     // deliberately asks for no tail. Frame indexes are zero-based, so an
     // action landing on frame N needs at least N + 1 output frames.
-    totalFrames: Math.max(
-      1,
-      (actionFrames.at(-1) ?? -1) + 1,
-      Math.ceil((durationMs * fps) / 1000),
-    ),
+    totalFrames,
   }
+}
+
+/**
+ * Which step an output frame belongs to, and how far into its glide it sits.
+ *
+ * `glideT` walks `1/(n+1) … n/(n+1)` across the n intermediate frames and is
+ * exactly 1 from the settled frame onwards, so the transition is seen arriving
+ * rather than starting already arrived.
+ */
+export function replayStateAtFrame(
+  schedule: ReplayVideoSchedule,
+  frameIndex: number,
+): ReplayVideoStateAt {
+  let actionIndex = -1
+  for (let index = 0; index < schedule.actionFrames.length; index++) {
+    if (schedule.actionFrames[index]! > frameIndex) break
+    actionIndex = index
+  }
+  if (actionIndex < 0) return { actionIndex, glideT: 1 }
+  const count = schedule.glideFrames[actionIndex] ?? 0
+  const offset = frameIndex - schedule.actionFrames[actionIndex]!
+  const glideT = count <= 0 || offset >= count ? 1 : (offset + 1) / (count + 1)
+  if (!schedule.playing[actionIndex]) return { actionIndex, glideT }
+  // Inside a play window: the take time it shows, never past the next step.
+  const ran = ((offset * 1000) / schedule.fps) * schedule.playbackSpeed
+  const until = schedule.stepTakeMs[actionIndex + 1] ?? Number.POSITIVE_INFINITY
+  const takeMs = Math.min(until, schedule.stepTakeMs[actionIndex]! + ran)
+  return { actionIndex, glideT, takeMs }
+}
+
+/** One output frame's quality: a glide frame at its step's tier, else full. */
+export function replayFrameQuality(
+  schedule: ReplayVideoSchedule,
+  at: ReplayVideoStateAt,
+  quality: number,
+): number {
+  const tier = resolveGlideQuality(schedule.glideTiers[at.actionIndex])
+  return glideFrameQuality(quality, tier, at.glideT)
 }
 
 export function replayActionIndexAtFrame(
   schedule: ReplayVideoSchedule,
   frameIndex: number,
 ): number {
-  let result = -1
-  for (let index = 0; index < schedule.actionFrames.length; index++) {
-    if (schedule.actionFrames[index]! > frameIndex) break
-    result = index
-  }
-  return result
+  return replayStateAtFrame(schedule, frameIndex).actionIndex
 }
 
-/** Number of consecutive frames sharing the same semantic replay state. */
+/**
+ * Number of consecutive frames sharing the same semantic replay state.
+ *
+ * A glide frame is its own state — that is the whole point of one — so a run
+ * inside a transition is a single frame and each is rendered to convergence.
+ */
 export function replayFramesInStateRun(
   schedule: ReplayVideoSchedule,
   frameIndex: number,
 ): number {
-  const actionIndex = replayActionIndexAtFrame(schedule, frameIndex)
+  const here = replayStateAtFrame(schedule, frameIndex)
   let count = 1
-  while (
-    frameIndex + count < schedule.totalFrames &&
-    replayActionIndexAtFrame(schedule, frameIndex + count) === actionIndex
-  ) {
+  while (frameIndex + count < schedule.totalFrames) {
+    const next = replayStateAtFrame(schedule, frameIndex + count)
+    if (
+      next.actionIndex !== here.actionIndex ||
+      next.glideT !== here.glideT ||
+      next.takeMs !== here.takeMs
+    ) {
+      break
+    }
     count++
   }
   return count
@@ -487,6 +610,7 @@ export function replayFramesInStateRun(
 
 export function createReplayVideoDriver(
   inputSession: RecordedSession,
+  glides?: Pick<ReplayVideoSchedule, 'glideMs' | 'glideTiers'>,
 ): ReplayVideoDriver {
   const validatedSession = validateSession(deepClone(inputSession))
   if (!validatedSession) {
@@ -516,6 +640,22 @@ export function createReplayVideoDriver(
   )
   let sidebarOpen = view.sidebarOpen
   let lastApplied = -1
+  /** The flame each step glides out of, and the plan that does the gliding. */
+  const glideSources = new Map<number, FlameDescriptor>()
+  const glidePlans = new Map<number, GlidePlan | undefined>()
+  /** The take's play windows, paced as the in-app replay paces them. */
+  const pacer = createPlayheadPacer(session.actions)
+  /** The take time the playhead was last paced to: it only walks forward. */
+  let pacedTo = Number.NEGATIVE_INFINITY
+
+  /** Put the playhead where the take had it at take time `t`. */
+  function pacePlayhead(t: number): void {
+    pacedTo = t
+    const frame = pacer.frameAt(t, timeline.snapshot.config)
+    if (frame === undefined) return
+    timeline.snapshot.currentFrame = frame
+    timeline.snapshot.previewHeld = true
+  }
 
   const setFlameDescriptor: HistorySetter<FlameDescriptor> = (mutate) => {
     const draft = deepClone(flame)
@@ -788,10 +928,16 @@ export function createReplayVideoDriver(
       },
     },
     modal: { open: () => {} },
+    // This world's glides come from the export request and its own plans: a
+    // take's Glide steps change nothing here, and never the viewer's.
+    ...APART_FROM_LIVE_GLIDE,
   }
 
-  function frameState(index: number): ReplayVideoFrameState {
-    const posed = applyTimelinePose(flame, timeline.snapshot)
+  function frameState(
+    index: number,
+    override?: { flame: FlameDescriptor; glideT: number },
+  ): ReplayVideoFrameState {
+    const posed = override?.flame ?? applyTimelinePose(flame, timeline.snapshot)
     const blendDescriptor = posed.renderSettings.blendFlame
     const blendFlame =
       blendDescriptor === undefined
@@ -799,6 +945,9 @@ export function createReplayVideoDriver(
         : tryValidateFlame(deepClone(blendDescriptor))
     return {
       flame: posed,
+      // Derived from the flame being shown, not from the settled one: during a
+      // glide the palette is whatever the intermediate carries, which in v1 is
+      // the old one until the settle (see `plan.notes`).
       palette: paletteFromFlame(posed),
       blendFlame,
       blendWeight: posed.renderSettings.blendWeight ?? 0,
@@ -806,6 +955,12 @@ export function createReplayVideoDriver(
       stochasticFilter: view.stochasticFilter,
       action: index < 0 ? undefined : session.actions[index],
       actionIndex: index,
+      glideT: override?.glideT ?? 1,
+      playhead:
+        timeline.snapshot.animationEnabled && timeline.snapshot.previewHeld
+          ? (timeline.snapshot.currentFrame ??
+            timeline.snapshot.config.startFrame)
+          : undefined,
     }
   }
 
@@ -821,21 +976,41 @@ export function createReplayVideoDriver(
     paletteRestoreColors = deepClone(view.paletteRestoreColors ?? {})
     sidebarOpen = view.sidebarOpen
     lastApplied = -1
+    glideSources.clear()
+    glidePlans.clear()
+    pacer.reset()
+    pacedTo = Number.NEGATIVE_INFINITY
     return frameState(-1)
   }
 
-  function advanceTo(index: number): ReplayVideoFrameState {
+  function advanceTo(
+    index: number,
+    glideT = 1,
+    takeMs?: number,
+  ): ReplayVideoFrameState {
     const target = Math.min(
       session.actions.length - 1,
       Math.max(-1, Math.floor(index)),
     )
-    if (target < lastApplied) reset()
+    // The playhead walks the take forward, so an earlier moment of the same
+    // step is replayed from the baseline like an earlier step is.
+    if (
+      target < lastApplied ||
+      (target === lastApplied && takeMs !== undefined && takeMs < pacedTo)
+    ) {
+      reset()
+    }
     for (
       let actionIndex = lastApplied + 1;
       actionIndex <= target;
       actionIndex++
     ) {
       const action = session.actions[actionIndex]!
+      // The playhead where the take had it when this step ran.
+      pacePlayhead(action.t)
+      // The state this step glides OUT of, kept before the command replaces
+      // it. Posed, so a timeline the session carries is included at both ends.
+      const before = applyTimelinePose(flame, timeline.snapshot)
       const nextPaletteRestoreColors = paletteRestoreColorsAfterReplayCommand(
         action.id,
         action.args,
@@ -848,30 +1023,83 @@ export function createReplayVideoDriver(
         throw new Error(`Step ${actionIndex + 1} could not be replayed`)
       }
       paletteRestoreColors = deepClone(nextPaletteRestoreColors)
+      glideSources.set(actionIndex, before)
       lastApplied = actionIndex
+      const { config } = timeline.snapshot
+      pacer.afterStep(
+        actionIndex,
+        timeline.snapshot.currentFrame ?? config.startFrame,
+        config,
+      )
     }
-    return frameState(target)
+    if (takeMs !== undefined) pacePlayhead(takeMs)
+    const settled = frameState(target)
+    if (glideT >= 1 || target < 0) return settled
+    const plan = glidePlanFor(target, settled.flame)
+    if (plan === undefined) return settled
+    const sampled = sampleGlide(plan, glideT)
+    return frameState(target, {
+      // Inside a window the glide is posed at the moving frame, as live.
+      flame: pacer.current()
+        ? applyTimelinePose(sampled, timeline.snapshot)
+        : sampled,
+      glideT,
+    })
+  }
+
+  /**
+   * The plan for the transition into `index`, made once and reused.
+   *
+   * Planning is the expensive half and the sample is the cheap one, so a
+   * twenty-frame glide plans once and samples twenty times — which is also
+   * what makes two exports of the same session frame-for-frame identical.
+   */
+  function glidePlanFor(
+    index: number,
+    settledFlame: FlameDescriptor,
+  ): GlidePlan | undefined {
+    if (glidePlans.has(index)) return glidePlans.get(index)
+    const from = glideSources.get(index)
+    // Planned as the live runtime plans the step (runtime.ts `start`).
+    const planned =
+      from &&
+      planGlide(from, settledFlame, {
+        durationMs: glides?.glideMs[index],
+        quality: glides?.glideTiers[index],
+      })
+    const usable =
+      planned === undefined || isGlideRefusal(planned) ? undefined : planned
+    glidePlans.set(index, usable)
+    return usable
   }
 
   return { session, advanceTo, reset }
 }
 
-export function createReplayVideoSpec(playbackSpeed = 1): ReplayVideoSpec {
-  return buildScheduleSpec(playbackSpeed)
+export function createReplayVideoSpec(
+  playbackSpeed = 1,
+  glide?: ReplayGlideOptions,
+): ReplayVideoSpec {
+  return buildScheduleSpec(
+    playbackSpeed,
+    REPLAY_VIDEO_LEAD_IN_MS,
+    REPLAY_VIDEO_TAIL_MS,
+    glide,
+  )
 }
 
 /** Build a detached, background-export job from the edited replay session. */
 export function createReplayVideoJobSpec(
   inputSession: RecordedSession,
   playbackSpeed = 1,
+  glide?: ReplayGlideOptions,
 ): AnimationJobSpec {
   const session = validateSession(deepClone(inputSession))
   if (!session) throw new Error('The recording is not a valid replay session')
-  if (session.unnamedWriteCount > 0) {
-    throw new Error(
-      `This take has ${session.unnamedWriteCount} uncaptured edit${session.unnamedWriteCount === 1 ? '' : 's'}. Record a clean take before publishing it as video.`,
-    )
-  }
+  // A take with uncaptured steps exports the way it replays: they were never
+  // in `actions`, so there is nothing to apply for them, and the embedded
+  // session keeps their count and names. The replay panel lists them before
+  // an export starts (see recorder/uncapturedSteps.ts).
   if (session.actions.length === 0) {
     throw new Error('This take has no authored steps to publish as video.')
   }
@@ -888,8 +1116,15 @@ export function createReplayVideoJobSpec(
       `Replay video cannot yet package custom variation code used by the step ${customVariationStep + 1}. Replace it with built-in variations before exporting this take.`,
     )
   }
-  const schedule = createReplayVideoSchedule(session, playbackSpeed)
-  const replayVideo = createReplayVideoSpec(playbackSpeed)
+  const schedule = createReplayVideoSchedule(
+    session,
+    playbackSpeed,
+    REPLAY_VIDEO_FPS,
+    REPLAY_VIDEO_LEAD_IN_MS,
+    REPLAY_VIDEO_TAIL_MS,
+    glide,
+  )
+  const replayVideo = createReplayVideoSpec(playbackSpeed, glide)
   const driver = createReplayVideoDriver(session)
   const initial = driver.reset()
   assertReplayVideoStatePortable(initial, -1)

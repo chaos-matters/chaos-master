@@ -1,11 +1,11 @@
 import { For, Show } from 'solid-js'
 import ui from '@/App.module.css'
 import { useToast } from '@/contexts/ToastContext'
+import { isTouchLayout } from '@/stores/workspaceLayoutStore'
 
 /**
- * Global toast column: fixed top-right, stacked, and above every modal and
- * overlay so feedback fired from inside a dialog is still visible. Rendered
- * once at the App level; everything else talks to it through useToast().
+ * Global toast column: fixed top-right on desktop, and top-left on touch/tablet
+ * layouts so it never covers the inspector deck on the right.
  */
 export function ToastHost() {
   const { toasts, dismissToast } = useToast()
@@ -15,12 +15,20 @@ export function ToastHost() {
     // each item as well nests live regions, which makes politeness resolve off
     // the inner node and causes some screen readers to announce a newly
     // inserted toast twice.
-    <div class={ui.toastRegion} aria-live="polite" aria-atomic="false">
+    <div
+      class={ui.toastRegion}
+      classList={{ [ui.toastRegionTouch as string]: isTouchLayout() }}
+      aria-live="polite"
+      aria-atomic="false"
+    >
       <For each={toasts()}>
         {(toast) => (
           <div
             class={ui.toast}
-            classList={{ [ui.toastActionable as string]: !!toast.actions }}
+            classList={{
+              [ui.toastActionable as string]: !!toast.actions,
+              [ui.toastTouch as string]: isTouchLayout(),
+            }}
           >
             <span>{toast.message}</span>
             <Show when={toast.actions}>

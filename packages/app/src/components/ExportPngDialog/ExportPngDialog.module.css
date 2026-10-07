@@ -80,26 +80,11 @@
   max-height: calc(80vh - 6rem);
 }
 
-@media (max-width: 700px) {
-  .dialogBody {
-    grid-template-columns: 1fr;
-  }
-
-  .previewPane {
-    aspect-ratio: auto;
-    height: 200px;
-    max-height: 200px;
-  }
-
-  .animationPreviewPane {
-    min-height: 120px;
-    max-height: 200px;
-  }
-}
-
 .previewPane {
   position: relative;
   aspect-ratio: 1;
+  min-height: 220px;
+  min-width: 0;
   max-height: 420px;
   border-radius: 0.5rem;
   overflow: hidden;
@@ -120,6 +105,24 @@
   padding: 8px;
 }
 
+@media (max-width: 860px) {
+  .dialogBody {
+    grid-template-columns: 1fr;
+  }
+
+  .previewPane {
+    aspect-ratio: auto;
+    height: 240px;
+    max-height: 280px;
+    min-height: 200px;
+  }
+
+  .animationPreviewPane {
+    min-height: 120px;
+    max-height: 200px;
+  }
+}
+
 .previewToolbar {
   position: absolute;
   top: 0.5rem;
@@ -130,17 +133,16 @@
 }
 
 .renderModeToggle {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   padding: 0.2rem 0.45rem;
   border: 1px solid var(--color-border, #444);
   border-radius: 0.3rem;
-  background: rgba(0, 0, 0, 0.6);
   color: var(--color-text-secondary, #999);
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  backdrop-filter: blur(4px);
   transition:
     background 0.15s,
     color 0.15s,
@@ -166,6 +168,7 @@
 }
 
 .renderPreviewButton {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   padding: 0.2rem 0.5rem;
   border: 1px solid var(--accent-color, #3b82f6);
   border-radius: 0.3rem;
@@ -176,7 +179,6 @@
   letter-spacing: 0.03em;
   text-transform: uppercase;
   cursor: pointer;
-  backdrop-filter: blur(4px);
   transition:
     background 0.15s,
     opacity 0.15s;

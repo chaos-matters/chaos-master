@@ -1,3 +1,20 @@
+/*
+ * The palette picker, written for the editor's opaque sidebar in the light
+ * and the dark theme.
+ *
+ * A surface of its own - the deep-zoom explorer's glass panel - sets these
+ * on an ancestor to restyle the picker inside it, whatever the theme:
+ *
+ *   --palette-ink             text that must stand out, or that sits on a
+ *                             wash (the count)
+ *   --palette-ink-2           every other text: labels, names, hints
+ *   --palette-edge            a tile's and the custom section's border
+ *   --palette-edge-hover      a tile's border under the pointer
+ *   --palette-edge-selected   the chosen tile's border
+ *
+ * Unset, which is everywhere else, each falls back to the value written
+ * beside it, per theme.
+ */
 .selector {
   display: flex;
   flex-direction: column;
@@ -14,7 +31,7 @@
 .label {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--palette-ink-2, rgba(255, 255, 255, 0.35));
   text-transform: uppercase;
   letter-spacing: 0.06em;
   user-select: none;
@@ -23,7 +40,7 @@
 
 .count {
   font-size: 0.625rem;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--palette-ink, rgba(255, 255, 255, 0.3));
   background: rgba(255, 255, 255, 0.08);
   padding: 0.125rem 0.375rem;
   border-radius: 10px;
@@ -65,7 +82,7 @@
   font-size: 0.65rem;
   font-weight: 500;
   line-height: 1;
-  color: var(--neutral-500);
+  color: var(--palette-ink-2, var(--neutral-500));
   background: transparent;
   border: 1px solid var(--neutral-700);
   border-radius: 4px;
@@ -78,7 +95,7 @@
     border-color 0.15s ease;
 
   [data-theme='dark'] & {
-    color: var(--neutral-400);
+    color: var(--palette-ink-2, var(--neutral-400));
     border-color: var(--neutral-700);
   }
 }
@@ -112,7 +129,7 @@
   gap: 0.25rem;
   padding: 0.375rem;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--palette-edge, rgba(255, 255, 255, 0.08));
   border-radius: 4px;
   cursor: pointer;
   transition: all 150ms ease;
@@ -120,12 +137,12 @@
 }
 
 .paletteButton:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--palette-edge-hover, rgba(255, 255, 255, 0.2));
   background: rgba(255, 255, 255, 0.04);
 }
 
 .paletteButton.selected {
-  border-color: rgba(255, 255, 255, 0.35);
+  border-color: var(--palette-edge-selected, rgba(255, 255, 255, 0.35));
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -159,7 +176,7 @@
 
 .name {
   font-size: 0.5625rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--palette-ink-2, rgba(255, 255, 255, 0.5));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -200,19 +217,19 @@
   padding: 0.75rem;
   background: rgba(255, 255, 255, 0.04);
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--palette-edge, rgba(255, 255, 255, 0.08));
 }
 
 .customHeader {
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--palette-ink, rgba(255, 255, 255, 0.7));
   margin-bottom: 0.5rem;
 }
 
 .customHint {
   font-size: 0.625rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--palette-ink-2, rgba(255, 255, 255, 0.4));
   margin-bottom: 0.75rem;
   line-height: 1.4;
 }
@@ -220,7 +237,7 @@
 .customPlaceholder {
   padding: 2rem;
   text-align: center;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--palette-ink-2, rgba(255, 255, 255, 0.3));
   font-size: 0.75rem;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
@@ -229,49 +246,49 @@
 
 /* Light mode */
 [data-theme='light'] .label {
-  color: rgba(0, 0, 0, 0.35);
+  color: var(--palette-ink-2, rgba(0, 0, 0, 0.35));
 }
 
 [data-theme='light'] .count {
   background: rgba(0, 0, 0, 0.08);
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--palette-ink, rgba(0, 0, 0, 0.4));
 }
 
 [data-theme='light'] .paletteButton {
-  border-color: rgba(0, 0, 0, 0.08);
+  border-color: var(--palette-edge, rgba(0, 0, 0, 0.08));
 }
 
 [data-theme='light'] .paletteButton:hover {
-  border-color: rgba(0, 0, 0, 0.2);
+  border-color: var(--palette-edge-hover, rgba(0, 0, 0, 0.2));
   background: rgba(0, 0, 0, 0.04);
 }
 
 [data-theme='light'] .paletteButton.selected {
-  border-color: rgba(0, 0, 0, 0.3);
+  border-color: var(--palette-edge-selected, rgba(0, 0, 0, 0.3));
   background: rgba(0, 0, 0, 0.06);
 }
 
 [data-theme='light'] .name {
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--palette-ink-2, rgba(0, 0, 0, 0.5));
 }
 
 [data-theme='light'] .customSection {
   background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
+  border-color: var(--palette-edge, rgba(0, 0, 0, 0.08));
 }
 
 [data-theme='light'] .customHeader {
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--palette-ink, rgba(0, 0, 0, 0.7));
 }
 
 [data-theme='light'] .customHint {
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--palette-ink-2, rgba(0, 0, 0, 0.4));
 }
 
 [data-theme='light'] .customPlaceholder {
   background: rgba(0, 0, 0, 0.05);
   border-color: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.3);
+  color: var(--palette-ink-2, rgba(0, 0, 0, 0.3));
 }
 
 [data-theme='light'] .gallery::-webkit-scrollbar-thumb {

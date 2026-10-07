@@ -1,0 +1,113 @@
+// Android signing for the Lumen Apeiron Capacitor shell.
+//
+// Taken from the MercuryPitch monorepo, where Beside Cue wrote this logic
+// first and paid for it in real failures; the comments below are its lessons,
+// kept because they are the reason each branch exists.
+//
+// The script is parameterised by an ENVIRONMENT VARIABLE PREFIX, so an app's
+// variables can never collide with another app's keystore. `LUMEN` yields
+// LUMEN_KEYSTORE_FILE, LUMEN_KEY_ALIAS and so on: the names the mobile
+// workflow (.github/workflows/lumen-mobile.yml) exports after decoding the
+// keystores from GitHub secrets.
+//
+// Contract — the caller sets these BEFORE `apply from:`, and applies it
+// AFTER `apply plugin: 'com.android.application'`:
+//
+//   ext.signingEnvPrefix    e.g. "LUMEN". Required.
+//   ext.debugKeystoreName   file name under ~/.android. Required.
+//   ext.fallbackVersionName used when <PREFIX>_VERSION_NAME is unset. Required.
+//
+// and reads these back, inside its own `android { defaultConfig { … } }`:
+//
+//   ext.resolvedVersionCode
+//   ext.resolvedVersionName
+//
+// Everything else — both signingConfigs and the release buildType's
+// signingConfig — this script configures itself.
+
+if (!project.hasProperty('signingEnvPrefix')) {
+    throw new GradleException(
+        'gradle/signing.gradle: set ext.signingEnvPrefix before applying it. ' +
+        'Without a prefix the two apps would share one set of environment ' +
+        'variable names, and a release build could be signed with the other ' +
+        "app's upload key."
+    )
+}
+
+def prefix = project.ext.signingEnvPrefix
+def envOf = { String suffix -> System.getenv("${prefix}_${suffix}") }
+
+// Release signing and store version numbers arrive from outside Git: CI
+// decodes the upload keystore to a file and exports these. A developer
+// machine has none of them, so a local release build still succeeds — it is
+// simply unsigned, which is what the app's own `:android` script has always
+// produced.
+//
+// This is the *upload* key, not the app signing key. Play App Signing keeps
+// the app signing key and re-signs every upload, so losing this one is
+// recoverable.
+def uploadKeystore = envOf('KEYSTORE_FILE')
+def hasUploadKey = uploadKeystore != null && !uploadKeystore.isEmpty() && file(uploadKeystore).exists()
+
+// Debug builds are signed with one keystore shared between CI and developer
+// machines. Android refuses to update an installed app whose signing
+// certificate differs, and every CI run otherwise generates a throwaway debug
+// key, so swapping between a PR artifact and a local build meant uninstalling
+// first — which wipes everything the app keeps only on the device.
+//
+// The password below is Android's documented debug-keystore convention, on
+// purpose. A debug key signs nothing Play would accept, so nothing is
+// protected by keeping it out of this file. The keystore itself still lives
+// outside Git.
+//
+// Absent, the build falls back to whatever debug key the Android toolchain
+// generates, so a fresh clone still builds — it simply cannot update an
+// install made by a different machine.
+def debugKeystore = envOf('DEBUG_KEYSTORE_FILE')
+if (debugKeystore == null || debugKeystore.isEmpty()) {
+    debugKeystore = "${System.getProperty('user.home')}/.android/${project.ext.debugKeystoreName}"
+}
+def hasDebugKey = file(debugKeystore).exists()
+
+// Play rejects a re-used versionCode, so a release build takes the monotonic
+// value CI derives from the run number.
+def versionCodeEnv = envOf('VERSION_CODE')
+ext.resolvedVersionCode = versionCodeEnv ? versionCodeEnv.toInteger() : 1
+ext.resolvedVersionName = envOf('VERSION_NAME') ?: project.ext.fallbackVersionName
+
+android {
+    signingConfigs {
+        // AGP always defines `debug`, so this reconfigures it rather than
+        // adding one; `buildTypes.debug` picks it up with no further wiring.
+        if (hasDebugKey) {
+            debug {
+                storeFile file(debugKeystore)
+                storePassword "android"
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+            }
+        }
+        if (hasUploadKey) {
+            release {
+                storeFile file(uploadKeystore)
+                storePassword envOf('KEYSTORE_PASSWORD')
+                keyAlias envOf('KEY_ALIAS')
+                keyPassword envOf('KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (hasUploadKey) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+// One line in the build log answering "why is this artifact unsigned", which
+// is otherwise a twenty-minute question at the moment an upload is rejected.
+logger.lifecycle(
+    "[${prefix}] release signing: ${hasUploadKey ? 'upload key present' : 'NO upload key — release artifacts will be UNSIGNED'}" +
+    ", debug signing: ${hasDebugKey ? debugKeystore : 'toolchain default (installs will not update across machines)'}"
+)

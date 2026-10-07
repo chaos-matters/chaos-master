@@ -35,7 +35,7 @@ describe('finishPilot', () => {
   it('marks the take saved once the library write settles', async () => {
     const ctx = drivingCtx()
     const result = await finishPilot(ctx, 'finished', { title: 'Warm tones' })
-    expect(result).toMatchObject({ phase: 'ended' })
+    expect(result).toMatchObject({ phase: 'ended', saved: true })
     expect(ended().sessionName).toBe('Lesson: Colour and tone — Warm tones')
     expect(ended().saved).toBe(true)
     expect(ctx.arcade!.toast).toHaveBeenCalledWith(
@@ -49,7 +49,11 @@ describe('finishPilot', () => {
     const result = await finishPilot(ctx, 'stopped', { title: 'Warm tones' })
 
     // The session still ended, and the end card can still name it.
-    expect(result).toMatchObject({ phase: 'ended', reason: 'stopped' })
+    expect(result).toMatchObject({
+      phase: 'ended',
+      reason: 'stopped',
+      saved: false,
+    })
     expect(ended().sessionName).toBe(
       'Lesson (stopped): Colour and tone — Warm tones',
     )
@@ -58,6 +62,15 @@ describe('finishPilot', () => {
       'Could not save "Lesson (stopped): Colour and tone — Warm tones" to your library',
     )
     expect(pilotLog().some((entry) => entry.kind === 'error')).toBe(true)
+  })
+
+  it('returns `saved` unset when nothing was recorded', async () => {
+    const ctx = drivingCtx()
+    ctx.recorder!.stop = vi.fn(() => undefined)
+    const result = await finishPilot(ctx, 'finished', { title: 'Warm tones' })
+    expect(result).toMatchObject({ phase: 'ended' })
+    expect((result as PilotEnded).saved).toBeUndefined()
+    expect(ctx.recorder!.save).not.toHaveBeenCalled()
   })
 
   it('leaves `saved` unset while the write is still in flight', async () => {

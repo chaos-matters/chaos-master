@@ -1,24 +1,41 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, useContext, } from 'solid-js'
+import { CANCEL, LoadFlameModal, } from '@/components/LoadFlameModal/LoadFlameModal'
+import { ModalContext } from '@/components/Modal/ModalContext'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
-import { Cross, Zap } from '@/icons'
+import { calculateGroundedStats, getSchoolMultiplier } from '@/flame/stats'
+import { applySymmetryToFlame } from '@/flame/symmetry'
+import { Root } from '@/lib/Root'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import { animateClash } from '@/webmcp/tools/animateClash'
-import { ARENA_ARCHETYPES, generateArchetypeOpponent, TACTICAL_STANCES, } from '@/webmcp/tools/arenaArchetypes'
+import { ARENA_ARCHETYPES, generateArchetypeOpponent, } from '@/webmcp/tools/arenaArchetypes'
+import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import { simulateClash } from '@/webmcp/tools/simulateClash'
 import ui from './ArenaOverlay.module.css'
+import { ArenaCenterStage } from './ArenaOverlay/ArenaCenterStage'
+import { ArenaFighterCard } from './ArenaOverlay/ArenaFighterCard'
+import { BattleLogDrawer, WinnerTrophyCard, } from './ArenaOverlay/ArenaResultsView'
+import { ArenaTopBar } from './ArenaOverlay/ArenaTopBar'
+import { exportChampionCardPng, SCHOOL_COLORS, } from './ArenaOverlay/championCardCanvas'
+import { playClashOnce } from './ArenaOverlay/clashPlayback'
+import { createClashRequests } from './ArenaOverlay/clashRequests'
+import loadModalUi from './LoadFlameModal/LoadFlameModal.module.css'
 import type { Component } from 'solid-js'
-import type { CommandContext } from '@/commands/types'
+import type { ClashPlayback } from './ArenaOverlay/clashPlayback'
+import type { ArenaFighterStats, CommandContext } from '@/commands/types'
+import type { AnimationLoad } from '@/components/LoadFlameModal/LoadFlameModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { GroundedFlameStats } from '@/flame/stats'
 import type { HardwareTier } from '@/utils/hardwareTier'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { ArchetypeId, OpponentArchetype, TacticalStance, } from '@/webmcp/tools/arenaArchetypes'
 import type { ClashRoundOutcome, SimulateClashResult, } from '@/webmcp/tools/simulateClash'
+
+export { SCHOOL_COLORS }
 
 export interface ArenaOverlayProps {
   /** The overlay only mounts when the workspace actually has an arena, so it
@@ -28,8 +45,6 @@ export interface ArenaOverlayProps {
   onClose?: () => void
 }
 
-const PREVIEW_RES = { width: 380, height: 214 }
-
 function ensureCamera(flame?: FlameDescriptor): FlameDescriptor | null {
   if (!flame || !flame.transforms) return null
   const rs = flame.renderSettings ?? {}
@@ -38,8 +53,62 @@ function ensureCamera(flame?: FlameDescriptor): FlameDescriptor | null {
     renderSettings: {
       ...rs,
       camera: rs.camera ?? { zoom: 1, position: [0, 0], rotation: 0 },
+      camera3D: rs.camera3D ?? {
+        position: [0, 0, -5],
+        target: [0, 0, 0],
+        up: [0, 1, 0],
+        fov: 45,
+      },
     },
   }
+}
+
+function handleArenaKeyboardNavigation(
+  e: KeyboardEvent,
+  actions: {
+    readonly gameState: () => 'idle' | 'clashing' | 'results'
+    readonly onClash: () => void
+    readonly onSkipClash: () => void
+    readonly onRerollOpponent: () => void
+    readonly onClose: () => void
+  },
+): void {
+  const target = e.target as HTMLElement | null
+  if (
+    target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable)
+  ) {
+    return
+  }
+
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault()
+    if (actions.gameState() === 'clashing') {
+      actions.onSkipClash()
+    } else {
+      actions.onClash()
+    }
+  } else if (e.key === 'r' || e.key === 'R') {
+    if (actions.gameState() !== 'clashing') {
+      e.preventDefault()
+      actions.onRerollOpponent()
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    actions.onClose()
+  }
+}
+
+/**
+ * The dimension a clash is staged in: player 1's flame's, 3D when it does not
+ * say. One function for the staging and the title, so the two cannot disagree.
+ */
+function clashDimensions(flame: FlameDescriptor | undefined): 2 | 3 {
+  // A fighter can arrive unvalidated (an agent's flame through the arena's
+  // setters); one with no render settings is staged in 3D, not a crash.
+  return (flame?.renderSettings?.dimensions as 2 | 3 | undefined) ?? 3
 }
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
@@ -50,25 +119,182 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [gameState, setGameState] = createSignal<
     'idle' | 'clashing' | 'results'
   >('idle')
-  const [commentary, setCommentary] = createSignal<string | null>(
+  const [localCommentary, setLocalCommentary] = createSignal<string | null>(
     'Prepare for 3D territorial combat. Choose a tactical stance and initiate the clash!',
   )
   const [winner, setWinner] = createSignal<1 | 2 | null>(null)
   const [rounds, setRounds] = createSignal<ClashRoundOutcome[]>([])
   const [activeRoundIndex, setActiveRoundIndex] = createSignal<number>(0)
-  const [eventBanner, setEventBanner] = createSignal<string | null>(null)
+  const [localEventBanner, setLocalEventBanner] = createSignal<string | null>(
+    null,
+  )
   const [winStreak, setWinStreak] = createSignal<number>(0)
-  const [stance, setStance] = createSignal<TacticalStance>('balanced')
+  const [localStance, setLocalStance] = createSignal<TacticalStance>('balanced')
   const [opponentArchetype, setOpponentArchetype] =
     createSignal<OpponentArchetype>(ARENA_ARCHETYPES.chaos_lord)
+  const [battleLog, setBattleLog] = createSignal<string[]>([])
+  const [showBattleLog, setShowBattleLog] = createSignal<boolean>(false)
+  const [exportingCard, setExportingCard] = createSignal<boolean>(false)
+
+  // Reactive version counters & memos for fighter preview invalidation
+  const [p1Version, setP1Version] = createSignal<number>(0)
+  const [p2Version, setP2Version] = createSignal<number>(0)
+
+  createEffect(() => {
+    const f1 = props.arena.player1Stats()?.flame
+    if (f1) setP1Version((v) => v + 1)
+  })
+
+  createEffect(() => {
+    const f2 = props.arena.player2Stats()?.flame
+    if (f2) setP2Version((v) => v + 1)
+  })
+
+  const p1PreviewFlame = createMemo(() =>
+    ensureCamera(props.arena.player1Stats()?.flame),
+  )
+  const p2PreviewFlame = createMemo(() =>
+    ensureCamera(props.arena.player2Stats()?.flame),
+  )
+
+  // Kinetic impact VFX signals for spectator mode
+  const [isShaking, setIsShaking] = createSignal<boolean>(false)
+  const [shockwaveActive, setShockwaveActive] = createSignal<boolean>(false)
+  const [combatFloater, setCombatFloater] = createSignal<{
+    text: string
+    color: string
+  } | null>(null)
+
+  const commentary = () => props.arena.commentary?.() || localCommentary()
+  const setCommentary = (val: string | null) => {
+    setLocalCommentary(val)
+    props.arena.setCommentary?.(val)
+  }
+
+  const eventBanner = () => props.arena.eventBanner?.() ?? localEventBanner()
+  const setEventBanner = (val: string | null) => {
+    setLocalEventBanner(val)
+    props.arena.setEventBanner?.(val)
+  }
+
+  const stance = () =>
+    (props.arena.stance?.() as TacticalStance) || localStance()
+  const setStance = (val: TacticalStance) => {
+    setLocalStance(val)
+    props.arena.setStance?.(val)
+  }
+
+  const p1Grounded = createMemo<GroundedFlameStats | null>(() => {
+    const p1 = props.arena.player1Stats()
+    if (!p1?.flame) return null
+    return p1.groundedStats ?? calculateGroundedStats(p1.flame)
+  })
+
+  const p2Grounded = createMemo<GroundedFlameStats | null>(() => {
+    const p2 = props.arena.player2Stats()
+    if (!p2?.flame) return null
+    return p2.groundedStats ?? calculateGroundedStats(p2.flame)
+  })
+
+  const p1Advantage = createMemo(() => {
+    const s1 = p1Grounded()?.school
+    const s2 = p2Grounded()?.school
+    if (!s1 || !s2) return 1.0
+    return getSchoolMultiplier(s1, s2)
+  })
+
+  const p2Advantage = createMemo(() => {
+    const s1 = p1Grounded()?.school
+    const s2 = p2Grounded()?.school
+    if (!s1 || !s2) return 1.0
+    return getSchoolMultiplier(s2, s1)
+  })
+
+  const victorStats = createMemo(() => {
+    const win = winner()
+    if (win === 1) return props.arena.player1Stats()
+    if (win === 2) return props.arena.player2Stats()
+    return props.arena.player1Stats()
+  })
+
+  const victorGrounded = createMemo(() => {
+    const win = winner()
+    if (win === 1) return p1Grounded()
+    if (win === 2) return p2Grounded()
+    return p1Grounded()
+  })
+
+  const handleExportCard = async () => {
+    const win = winner()
+    if (!win) return
+    const p1 = props.arena.player1Stats()
+    const p2 = props.arena.player2Stats()
+    const victor = win === 1 ? p1 : p2
+    const rival = win === 1 ? p2 : p1
+    const vGrounded = win === 1 ? p1Grounded() : p2Grounded()
+    if (!victor || !vGrounded) return
+
+    setExportingCard(true)
+    try {
+      const ok = await exportChampionCardPng({
+        victor,
+        rival,
+        grounded: vGrounded,
+        winStreak: winStreak(),
+        stance: stance(),
+        isWinner1: win === 1,
+      })
+      if (ok) {
+        setCommentary(
+          `Exported Champion Card for ${victor.name ?? 'Champion'}!`,
+        )
+      }
+    } finally {
+      setExportingCard(false)
+    }
+  }
 
   let activeInterval: ReturnType<typeof setInterval> | null = null
+  let activeTimeouts: ReturnType<typeof setTimeout>[] = []
   let initialFlame: FlameDescriptor | null = null
   let initialTracks: TimelineTrack[] | null = null
   let initialDuration: number | null = null
   let initialAnimationEnabled: boolean | null = null
   let wasClashStaged = false
-  let cachedSimResult: SimulateClashResult | null = null
+  /** Gives the viewer's loop setting back; set while a clash owns playback. */
+  let clashPlayback: ClashPlayback | null = null
+  const clashRequests = createClashRequests()
+  const releaseClashPlayback = () => {
+    clashPlayback?.release()
+    clashPlayback = null
+  }
+  const [cachedSimResult, setCachedSimResult] =
+    createSignal<SimulateClashResult | null>(null)
+
+  const registerTimeout = (
+    fn: () => void,
+    ms: number,
+  ): ReturnType<typeof setTimeout> => {
+    const id = setTimeout(() => {
+      activeTimeouts = activeTimeouts.filter((t) => t !== id)
+      fn()
+    }, ms)
+    activeTimeouts.push(id)
+    return id
+  }
+
+  // Every stop ends the clash an agent may be awaiting; say why.
+  const clearAllTimers = (reason = 'The clash was stopped.') => {
+    clashRequests.cancel(reason)
+    if (activeInterval !== null) {
+      clearInterval(activeInterval)
+      activeInterval = null
+    }
+    for (const id of activeTimeouts) {
+      clearTimeout(id)
+    }
+    activeTimeouts = []
+  }
 
   // Pinned to the player throughout: the target follows a duel to the rival
   // seat, and restoring through it would write the agent's flame into the
@@ -85,6 +311,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   const restoreWorkspace = () => {
+    releaseClashPlayback()
     if (wasClashStaged && initialFlame) {
       if (timeline) {
         timeline.pause()
@@ -107,24 +334,19 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     }
   }
 
-  const clearActiveInterval = () => {
-    if (activeInterval !== null) {
-      clearInterval(activeInterval)
-      activeInterval = null
-    }
-  }
-
   // Reroll opponent to a fresh procedural archetype
   const handleRerollOpponent = (specificArchetype?: ArchetypeId) => {
     const p1 = props.arena.player1Stats()
     const base = p1?.flame ?? initialFlame
     if (!base) return
 
-    clearActiveInterval()
+    clearAllTimers('The opponent was changed.')
     restoreWorkspace()
     setGameState('idle')
     setWinner(null)
     setRounds([])
+    setBattleLog([])
+    setCachedSimResult(null)
     setEventBanner(null)
     setCommentary(
       'A new challenger enters the arena! Inspect their traits and prepare for battle.',
@@ -137,14 +359,149 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
       props.arena.setPlayer2Stats({
         name: newOpponent.name,
         type: newOpponent.className,
+        school: newOpponent.school,
         powerLevel: newOpponent.powerLevel,
         flame: newOpponent.flame,
+        groundedStats: newOpponent.groundedStats,
         metrics: newOpponent.metrics,
       })
     }
   }
 
+  const requestModal = useContext(ModalContext)
+
+  // Open existing Flame Gallery modal and load chosen flame into fighter slot
+  const openGalleryForFighter = async (player: 1 | 2) => {
+    if (gameState() === 'clashing' || !requestModal) return
+    const result = await requestModal<
+      FlameDescriptor | AnimationLoad | typeof CANCEL
+    >({
+      class: loadModalUi.loadFlameModal,
+      content: ({ respond }) => (
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <LoadFlameModal
+            respond={respond}
+            currentDimensions={3}
+            mode="gallery"
+          />
+        </Root>
+      ),
+    })
+    if (!result || result === CANCEL) return
+    const chosenFlame: FlameDescriptor =
+      'flame' in result ? result.flame : result
+    const cloned = deepClone(chosenFlame)
+    const fStats = calculateFlameStats(cloned)
+    const gStats = calculateGroundedStats(cloned)
+    const newFighterStats: ArenaFighterStats = {
+      name: cloned.metadata?.name || (player === 1 ? 'Player 1' : 'Player 2'),
+      type: fStats.type,
+      school: gStats.school,
+      powerLevel: gStats.powerLevel,
+      flame: cloned,
+      groundedStats: gStats,
+      metrics: fStats.metrics,
+    }
+    if (player === 1) {
+      props.arena.setPlayer1Stats?.(newFighterStats)
+      setP1Version((v) => v + 1)
+    } else {
+      props.arena.setPlayer2Stats?.(newFighterStats)
+      setP2Version((v) => v + 1)
+    }
+    setWinner(null)
+    setRounds([])
+    setBattleLog([])
+    setCachedSimResult(null)
+    setGameState('idle')
+    setCommentary(
+      `${player === 1 ? 'Player 1' : 'Player 2'} loaded ${newFighterStats.name} from gallery.`,
+    )
+  }
+
+  // Sync active flame from the main IFS workspace into Player 1
+  const handleSyncActiveFlame = () => {
+    if (gameState() === 'clashing') return
+    const current = getWebMcpContext()?.flameDescriptor?.()
+    if (!current) return
+    const cloned = deepClone(current)
+    const fStats = calculateFlameStats(cloned)
+    const gStats = calculateGroundedStats(cloned)
+    const newFighterStats: ArenaFighterStats = {
+      name: cloned.metadata?.name || 'Active Flame',
+      type: fStats.type,
+      school: gStats.school,
+      powerLevel: gStats.powerLevel,
+      flame: cloned,
+      groundedStats: gStats,
+      metrics: fStats.metrics,
+    }
+    props.arena.setPlayer1Stats?.(newFighterStats)
+    setP1Version((v) => v + 1)
+    setWinner(null)
+    setRounds([])
+    setBattleLog([])
+    setCachedSimResult(null)
+    setGameState('idle')
+    setCommentary(
+      `Synced active editor flame "${newFighterStats.name}" to Player 1.`,
+    )
+  }
+
+  // Apply rotational symmetry order (C1 to C8) to fighter
+  const handleApplySymmetry = (player: 1 | 2, folds: number) => {
+    if (gameState() === 'clashing') return
+    const currentStats =
+      player === 1 ? props.arena.player1Stats() : props.arena.player2Stats()
+    if (!currentStats?.flame) return
+    const updatedFlame = applySymmetryToFlame(
+      currentStats.flame,
+      folds,
+      'rotational',
+    )
+    const fStats = calculateFlameStats(updatedFlame)
+    const gStats = calculateGroundedStats(updatedFlame)
+    const updatedFighter: ArenaFighterStats = {
+      ...currentStats,
+      flame: updatedFlame,
+      powerLevel: gStats.powerLevel,
+      groundedStats: gStats,
+      metrics: fStats.metrics,
+    }
+    if (player === 1) {
+      props.arena.setPlayer1Stats?.(updatedFighter)
+      setP1Version((v) => v + 1)
+    } else {
+      props.arena.setPlayer2Stats?.(updatedFighter)
+      setP2Version((v) => v + 1)
+    }
+    setWinner(null)
+    setRounds([])
+    setBattleLog([])
+    setCachedSimResult(null)
+    setGameState('idle')
+    setCommentary(
+      folds > 1
+        ? `Applied C${folds} rotational symmetry to ${player === 1 ? 'Player 1' : 'Player 2'}.`
+        : `Reset symmetry to C1 for ${player === 1 ? 'Player 1' : 'Player 2'}.`,
+    )
+  }
+
   onMount(() => {
+    // Register programmatic clash runner and gameState
+    props.arena.gameState = gameState
+    props.arena.startClash = (opts) => {
+      if (opts?.stance) {
+        setStance(opts.stance as TacticalStance)
+      }
+      return runSimulation()
+        ? clashRequests.track()
+        : Promise.resolve({
+            cancelled: true,
+            reason: 'The clash could not start: both fighters need a flame.',
+          })
+    }
+
     // If P2 is not set, generate an archetype opponent
     const p2 = props.arena.player2Stats()
     if (!p2 || !p2.flame) {
@@ -153,37 +510,40 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   })
 
   onCleanup(() => {
-    clearActiveInterval()
+    clearAllTimers('The arena was closed.')
     restoreWorkspace()
   })
 
   const handleClose = () => {
-    clearActiveInterval()
+    clearAllTimers('The arena was closed.')
     restoreWorkspace()
     props.arena.setOpen(false)
     props.onClose?.()
   }
 
-  const runSimulation = () => {
+  /** Returns whether a clash started. */
+  const runSimulation = (): boolean => {
     const p1 = props.arena.player1Stats()
     const p2 = props.arena.player2Stats()
-    if (!p1 || !p2 || !p1.flame || !p2.flame) return
+    if (!p1 || !p2 || !p1.flame || !p2.flame) return false
 
-    clearActiveInterval()
+    clearAllTimers('A new clash replaced it.')
     captureWorkspace()
 
     setGameState('clashing')
     setWinner(null)
     setEventBanner(null)
     setCommentary(
-      'Fighters engaging in shared 3D volume... Calculating territory density and entropy!',
+      'Fighters engaging in shared arena volume... Calculating trajectory and impact dynamics!',
     )
+
+    const flameDimensions = clashDimensions(p1.flame)
 
     const simRes = simulateClash.execute(
       {
         flameA: p1.flame,
         flameB: p2.flame,
-        dimensions: 3,
+        dimensions: flameDimensions,
         rounds: 3,
         stanceA: stance(),
         stanceB: 'balanced',
@@ -193,14 +553,14 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
     if (!simRes || !simRes.rounds) {
       setGameState('idle')
-      return
+      return false
     }
 
-    cachedSimResult = simRes
+    setCachedSimResult(simRes)
     setRounds(simRes.rounds)
     setActiveRoundIndex(0)
 
-    // Stage Round 1 flame & keyframe 4 camera tracks across 90 frames (30 per round)
+    // Stage flame & keyframe 2D/3D kinetic combat tracks across 90 frames (30 per round)
     animateClash.execute(
       {
         simulation: simRes,
@@ -212,13 +572,14 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     )
     wasClashStaged = true
 
-    // Start timeline playback
+    // Play the rounds once: the viewer's timeline loops by default, which
+    // replayed round 1 under ROUND 3 / 3 after the verdict.
     if (timeline) {
-      timeline.setCurrentFrame(0)
-      timeline.play()
+      releaseClashPlayback()
+      clashPlayback = playClashOnce(timeline)
     }
 
-    // Step through round 1 -> round 2 -> round 3
+    // Step through rounds with impact VFX sync
     let currentIdx = 0
     activeInterval = setInterval(() => {
       if (currentIdx < simRes.rounds.length) {
@@ -226,11 +587,6 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         setActiveRoundIndex(currentIdx)
         if (r.event) {
           setEventBanner(r.event)
-        }
-
-        // Advance staged flame at round boundaries without extra undo entries
-        if (r.clashFlame) {
-          history.replaceSilently(r.clashFlame)
         }
 
         const winnerName =
@@ -242,18 +598,45 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         setCommentary(
           `Round ${r.round}: ${winnerName} takes territory (${Math.round(r.ownershipA * 100)}% vs ${Math.round(r.ownershipB * 100)}%)${r.event ? ` — [${r.event}]` : ''}`,
         )
+
+        // Trigger visual impact flash, screen shake, and floating text at mid-round collision
+        registerTimeout(() => {
+          if (gameState() !== 'clashing') return
+          setIsShaking(true)
+          registerTimeout(() => setIsShaking(false), 300)
+          setShockwaveActive(true)
+          registerTimeout(() => setShockwaveActive(false), 600)
+          const isWinnerP1 = r.winner === 'A'
+          const floaterText = r.event
+            ? `CRITICAL [${r.event}]!`
+            : isWinnerP1
+              ? '+150 TERRITORY'
+              : r.winner === 'B'
+                ? '-150 TERRITORY'
+                : 'CLASH DEADLOCK'
+          const floaterColor = isWinnerP1
+            ? '#22d3ee'
+            : r.winner === 'B'
+              ? '#fb923c'
+              : '#fbbf24'
+          setCombatFloater({ text: floaterText, color: floaterColor })
+          registerTimeout(() => setCombatFloater(null), 850)
+        }, 350)
+
         currentIdx++
       } else {
         finishSimulation(simRes)
       }
     }, 1000)
+    return true
   }
 
   const finishSimulation = (simRes: SimulateClashResult) => {
-    clearActiveInterval()
-    if (timeline) {
-      timeline.pause()
-    }
+    clashRequests.complete(simRes)
+    clearAllTimers()
+    // Holds the last frame, where the verdict is; a skip gets there too.
+    if (clashPlayback) clashPlayback.finish()
+    else timeline?.pause()
 
     const p1 = props.arena.player1Stats()
     const p2 = props.arena.player2Stats()
@@ -262,6 +645,9 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
     setWinner(finalWin)
     setGameState('results')
+    if (simRes.battleLog) {
+      setBattleLog(simRes.battleLog)
+    }
 
     if (finalWin === 1) {
       const nextStreak = winStreak() + 1
@@ -283,12 +669,8 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
   // Fast forward directly to results
   const handleSkipClash = () => {
-    if (gameState() !== 'clashing' || !cachedSimResult) return
-    const simRes = cachedSimResult
-    const lastRound = simRes.rounds[simRes.rounds.length - 1]
-    if (lastRound?.clashFlame) {
-      history.replaceSilently(lastRound.clashFlame)
-    }
+    const simRes = cachedSimResult()
+    if (gameState() !== 'clashing' || !simRes) return
     setActiveRoundIndex(simRes.rounds.length - 1)
     finishSimulation(simRes)
   }
@@ -298,8 +680,9 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   const loadFighter = (player: 1 | 2) => {
-    clearActiveInterval()
-    wasClashStaged = false
+    clearAllTimers('A fighter was reloaded.')
+    // The user's own flame and tracks first, or the clash's keep playing.
+    restoreWorkspace()
     if (props.arena.selectFighter) {
       props.arena.selectFighter(player)
       props.arena.setOpen(false)
@@ -310,32 +693,13 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   // Keyboard shortcut handler
   onMount(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return
-      }
-
-      if (e.key === ' ' || e.code === 'Space') {
-        e.preventDefault()
-        if (gameState() === 'idle' || gameState() === 'results') {
-          handleClash()
-        } else if (gameState() === 'clashing') {
-          handleSkipClash()
-        }
-      } else if (e.key === 'r' || e.key === 'R') {
-        if (gameState() === 'idle' || gameState() === 'results') {
-          e.preventDefault()
-          handleRerollOpponent()
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        handleClose()
-      }
+      handleArenaKeyboardNavigation(e, {
+        gameState,
+        onClash: handleClash,
+        onSkipClash: handleSkipClash,
+        onRerollOpponent: handleRerollOpponent,
+        onClose: handleClose,
+      })
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -346,463 +710,129 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
-      <div class={ui.modal} data-testid="flame-clash-arena-modal">
-        {/* Header */}
-        <div class={ui.header}>
-          <div class={ui.titleGroup}>
-            <div class={ui.pulseDot} />
-            <h2 class={ui.title}>Flame Clash Arena 3D</h2>
-            <Show when={winStreak() > 0}>
-              <div class={ui.streakBadge} title="Current Arena Win Streak">
-                <span class={ui.streakFire}>★</span>
-                <span>
-                  Streak: {winStreak()} {winStreak() === 1 ? 'Win' : 'Wins'}
-                </span>
-              </div>
-            </Show>
-          </div>
+      <div
+        class={ui.modal}
+        classList={{ [ui.isClashing!]: gameState() === 'clashing' }}
+        data-testid="flame-clash-arena-modal"
+      >
+        <ArenaTopBar
+          winStreak={winStreak()}
+          gameState={gameState()}
+          rounds={rounds()}
+          activeRoundIndex={activeRoundIndex()}
+          winner={winner()}
+          commentary={commentary()}
+          eventBanner={eventBanner()}
+          dimensions={clashDimensions(props.arena.player1Stats()?.flame)}
+          onReplay={() => {
+            runSimulation()
+          }}
+          onClose={handleClose}
+        />
 
-          <div class={ui.headerActions}>
-            <Show when={rounds().length > 0 && gameState() === 'results'}>
-              <button
-                class={ui.replayBtn}
-                onClick={runSimulation}
-                title="Replay Battle"
-              >
-                Replay Clash
-              </button>
-            </Show>
-            <button
-              class={ui.closeButton}
-              onClick={handleClose}
-              aria-label="Exit Arena"
-              title="Exit Arena (Esc)"
-            >
-              <Cross width="1rem" />
-            </button>
-          </div>
-        </div>
-
-        {/* Body */}
         <div class={ui.body}>
-          {/* 3-Round Territory Bar */}
-          <Show when={rounds().length > 0}>
-            <div class={ui.roundsBar}>
-              <For each={rounds()}>
-                {(r, idx) => {
-                  const isCur = () => activeRoundIndex() === idx()
-                  return (
-                    <div
-                      class={ui.roundBadge}
-                      classList={{
-                        [ui.roundBadgeActive!]: isCur(),
-                        [ui.roundBadgeP1!]: r.winner === 'A',
-                        [ui.roundBadgeP2!]: r.winner === 'B',
-                      }}
-                    >
-                      R{r.round}:{' '}
-                      {r.winner === 'A'
-                        ? 'P1'
-                        : r.winner === 'B'
-                          ? 'P2'
-                          : 'DRAW'}
-                    </div>
-                  )
-                }}
-              </For>
-            </div>
-
-            {/* Active Round Territory Meter */}
-            <Show when={rounds()[activeRoundIndex()]}>
-              {(cur) => (
-                <div class={ui.territoryBar}>
-                  <div
-                    class={ui.territoryA}
-                    style={{ width: `${Math.round(cur().ownershipA * 100)}%` }}
-                    title={`P1 Territory: ${Math.round(cur().ownershipA * 100)}%`}
-                  />
-                  <div
-                    class={ui.territoryContested}
-                    style={{ width: `${Math.round(cur().contested * 100)}%` }}
-                    title={`Contested: ${Math.round(cur().contested * 100)}%`}
-                  />
-                  <div
-                    class={ui.territoryB}
-                    style={{ width: `${Math.round(cur().ownershipB * 100)}%` }}
-                    title={`P2 Territory: ${Math.round(cur().ownershipB * 100)}%`}
-                  />
-                </div>
+          <div class={ui.battlefield}>
+            <Show when={props.arena.player1Stats()}>
+              {(p1) => (
+                <ArenaFighterCard
+                  player={1}
+                  fighter={p1()}
+                  grounded={p1Grounded()}
+                  advantage={p1Advantage()}
+                  isWinner={winner() === 1}
+                  previewFlame={p1PreviewFlame()}
+                  version={p1Version()}
+                  hardwareTier={props.hardwareTier}
+                  gameState={gameState()}
+                  onLoad={() => {
+                    loadFighter(1)
+                  }}
+                  onApplySymmetry={(order) => {
+                    handleApplySymmetry(1, order)
+                  }}
+                  onOpenGallery={() => {
+                    void openGalleryForFighter(1)
+                  }}
+                  stance={stance()}
+                  onSetStance={setStance}
+                  onSyncActiveFlame={handleSyncActiveFlame}
+                />
               )}
             </Show>
-          </Show>
 
-          {/* Battlefield */}
-          <div class={ui.battlefield}>
-            {/* Player 1 (Left / Cyan) */}
-            <Show when={props.arena.player1Stats()}>
-              {(p1) => {
-                const curStance = () => TACTICAL_STANCES[stance()]
-                const effPower = () =>
-                  Math.round(
-                    (p1().powerLevel || 0) *
-                      ((curStance().effects.energyMultiplier +
-                        curStance().effects.symmetryMultiplier +
-                        curStance().effects.chaosMultiplier) /
-                        3),
-                  )
+            <ArenaCenterStage
+              gameState={gameState()}
+              isShaking={isShaking()}
+              shockwaveActive={shockwaveActive()}
+              combatFloater={combatFloater()}
+              onClash={handleClash}
+              onSkipClash={handleSkipClash}
+              resultsView={
+                <WinnerTrophyCard
+                  winner={winner()}
+                  winStreak={winStreak()}
+                  victorStats={victorStats()}
+                  victorGrounded={victorGrounded()}
+                  victorPreviewFlame={
+                    winner() === 2 ? p2PreviewFlame() : p1PreviewFlame()
+                  }
+                  previewVersion={winner() === 2 ? p2Version() : p1Version()}
+                  cachedSimResult={cachedSimResult()}
+                  hardwareTier={props.hardwareTier}
+                  exportingCard={exportingCard()}
+                  onNextChallenger={() => {
+                    handleRerollOpponent()
+                  }}
+                  onReplay={() => {
+                    runSimulation()
+                  }}
+                  onLoadVictor={(win) => {
+                    loadFighter(win)
+                  }}
+                  onExportCard={handleExportCard}
+                />
+              }
+            />
 
-                return (
-                  <div
-                    class={`${ui.fighterCard} ${ui.p1Card}`}
-                    classList={{ [ui.p1CardWinner!]: winner() === 1 }}
-                  >
-                    <div class={ui.fighterPreview}>
-                      <Show
-                        when={ensureCamera(p1().flame)}
-                        fallback={
-                          <div class={ui.fighterPreviewInner}>
-                            <span class={ui.fighterLabel}>
-                              {p1().name ?? 'Player 1'}
-                            </span>
-                          </div>
-                        }
-                      >
-                        {(f) => (
-                          <div class={ui.previewLayer}>
-                            <VariationPreview
-                              version={0}
-                              isSelected={winner() === 1}
-                              flame={f()}
-                              name={p1().name ?? 'Player 1'}
-                              resolution={PREVIEW_RES}
-                              hardwareTier={props.hardwareTier}
-                              snapshotOnly
-                            />
-                          </div>
-                        )}
-                      </Show>
-
-                      <Show when={winner() === 1}>
-                        <div class={ui.victorBadge}>VICTOR</div>
-                      </Show>
-                    </div>
-
-                    <div class={ui.fighterHeader}>
-                      <div>
-                        <div class={`${ui.fighterName} ${ui.p1Name}`}>
-                          {p1().name ?? 'Player 1'}
-                        </div>
-                        <div class={ui.fighterClass}>
-                          Class: {p1().type || 'Fractal Guardian'}
-                        </div>
-                      </div>
-                      <Show when={p1().flame}>
-                        <button
-                          class={ui.loadBtn}
-                          onClick={() => {
-                            loadFighter(1)
-                          }}
-                          title="Load this flame into main workspace"
-                        >
-                          Load
-                        </button>
-                      </Show>
-                    </div>
-
-                    <div class={ui.statList}>
-                      <StatRow
-                        label="Power"
-                        value={effPower()}
-                        max={2000}
-                        color="#22d3ee"
-                      />
-                      <StatRow
-                        label="Complexity"
-                        value={
-                          (p1().metrics?.complexity || 0) *
-                          10 *
-                          curStance().effects.complexityMultiplier
-                        }
-                        max={100}
-                        color="#60a5fa"
-                      />
-                      <StatRow
-                        label="Chaos"
-                        value={
-                          (p1().metrics?.chaosLevel || 0) *
-                          10 *
-                          curStance().effects.chaosMultiplier
-                        }
-                        max={100}
-                        color="#c084fc"
-                      />
-                      <StatRow
-                        label="Symmetry"
-                        value={
-                          (p1().metrics?.symmetryScore || 0) *
-                          10 *
-                          curStance().effects.symmetryMultiplier
-                        }
-                        max={100}
-                        color="#818cf8"
-                      />
-                      <StatRow
-                        label="Energy"
-                        value={
-                          (p1().metrics?.energyIntensity || 0) *
-                          10 *
-                          curStance().effects.energyMultiplier
-                        }
-                        max={100}
-                        color="#2dd4bf"
-                      />
-                    </div>
-
-                    {/* Tactical Stance Selector */}
-                    <div class={ui.stanceContainer}>
-                      <div class={ui.stanceTitle}>Tactical Stance</div>
-                      <div class={ui.stanceGrid}>
-                        <For each={Object.values(TACTICAL_STANCES)}>
-                          {(s) => (
-                            <button
-                              class={ui.stanceBtn}
-                              classList={{
-                                [ui.stanceBtnActive!]: stance() === s.id,
-                              }}
-                              onClick={() => setStance(s.id)}
-                              disabled={gameState() === 'clashing'}
-                              title={s.description}
-                            >
-                              <span class={ui.stanceName}>{s.name}</span>
-                              <span class={ui.stanceTagline}>{s.tagline}</span>
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }}
-            </Show>
-
-            {/* VS Center Graphic & Clash Button */}
-            <div class={ui.vsCenter}>
-              <div class={ui.vsText}>VS</div>
-
-              <Show when={gameState() === 'idle'}>
-                <button
-                  class={ui.clashBtn}
-                  onClick={handleClash}
-                  title="Engage battle (Space)"
-                >
-                  <Zap width="1.2rem" height="1.2rem" />
-                  <span>CLASH</span>
-                  <Zap width="1.2rem" height="1.2rem" />
-                </button>
-                <div class={ui.keyboardHints}>Press [Space] to Clash</div>
-              </Show>
-
-              <Show when={gameState() === 'clashing'}>
-                <button class={ui.clashBtn} disabled>
-                  <Zap width="1.2rem" height="1.2rem" />
-                  <span>CLASHING...</span>
-                  <Zap width="1.2rem" height="1.2rem" />
-                </button>
-                <button
-                  class={ui.skipBtn}
-                  onClick={handleSkipClash}
-                  title="Skip animation to results"
-                >
-                  Skip to Results
-                </button>
-              </Show>
-
-              <Show when={gameState() === 'results'}>
-                <div class={ui.resultsActions}>
-                  <button
-                    class={ui.nextChallengerBtn}
-                    onClick={() => {
-                      handleRerollOpponent()
-                    }}
-                    title="Face next procedural opponent (R)"
-                  >
-                    <span>Next Challenger</span>
-                    <Zap width="1rem" height="1rem" />
-                  </button>
-                  <Show when={winner() !== null}>
-                    <button
-                      class={ui.loadVictorBtn}
-                      onClick={() => {
-                        loadFighter(winner()!)
-                      }}
-                      title="Load victorious flame to workspace"
-                    >
-                      Load Victor to Canvas
-                    </button>
-                  </Show>
-                </div>
-                <div class={ui.keyboardHints}>
-                  Press [R] for Next Challenger
-                </div>
-              </Show>
-            </div>
-
-            {/* Player 2 (Right / Orange/Red) */}
             <Show when={props.arena.player2Stats()}>
               {(p2) => (
-                <div
-                  class={`${ui.fighterCard} ${ui.p2Card}`}
-                  classList={{ [ui.p2CardWinner!]: winner() === 2 }}
-                >
-                  <div class={ui.fighterPreview}>
-                    <Show
-                      when={ensureCamera(p2().flame)}
-                      fallback={
-                        <div class={ui.fighterPreviewInner}>
-                          <span class={ui.fighterLabel}>
-                            {p2().name ?? 'Player 2'}
-                          </span>
-                        </div>
-                      }
-                    >
-                      {(f) => (
-                        <div class={ui.previewLayer}>
-                          <VariationPreview
-                            version={0}
-                            isSelected={winner() === 2}
-                            flame={f()}
-                            name={p2().name ?? 'Player 2'}
-                            resolution={PREVIEW_RES}
-                            hardwareTier={props.hardwareTier}
-                            snapshotOnly
-                          />
-                        </div>
-                      )}
-                    </Show>
-
-                    <Show when={winner() === 2}>
-                      <div class={ui.victorBadge}>VICTOR</div>
-                    </Show>
-                  </div>
-
-                  <div class={ui.fighterHeader}>
-                    <div>
-                      <div class={`${ui.fighterName} ${ui.p2Name}`}>
-                        {p2().name ?? 'Player 2'}
-                      </div>
-                      <div class={ui.fighterClass}>
-                        Archetype: {p2().type || opponentArchetype().className}
-                      </div>
-                    </div>
-                    <Show when={p2().flame}>
-                      <button
-                        class={ui.loadBtn}
-                        onClick={() => {
-                          loadFighter(2)
-                        }}
-                        title="Load this flame into main workspace"
-                      >
-                        Load
-                      </button>
-                    </Show>
-                  </div>
-
-                  <div class={ui.statList}>
-                    <StatRow
-                      label="Power"
-                      value={p2().powerLevel || 0}
-                      max={2000}
-                      color="#fb923c"
-                    />
-                    <StatRow
-                      label="Complexity"
-                      value={(p2().metrics?.complexity || 0) * 10}
-                      max={100}
-                      color="#f87171"
-                    />
-                    <StatRow
-                      label="Chaos"
-                      value={(p2().metrics?.chaosLevel || 0) * 10}
-                      max={100}
-                      color="#f472b6"
-                    />
-                    <StatRow
-                      label="Symmetry"
-                      value={(p2().metrics?.symmetryScore || 0) * 10}
-                      max={100}
-                      color="#facc15"
-                    />
-                    <StatRow
-                      label="Energy"
-                      value={(p2().metrics?.energyIntensity || 0) * 10}
-                      max={100}
-                      color="#fbbf24"
-                    />
-                  </div>
-
-                  {/* Opponent Lore & Actions */}
-                  <div class={ui.opponentLoreBox}>
-                    {opponentArchetype().lore}
-                  </div>
-
-                  <div class={ui.cardFooterActions}>
-                    <button
-                      class={ui.rerollBtn}
-                      onClick={() => {
-                        handleRerollOpponent()
-                      }}
-                      disabled={gameState() === 'clashing'}
-                      title="Generate new opponent archetype (R)"
-                    >
-                      <span>Reroll Opponent</span>
-                    </button>
-                  </div>
-                </div>
+                <ArenaFighterCard
+                  player={2}
+                  fighter={p2()}
+                  grounded={p2Grounded()}
+                  advantage={p2Advantage()}
+                  isWinner={winner() === 2}
+                  previewFlame={p2PreviewFlame()}
+                  version={p2Version()}
+                  hardwareTier={props.hardwareTier}
+                  gameState={gameState()}
+                  onLoad={() => {
+                    loadFighter(2)
+                  }}
+                  onApplySymmetry={(order) => {
+                    handleApplySymmetry(2, order)
+                  }}
+                  onOpenGallery={() => {
+                    void openGalleryForFighter(2)
+                  }}
+                  opponentArchetype={opponentArchetype()}
+                  onRerollOpponent={() => {
+                    handleRerollOpponent()
+                  }}
+                />
               )}
             </Show>
           </div>
 
-          {/* Commentary Box */}
-          <Show when={commentary()}>
-            {(msg) => (
-              <div class={ui.commentaryBox}>
-                {msg()}
-                <Show when={eventBanner()}>
-                  {(evt) => <span class={ui.eventBanner}>{evt()}</span>}
-                </Show>
-              </div>
-            )}
-          </Show>
+          <BattleLogDrawer
+            battleLog={battleLog()}
+            showBattleLog={showBattleLog()}
+            onToggle={() => {
+              setShowBattleLog(!showBattleLog())
+            }}
+          />
         </div>
       </div>
     </ComputeGate>
-  )
-}
-
-function StatRow(props: {
-  label: string
-  value: number
-  max: number
-  color: string
-}) {
-  const percentage = () =>
-    Math.min(100, Math.max(0, (props.value / props.max) * 100))
-
-  return (
-    <div class={ui.statRow}>
-      <div class={ui.statLabels}>
-        <span>{props.label}</span>
-        <span>{Math.round(props.value)}</span>
-      </div>
-      <div class={ui.statTrack}>
-        <div
-          class={ui.statFill}
-          style={{
-            width: `${percentage()}%`,
-            background: props.color,
-          }}
-        />
-      </div>
-    </div>
   )
 }

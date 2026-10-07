@@ -1,17 +1,20 @@
-import { createSignal } from 'solid-js'
+import { batch, createSignal } from 'solid-js'
 import { drivingSeat } from '@/arcade/pilot'
 import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
-import { setDocumentWriteReporter, setTimelineTransportReporter, } from './documentWriteHook'
+import { probeTimelinePlayback, setDocumentWriteReporter, setTimelinePlaybackReporter, setTimelineTransportReporter, } from './documentWriteHook'
 import { focusForCommand, focusHintFor } from './focus'
 import { NARRATION_COMMAND_ID, narrationAsStep } from './narrationMode'
 import { MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_FILE_BYTES, MAX_SESSION_JSON_CHARS, serializeSession, SESSION_FORMAT_VERSION, validateRecordedAction, validateSession, } from './schema'
+import { describeTimelinePlayback, TIMELINE_PLAYBACK_COMMAND_ID, } from './transportStep'
+import { createUncapturedLog, describeUnrecordedCommand, describeUnroutedEdit, noteUncapturedStep, uncapturedJsonChars, uncapturedSessionFields, uncapturedStopMessage, } from './uncapturedSteps'
 import type { Accessor, Setter } from 'solid-js'
-import type { RecordedAction, RecordedSession, SessionViewSnapshot, } from './schema'
+import type { RecordedAction, RecordedSession, SessionViewSnapshot, UncapturedStep, } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
+import type { UncapturedLog } from './uncapturedSteps'
 import type { FlameCommand } from '@/commands/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -63,38 +66,23 @@ type ActiveRecording = {
    * session budget without serializing the initial flame after every click. */
   actionJsonChars: number[]
   actionJsonCharsTotal: number
-  /** Compact size of this session with an empty action list and zero unnamed
-   * writes. Action and counter deltas are added to this baseline. */
+  /** Compact size of this session with an empty action list and nothing
+   * uncaptured. Action and uncaptured-step deltas are added to this baseline. */
   baseJsonChars: number
-  unnamedWrites: { t: number; description?: string }[]
+  uncaptured: UncapturedLog
   /** High-frequency effects report once per take instead of once per frame. */
   unreplayableKeys: Set<string>
 }
 
-/**
- * The editing state around the flame that a recording also starts from.
- *
- * The flame is the document, but it is not the whole world: keyframe edits
- * mean nothing without the tracks they land on, and an audio mapping drives
- * the flame every frame. Both are snapshotted so a replay edits the animation
- * it was recorded against rather than whatever the viewer happens to have
- * open. Optional because sandboxes (tests, the Home portal) have neither.
- */
-export type SessionStartExtras = {
-  timeline?: TimelineSnapshot
-  audio?: AudioWiringSnapshot
-  sonification?: SonificationSnapshot
-  view?: SessionViewSnapshot
+import type { RecordableCommand, RecorderStream, SessionRecordingStartFailureReason, SessionRecordingStartResult, SessionStartExtras, } from './types'
+
+export type {
+  RecordableCommand,
+  RecorderStream,
+  SessionRecordingStartFailureReason,
+  SessionRecordingStartResult,
+  SessionStartExtras,
 }
-
-export type SessionRecordingStartFailureReason =
-  | 'already-recording'
-  | 'workspace-not-serializable'
-  | 'workspace-not-recordable'
-
-export type SessionRecordingStartResult =
-  | { ok: true }
-  | { ok: false; reason: SessionRecordingStartFailureReason }
 
 /**
  * One recording per seat.
@@ -134,6 +122,8 @@ type StreamState = {
   setActionCount: Setter<number>
   unnamedWriteCount: Accessor<number>
   setUnnamedWriteCount: Setter<number>
+  uncapturedSteps: Accessor<readonly UncapturedStep[]>
+  setUncapturedSteps: Setter<readonly UncapturedStep[]>
   lastSession: Accessor<RecordedSession | undefined>
   setLastSession: Setter<RecordedSession | undefined>
 }
@@ -149,6 +139,9 @@ function streamState(id: SeatId): StreamState {
   const [isRecording, setIsRecording] = createSignal(false)
   const [actionCount, setActionCount] = createSignal(0)
   const [unnamedWriteCount, setUnnamedWriteCount] = createSignal(0)
+  const [uncapturedSteps, setUncapturedSteps] = createSignal<
+    readonly UncapturedStep[]
+  >([])
   const [lastSession, setLastSession] = createSignal<RecordedSession>()
   const created: StreamState = {
     id,
@@ -164,6 +157,8 @@ function streamState(id: SeatId): StreamState {
     setActionCount,
     unnamedWriteCount,
     setUnnamedWriteCount,
+    uncapturedSteps,
+    setUncapturedSteps,
     lastSession,
     setLastSession,
   }
@@ -215,7 +210,7 @@ function sessionFrom(rec: ActiveRecording): RecordedSession {
     initialSonification: rec.initialSonification,
     initialView: rec.initialView,
     actions: rec.actions,
-    unnamedWriteCount: rec.unnamedWrites.length,
+    ...uncapturedSessionFields(rec.uncaptured),
   }
 }
 
@@ -227,8 +222,7 @@ function compactSessionChars(rec: ActiveRecording): number {
     rec.baseJsonChars +
     rec.actionJsonCharsTotal +
     Math.max(0, rec.actions.length - 1) +
-    String(rec.unnamedWrites.length).length -
-    1
+    uncapturedJsonChars(rec.uncaptured)
   )
 }
 
@@ -390,7 +384,7 @@ function startIn(
       actionJsonChars: [],
       actionJsonCharsTotal: 0,
       baseJsonChars: 0,
-      unnamedWrites: [],
+      uncaptured: createUncapturedLog(),
       unreplayableKeys: new Set(),
     }
   } catch {
@@ -410,6 +404,7 @@ function startIn(
   // already spoken for the step about to be recorded.
   s.pendingNarration = undefined
   s.setActionCount(0)
+  s.setUncapturedSteps([])
   s.setUnnamedWriteCount(0)
   // A finished session describes the flame it was recorded against; once a
   // new recording starts it must not be embedded into anything.
@@ -446,6 +441,9 @@ function reportDerivedWorkspaceWriteIn(s: StreamState): void {
 
 function stopIn(s: StreamState): RecordedSession | undefined {
   if (!s.active) return undefined
+  // Stopped while playing: end on where the playback got, still playing.
+  const still = probeTimelinePlayback(s.id)
+  if (still) reportTimelinePlaybackIn(s, true, still.frame, still.advanced)
   // Compact validation is enforced while recording. Pretty-printed downloads
   // and UTF-8 can be slightly larger, so trim only the newest actions until
   // the exact persisted form also fits. Earlier steps remain a valid prefix,
@@ -469,6 +467,8 @@ function stopIn(s: StreamState): RecordedSession | undefined {
     return undefined
   }
   s.setLastSession(finished)
+  const uncaptured = uncapturedStopMessage(finished)
+  if (uncaptured !== undefined) console.warn(`[recorder] ${uncaptured}`)
   return finished
 }
 
@@ -482,6 +482,106 @@ function cancelIn(s: StreamState): void {
  * invocation (top-level, unsuppressed, while a recording is active), then
  * runs it inside a command scope so history pushes it causes are attributed
  * to it instead of being flagged as unnamed writes.
+ */
+function coalesceRecordedAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+  anchorIndex: number,
+  existing: RecordedAction,
+): void {
+  // A drag re-sets the same target dozens of times inside ONE undo step;
+  // the log keeps the last value and the timestamp the gesture began.
+  const coalescedArgs = cmd.coalesceArgs
+    ? cmd.coalesceArgs(existing.args, args)
+    : args
+  const snapshot = snapshotAction(
+    s,
+    rec,
+    {
+      ...existing,
+      args: coalescedArgs,
+      focus: focusFor(cmd, [...coalescedArgs]),
+      // The label has to move with the args. Describing commands render
+      // the value into their label ("Set gamma to 2.42"), so keeping the
+      // first one left the step list quoting a value the action no longer
+      // carried.
+      label: cmd.describe?.([...coalescedArgs]) ?? cmd.label,
+    },
+    anchorIndex,
+  )
+  if (snapshot !== undefined) {
+    rec.actionJsonCharsTotal +=
+      snapshot.jsonChars - (rec.actionJsonChars[anchorIndex] ?? 0)
+    rec.actionJsonChars[anchorIndex] = snapshot.jsonChars
+    rec.actions[anchorIndex] = snapshot.action
+    s.pendingActionIndex = anchorIndex
+  }
+}
+
+function appendRecordedAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+  anchorKey?: string,
+): void {
+  const narration = s.pendingNarration
+  s.pendingNarration = undefined
+  const snapshot = snapshotAction(s, rec, {
+    t: elapsedMs(rec),
+    id: cmd.id,
+    args,
+    label: cmd.describe?.([...args]) ?? cmd.label,
+    focus: focusFor(cmd, [...args]),
+    ...(narration === undefined ? {} : { note: narration }),
+  })
+  if (snapshot !== undefined) {
+    rec.actions.push(snapshot.action)
+    rec.actionJsonChars.push(snapshot.jsonChars)
+    rec.actionJsonCharsTotal += snapshot.jsonChars
+    s.pendingActionIndex = rec.actions.length - 1
+    if (anchorKey !== undefined) {
+      s.coalesceAnchors.set(anchorKey, s.pendingActionIndex)
+    }
+    s.setActionCount(rec.actions.length)
+  }
+}
+
+function recordActiveCommandAction(
+  s: StreamState,
+  rec: ActiveRecording,
+  cmd: RecordableCommand,
+  args: readonly unknown[],
+): void {
+  // Any command during a gesture accounts for the entry that gesture will
+  // push, so the commit is not reported as an anonymous write.
+  s.gestureClaimed = true
+  try {
+    const key = cmd.coalesceKey?.([...args])
+    const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
+    const anchorIndex =
+      anchorKey === undefined ? undefined : s.coalesceAnchors.get(anchorKey)
+    const existing =
+      anchorIndex === undefined ? undefined : rec.actions[anchorIndex]
+    if (existing !== undefined && anchorIndex !== undefined) {
+      coalesceRecordedAction(s, rec, cmd, args, anchorIndex, existing)
+    } else {
+      appendRecordedAction(s, rec, cmd, args, anchorKey)
+    }
+  } catch {
+    noteSessionBudgetExceeded(
+      s,
+      rec,
+      'An action could not be serialized and was not recorded',
+    )
+  }
+}
+
+/**
+ * Executes a command while logging it, handling depth, cancellation, and error
+ * reporting.
  *
  * Args are cloned via the JSON-based `deepClone`, matching the convention
  * that command args are plain data — a non-serializable arg would break
@@ -494,109 +594,33 @@ function recordCommandExecutionIn(
   run: () => void,
 ): void {
   const rec = s.active
-  if (
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.preservesFinishedSession !== true
-  ) {
+  const isTopLevel = commandDepth === 0 && suppressDepth === 0
+  if (isTopLevel && cmd.preservesFinishedSession !== true) {
     noteLiveWorkspaceMutation(s)
+    if (!rec) {
+      invalidateLastFinishedSessionIn(s)
+    }
   }
-  if (
-    !rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.preservesFinishedSession !== true
-  ) {
-    invalidateLastFinishedSessionIn(s)
-  }
-  if (
-    rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.recordable === false
-  ) {
-    s.coalesceAnchors = new Map()
-    s.gestureClaimed = false
-    noteUnnamedWrite(s, rec, `${cmd.label} is wall-clock transport`)
-  } else if (
-    rec &&
-    commandDepth === 0 &&
-    suppressDepth === 0 &&
-    cmd.id === NARRATION_COMMAND_ID &&
-    !narrationAsStep()
-  ) {
-    // The sentence still runs (the live rail shows it); it just waits to
-    // caption the step it introduces instead of standing as a step itself.
-    s.gestureClaimed = true
-    const text = args[0]
-    s.pendingNarration = typeof text === 'string' ? text : undefined
-  } else if (rec && commandDepth === 0 && suppressDepth === 0) {
-    // Any command during a gesture accounts for the entry that gesture will
-    // push, so the commit is not reported as an anonymous write.
-    s.gestureClaimed = true
-    try {
-      const key = cmd.coalesceKey?.([...args])
-      const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
-      const anchorIndex =
-        anchorKey === undefined ? undefined : s.coalesceAnchors.get(anchorKey)
-      const existing =
-        anchorIndex === undefined ? undefined : rec.actions[anchorIndex]
-      if (existing !== undefined && anchorIndex !== undefined) {
-        // A drag re-sets the same target dozens of times inside ONE undo step;
-        // the log keeps the last value and the timestamp the gesture began.
-        const coalescedArgs = cmd.coalesceArgs
-          ? cmd.coalesceArgs(existing.args, args)
-          : args
-        const snapshot = snapshotAction(
-          s,
-          rec,
-          {
-            ...existing,
-            args: coalescedArgs,
-            focus: focusFor(cmd, [...coalescedArgs]),
-            // The label has to move with the args. Describing commands render
-            // the value into their label ("Set gamma to 2.42"), so keeping the
-            // first one left the step list quoting a value the action no longer
-            // carried.
-            label: cmd.describe?.([...coalescedArgs]) ?? cmd.label,
-          },
-          anchorIndex,
-        )
-        if (snapshot !== undefined) {
-          rec.actionJsonCharsTotal +=
-            snapshot.jsonChars - (rec.actionJsonChars[anchorIndex] ?? 0)
-          rec.actionJsonChars[anchorIndex] = snapshot.jsonChars
-          rec.actions[anchorIndex] = snapshot.action
-          s.pendingActionIndex = anchorIndex
-        }
-      } else {
-        const narration = s.pendingNarration
-        s.pendingNarration = undefined
-        const snapshot = snapshotAction(s, rec, {
-          t: elapsedMs(rec),
-          id: cmd.id,
-          args,
-          label: cmd.describe?.([...args]) ?? cmd.label,
-          focus: focusFor(cmd, [...args]),
-          ...(narration === undefined ? {} : { note: narration }),
-        })
-        if (snapshot !== undefined) {
-          rec.actions.push(snapshot.action)
-          rec.actionJsonChars.push(snapshot.jsonChars)
-          rec.actionJsonCharsTotal += snapshot.jsonChars
-          s.pendingActionIndex = rec.actions.length - 1
-          if (anchorKey !== undefined) {
-            s.coalesceAnchors.set(anchorKey, s.pendingActionIndex)
-          }
-          s.setActionCount(rec.actions.length)
-        }
+  if (rec && isTopLevel) {
+    if (cmd.recordable === false) {
+      // Not a step, and a gap in the take only when it changes something a
+      // replay reproduces. A command that cannot (`preservesFinishedSession`,
+      // the promise the finished session above already relies on) is no event
+      // here at all: an export, or a read of the export queue, leaves the
+      // count and any drag it ran in the middle of as they were.
+      if (cmd.preservesFinishedSession !== true) {
+        s.coalesceAnchors = new Map()
+        s.gestureClaimed = false
+        noteUnnamedWrite(s, rec, describeUnrecordedCommand(cmd.label))
       }
-    } catch {
-      noteSessionBudgetExceeded(
-        s,
-        rec,
-        'An action could not be serialized and was not recorded',
-      )
+    } else if (cmd.id === NARRATION_COMMAND_ID && !narrationAsStep()) {
+      // The sentence still runs (the live rail shows it); it just waits to
+      // caption the step it introduces instead of standing as a step itself.
+      s.gestureClaimed = true
+      const text = args[0]
+      s.pendingNarration = typeof text === 'string' ? text : undefined
+    } else {
+      recordActiveCommandAction(s, rec, cmd, args)
     }
   }
   commandDepth++
@@ -730,8 +754,7 @@ function reportUnreplayableIn(s: StreamState, reason: string): void {
     s.pendingActionIndex = undefined
   }
   s.coalesceAnchors = new Map()
-  rec.unnamedWrites.push({ t: elapsedMs(rec), description: reason })
-  s.setUnnamedWriteCount(rec.unnamedWrites.length)
+  noteUncapturedIn(s, rec, reason)
   console.warn('[recorder] Unreplayable during recording:', reason)
 }
 
@@ -802,7 +825,7 @@ function reportDocumentWriteIn(
     return
   }
   if (claimed || suppressDepth > 0) return
-  noteUnnamedWrite(s, rec, description)
+  noteUnnamedWrite(s, rec, describeUnroutedEdit(description))
 }
 
 /**
@@ -832,14 +855,15 @@ function reportTimelineWriteIn(s: StreamState, description?: string): void {
     invalidateLastFinishedSessionIn(s)
     return
   }
-  noteUnnamedWrite(s, rec, description)
+  noteUnnamedWrite(s, rec, describeUnroutedEdit(description))
 }
 
-/** Direct scrub/play/step controls are transport, not timeline document
- * entries. They still detach stale export metadata, and while recording they
- * receive one honest fidelity marker per take because wall-clock transport is
- * deliberately not replayed. Command-routed seeks are already represented in
- * the log and therefore skip this hook while `commandDepth > 0`. */
+/** Direct scrub/step controls are transport, not timeline document entries.
+ * They still detach stale export metadata, and while recording they receive
+ * one honest fidelity marker per take because a seek outside a command is not
+ * replayed. Command-routed seeks are already represented in the log and
+ * therefore skip this hook while `commandDepth > 0`. Play and Pause are not
+ * reported here: see {@link reportTimelinePlaybackIn}. */
 function reportTimelineTransportIn(s: StreamState, description: string): void {
   if (commandDepth > 0 || suppressDepth > 0) return
   // An Arcade pilot's playback is the tool's own preview, started so the
@@ -856,16 +880,81 @@ function reportTimelineTransportIn(s: StreamState, description: string): void {
   reportUnreplayableOnceIn(s, 'timeline-transport', description)
 }
 
+/**
+ * Playback started or stopped: log the step that puts it back.
+ *
+ * Any Play or Pause reaches here (Space, the transport buttons, a workspace
+ * flow pausing the raw timeline, a non-looping playback running off its end),
+ * because the timeline reports the change itself. The step is
+ * `timeline.setPlaying(playing, frame)`; a stop adds the frames the playback
+ * advanced. The frame makes it replayable, the count lets a replay play the
+ * window at the take's pace (recorder/playWindows.ts).
+ *
+ * Skipped inside a command (that command is what the log carries), under
+ * suppression (replay, and recorder plumbing such as the pause a take starts
+ * with), and for the seat an Arcade agent drives, which previews its own
+ * animation (as in `reportTimelineTransportIn`). A step ends any coalescing
+ * run but, not being a document write, claims no gesture a drag has open.
+ */
+function reportTimelinePlaybackIn(
+  s: StreamState,
+  playing: boolean,
+  frame: number,
+  advanced?: number,
+): void {
+  if (commandDepth > 0 || suppressDepth > 0) return
+  if (drivingSeat() === s.id) return
+  noteLiveWorkspaceMutation(s)
+  const rec = s.active
+  if (!rec) {
+    invalidateLastFinishedSessionIn(s)
+    return
+  }
+  s.coalesceAnchors = new Map()
+  // The playhead is a whole frame everywhere it is set, and the step's replay
+  // policy accepts nothing else; one stray fraction must not make the whole
+  // take refuse to replay.
+  const pinned = Math.max(0, Math.round(frame))
+  const args: unknown[] = [playing, pinned]
+  if (advanced !== undefined) args.push(Math.max(0, Math.round(advanced)))
+  const snapshot = snapshotAction(s, rec, {
+    t: elapsedMs(rec),
+    id: TIMELINE_PLAYBACK_COMMAND_ID,
+    args,
+    label: describeTimelinePlayback(playing, pinned, advanced !== undefined),
+    focus: focusHintFor(TIMELINE_PLAYBACK_COMMAND_ID, args),
+  })
+  if (snapshot === undefined) return
+  rec.actions.push(snapshot.action)
+  rec.actionJsonChars.push(snapshot.jsonChars)
+  rec.actionJsonCharsTotal += snapshot.jsonChars
+  s.setActionCount(rec.actions.length)
+}
+
+/** Log one uncaptured step and show it. Past the names a file keeps, the
+ *  list does not change, so only the count moves: a flood of unrouted writes
+ *  then costs a number each, not a fresh copy of 2,000 names. */
+function noteUncapturedIn(
+  s: StreamState,
+  rec: ActiveRecording,
+  reason: string,
+): void {
+  const named = noteUncapturedStep(rec.uncaptured, elapsedMs(rec), reason)
+  batch(() => {
+    if (named) s.setUncapturedSteps([...rec.uncaptured.steps])
+    s.setUnnamedWriteCount(rec.uncaptured.count)
+  })
+}
+
 function noteUnnamedWrite(
   s: StreamState,
   rec: ActiveRecording,
-  description: string | undefined,
+  reason: string,
 ): void {
-  rec.unnamedWrites.push({ t: elapsedMs(rec), description })
-  s.setUnnamedWriteCount(rec.unnamedWrites.length)
+  noteUncapturedIn(s, rec, reason)
   console.warn(
     '[recorder] Unnamed write during recording — not replayable:',
-    description ?? '(no description)',
+    reason,
   )
 }
 
@@ -899,63 +988,17 @@ export function withRecordingSuppressed<T>(fn: () => T): T {
   }
 }
 
-export type RecordableCommand = Pick<
-  FlameCommand,
-  | 'id'
-  | 'label'
-  | 'coalesceArgs'
-  | 'coalesceKey'
-  | 'describe'
-  | 'focus'
-  | 'preservesFinishedSession'
-  | 'recordable'
->
-
-/** One seat's recorder. Every method is the per-stream form of the module
- *  function of the same name; the module functions delegate to the `player`
- *  stream so existing callers see no change. */
-export interface RecorderStream {
-  readonly id: SeatId
-  /** `now` lets several streams share one time origin (a duel starts both in
-   *  one call). */
-  start(
-    initial: FlameDescriptor,
-    extras?: SessionStartExtras,
-    now?: number,
-  ): SessionRecordingStartResult
-  stop(): RecordedSession | undefined
-  cancel(): void
-  isRecording: () => boolean
-  actionCount: () => number
-  unnamedWriteCount: () => number
-  lastSession: () => RecordedSession | undefined
-  lastFinishedSession(): RecordedSession | undefined
-  invalidateLastFinishedSession(): void
-  liveWorkspaceMutationGeneration(): number
-  recordCommandExecution(
-    cmd: RecordableCommand,
-    args: readonly unknown[],
-    run: () => void,
-  ): void
-  recordSyntheticAction(
-    id: string,
-    args: readonly unknown[],
-    label?: string,
-  ): void
-  replaceCurrentRecordedAction(
-    id: string,
-    args: readonly unknown[],
-    label?: string,
-  ): void
-  reportUnreplayable(reason: string): void
-  reportUnreplayableOnce(key: string, reason: string): void
-  reportDocumentWrite(description?: string, fromPreview?: boolean): void
-  reportTimelineWrite(description?: string): void
-  reportTimelineTransport(description: string): void
-  reportDerivedWorkspaceWrite(): void
-  isUndoTargetWithinRecording(target: UndoTarget | undefined): boolean
-  notePreviewStarted(): void
-  breakRecordingCoalescing(): void
+/**
+ * True while {@link withRecordingSuppressed} is running something.
+ *
+ * "No user behind it" is the question the recorder already answers for every
+ * document write, so anything else that needs to tell a person's edit from
+ * machinery asks here rather than inventing a second answer. The glide runtime
+ * is the first such caller: a write from a person takes the document off it,
+ * while the replay player committing its own batch must not.
+ */
+export function isRecordingSuppressed(): boolean {
+  return suppressDepth > 0
 }
 
 const handles = new Map<SeatId, RecorderStream>()
@@ -975,6 +1018,7 @@ export function recorderStream(id: SeatId): RecorderStream {
     isRecording: s.isRecording,
     actionCount: s.actionCount,
     unnamedWriteCount: s.unnamedWriteCount,
+    uncapturedSteps: s.uncapturedSteps,
     lastSession: s.lastSession,
     lastFinishedSession: () => lastFinishedSessionIn(s),
     invalidateLastFinishedSession: () => {
@@ -1004,6 +1048,9 @@ export function recorderStream(id: SeatId): RecorderStream {
     },
     reportTimelineTransport: (description) => {
       reportTimelineTransportIn(s, description)
+    },
+    reportTimelinePlayback: (playing, frame, advanced) => {
+      reportTimelinePlaybackIn(s, playing, frame, advanced)
     },
     reportDerivedWorkspaceWrite: () => {
       reportDerivedWorkspaceWriteIn(s)
@@ -1040,6 +1087,8 @@ const player = () => recorderStream(DEFAULT_SEAT)
 export const isSessionRecording = (): boolean => player().isRecording()
 export const recordedActionCount = (): number => player().actionCount()
 export const unnamedWriteCount = (): number => player().unnamedWriteCount()
+export const uncapturedSteps = (): readonly UncapturedStep[] =>
+  player().uncapturedSteps()
 
 export function getLiveWorkspaceMutationGeneration(): number {
   return player().liveWorkspaceMutationGeneration()
@@ -1143,4 +1192,8 @@ setDocumentWriteReporter((description, seatId) => {
 })
 setTimelineTransportReporter((description, seatId) => {
   recorderStream(seatId ?? DEFAULT_SEAT).reportTimelineTransport(description)
+})
+setTimelinePlaybackReporter((playing, frame, seatId, advanced) => {
+  const stream = recorderStream(seatId ?? DEFAULT_SEAT)
+  stream.reportTimelinePlayback(playing, frame, advanced)
 })

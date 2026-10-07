@@ -1,7 +1,7 @@
 import { unzipSync } from 'fflate'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
-import { TimelineTrack } from '@/flame/schema/timeline'
+import { TimelineSnapshotConfig, TimelineTrack } from '@/flame/schema/timeline'
 import * as v from '@/valibot'
 import { blobToBase64 } from './blob'
 import { extractFlameFromPng } from './flameInPng'
@@ -10,6 +10,7 @@ import { addRandomizerHistoryEntries, loadRandomizerHistoryEntries, MAX_RANDOMIZ
 import { loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, newRecentFlameId, saveRecentFlames, } from './recentFlames'
 import type { BackupGroups } from './flameBackup'
 import type { RecentFlame } from './recentFlames'
+import type { TimelineConfig } from './timeline'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /** Effectively "all" — every store is capped well below this. */
@@ -35,6 +36,10 @@ export type ImportCandidate = {
   flame: FlameDescriptor
   savedAt: number
   tracks?: TimelineTrack[]
+  /** The timeline the animation was authored at, where the backup carried
+   *  one. Not derived from the tracks: a flame with none still has a frame
+   *  rate and an end frame. */
+  config?: TimelineConfig
   /** PNG data URL. History galleries are plain `<img>` tiles, so a
    *  generated/logo flame that arrives without one (a JSON-only backup) is
    *  routed to Recent flames instead, which renders its own live preview. */
@@ -62,11 +67,14 @@ export type ImportSummary = {
 }
 
 /** Flame plus the metadata its envelope carried, before it becomes an entry. */
-type ParsedFlame = {
+export type ParsedFlame = {
   flame: FlameDescriptor
   name?: string
   savedAt?: number
   tracks?: TimelineTrack[]
+  /** The timeline the animation was authored at: fps, speed, the end frame
+   *  and the loop mode. Absent in envelopes written before it was stored. */
+  config?: TimelineConfig
 }
 
 /** Top-level backup folder -> destination store. */
@@ -97,7 +105,63 @@ export function emptyImportSummary(): ImportSummary {
  *  timeline schema so a hand-edited file can't inject junk into the timeline. */
 function parseTracks(raw: unknown): TimelineTrack[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined
-  const result = v.safeParse(v.array(TimelineTrack), raw)
+  const result = v.safeParse(v.array(TimelineTrack), raw.map(onWholeFrames))
+  return result.success ? result.output : undefined
+}
+
+/**
+ * A track whose keyframes sit between frames, put back on whole ones.
+ *
+ * Development builds of the motion blur export left the playhead on a
+ * sub-frame, and the next auto-keyframe landed there (utils/animationExport.ts
+ * now puts it back). The schema holds a keyframe's frame to an integer, so one
+ * such keyframe failed the whole array and the file opened with no animation.
+ * A rounded keyframe that lands on a frame the track already has gives way to
+ * the one placed there. Anything else malformed still fails the schema.
+ */
+function onWholeFrames(track: unknown): unknown {
+  if (track === null || typeof track !== 'object') return track
+  const keyframes: unknown = (track as { keyframes?: unknown }).keyframes
+  if (!Array.isArray(keyframes)) return track
+  const frameOf = (kf: unknown): number | undefined => {
+    if (kf === null || typeof kf !== 'object') return undefined
+    const frame: unknown = (kf as { frame?: unknown }).frame
+    return typeof frame === 'number' && Number.isFinite(frame)
+      ? frame
+      : undefined
+  }
+  const fractional = (kf: unknown) => {
+    const frame = frameOf(kf)
+    return frame !== undefined && !Number.isInteger(frame)
+  }
+  if (!keyframes.some(fractional)) return track
+  const taken = new Set(keyframes.filter((kf) => !fractional(kf)).map(frameOf))
+  const repaired: unknown[] = []
+  for (const kf of keyframes) {
+    const frame = frameOf(kf)
+    if (frame === undefined || Number.isInteger(frame)) {
+      repaired.push(kf)
+      continue
+    }
+    const whole = Math.round(frame)
+    if (taken.has(whole)) continue
+    taken.add(whole)
+    repaired.push({ ...(kf as object), frame: whole })
+  }
+  return { ...track, keyframes: repaired }
+}
+
+/**
+ * The timeline an animation was authored at, validated like its tracks: fps,
+ * the speed and the end frame all decide what playback does, so a value from
+ * an older build or a hand-edited file cannot be trusted straight in. The
+ * snapshot schema is the one that carries `timeScale`.
+ */
+function parseConfig(raw: unknown): TimelineConfig | undefined {
+  if (raw === null || typeof raw !== 'object') return undefined
+  const result = v.safeParse(TimelineSnapshotConfig, raw)
+  // Pinned at the call site: valibot's inferred output widens in ways that
+  // differ between a local typecheck and CI.
   return result.success ? result.output : undefined
 }
 
@@ -124,9 +188,13 @@ export function parseFlameEnvelope(raw: unknown): ParsedFlame | undefined {
   if (typeof envelope.savedAt === 'number') {
     parsed.savedAt = envelope.savedAt
   }
-  const animation = envelope.animation as { tracks?: unknown } | undefined
+  const animation = envelope.animation as
+    | { tracks?: unknown; config?: unknown }
+    | undefined
   const tracks = parseTracks(animation?.tracks)
   if (tracks) parsed.tracks = tracks
+  const config = parseConfig(animation?.config)
+  if (config) parsed.config = config
   return parsed
 }
 
@@ -160,8 +228,39 @@ async function readFlamePng(
     const parsed: ParsedFlame = { flame: result.flame }
     const tracks = parseTracks(result.animation?.tracks)
     if (tracks) parsed.tracks = tracks
+    // The app writes this into the image beside the tracks, and reading the
+    // tracks without it brought the animation back at the workspace's
+    // defaults - 30fps over 90 frames, however long it actually was.
+    const config = parseConfig(result.animation?.config)
+    if (config) parsed.config = config
     return parsed
   } catch (_) {
+    return undefined
+  }
+}
+
+/**
+ * One dropped or picked file, opened straight into the workspace.
+ *
+ * The same readers the backup importer uses, because it is the same bytes:
+ * the single-file path had a copy of its own that stopped at the tracks, so
+ * the app wrote a timeline into an exported PNG and read that exact file back
+ * at the workspace's defaults. What the caller does with a failure differs -
+ * it names the file in an alert rather than counting it - so this reports
+ * nothing rather than throwing.
+ */
+export async function readSingleFlameFile(
+  file: File,
+): Promise<ParsedFlame | undefined> {
+  const name = file.name.toLowerCase()
+  const isText =
+    name.endsWith('.flame') || name.endsWith('.xml') || name.endsWith('.json')
+  try {
+    return isText
+      ? readFlameText(await file.text())
+      : await readFlamePng(new Uint8Array(await file.arrayBuffer()))
+  } catch (err) {
+    console.warn(err)
     return undefined
   }
 }
@@ -190,6 +289,7 @@ function toCandidate(
     savedAt: parsed.savedAt ?? fallbackSavedAt,
   }
   if (parsed.tracks) candidate.tracks = parsed.tracks
+  if (parsed.config) candidate.config = parsed.config
   if (thumbnail !== undefined) candidate.thumbnail = thumbnail
   return candidate
 }
@@ -404,6 +504,9 @@ export function mergeRecentFlames(
     if (candidate.tracks && candidate.tracks.length > 0) {
       entry.tracks = candidate.tracks
     }
+    // The timeline the animation was authored at, so a backup round trip
+    // does not quietly return every flame at 30fps over 90 frames.
+    if (candidate.config) entry.config = candidate.config
     added.push(entry)
     outcome.added++
   }

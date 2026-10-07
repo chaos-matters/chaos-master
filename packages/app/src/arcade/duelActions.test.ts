@@ -116,4 +116,37 @@ describe('finishDuel', () => {
     if ('error' in result) throw new Error(result.error)
     expect(result.title).toBe('Ember lattice')
   })
+
+  it('handles partial take save failure gracefully when rival take rejects', async () => {
+    const ctx = createMockCommandContext()
+    let calls = 0
+    ctx.recorder = recorderFacade(
+      (_session: RecordedSession, _name: string) => {
+        calls++
+        if (calls === 2) {
+          return Promise.reject(new Error('disk full'))
+        }
+        return Promise.resolve()
+      },
+    )
+    setWebMcpContext(ctx)
+    beginDuel()
+
+    const result = await finishDuel(ctx, 'finished', { title: 'Partial Save' })
+
+    if ('error' in result) throw new Error(result.error)
+    expect(duelActive()).toBe(false)
+    expect(result.savedTakes).toBe(1)
+  })
+
+  it('defaults to "Duel" title when neither opts nor ready title is provided', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    beginDuel()
+
+    const result = await finishDuel(ctx, 'finished', {})
+
+    if ('error' in result) throw new Error(result.error)
+    expect(result.title).toBe('Duel')
+  })
 })

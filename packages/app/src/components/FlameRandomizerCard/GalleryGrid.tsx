@@ -1,8 +1,10 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { PREVIEW_RESOLUTION_BY_TIER } from '@/utils/hardwareTier'
+import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import ui from './GalleryGrid.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
@@ -70,33 +72,24 @@ export function GalleryGrid(props: {
     }
   }
 
-  // Enter applies the selected cell (modal model). Ignore while typing in the
-  // size/brightness inputs.
-  createEffect(() => {
-    if (props.applyOnClick) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Enter') return
-      const target = e.target
-      if (
-        target instanceof HTMLElement &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return
-      }
-      const candidate = props.candidates[selectedIndex()]
-      if (candidate !== undefined) {
-        e.preventDefault()
-        props.onApply(candidate)
-      }
+  // Enter applies the selected cell (modal model), heard only from the grid
+  // itself or a cell, which the click that selected it focused. On the whole
+  // document it took the Enter of every focused control, a cell's own buttons
+  // included. The agent owns the keyboard under the Arcade's screen lock.
+  const applyOnEnter = (e: KeyboardEvent & { currentTarget: HTMLElement }) => {
+    // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+    // under the screen lock before any listener runs; kept until WP9 takes
+    // these checks out one at a time, each with its own test.
+    if (props.applyOnClick || e.key !== 'Enter' || pilotOwnsKeyboard()) return
+    const target = e.target as Element
+    if (target !== e.currentTarget && target.parentElement !== e.currentTarget)
+      return
+    const candidate = props.candidates[selectedIndex()]
+    if (candidate !== undefined) {
+      e.preventDefault()
+      props.onApply(candidate)
     }
-    document.addEventListener('keydown', onKeyDown)
-    onCleanup(() => {
-      document.removeEventListener('keydown', onKeyDown)
-    })
-  })
+  }
 
   // Clear the applied-cell highlight when another part of the randomizer card
   // takes over the selection (apply-on-click mode only).
@@ -137,9 +130,21 @@ export function GalleryGrid(props: {
       ? { filter: `brightness(${props.brightness})` }
       : undefined
 
+  const [gridEl, setGridEl] = createSignal<HTMLDivElement>()
+  const scrollContainer = () =>
+    props.maxHeight !== undefined ? gridEl() : null
+  const trackTileVisibility = createSharedIntersectionObserver(
+    scrollContainer,
+    {
+      rootMargin: '200px',
+    },
+  )
+
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
       <div
+        ref={setGridEl}
+        onKeyDown={applyOnEnter}
         class={ui.grid}
         classList={{ [ui.scroll!]: props.maxHeight !== undefined }}
         style={{
@@ -150,113 +155,124 @@ export function GalleryGrid(props: {
         }}
       >
         <For each={visibleCandidates()}>
-          {(candidate, i) => (
-            <div
-              class={ui.cell}
-              classList={{
-                [ui.cellActive!]: activeIndex() === i(),
-                [ui.cellSelected!]: selectedIndex() === i(),
-              }}
-              title={
-                props.applyOnClick
-                  ? selectedIndex() === i()
-                    ? 'Applied — click to re-apply'
-                    : 'Click to apply this flame'
-                  : selectedIndex() === i()
-                    ? 'Click again (or press Enter) to apply'
-                    : 'Click to select'
-              }
-              onClick={() => {
-                handleCellClick(candidate, i())
-              }}
-            >
-              <div class={ui.previewLayer} style={brightnessStyle()}>
-                <VariationPreview
-                  version={props.version}
-                  isSelected={false}
-                  flame={candidate}
-                  name={`gallery-${i()}`}
-                  hardwareTier={props.hardwareTier ?? null}
-                  resolution={previewResolution()}
-                />
-              </div>
-              <div class={ui.actions}>
-                {/* In apply-on-click (sidebar) mode the whole cell applies, so
+          {(candidate, i) => {
+            const [cellEl, setCellEl] = createSignal<HTMLDivElement>()
+            const nearViewport = trackTileVisibility(cellEl)
+            return (
+              <div
+                ref={setCellEl}
+                tabIndex={-1}
+                class={ui.cell}
+                classList={{
+                  [ui.cellActive!]: activeIndex() === i(),
+                  [ui.cellSelected!]: selectedIndex() === i(),
+                }}
+                title={
+                  props.applyOnClick
+                    ? selectedIndex() === i()
+                      ? 'Applied — click to re-apply'
+                      : 'Click to apply this flame'
+                    : selectedIndex() === i()
+                      ? 'Click again (or press Enter) to apply'
+                      : 'Click to select'
+                }
+                onClick={() => {
+                  handleCellClick(candidate, i())
+                }}
+              >
+                <div class={ui.previewLayer} style={brightnessStyle()}>
+                  <Show when={nearViewport() && candidate} keyed>
+                    {(cand) => (
+                      <VariationPreview
+                        version={props.version}
+                        isSelected={false}
+                        flame={cand}
+                        name={`gallery-${i()}`}
+                        hardwareTier={props.hardwareTier ?? null}
+                        resolution={previewResolution()}
+                        isVisible={nearViewport()}
+                      />
+                    )}
+                  </Show>
+                </div>
+                <div class={ui.actions}>
+                  {/* In apply-on-click (sidebar) mode the whole cell applies, so
                     the explicit Apply tick is redundant — hide it there. */}
-                <Show when={!props.applyOnClick}>
+                  <Show when={!props.applyOnClick}>
+                    <button
+                      type="button"
+                      class={ui.iconBtn}
+                      title="Apply this flame"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        props.onApply(candidate)
+                      }}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </button>
+                  </Show>
+                  <Show when={props.onInspect}>
+                    <button
+                      type="button"
+                      class={ui.iconBtn}
+                      title="Inspect: view this flame at high quality"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        props.onInspect?.(candidate)
+                      }}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="11" cy="11" r="7" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </button>
+                  </Show>
                   <button
                     type="button"
                     class={ui.iconBtn}
-                    title="Apply this flame"
+                    title="Mutate: breed variations of this flame"
                     onClick={(e) => {
                       e.stopPropagation()
-                      props.onApply(candidate)
+                      props.onMutate(candidate)
                     }}
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                      <rect
+                        x="1.5"
+                        y="1.5"
+                        width="13"
+                        height="13"
+                        rx="3"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      />
+                      <circle cx="5.2" cy="5.2" r="1.4" />
+                      <circle cx="10.8" cy="10.8" r="1.4" />
+                      <circle cx="10.8" cy="5.2" r="1.4" />
+                      <circle cx="5.2" cy="10.8" r="1.4" />
                     </svg>
                   </button>
-                </Show>
-                <Show when={props.onInspect}>
-                  <button
-                    type="button"
-                    class={ui.iconBtn}
-                    title="Inspect: view this flame at high quality"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      props.onInspect?.(candidate)
-                    }}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="11" cy="11" r="7" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                  </button>
-                </Show>
-                <button
-                  type="button"
-                  class={ui.iconBtn}
-                  title="Mutate: breed variations of this flame"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    props.onMutate(candidate)
-                  }}
-                >
-                  <svg viewBox="0 0 16 16" fill="currentColor">
-                    <rect
-                      x="1.5"
-                      y="1.5"
-                      width="13"
-                      height="13"
-                      rx="3"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                    />
-                    <circle cx="5.2" cy="5.2" r="1.4" />
-                    <circle cx="10.8" cy="10.8" r="1.4" />
-                    <circle cx="10.8" cy="5.2" r="1.4" />
-                    <circle cx="5.2" cy="10.8" r="1.4" />
-                  </svg>
-                </button>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          }}
         </For>
       </div>
     </ComputeGate>

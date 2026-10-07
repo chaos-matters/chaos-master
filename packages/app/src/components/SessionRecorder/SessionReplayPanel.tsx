@@ -1,17 +1,20 @@
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { usePrefersReducedMotion } from '@/components/Home/homePlayback'
-import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, Speech, } from '@/icons'
+import { getGlideRuntime } from '@/flame/glide/runtime'
+import { ChevronLeft, ChevronRight, Download, Focus, Glide, Pause, Pencil, PlayPause, SkipBack, Speech, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
 import { replayInterfaceCaptureSupported } from '@/recorder/replayInterfaceVideo'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
-import { agentRailEnabled, followCamEnabled, setAgentRailEnabled, setFollowCamEnabled, setRecorderExportPending, } from './recorderUi'
+import { agentRailEnabled, followCamEnabled, replayGlideEnabled, setAgentRailEnabled, setFollowCamEnabled, setRecorderExportPending, setReplayGlideEnabled, } from './recorderUi'
 import { ReplayAgentRail } from './ReplayAgentRail'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
+import { ExportSkipNotice, UncapturedSteps } from './UncapturedSteps'
 import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
+import type { ReplayGlideOptions } from '@/recorder/glide'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { ReplayVideoExportMode, ReplayVideoExportRequest, } from '@/recorder/replayInterfaceVideo'
 import type { RecordedSession } from '@/recorder/schema'
@@ -56,6 +59,9 @@ export function SessionReplayPanel(props: {
   const [exportMode, setExportMode] =
     createSignal<ReplayVideoExportMode>('artwork')
   const [exportError, setExportError] = createSignal<string>()
+  /** An export of a take with uncaptured steps first says what it will skip;
+   *  the next press of the export button is the one that starts it. */
+  const [confirmingSkips, setConfirmingSkips] = createSignal(false)
   const panelId = createUniqueId()
   const reducedMotion = usePrefersReducedMotion()
 
@@ -83,8 +89,27 @@ export function SessionReplayPanel(props: {
    */
   const [session, setSession] = createStore(deepClone(props.session))
 
+  /**
+   * The glide settings a replay runs with, read afresh for every step so the
+   * toggle lands on the next one rather than on the next Play.
+   *
+   * The tier comes from the workspace's own glide quality, so a replay
+   * downshifts exactly as an edit does. An export request carries it with the
+   * viewer's switch, and the take's steps switch the tier from there.
+   */
+  const glideOptions = (): ReplayGlideOptions => {
+    const quality = getGlideRuntime()?.quality()
+    return {
+      enabled: replayGlideEnabled(),
+      ...(quality === undefined
+        ? {}
+        : { durationScale: quality.durationScale, tier: quality.tier }),
+    }
+  }
+
   const player = createSessionPlayer(session, props.target, {
     speed,
+    glide: glideOptions,
     beforeAction: (action) => {
       if (followCamEnabled()) {
         props.onPrepareAction?.(deriveReplayFocusPreparation(action))
@@ -157,7 +182,10 @@ export function SessionReplayPanel(props: {
   const interfaceCaptureAvailable = () =>
     props.onExportVideo !== undefined && replayInterfaceCaptureSupported()
 
+  /** Set once the running export takes the replay over (prepareReplay). */
+  let exportTookReplay = false
   const prepareLiveReplay = () => {
+    exportTookReplay = true
     setFollowCamEnabled(true)
     player.stop()
     player.seek(-1)
@@ -242,13 +270,23 @@ export function SessionReplayPanel(props: {
         <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {replayStatus()}
         </p>
-        <Show when={session.unnamedWriteCount > 0}>
-          <span
-            class={styles.warning}
-            title={`${session.unnamedWriteCount} edit(s) in this session were not captured as commands, so this replay cannot reproduce them.`}
-          >
-            {session.unnamedWriteCount} not captured
-          </span>
+        {/* A synthesized session was planned from the finished flame, not
+            recorded while someone made it. The panel must not let a viewer
+            read it as "how this was made" — see recorder/synthesize. */}
+        <Show when={session.synthetic}>
+          {(synthetic) => (
+            <span
+              class={styles.synthetic}
+              data-replay-synthetic
+              title={`These steps were planned from the finished flame (${synthetic().strategy}, seed ${synthetic().seed})${
+                synthetic().snapped
+                  ? ', ending with a snap to the parts no command could rebuild'
+                  : ''
+              }. They are not a recording of how it was made.`}
+            >
+              A possible way to build this
+            </span>
+          )}
         </Show>
         <button
           data-recorder-replay-close
@@ -269,6 +307,7 @@ export function SessionReplayPanel(props: {
           Close
         </button>
       </div>
+      <UncapturedSteps session={session} />
 
       <div class={styles.transport}>
         <button
@@ -375,6 +414,26 @@ export function SessionReplayPanel(props: {
           disabled={exporting()}
         >
           <Focus class={styles.buttonIcon} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class={styles.button}
+          classList={{ [styles.toggleOn as string]: replayGlideEnabled() }}
+          onClick={() => setReplayGlideEnabled((on) => !on)}
+          title={
+            replayGlideEnabled()
+              ? 'Glide on: each step animates into place'
+              : 'Glide off: each step cuts straight in'
+          }
+          aria-pressed={replayGlideEnabled()}
+          aria-label={
+            replayGlideEnabled()
+              ? 'Cut between replay steps'
+              : 'Glide between replay steps'
+          }
+          disabled={exporting()}
+        >
+          <Glide class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -605,14 +664,13 @@ export function SessionReplayPanel(props: {
                   <button
                     type="button"
                     class={styles.button}
-                    disabled={
-                      saving() ||
-                      exporting() ||
-                      session.unnamedWriteCount > 0 ||
-                      player.total === 0
-                    }
+                    disabled={saving() || exporting() || player.total === 0}
                     aria-busy={exporting()}
-                    aria-describedby={`${panelId}-video-mode-help`}
+                    aria-describedby={
+                      confirmingSkips()
+                        ? `${panelId}-export-skips ${panelId}-video-mode-help`
+                        : `${panelId}-video-mode-help`
+                    }
                     onClick={() => {
                       const validated = validateSession(
                         deepClone(unwrap(session)),
@@ -620,6 +678,14 @@ export function SessionReplayPanel(props: {
                       if (validated === undefined || saving() || exporting()) {
                         return
                       }
+                      if (
+                        validated.unnamedWriteCount > 0 &&
+                        !confirmingSkips()
+                      ) {
+                        setConfirmingSkips(true)
+                        return
+                      }
+                      setConfirmingSkips(false)
 
                       const mode = exportMode()
                       const previousFollowCam = followCamEnabled()
@@ -636,9 +702,17 @@ export function SessionReplayPanel(props: {
                               mode,
                               session: validated,
                               playbackSpeed: speed(),
+                              // Where the take's glides start: its own
+                              // steps switch the tier from there.
+                              glide: {
+                                ...glideOptions(),
+                                preference:
+                                  player.viewerGlideSwitches().quality,
+                              },
                             }
 
                       setExportError(undefined)
+                      exportTookReplay = false
                       setExporting(true)
                       setRecorderExportPending(true)
                       try {
@@ -648,6 +722,11 @@ export function SessionReplayPanel(props: {
                         const result = exportVideo()(request)
                         void Promise.resolve(result)
                           .catch((error: unknown) => {
+                            // A failed or cancelled capture ends the replay it
+                            // took: the playhead and Glide switches go back.
+                            if (mode === 'interface' && exportTookReplay) {
+                              player.stop()
+                            }
                             setExportError(
                               error instanceof Error
                                 ? error.message
@@ -675,17 +754,15 @@ export function SessionReplayPanel(props: {
                       }
                     }}
                     title={
-                      session.unnamedWriteCount > 0
-                        ? 'Record a clean take before publishing a replay video'
-                        : player.total === 0
-                          ? 'Record at least one authored step before publishing a replay video'
-                          : exporting()
-                            ? exportMode() === 'interface'
-                              ? 'Recording the visible interface in real time'
-                              : 'Adding artwork video to Exports'
-                            : exportMode() === 'interface'
-                              ? 'Share this tab, replay the take and download the visible interface'
-                              : 'Render a widescreen, captioned artwork replay as MP4'
+                      player.total === 0
+                        ? 'Record at least one authored step before publishing a replay video'
+                        : exporting()
+                          ? exportMode() === 'interface'
+                            ? 'Recording the visible interface in real time'
+                            : 'Adding artwork video to Exports'
+                          : exportMode() === 'interface'
+                            ? 'Share this tab, replay the take and download the visible interface'
+                            : 'Render a widescreen, captioned artwork replay as MP4'
                     }
                   >
                     <Download class={styles.buttonIcon} aria-hidden="true" />
@@ -695,10 +772,23 @@ export function SessionReplayPanel(props: {
                           ? 'Recording interface…'
                           : 'Queuing artwork…'
                         : exportMode() === 'interface'
-                          ? 'Record full interface'
-                          : 'Export artwork'}
+                          ? confirmingSkips()
+                            ? 'Record anyway'
+                            : 'Record full interface'
+                          : confirmingSkips()
+                            ? 'Export anyway'
+                            : 'Export artwork'}
                     </span>
                   </button>
+                  <Show when={confirmingSkips()}>
+                    <ExportSkipNotice
+                      id={`${panelId}-export-skips`}
+                      session={session}
+                      onCancel={() => {
+                        setConfirmingSkips(false)
+                      }}
+                    />
+                  </Show>
                   <Show when={exportError()}>
                     {(message) => (
                       <div class={styles.exportError} role="alert">

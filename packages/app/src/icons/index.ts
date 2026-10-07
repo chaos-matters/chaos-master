@@ -11,7 +11,9 @@ import ChevronRight from './chevron-right.svg'
 import CircleHalf from './circle-half.svg'
 import ColourWedge from './colour-wedge.svg'
 import Copy from './copy.svg'
+import Create from './create.svg'
 import Cross from './cross.svg'
+import DeepZoom from './deep-zoom.svg'
 import Discord from './discord.svg'
 import Download from './download.svg'
 import Eye from './eye.svg'
@@ -21,6 +23,7 @@ import Focus from './focus.svg'
 import FolderOpen from './folder-open.svg'
 import GaugeMax from './gauge-max.svg'
 import GitHub from './github.svg'
+import Glide from './glide.svg'
 import Globe from './globe.svg'
 import GridIcon from './grid.svg'
 import Heart from './heart.svg'
@@ -30,8 +33,10 @@ import HoverPreview from './hover-preview.svg'
 import Info from './info.svg'
 import Lineage from './lineage.svg'
 import ListIcon from './list.svg'
+import LumenMark from './lumen-mark.svg'
 import Menu from './menu.svg'
 import Minus from './minus.svg'
+import MoreDots from './more-dots.svg'
 import MusicNote from './music-note.svg'
 import Pause from './pause.svg'
 import Pencil from './pencil.svg'
@@ -41,6 +46,7 @@ import Record from './record.svg'
 import Redo from './redo.svg'
 import Reset from './reset.svg'
 import Robot from './robot.svg'
+import Settings from './settings.svg'
 import ShapeTriangle from './shape-triangle.svg'
 import Share from './share.svg'
 import Shuffle from './shuffle.svg'
@@ -49,8 +55,10 @@ import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
 import Speech from './speech.svg'
+import SplitView from './split-view.svg'
 import Star from './star.svg'
 import Stop from './stop.svg'
+import Stopwatch from './stopwatch.svg'
 import Swords from './swords.svg'
 import Terminal from './terminal.svg'
 import TriangleAlert from './triangle-alert.svg'
@@ -73,7 +81,9 @@ export {
   CircleHalf,
   ColourWedge,
   Copy,
+  Create,
   Cross,
+  DeepZoom,
   Discord,
   Download,
   Eye,
@@ -82,6 +92,7 @@ export {
   FolderOpen,
   Focus,
   GaugeMax,
+  Glide,
   GitHub,
   Globe,
   GridIcon,
@@ -92,8 +103,10 @@ export {
   HoverPreview,
   Lineage,
   ListIcon,
+  LumenMark,
   Menu,
   Minus,
+  MoreDots,
   MusicNote,
   Pause,
   Pencil,
@@ -103,6 +116,7 @@ export {
   Redo,
   Reset,
   Robot,
+  Settings,
   Share,
   Shuffle,
   SkipBack,
@@ -110,6 +124,7 @@ export {
   Sparkle,
   Star,
   Stop,
+  Stopwatch,
   Swords,
   Terminal,
   Undo,
@@ -119,4 +134,5 @@ export {
   TriangleAlert,
   VariationSpiral,
   Speech,
+  SplitView,
 }

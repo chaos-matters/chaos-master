@@ -4,16 +4,17 @@
  * Features:
  * - Gradient bar with draggable color stops
  * - Click gradient to add new stops
- * - Drag stops to reposition
+ * - Drag stops to reposition, with a mouse, a pen or a finger
  * - Click stop to edit color via OkLab a/b plane picker
  * - Delete individual stops
  * - Palette name editing
  * - Save / Cancel / Delete palette
  */
 
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { addCustomPalette, deleteCustomPalette, paletteEntry, updateCustomPalette, } from '@/flame/colorMap'
 import { oklabToRgbForCss } from '@/flame/colors'
+import { createDragHandler } from '@/utils/createDragHandler'
 import { clamp } from '@/utils/easing'
 import ui from './CustomPaletteEditor.module.css'
 import type { Palette, PaletteEntry } from '@/flame/colorMap'
@@ -46,11 +47,9 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
       : [paletteEntry(0, -0.2, -0.2), paletteEntry(1, 0.2, 0.2)],
   )
 
-  // Active stop being edited
-  const [activeStopIndex, setActiveStopIndex] = createSignal<number | null>(
-    null,
-  )
-  const [draggingIndex, setDraggingIndex] = createSignal<number | null>(null)
+  // The stop being edited, by id: dragging a stop past a neighbour re-sorts
+  // them, and an index would then name the neighbour.
+  const [activeStopId, setActiveStopId] = createSignal<string | null>(null)
   const [editingColor, setEditingColor] = createSignal(false)
 
   // Color being edited in the a/b picker
@@ -72,11 +71,19 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
     return `linear-gradient(to right, ${stops.join(', ')})`
   })
 
-  const activeEntry = createMemo(() => {
-    const idx = activeStopIndex()
-    if (idx === null) return null
-    return sortedEntries()[idx]
-  })
+  const activeStopIndex = () =>
+    sortedEntries().findIndex((entry) => entry.id === activeStopId())
+
+  const activeEntry = createMemo(
+    () => sortedEntries().find((entry) => entry.id === activeStopId()) ?? null,
+  )
+
+  function selectStop(entry: PaletteEntry) {
+    setActiveStopId(entry.id)
+    setEditA(entry.a)
+    setEditB(entry.b)
+    setEditingColor(false)
+  }
 
   function handleGradientClick(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains(ui.stopHandle || ''))
@@ -119,106 +126,69 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
     }
 
     setEntries([...entries(), newEntry])
-    const newIdx = sortedEntries().findIndex((e) => e.id === newEntry.id)
-    setActiveStopIndex(newIdx)
+    setActiveStopId(newEntry.id)
     setEditA(a)
     setEditB(b)
     setEditingColor(true)
   }
 
-  function handleStopMouseDown(e: MouseEvent, index: number) {
-    e.stopPropagation()
-    e.preventDefault()
-    setActiveStopIndex(index)
-    setEditingColor(false)
+  // Pointer events, so a finger drags a stop on a tablet as a mouse does;
+  // touch-action on the handle keeps the browser from scrolling instead. The
+  // dead zone keeps a tap from nudging the stop it selects.
+  const startStopDrag = createDragHandler(
+    (event) => {
+      const id =
+        event.target instanceof HTMLElement
+          ? event.target.dataset.stopId
+          : undefined
+      const bar = gradientBarRef
+      if (id === undefined || !bar) return undefined
+      return {
+        onPointerMove(move) {
+          const rect = bar.getBoundingClientRect()
+          const position = clamp((move.clientX - rect.left) / rect.width, 0, 1)
+          setEntries((prev) =>
+            prev.map((entry) =>
+              entry.id === id ? { ...entry, position } : entry,
+            ),
+          )
+        },
+      }
+    },
+    { deadZoneRadius: 4 },
+  )
 
-    const entry = sortedEntries()[index]
-    if (entry) {
-      setEditA(entry.a)
-      setEditB(entry.b)
-    }
-
-    setDraggingIndex(index)
-  }
-
-  // Event handlers for dragging - ref to track state without causing reactive updates.
-  // Tracks the dragged entry's stable id (not its sorted-position index): the
-  // index would resolve to a *different* entry the moment the drag crosses a
-  // neighbor and re-sorting changes rank order mid-drag.
-  const draggingIdRef = { current: null as string | null }
-
-  // Setup drag event listeners when draggingIndex changes
-  createEffect(() => {
-    const idx = draggingIndex()
-    draggingIdRef.current =
-      idx === null ? null : (sortedEntries()[idx]?.id ?? null)
-
-    if (draggingIdRef.current === null || !gradientBarRef) return
-
-    const onMouseMove = (me: MouseEvent) => {
-      const draggedId = draggingIdRef.current
-      if (draggedId === null) return
-
-      const rect = gradientBarRef.getBoundingClientRect()
-      const newPos = clamp((me.clientX - rect.left) / rect.width, 0, 1)
-
-      setEntries((prev) =>
-        prev.map((entry) =>
-          entry.id === draggedId ? { ...entry, position: newPos } : entry,
-        ),
-      )
-    }
-
-    const onMouseUp = () => {
-      setDraggingIndex(null)
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-
-    onCleanup(() => {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    })
-  })
-
-  function handlePickerClick(e: MouseEvent) {
+  /** Put the a/b point under the pointer, kept inside the plane. */
+  function pickAt(e: PointerEvent) {
     if (!pickerRef) return
     const rect = pickerRef.getBoundingClientRect()
     // x: -1 to 1 (a channel), y: -1 to 1 (b channel)
-    const a = clamp(((e.clientX - rect.left) / rect.width) * 2 - 1, -1, 1)
-    const b = clamp((1 - (e.clientY - rect.top) / rect.height) * 2 - 1, -1, 1)
-    setEditA(a)
-    setEditB(b)
+    setEditA(clamp(((e.clientX - rect.left) / rect.width) * 2 - 1, -1, 1))
+    setEditB(clamp((1 - (e.clientY - rect.top) / rect.height) * 2 - 1, -1, 1))
   }
 
-  function applyColorToStop() {
-    const idx = activeStopIndex()
-    if (idx === null) return
-    const sorted = sortedEntries()
-    const entry = sorted[idx]
-    if (!entry) return
+  // The point jumps to where the plane is pressed and follows the pointer,
+  // mouse, pen or finger, until it is let go.
+  const startPick = createDragHandler((event) => {
+    pickAt(event)
+    return { onPointerMove: pickAt }
+  })
 
+  function applyColorToStop() {
+    const id = activeStopId()
+    if (id === null) return
     setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entry.id ? { ...e, a: editA(), b: editB() } : e,
-      ),
+      prev.map((e) => (e.id === id ? { ...e, a: editA(), b: editB() } : e)),
     )
   }
 
   function handleDeleteStop(e: MouseEvent) {
     e.stopPropagation()
-    if (entries().length <= MIN_STOPS) return
+    const id = activeStopId()
+    if (entries().length <= MIN_STOPS || id === null) return
 
-    const idx = activeStopIndex()
-    if (idx === null) return
-
-    const sorted = sortedEntries()
-    const entry = sorted[idx]
-    if (!entry) return
-
-    setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-    setActiveStopIndex(null)
+    setEntries((prev) => prev.filter((entry) => entry.id !== id))
+    setActiveStopId(null)
     setEditingColor(false)
   }
 
@@ -250,11 +220,8 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
 
   // Sync active stop position to edit values when selection changes
   createEffect(() => {
-    const idx = activeStopIndex()
-    if (idx === null) return
-    const entry = sortedEntries()[idx]
-    if (!entry) return
-    if (!editingColor()) {
+    const entry = activeEntry()
+    if (entry && !editingColor()) {
       setEditA(entry.a)
       setEditB(entry.b)
     }
@@ -282,25 +249,24 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
         onClick={handleGradientClick}
       >
         <For each={sortedEntries()}>
-          {(entry, i) => (
+          {(entry) => (
             <div
               class={ui.stopHandle}
               classList={{
-                [ui.stopActive as string]: activeStopIndex() === i(),
+                [ui.stopActive as string]: activeStopId() === entry.id,
               }}
+              data-stop-id={entry.id}
               style={{
                 left: `${Math.round(entry.position * 100)}%`,
                 background: oklabToRgbForCss(entry.a, entry.b, 0.7),
               }}
-              onMouseDown={(e) => {
-                handleStopMouseDown(e, i())
+              onPointerDown={(e) => {
+                selectStop(entry)
+                startStopDrag(e)
               }}
               onClick={(e) => {
                 e.stopPropagation()
-                setActiveStopIndex(i())
-                setEditA(entry.a)
-                setEditB(entry.b)
-                setEditingColor(false)
+                selectStop(entry)
               }}
             />
           )}
@@ -311,7 +277,7 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
       <Show when={activeEntry()}>
         <div class={ui.stopInfo}>
           <span class={ui.stopLabel}>
-            Stop {(activeStopIndex() ?? 0) + 1} / {sortedEntries().length}
+            Stop {activeStopIndex() + 1} / {sortedEntries().length}
           </span>
           <div class={ui.stopValues}>
             <span>a: {editA().toFixed(2)}</span>
@@ -350,7 +316,7 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
             <div
               ref={pickerRef}
               class={ui.oklabPicker}
-              onClick={handlePickerClick}
+              onPointerDown={startPick}
             >
               {/* Grid overlay */}
               <div class={ui.pickerGrid} />

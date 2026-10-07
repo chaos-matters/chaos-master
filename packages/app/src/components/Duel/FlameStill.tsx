@@ -9,8 +9,8 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { ExportImageType } from '@/MainWorkspace'
 
 /**
  * One flame, rendered off-screen to a still, once.
@@ -66,9 +66,13 @@ export function FlameStill(props: {
   let captured = false
   const startedAt = globalThis.performance.now()
 
-  const capture = (canvas: HTMLCanvasElement) => {
+  const capture = async (canvas: HTMLCanvasElement, fence?: Promise<void>) => {
     if (captured) return
     captured = true
+    if (fence) {
+      await fence
+    }
+    await new Promise((resolve) => requestAnimationFrame(resolve))
     canvas.toBlob(
       (blob) => {
         if (blob) props.onStill(blob)
@@ -82,7 +86,7 @@ export function FlameStill(props: {
     if (captured) return
     const overdue = globalThis.performance.now() - startedAt >= props.deadlineMs
     if (info?.finalImageReady !== true && !overdue) return
-    capture(canvas)
+    void capture(canvas, info?.fence)
   }
 
   // A component, not a hoisted JSX value: JSX in a variable is evaluated where
@@ -117,6 +121,7 @@ export function FlameStill(props: {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={() => camera.rotation ?? 0}
               interactive={() => false}
             >
               <FlameLayer />

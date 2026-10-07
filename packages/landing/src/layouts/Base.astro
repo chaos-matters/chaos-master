@@ -26,6 +26,12 @@ const ogImage = new URL('/og-cover.jpg', Astro.site).href
 const remoteLog =
   import.meta.env.DEV && import.meta.env.PUBLIC_REMOTE_LOG === 'true'
 const gaId = import.meta.env.PUBLIC_GA_ID
+
+// The review deploy (about.dev.lumenapeiron.com) is the same build as
+// production. Set by the `build:review` script; pairs with the Disallow in
+// pages/robots.txt.ts — that stops the crawl, this stops anything already
+// fetched from being indexed.
+const isReviewDeploy = import.meta.env.PUBLIC_REVIEW_DEPLOY === 'true'
 ---
 
 <!doctype html>
@@ -33,6 +39,7 @@ const gaId = import.meta.env.PUBLIC_GA_ID
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {isReviewDeploy && <meta name="robots" content="noindex, nofollow" />}
     {
       gaId && (
         <>

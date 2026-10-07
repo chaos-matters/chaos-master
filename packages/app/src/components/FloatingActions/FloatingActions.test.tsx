@@ -5,8 +5,22 @@ import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, } from '@/recorder/recorder'
 import { recorderVisible, setRecorderExportPending, setRecorderSavePending, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import { FloatingActions } from './FloatingActions'
+import type { ComponentProps } from 'solid-js'
 
-function renderFloatingActions(initiallyCollapsed = false) {
+type TimelineProps = Partial<
+  Pick<
+    ComponentProps<typeof FloatingActions>,
+    | 'showTimeline'
+    | 'setShowTimeline'
+    | 'animationEnabled'
+    | 'setAnimationEnabled'
+  >
+>
+
+function renderFloatingActions(
+  initiallyCollapsed = false,
+  timeline: TimelineProps = {},
+) {
   const [collapsed, setCollapsed] = createSignal(initiallyCollapsed)
   const noop = vi.fn()
   const result = render(() => (
@@ -24,10 +38,10 @@ function renderFloatingActions(initiallyCollapsed = false) {
       onRandomizeColors={noop}
       hideDiceButtons={() => false}
       setHideDiceButtons={noop}
-      animationEnabled={() => false}
-      setAnimationEnabled={noop}
-      showTimeline={() => false}
-      setShowTimeline={noop}
+      animationEnabled={timeline.animationEnabled ?? (() => false)}
+      setAnimationEnabled={timeline.setAnimationEnabled ?? noop}
+      showTimeline={timeline.showTimeline ?? (() => false)}
+      setShowTimeline={timeline.setShowTimeline ?? noop}
       adaptiveFilterEnabled={() => true}
       setAdaptiveFilterEnabled={noop}
       stochasticFilterEnabled={() => false}
@@ -137,6 +151,46 @@ describe('FloatingActions recorder toggle', () => {
 
     setRecorderExportPending(false)
     expect(toggle.disabled).toBe(false)
+    unmount()
+  })
+})
+
+describe('FloatingActions timeline toggle while no frame has been drawn', () => {
+  // The toggle used to work out the new state at the click and apply it
+  // inside document.startViewTransition's callback, a frame later, while the
+  // transition sent every click on the page to <html>. Measured in headed
+  // Chrome, a second click inside that window was lost, so two clicks left
+  // the timeline toggled once. The stub never runs its callback, a renderer
+  // with no frame yet; jsdom has none, and would test the other branch.
+  beforeEach(() => {
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: () => ({ ready: Promise.resolve(), finished: Promise.resolve() }),
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'startViewTransition')
+  })
+
+  it('hides and shows the timeline at each of two clicks', () => {
+    const [showTimeline, setShowTimeline] = createSignal(true)
+    const [animationEnabled, setAnimationEnabled] = createSignal(true)
+    const { unmount } = renderFloatingActions(false, {
+      showTimeline,
+      setShowTimeline,
+      animationEnabled,
+      setAnimationEnabled,
+    })
+    const toggle = screen.getByTitle('Hide timeline (also disables animation)')
+
+    fireEvent.click(toggle)
+    expect(showTimeline()).toBe(false)
+    // Hiding the timeline stops the animation it drives.
+    expect(animationEnabled()).toBe(false)
+
+    fireEvent.click(toggle)
+    expect(showTimeline()).toBe(true)
     unmount()
   })
 })

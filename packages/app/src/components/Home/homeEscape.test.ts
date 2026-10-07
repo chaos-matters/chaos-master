@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { resetPilot, startPilot } from '@/arcade/pilot'
 import { installHomeEscapeBoundary } from './homeEscape'
 
 function testDocument() {
@@ -30,6 +31,33 @@ describe('installHomeEscapeBoundary', () => {
     expect(onExit).toHaveBeenCalledOnce()
     expect(event.defaultPrevented).toBe(true)
     expect(hiddenWorkspaceHandler).not.toHaveBeenCalled()
+    remove()
+  })
+
+  // An agent can start a take with Home open: the workspace under it still
+  // answers WebMCP. The lock's shield is an open dialog, so the boundary
+  // claimed Escape for it and stopped it before the pilot's Esc-twice, which
+  // listens in the same phase but was installed later.
+  it('leaves Escape to the pilot under the Arcade screen lock', () => {
+    const { doc, target } = testDocument()
+    doc.body.appendChild(doc.createElement('dialog')).setAttribute('open', '')
+    const onExit = vi.fn()
+    const remove = installHomeEscapeBoundary(onExit, doc)
+    startPilot({
+      mode: 'cinema',
+      title: 'Animating your flame',
+      stepBudget: 25,
+      allowed: ['timeline.'],
+      qualityRankAtStart: 1,
+    })
+    const pilotEscape = vi.fn()
+    doc.addEventListener('keydown', pilotEscape, true)
+
+    target.dispatchEvent(keydown('Escape'))
+
+    expect(pilotEscape).toHaveBeenCalledOnce()
+    expect(onExit).not.toHaveBeenCalled()
+    resetPilot()
     remove()
   })
 

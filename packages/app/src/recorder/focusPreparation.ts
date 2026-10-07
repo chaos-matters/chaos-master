@@ -166,11 +166,7 @@ function affineTarget(
   }
 }
 
-function targetFromFocusHint(
-  hint: string | undefined,
-): FocusTarget | undefined {
-  if (hint === undefined) return undefined
-
+function targetFromFocusEntity(hint: string): FocusTarget | undefined {
   if (
     hint === `focus:${FINAL_AFFINE_FOCUS_ID}` ||
     hint.startsWith(`focus:${FINAL_AFFINE_FOCUS_ID}:`)
@@ -178,25 +174,71 @@ function targetFromFocusHint(
     return affineTarget(undefined, 'final', hint)
   }
 
-  if (hint.startsWith('focus:')) {
-    const parts = hint.slice('focus:'.length).split(':')
-    if (parts[0] !== 'tx' || !isSafeFlameEntityId(parts[1])) {
-      return undefined
+  const parts = hint.slice('focus:'.length).split(':')
+  if (parts[0] !== 'tx' || !isSafeFlameEntityId(parts[1])) {
+    return undefined
+  }
+  const transformId = parts[1]
+  if (parts.length === 2) {
+    return { kind: 'transform', transformId, focus: hint }
+  }
+  if (parts.length >= 3 && parts[2] === 'visibility') {
+    return { kind: 'transform', transformId, focus: hint }
+  }
+  if (parts.length >= 3 && parts[2] === 'header-color-randomize') {
+    return { kind: 'transform', transformId, focus: hint }
+  }
+  if (parts.length >= 3 && parts[2] === 'affine') {
+    return affineTarget(transformId, undefined, hint)
+  }
+  if (parts.length >= 3 && parts[2] === 'color') {
+    return {
+      kind: 'transform',
+      transformId,
+      focus: hint,
+      editorSurface: 'color',
     }
+  }
+  if (
+    parts.length >= 4 &&
+    parts[2] === 'variation' &&
+    isSafeFlameEntityId(parts[3])
+  ) {
+    return {
+      kind: 'variation',
+      transformId,
+      variationId: parts[3],
+      focus: hint,
+    }
+  }
+  return undefined
+}
+
+function targetFromParamPath(hint: string): FocusTarget | undefined {
+  const path = hint.slice('param:'.length)
+  const parts = path.split('.')
+  // These are view-control paths, not the otherwise identical
+  // `<transform>.<variation>` parameter grammar.
+  if (parts[0] === 'camera' || parts[0] === 'camera3D') return undefined
+  if (parts[0] === 'metadata') {
+    return {
+      kind: 'sidebar',
+      focus: hint,
+      editorSurface: 'metadata',
+    }
+  }
+  if (parts[0] === 'sonification') {
+    return { kind: 'sonification', focus: hint }
+  }
+  if (parts[0] === 'finalTransform') {
+    return affineTarget(undefined, 'final', hint)
+  }
+  if (parts[0] === 'transform' && isSafeFlameEntityId(parts[1])) {
     const transformId = parts[1]
-    if (parts.length === 2) {
-      return { kind: 'transform', transformId, focus: hint }
+    if (parts[2] === 'preAffine' || parts[2] === 'postAffine') {
+      return affineTarget(transformId, parts[2], hint)
     }
-    if (parts.length >= 3 && parts[2] === 'visibility') {
-      return { kind: 'transform', transformId, focus: hint }
-    }
-    if (parts.length >= 3 && parts[2] === 'header-color-randomize') {
-      return { kind: 'transform', transformId, focus: hint }
-    }
-    if (parts.length >= 3 && parts[2] === 'affine') {
-      return affineTarget(transformId, undefined, hint)
-    }
-    if (parts.length >= 3 && parts[2] === 'color') {
+    if (parts[2] === 'color') {
       return {
         kind: 'transform',
         transformId,
@@ -204,115 +246,82 @@ function targetFromFocusHint(
         editorSurface: 'color',
       }
     }
-    if (
-      parts.length >= 4 &&
-      parts[2] === 'variation' &&
-      isSafeFlameEntityId(parts[3])
-    ) {
-      return {
-        kind: 'variation',
-        transformId,
-        variationId: parts[3],
-        focus: hint,
-      }
-    }
-    return undefined
+    return { kind: 'transform', transformId, focus: hint }
   }
+  if (
+    parts.length >= 2 &&
+    isSafeFlameEntityId(parts[0]) &&
+    isSafeFlameEntityId(parts[1])
+  ) {
+    return {
+      kind: 'variation',
+      transformId: parts[0],
+      variationId: parts[1],
+      focus: hint,
+    }
+  }
+  // Render-setting parameters are editor-sidebar controls even when they do
+  // not carry a transform identity.
+  return { kind: 'sidebar', focus: hint }
+}
 
-  if (hint.startsWith('param:')) {
-    const path = hint.slice('param:'.length)
-    const parts = path.split('.')
-    // These are view-control paths, not the otherwise identical
-    // `<transform>.<variation>` parameter grammar.
-    if (parts[0] === 'camera' || parts[0] === 'camera3D') return undefined
-    if (parts[0] === 'metadata') {
-      return {
-        kind: 'sidebar',
-        focus: hint,
-        editorSurface: 'metadata',
-      }
+function targetFromUiTarget(hint: string): FocusTarget | undefined {
+  const target = hint.slice('ui:'.length)
+  if (target === 'transform-list') {
+    return { kind: 'transform-list', focus: hint }
+  }
+  if (target === 'affine-editor') {
+    return {
+      kind: 'affine',
+      focus: hint,
+      editorSurface: 'affine',
     }
-    if (parts[0] === 'sonification') {
-      return { kind: 'sonification', focus: hint }
+  }
+  if (target === 'audio-panel') {
+    return { kind: 'audio', focus: hint }
+  }
+  if (target === 'sonification-panel') {
+    return { kind: 'sonification', focus: hint }
+  }
+  if (target === 'palette-selector') {
+    return {
+      kind: 'sidebar',
+      focus: hint,
+      editorSurface: 'palette',
     }
-    if (parts[0] === 'finalTransform') {
-      return affineTarget(undefined, 'final', hint)
+  }
+  if (RANDOMIZER_UI_TARGETS.has(target)) {
+    return {
+      kind: 'sidebar',
+      focus: hint,
+      editorSurface: 'randomizer',
     }
-    if (parts[0] === 'transform' && isSafeFlameEntityId(parts[1])) {
-      const transformId = parts[1]
-      if (parts[2] === 'preAffine' || parts[2] === 'postAffine') {
-        return affineTarget(transformId, parts[2], hint)
-      }
-      if (parts[2] === 'color') {
-        return {
-          kind: 'transform',
-          transformId,
-          focus: hint,
-          editorSurface: 'color',
-        }
-      }
-      return { kind: 'transform', transformId, focus: hint }
-    }
-    if (
-      parts.length >= 2 &&
-      isSafeFlameEntityId(parts[0]) &&
-      isSafeFlameEntityId(parts[1])
-    ) {
-      return {
-        kind: 'variation',
-        transformId: parts[0],
-        variationId: parts[1],
-        focus: hint,
-      }
-    }
-    // Render-setting parameters are editor-sidebar controls even when they do
-    // not carry a transform identity.
+  }
+  if (FLOATING_ACTION_UI_TARGETS.has(target)) {
+    return { kind: 'floating-actions', focus: hint }
+  }
+  if (SIDEBAR_UI_TARGETS.has(target)) {
     return { kind: 'sidebar', focus: hint }
   }
-
-  if (hint.startsWith('ui:')) {
-    const target = hint.slice('ui:'.length)
-    if (target === 'transform-list') {
-      return { kind: 'transform-list', focus: hint }
-    }
-    if (target === 'affine-editor') {
-      return {
-        kind: 'affine',
-        focus: hint,
-        editorSurface: 'affine',
-      }
-    }
-    if (target === 'audio-panel') {
-      return { kind: 'audio', focus: hint }
-    }
-    if (target === 'sonification-panel') {
-      return { kind: 'sonification', focus: hint }
-    }
-    if (target === 'palette-selector') {
-      return {
-        kind: 'sidebar',
-        focus: hint,
-        editorSurface: 'palette',
-      }
-    }
-    if (RANDOMIZER_UI_TARGETS.has(target)) {
-      return {
-        kind: 'sidebar',
-        focus: hint,
-        editorSurface: 'randomizer',
-      }
-    }
-    if (FLOATING_ACTION_UI_TARGETS.has(target)) {
-      return { kind: 'floating-actions', focus: hint }
-    }
-    if (SIDEBAR_UI_TARGETS.has(target)) {
-      return { kind: 'sidebar', focus: hint }
-    }
-    if (TIMELINE_UI_TARGETS.has(target)) {
-      return { kind: 'timeline', focus: hint }
-    }
+  if (TIMELINE_UI_TARGETS.has(target)) {
+    return { kind: 'timeline', focus: hint }
   }
+  return undefined
+}
 
+function targetFromFocusHint(
+  hint: string | undefined,
+): FocusTarget | undefined {
+  if (hint === undefined) return undefined
+  if (hint.startsWith('focus:')) {
+    return targetFromFocusEntity(hint)
+  }
+  if (hint.startsWith('param:')) {
+    return targetFromParamPath(hint)
+  }
+  if (hint.startsWith('ui:')) {
+    return targetFromUiTarget(hint)
+  }
   return undefined
 }
 
@@ -361,6 +370,86 @@ function colorViewFromAction(
     : 'grid'
 }
 
+function applyContainerPreparation(
+  preparation: ReplayFocusPreparation,
+  target: FocusTarget,
+): void {
+  if (target.kind === 'timeline') {
+    preparation.timeline = COLLAPSE_HIDDEN_TIMELINE_FOCUS.has(target.focus)
+      ? { show: true, expand: true }
+      : { show: true }
+  } else if (target.kind === 'floating-actions') {
+    preparation.floatingActions = { expand: true }
+  } else {
+    preparation.sidebar = EDITOR_SIDEBAR
+    if (target.kind === 'audio') preparation.audioPanel = { show: true }
+    if (target.kind === 'sonification') {
+      preparation.sonificationPanel = { show: true }
+    }
+  }
+}
+
+function applyTransformPreparation(
+  preparation: ReplayFocusPreparation,
+  target: FocusTarget,
+  removesTransform: boolean,
+  targetsSymmetryTransform: boolean,
+): void {
+  if (targetsSymmetryTransform) {
+    preparation.symmetryCard = { expand: true }
+  } else if (target.transformId !== undefined) {
+    preparation.transform = {
+      id: target.transformId,
+      select: true,
+      expand: true,
+    }
+  }
+  if (removesTransform) preparation.clearTransformSelection = true
+  if (
+    target.focus === 'ui:symmetry-type' ||
+    target.focus === 'ui:symmetry-folds' ||
+    target.focus === 'ui:symmetry-card'
+  ) {
+    preparation.symmetryCard = { expand: true }
+  }
+}
+
+function applySurfacePreparation(
+  preparation: ReplayFocusPreparation,
+  target: FocusTarget,
+  action: RecordedAction,
+  targetsSymmetryTransform: boolean,
+): void {
+  const affineMode = target.affineMode ?? affineModeFromAction(action)
+  if (!targetsSymmetryTransform && affineMode !== undefined) {
+    preparation.affineMode = affineMode
+  }
+  const affineTab = affineTabFromAction(action)
+  if (!targetsSymmetryTransform && affineTab !== undefined) {
+    preparation.affineTab = affineTab
+  }
+  if (!targetsSymmetryTransform && target.editorSurface !== undefined) {
+    preparation.editorSurface = target.editorSurface
+  }
+  if (action.id === 'flame.setMetadata' && target.kind === 'sidebar') {
+    preparation.editorSurface = 'metadata'
+  }
+  if (
+    (action.id === 'flame.setRenderSetting' ||
+      action.id === 'flame.updateRenderSettings') &&
+    target.kind === 'sidebar' &&
+    target.focus.startsWith('param:')
+  ) {
+    preparation.editorSurface = 'render'
+  }
+  const colorView =
+    colorViewFromAction(action) ??
+    (target.editorSurface === 'color' && target.focus.startsWith('param:')
+      ? 'list'
+      : undefined)
+  if (colorView !== undefined) preparation.colorView = colorView
+}
+
 /**
  * Derive the UI preparation needed for a replay step. The central command
  * focus vocabulary wins over the focus saved in an older session, upgrading
@@ -390,66 +479,15 @@ export function deriveReplayFocusPreparation(
   }
   const targetsSymmetryTransform =
     target.transformId?.startsWith('_sym__') === true
-  if (target.kind === 'timeline') {
-    preparation.timeline = COLLAPSE_HIDDEN_TIMELINE_FOCUS.has(target.focus)
-      ? { show: true, expand: true }
-      : { show: true }
-  } else if (target.kind === 'floating-actions') {
-    preparation.floatingActions = { expand: true }
-  } else {
-    preparation.sidebar = EDITOR_SIDEBAR
-    if (target.kind === 'audio') preparation.audioPanel = { show: true }
-    if (target.kind === 'sonification') {
-      preparation.sonificationPanel = { show: true }
-    }
-  }
 
-  if (targetsSymmetryTransform) {
-    preparation.symmetryCard = { expand: true }
-  } else if (target.transformId !== undefined) {
-    preparation.transform = {
-      id: target.transformId,
-      select: true,
-      expand: true,
-    }
-  }
-  if (removesTransform) preparation.clearTransformSelection = true
-
-  const affineMode = target.affineMode ?? affineModeFromAction(action)
-  if (!targetsSymmetryTransform && affineMode !== undefined) {
-    preparation.affineMode = affineMode
-  }
-  const affineTab = affineTabFromAction(action)
-  if (!targetsSymmetryTransform && affineTab !== undefined) {
-    preparation.affineTab = affineTab
-  }
-  if (!targetsSymmetryTransform && target.editorSurface !== undefined) {
-    preparation.editorSurface = target.editorSurface
-  }
-  if (
-    target.focus === 'ui:symmetry-type' ||
-    target.focus === 'ui:symmetry-folds' ||
-    target.focus === 'ui:symmetry-card'
-  ) {
-    preparation.symmetryCard = { expand: true }
-  }
-  if (action.id === 'flame.setMetadata' && target.kind === 'sidebar') {
-    preparation.editorSurface = 'metadata'
-  }
-  if (
-    (action.id === 'flame.setRenderSetting' ||
-      action.id === 'flame.updateRenderSettings') &&
-    target.kind === 'sidebar' &&
-    target.focus.startsWith('param:')
-  ) {
-    preparation.editorSurface = 'render'
-  }
-  const colorView =
-    colorViewFromAction(action) ??
-    (target.editorSurface === 'color' && target.focus.startsWith('param:')
-      ? 'list'
-      : undefined)
-  if (colorView !== undefined) preparation.colorView = colorView
+  applyContainerPreparation(preparation, target)
+  applyTransformPreparation(
+    preparation,
+    target,
+    removesTransform,
+    targetsSymmetryTransform,
+  )
+  applySurfacePreparation(preparation, target, action, targetsSymmetryTransform)
 
   return preparation
 }

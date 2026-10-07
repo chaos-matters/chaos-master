@@ -1,3 +1,4 @@
+import { LEGACY_DRAFT_KEY } from '@/lib/pauseSave'
 import { clearHistory, loadHistoryEntries } from './logoHistoryDB'
 import { clearRandomizerHistory, loadRandomizerHistoryEntries, } from './randomizerHistoryDB'
 import { clearRecentFlames, loadRecentFlames } from './recentFlames'
@@ -6,6 +7,35 @@ import { clearRecentFlames, loadRecentFlames } from './recentFlames'
 const LS_PREFIX = 'chaos-master-'
 /** Recent flames live under this key — counted as flame data, not settings. */
 const RECENT_FLAMES_KEY = 'chaos-master-recent-flames'
+/**
+ * Keys under the app's prefix that hold a user's flame rather than a
+ * preference, and so are neither counted as settings nor swept by
+ * "Clear settings" — which promises "Your saved flames are not touched."
+ *
+ * `chaos-master-draft` is the crash slot of a build before the pause write
+ * was folded into Recents (lib/pauseSave.ts). Nothing writes it any more, but
+ * an upgrade may still find work in it that has been nowhere else, and the
+ * migration only retires the key once that work is on the shelf. The trap was
+ * exact: the app tells a user at the cap to free space, they clear settings,
+ * and the work goes with the theme. It stays listed here for as long as the
+ * migration does.
+ *
+ * Custom variations and custom palettes are the user's work too, and a saved
+ * flame that uses one stops rendering it once it is gone, so clearing them
+ * would touch saved flames after all. Named here rather than imported: their
+ * owners (flame/variations/custom/CustomVariationRegistry.ts,
+ * flame/colorMap.ts) would pull the variation compiler into Data Management,
+ * and storageUsage.test.ts fails if either key changes without this list.
+ */
+const CUSTOM_KEYS = [
+  'chaos-master-custom-variations',
+  'chaos-master-custom-palettes',
+]
+const FLAME_KEYS = new Set<string>([
+  RECENT_FLAMES_KEY,
+  LEGACY_DRAFT_KEY,
+  ...CUSTOM_KEYS,
+])
 /** Effectively "all" — histories are capped well below this. */
 const ALL = 1_000_000
 
@@ -19,6 +49,8 @@ export type StorageUsage = {
   generatedHistory: StorageBucket
   /** Logo/Favicon generator history (IndexedDB). */
   logoHistory: StorageBucket
+  /** Custom variations and palettes, counted one by one (localStorage). */
+  custom: StorageBucket
   totalBytes: number
 }
 
@@ -26,13 +58,13 @@ function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).length
 }
 
-/** All app settings keys in localStorage (everything but the recent flames). */
+/** All app settings keys in localStorage (everything but the flame data). */
 function settingsKeys(): string[] {
   const keys: string[] = []
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i)
-      if (k !== null && k.startsWith(LS_PREFIX) && k !== RECENT_FLAMES_KEY) {
+      if (k !== null && k.startsWith(LS_PREFIX) && !FLAME_KEYS.has(k)) {
         keys.push(k)
       }
     }
@@ -54,6 +86,30 @@ function localStorageBucket(keys: string[]): StorageBucket {
     bytes += utf8Bytes(k) + utf8Bytes(v)
   }
   return { count: keys.length, bytes }
+}
+
+/** The custom variations and palettes, counted as the entries the user made
+ *  rather than as the two keys that hold them. */
+function customBucket(): StorageBucket {
+  let count = 0
+  let bytes = 0
+  for (const key of CUSTOM_KEYS) {
+    let raw: string | null
+    try {
+      raw = localStorage.getItem(key)
+    } catch {
+      raw = null
+    }
+    if (raw === null) continue
+    bytes += utf8Bytes(key) + utf8Bytes(raw)
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      count += Array.isArray(parsed) ? parsed.length : 1
+    } catch {
+      count += 1
+    }
+  }
+  return { count, bytes }
 }
 
 function idbBucket(entries: unknown[]): StorageBucket {
@@ -87,14 +143,23 @@ export async function computeStorageUsage(): Promise<StorageUsage> {
   ])
   const generatedHistory = idbBucket(gen)
   const logoHistory = idbBucket(logo)
+  const custom = customBucket()
 
   const totalBytes =
     settings.bytes +
     recentFlames.bytes +
     generatedHistory.bytes +
-    logoHistory.bytes
+    logoHistory.bytes +
+    custom.bytes
 
-  return { settings, recentFlames, generatedHistory, logoHistory, totalBytes }
+  return {
+    settings,
+    recentFlames,
+    generatedHistory,
+    logoHistory,
+    custom,
+    totalBytes,
+  }
 }
 
 /** Remove all persisted settings (keeps flame data). Returns what was cleared. */

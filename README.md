@@ -61,6 +61,7 @@ The app starts at `https://localhost:5173` (or the next available port).
   <a href="https://github.com/chaos-matters/chaos-master/actions/workflows/node.js.yml">CI</a>
   ·
   <a href="LICENSE">AGPL-3.0</a>
+  (<a href="APP-STORE-EXCEPTION.md">app store permission</a>)
   ·
   <a href="https://ko-fi.com/chaosmatters">Ko-fi</a>
   ·

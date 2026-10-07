@@ -1,0 +1,3 @@
+<flame name="Asymmetric Post" size="800 600" center="0.1 -0.2" scale="180" background="0 0 0" brightness="4" gamma="2.2">
+  <xform weight="1" color="0.3" linear="0.6" swirl="0.4" coefs="0.8 -0.2 0.3 0.1 0.9 -0.1" post="1.2 0.1 -0.1 0.9 0.05 -0.05"/>
+</flame>

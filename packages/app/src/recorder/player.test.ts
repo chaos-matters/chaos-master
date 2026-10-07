@@ -644,8 +644,8 @@ describe('createSessionPlayer', () => {
       player.play()
       vi.advanceTimersByTime(0)
       player.pause()
-      executeCommand('flame.setGamma', ctx, 9)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      executeCommand('flame.setGamma', ctx, 7)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       player.play()
       expect(loaded()).toBe(2)
@@ -684,14 +684,14 @@ describe('createSessionPlayer', () => {
       expect(player.currentAction()).toBeUndefined()
       executeCommand('flame.setGamma', ctx, 7)
       executeCommand('flame.setGamma', ctx, 8)
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       history.commit()
 
       // The pending replay timer was cancelled; step 2 can neither overwrite
       // the manual value nor append itself to the user's preview.
       vi.advanceTimersByTime(10_000)
       expect(player.stepIndex()).toBe(0)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       // The gesture and replay prefix remain two coherent undo steps.
       history.undo()
@@ -719,10 +719,10 @@ describe('createSessionPlayer', () => {
       expect(loaded()).toBe(1)
 
       if (!history.isPreviewing()) history.startPreview('Manual gamma scrub')
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       history.commit()
       expect(player.isPlaying()).toBe(false)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       player.play()
       expect(loaded()).toBe(2)
@@ -947,7 +947,7 @@ describe('createSessionPlayer', () => {
 
       // Re-seeking the step we are on still rebuilds — that is how the viewer
       // discards edits of their own and gets the recorded state back.
-      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('flame.setGamma', ctx, 7)
       player.seek(2)
       expect(loaded()).toBe(2)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
@@ -1040,8 +1040,8 @@ describe('createSessionPlayer', () => {
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
 
       // Carry on from step 1 with an edit of the viewer's own...
-      executeCommand('flame.setGamma', ctx, 9)
-      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+      executeCommand('flame.setGamma', ctx, 7)
+      expect(flame.renderSettings.gamma).toBeCloseTo(7, 5)
 
       // ...which is its own undo step, on top of the replayed one.
       history.undo()
@@ -1208,6 +1208,178 @@ describe('authored pacing', () => {
       expect(player.currentAction()).toBeUndefined()
       player.seek(1)
       expect(player.currentAction()?.args).toEqual([2.5])
+      dispose()
+    })
+  })
+})
+
+/**
+ * Gliding between steps.
+ *
+ * The transport does not animate anything itself — it asks the target to, and
+ * the target is where the workspace's silent write path lives. What the player
+ * owns is WHEN: which flame the transition starts from, that the step is
+ * applied to the settled document and not to a frame of the last transition,
+ * and that the time a glide takes comes out of the dwell rather than being
+ * added to it.
+ */
+describe('createSessionPlayer with glides', () => {
+  type GlideCall = { from: FlameDescriptor; durationMs: number }
+
+  function makeGlidingTarget(start: FlameDescriptor) {
+    const base = makeTarget(start)
+    const calls: GlideCall[] = []
+    let settles = 0
+    const target = {
+      ...base.target,
+      readFlame: () => deepClone(base.flame),
+      glide: (from: FlameDescriptor, durationMs: number) => {
+        calls.push({ from: deepClone(from), durationMs })
+      },
+      settleGlide: () => {
+        settles++
+        return undefined
+      },
+    }
+    return { ...base, target, calls, settles: () => settles }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('does nothing at all when glides are off', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target, {
+        glide: () => ({ enabled: false }),
+      })
+      player.play()
+      vi.advanceTimersByTime(20_000)
+      expect(world.calls).toEqual([])
+      dispose()
+    })
+  })
+
+  it('glides each step from the flame that preceded it', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target, {
+        glide: () => ({ enabled: true, defaultMs: 300 }),
+      })
+      player.play()
+      vi.advanceTimersByTime(20_000)
+      expect(world.calls).toHaveLength(gammaSteps.actions.length)
+      expect(world.calls.every((call) => call.durationMs === 300)).toBe(true)
+      // Each transition starts from the gamma the previous step left behind.
+      expect(world.calls[1]!.from.renderSettings.gamma).toBe(1.5)
+      expect(world.calls[2]!.from.renderSettings.gamma).toBe(2.5)
+      dispose()
+    })
+  })
+
+  it('settles the previous transition before applying the next step', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target, {
+        glide: () => ({ enabled: true, defaultMs: 300 }),
+      })
+      player.play()
+      vi.advanceTimersByTime(20_000)
+      expect(world.settles()).toBeGreaterThanOrEqual(gammaSteps.actions.length)
+      dispose()
+    })
+  })
+
+  it('honours a step’s own duration and its cut', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      const authored = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5], glideMs: 1200 },
+        { t: 100, id: 'flame.setGamma', args: [2.5], glide: 'cut' },
+        { t: 250, id: 'flame.setGamma', args: [3.5], glide: 'transform' },
+      ])
+      const player = createSessionPlayer(authored, world.target, {
+        glide: () => ({ enabled: true, defaultMs: 300 }),
+      })
+      player.play()
+      vi.advanceTimersByTime(20_000)
+      expect(world.calls.map((call) => call.durationMs)).toEqual([1200, 900])
+      dispose()
+    })
+  })
+
+  it('settles a transition in flight even when the next step is a cut', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      // Settles and executes in the order the player asked for them. A cut
+      // applied UNDER a running transition is overwritten frame by frame and
+      // then undone by that transition's own settle, so the settle has to come
+      // first whether or not the step itself glides.
+      const events: string[] = []
+      const target = {
+        ...world.target,
+        settleGlide: () => {
+          events.push('settle')
+          world.target.settleGlide()
+          // Nothing to hand back: the harness has no document in flight, the
+          // same answer a workspace with no glide running gives.
+          return undefined
+        },
+        execute: (id: string, args: unknown[]) => {
+          events.push(`execute ${String(args[0])}`)
+          return world.target.execute(id, args)
+        },
+      }
+      // 1200 ms of glide against a 100 ms authored gap: the gap collapses to
+      // MIN_STEP_GAP_MS, so the cut lands while the transition is still moving.
+      const authored = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5], glideMs: 1200 },
+        { t: 100, id: 'flame.setGamma', args: [2.5], glide: 'cut' },
+      ])
+      const player = createSessionPlayer(authored, target, {
+        glide: () => ({ enabled: true, defaultMs: 300 }),
+      })
+      player.play()
+      vi.advanceTimersByTime(20_000)
+
+      const glided = events.indexOf('execute 1.5')
+      const cut = events.indexOf('execute 2.5')
+      expect(glided).toBeGreaterThanOrEqual(0)
+      expect(cut).toBeGreaterThan(glided)
+      expect(events.slice(glided + 1, cut)).toContain('settle')
+      dispose()
+    })
+  })
+
+  it('does not lengthen the take', () => {
+    const totalDuration = (glideMs: number) => {
+      let total = 0
+      for (let index = 0; index < gammaSteps.actions.length; index++) {
+        total += stepGapMs(
+          index > 0 ? gammaSteps.actions[index - 1] : undefined,
+          gammaSteps.actions[index],
+          1,
+          index > 0 ? glideMs : 0,
+        )
+      }
+      return total
+    }
+    expect(totalDuration(400)).toBeLessThanOrEqual(totalDuration(0))
+  })
+
+  it('does not glide a seek, which nobody watches', () => {
+    createRoot((dispose) => {
+      const world = makeGlidingTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target, {
+        glide: () => ({ enabled: true, defaultMs: 300 }),
+      })
+      player.seek(2)
+      expect(world.calls).toEqual([])
+      expect(player.stepIndex()).toBe(2)
       dispose()
     })
   })

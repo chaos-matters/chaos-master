@@ -3,6 +3,23 @@ import type { CrossoverMode } from '@/flame/breedFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
+const DEFAULT_BRED_CHILDREN = 3
+/**
+ * Every child is built on the main thread, and the tool is read-only, so it
+ * runs even while an Arcade session holds the lock: a count of a million
+ * froze the tab. The Evolution Chamber breeds 9 at a time.
+ */
+export const MAX_BRED_CHILDREN = 16
+
+/** Clamped rather than refused, as the agent's render settings are; anything
+ *  that is not a finite number is read as the default. */
+function heldChildCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_BRED_CHILDREN
+  }
+  return Math.min(MAX_BRED_CHILDREN, Math.max(1, Math.floor(value)))
+}
+
 export const breedFlamesTool: WebMcpTool = {
   name: 'breed_flames',
   description:
@@ -20,7 +37,7 @@ export const breedFlamesTool: WebMcpTool = {
       },
       count: {
         type: 'number',
-        description: 'How many child flames to generate. Default is 3.',
+        description: `How many child flames to generate. Default is ${DEFAULT_BRED_CHILDREN}, at most ${MAX_BRED_CHILDREN}.`,
       },
       crossoverMode: {
         type: 'string',
@@ -43,7 +60,7 @@ export const breedFlamesTool: WebMcpTool = {
     const rawInput = input as {
       flameA: FlameDescriptor
       flameB: FlameDescriptor
-      count?: number
+      count?: unknown
       crossoverMode?: string
       mutationStrength?: number
     }
@@ -55,7 +72,7 @@ export const breedFlamesTool: WebMcpTool = {
     }
 
     try {
-      const count = typeof rawInput.count === 'number' ? rawInput.count : 3
+      const count = heldChildCount(rawInput.count)
       const crossoverMode = (rawInput.crossoverMode as CrossoverMode) || 'smart'
       const mutationStrength =
         typeof rawInput.mutationStrength === 'number'

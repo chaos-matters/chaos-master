@@ -173,6 +173,7 @@ export function BenchmarkRunnerHost(props: BenchmarkRunnerHostProps) {
               <Camera2D
                 position={vec2f(...props.flame.renderSettings.camera.position)}
                 zoom={props.flame.renderSettings.camera.zoom}
+                rotation={props.flame.renderSettings.camera.rotation ?? 0}
               >
                 {flameView()}
               </Camera2D>

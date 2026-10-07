@@ -1,3 +1,4 @@
+import { GLIDE_STEP_HINTS, MAX_GLIDE_MS } from '@/flame/glide/types'
 import { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import { isSafeFlameEntityId, MAX_FLAME_TRANSFORMS, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { TimelineSnapshot, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
@@ -37,6 +38,12 @@ export const MAX_ACTION_LABEL_CHARS = 4096
 export const MAX_ACTION_FOCUS_CHARS = 512
 export const MAX_ACTION_NOTE_CHARS = 16_384
 export const MAX_ACTION_HOLD_MS = 600_000
+/** A take names at most as many uncaptured steps as it can hold steps; the
+ * count past that stays exact, it is only the names that stop. */
+export const MAX_UNCAPTURED_STEPS = MAX_SESSION_ACTIONS
+export const MAX_UNCAPTURED_REASON_CHARS = 256
+
+const GlideStepHintSchema = v.picklist(GLIDE_STEP_HINTS)
 
 // Command ids are dot-separated, but the existing registry deliberately uses
 // camelCase within a segment (`flame.setGamma`, `timeline.loadTimeline`). Keep
@@ -106,9 +113,82 @@ const RecordedActionSchema = v.object({
       v.maxValue(MAX_ACTION_HOLD_MS),
     ),
   ),
+  /**
+   * How long the animated transition INTO this step should take, overriding
+   * both the hint below and the planner's own reading of the change.
+   *
+   * A sibling of `holdMs` and the same kind of data: authored pacing a human
+   * sets in the replay panel, which wins over anything measured or derived.
+   * `0` means this step snaps.
+   */
+  glideMs: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(MAX_GLIDE_MS)),
+  ),
+  /**
+   * What KIND of transition this step is — `cut`, `scalar`, `camera`,
+   * `variation`, `transform` or `whole` — resolved against the duration table
+   * at replay time rather than written as a duration.
+   *
+   * Shaped like `focus`, and for the same reason: a semantic string survives
+   * retuning the pacing, a number in a file does not. A synthesized session
+   * sets it from the change it planned; a real recording usually omits it and
+   * lets the diff speak for itself.
+   */
+  glide: v.optional(GlideStepHintSchema),
 })
 
 export type RecordedAction = v.InferOutput<typeof RecordedActionSchema>
+
+export const MAX_SYNTHETIC_STRATEGY_CHARS = 32
+export const MAX_SYNTHETIC_RESIDUAL_ENTRIES = 64
+export const MAX_SYNTHETIC_RESIDUAL_CHARS = 256
+const MAX_SYNTHETIC_SEED = 0xffff_ffff
+
+/**
+ * Present only on a session that was SYNTHESIZED from a finished flame rather
+ * than recorded while someone made it (`recorder/synthesize/`).
+ *
+ * The two kinds share this container deliberately — replay, the step list, the
+ * follow-cam, the video exporter and the `FlameSteps` chunk all work on a
+ * session, and a second format would mean a second everything. This field is
+ * what keeps them distinguishable, and the replay UI uses it to avoid claiming
+ * a plausible reconstruction is how a flame was actually made.
+ *
+ * Optional, and additive: a session written before this existed simply lacks
+ * it, and an older build parses a session that has it and ignores it (the
+ * shell schema drops keys it does not know), so the format version is
+ * unchanged.
+ */
+const SyntheticOriginSchema = v.object({
+  /** Which journey produced the order — see `SYNTHESIS_STRATEGIES`. Kept as a
+   *  bounded string rather than a picklist so the strategy list can grow
+   *  without a format change, and so this module stays free of the planner. */
+  strategy: v.pipe(
+    v.string(),
+    v.nonEmpty(),
+    v.maxLength(MAX_SYNTHETIC_STRATEGY_CHARS),
+  ),
+  /** The seed the order was drawn with; the same seed replans identically. */
+  seed: v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(0),
+    v.maxValue(MAX_SYNTHETIC_SEED),
+  ),
+  /** True when the steps did not reach the target on their own and the
+   *  session ends with a single "snap to the finished flame". */
+  snapped: v.optional(v.boolean(), false),
+  /** What that snap had to carry — the descriptor paths no command reached. */
+  residual: v.optional(
+    v.pipe(
+      v.array(v.pipe(v.string(), v.maxLength(MAX_SYNTHETIC_RESIDUAL_CHARS))),
+      v.maxLength(MAX_SYNTHETIC_RESIDUAL_ENTRIES),
+    ),
+    [],
+  ),
+})
+
+export type SyntheticOrigin = v.InferOutput<typeof SyntheticOriginSchema>
 
 /** Structural validation used by the live recorder before retaining an
  * action. Session-level rules (command-id policy and monotonic ordering) stay
@@ -188,6 +268,23 @@ export const SessionViewSnapshot = v.object({
 })
 export type SessionViewSnapshot = v.InferOutput<typeof SessionViewSnapshot>
 
+/** One step a take could not record: when, and why, in words for a person
+ * (see recorder/uncapturedSteps.ts). */
+const UncapturedStepSchema = v.object({
+  t: v.pipe(
+    v.number(),
+    v.finite(),
+    v.minValue(0),
+    v.maxValue(MAX_ACTION_TIMESTAMP_MS),
+  ),
+  reason: v.pipe(
+    v.string(),
+    v.nonEmpty(),
+    v.maxLength(MAX_UNCAPTURED_REASON_CHARS),
+  ),
+})
+export type UncapturedStep = v.InferOutput<typeof UncapturedStepSchema>
+
 // `initial` is validated separately through tryValidateFlame: it dispatches
 // 2D vs 3D and migrates old saves, which a plain schema reference would not.
 const RecordedSessionShellSchema = v.object({
@@ -221,6 +318,8 @@ const RecordedSessionShellSchema = v.object({
   initialSonification: v.optional(SonificationSnapshotSchema),
   /** View state at Record. Optional keeps older session files parseable. */
   initialView: v.optional(SessionViewSnapshot),
+  /** Absent on a real recording; present on a plausible reconstruction. */
+  synthetic: v.optional(SyntheticOriginSchema),
   actions: v.pipe(
     v.array(RecordedActionSchema),
     v.maxLength(MAX_SESSION_ACTIONS),
@@ -230,6 +329,15 @@ const RecordedSessionShellSchema = v.object({
    *  replay cannot reproduce the session faithfully (the coverage ratchet —
    *  see docs/plans/semantic-recorder-plan.md). */
   unnamedWriteCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  /**
+   * The steps that count names, in the order they happened. Optional twice
+   * over: a take recorded before names were saved has only the count, and a
+   * clean take has nothing to name. Readers that predate it still have the
+   * count, which is why the count stays.
+   */
+  uncapturedSteps: v.optional(
+    v.pipe(v.array(UncapturedStepSchema), v.maxLength(MAX_UNCAPTURED_STEPS)),
+  ),
 })
 
 export type RecordedSession = Omit<
@@ -253,17 +361,16 @@ export function parseSession(json: string): RecordedSession | undefined {
   }
 }
 
-/** Same checks against an already-decoded value — the form a session takes
- *  when it arrives from a PNG chunk rather than a file. */
-export function validateSession(data: unknown): RecordedSession | undefined {
+function isSessionJsonLengthValid(data: unknown): boolean {
   try {
     const encoded = JSON.stringify(data)
-    if (encoded === undefined || encoded.length > MAX_SESSION_JSON_CHARS) {
-      return undefined
-    }
+    return encoded !== undefined && encoded.length <= MAX_SESSION_JSON_CHARS
   } catch {
-    return undefined
+    return false
   }
+}
+
+function validateInitialPaletteColors(data: unknown): boolean {
   try {
     if (data !== null && typeof data === 'object') {
       const initialView = (data as { initialView?: unknown }).initialView
@@ -275,15 +382,63 @@ export function validateSession(data: unknown): RecordedSession | undefined {
           paletteRestoreColors !== undefined &&
           tryValidateTransformColorSnapshot(paletteRestoreColors) === undefined
         ) {
-          return undefined
+          return false
         }
       }
     }
+    return true
   } catch {
+    return false
+  }
+}
+
+function validateActionTimestampsAndSonification(
+  actions: readonly RecordedAction[],
+  initialSonificationModel?: string,
+): boolean {
+  let previousTime = -1
+  let sonificationModel = initialSonificationModel
+  let sonificationModelTransitions = 0
+  for (const action of actions) {
+    if (action.t < previousTime) return false
+    previousTime = action.t
+    if (
+      action.id !== 'sonification.setConfig' &&
+      action.id !== 'sonification.setEnabled'
+    ) {
+      continue
+    }
+    const snapshot = tryValidateSonificationSnapshot(action.args[0])
+    if (!snapshot) continue
+    if (
+      sonificationModel === undefined ||
+      snapshot.config.model !== sonificationModel
+    ) {
+      sonificationModelTransitions++
+      if (sonificationModelTransitions > MAX_SONIFICATION_MODEL_TRANSITIONS) {
+        return false
+      }
+    }
+    sonificationModel = snapshot.config.model
+  }
+  return true
+}
+
+/** Same checks against an already-decoded value — the form a session takes
+ *  when it arrives from a PNG chunk rather than a file. */
+export function validateSession(data: unknown): RecordedSession | undefined {
+  if (!isSessionJsonLengthValid(data) || !validateInitialPaletteColors(data)) {
     return undefined
   }
   const shell = v.safeParse(RecordedSessionShellSchema, data)
   if (!shell.success) return undefined
+  // A list can fall short of the count (the names stop at a cap) but never
+  // name steps the count says did not happen.
+  if (
+    (shell.output.uncapturedSteps?.length ?? 0) > shell.output.unnamedWriteCount
+  ) {
+    return undefined
+  }
   if (
     shell.output.initialTimeline !== undefined &&
     tryValidateTimelineSnapshot(shell.output.initialTimeline) === undefined
@@ -303,30 +458,13 @@ export function validateSession(data: unknown): RecordedSession | undefined {
   ) {
     return undefined
   }
-  let previousTime = -1
-  let sonificationModel = shell.output.initialSonification?.config.model
-  let sonificationModelTransitions = 0
-  for (const action of shell.output.actions) {
-    if (action.t < previousTime) return undefined
-    previousTime = action.t
-    if (
-      action.id !== 'sonification.setConfig' &&
-      action.id !== 'sonification.setEnabled'
-    ) {
-      continue
-    }
-    const snapshot = tryValidateSonificationSnapshot(action.args[0])
-    if (!snapshot) continue
-    if (
-      sonificationModel === undefined ||
-      snapshot.config.model !== sonificationModel
-    ) {
-      sonificationModelTransitions++
-      if (sonificationModelTransitions > MAX_SONIFICATION_MODEL_TRANSITIONS) {
-        return undefined
-      }
-    }
-    sonificationModel = snapshot.config.model
+  if (
+    !validateActionTimestampsAndSonification(
+      shell.output.actions,
+      shell.output.initialSonification?.config.model,
+    )
+  ) {
+    return undefined
   }
   const initial = tryValidateFlame(shell.output.initial)
   if (initial === undefined) return undefined

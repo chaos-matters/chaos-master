@@ -15,9 +15,11 @@
   color: var(--neutral-600);
   border-color: var(--neutral-200);
   background-color: white;
+  /* The --card-* hooks are for the glass sidebar (App.module.css,
+     .sidebarGlass), which sets them; everywhere else the card is as it was. */
   [data-theme='dark'] & {
-    color: var(--neutral-400);
-    border-color: var(--neutral-900);
-    background-color: var(--neutral-950);
+    color: var(--card-ink, var(--neutral-400));
+    border-color: var(--card-edge, var(--neutral-900));
+    background-color: var(--card-fill, var(--neutral-950));
   }
 }

@@ -1,6 +1,10 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
+import { COVERED_ATTRIBUTES, visibleClientRect, } from '@/components/CanvasViewport/visibleCanvas'
 import { useSpotlightTour } from '@/contexts/SpotlightTourContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import { isTouchLayout } from '@/stores/workspaceLayoutStore'
 import { clamp } from '@/utils/easing'
 import ui from './SpotlightTour.module.css'
 import type { TourContext } from './tourTypes'
@@ -12,8 +16,40 @@ interface SpotlightTourProps {
 const CARD_PADDING = 16
 const HOLE_PADDING = 8
 
+/**
+ * The start of a card of `size` moved, if it has to, so the card keeps
+ * CARD_PADDING from both ends of a viewport `extent` long. A card longer than
+ * the viewport keeps its start on screen, where its title is.
+ */
+function keepInside(start: number, size: number, extent: number): number {
+  return Math.max(CARD_PADDING, Math.min(start, extent - size - CARD_PADDING))
+}
+
+/**
+ * The edge of a card placed on `side` of its target that carries the arrow:
+ * where the glass layer breaks its own edge for the arrow's base
+ * (SpotlightTour.module.css, .glassLayer[data-seam]).
+ */
+const SEAM_EDGE = {
+  top: 'bottom',
+  bottom: 'top',
+  left: 'right',
+  right: 'left',
+} as const
+
 export function SpotlightTour(props: SpotlightTourProps) {
   const tour = useSpotlightTour()
+  const { theme } = useTheme()
+  /**
+   * The card is glass (the primitive's panel) wherever the app is dark: the
+   * dark theme, and the touch layouts, whose chrome is dark glass in both
+   * themes. The desktop's light theme keeps its light card, since the glass
+   * is dark-only (docs/plans/glass-panels.md, decision b). Classes and not a
+   * composes: the panel's busy rule would turn a light card dark. The panel
+   * goes on a layer behind the text and on the arrow, never on the card, so
+   * the arrow frosts the art too (SpotlightTour.module.css, .glassCard).
+   */
+  const glassCard = () => theme() === 'dark' || isTouchLayout()
 
   const [holeRect, setHoleRect] = createSignal({
     x: 0,
@@ -24,10 +60,16 @@ export function SpotlightTour(props: SpotlightTourProps) {
   const [cardStyle, setCardStyle] = createSignal<Record<string, string>>({})
   const [arrowStyle, setArrowStyle] = createSignal<Record<string, string>>({})
   const [arrowClass, setArrowClass] = createSignal('')
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [cardPosition, setCardPosition] = createSignal<
     'top' | 'bottom' | 'left' | 'right'
   >('bottom')
+  /**
+   * The step's target is not on screen: a tour written for the desktop
+   * started on a touch layout, or a panel a step expects is closed. The card
+   * sits in the middle with no arrow, rather than where the last step left it
+   * pointing at nothing.
+   */
+  const [centred, setCentred] = createSignal(false)
   let cardRef: HTMLDivElement | undefined
 
   const stepIndex = () => tour.currentStepIndex()
@@ -73,15 +115,19 @@ export function SpotlightTour(props: SpotlightTourProps) {
     const target = findTarget(s.target, s.targetLast)
     if (!target) {
       setHoleRect({ x: 0, y: 0, width: 0, height: 0 })
+      centreCard()
       return
     }
+    setCentred(false)
 
     // Force browser to flush pending layout so getBoundingClientRect
     // returns accurate geometry (needed when flex/grid containers haven't
     // been interacted with yet, e.g. timeline before first resize).
     void (target as HTMLElement).offsetHeight
 
-    const targetRect = target.getBoundingClientRect()
+    // Only the part of the canvas on show: with the Glass panels setting on,
+    // it runs on under the floating deck, sidebar and rail sheet.
+    const targetRect = visibleClientRect(target)
     const vw = window.innerWidth
     const vh = window.innerHeight
 
@@ -189,30 +235,52 @@ export function SpotlightTour(props: SpotlightTourProps) {
       )
     }
 
+    // Whatever side it took, the card stays inside the viewport. Placed
+    // below a target low on the screen it ran off the bottom (the App Tour's
+    // step 2 at 1440x900 ended 12px past it, Next at the edge). Covering part
+    // of the target beats a card that cannot be read or advanced.
+    cardLeft = keepInside(cardLeft, cardW, vw)
+    cardTop = keepInside(cardTop, cardH, vh)
     setCardStyle({
-      top: `${Math.max(CARD_PADDING, cardTop)}px`,
-      left: `${Math.max(CARD_PADDING, cardLeft)}px`,
+      top: `${cardTop}px`,
+      left: `${cardLeft}px`,
     })
 
-    // Position the arrow to point at the target center, not card center
+    // Point the arrow at the target's centre. Its offset along the edge is
+    // its centre, as its class pulls its box back by half its size (and the
+    // glass layer breaks its edge there, --seam-at). The box keeps 12px
+    // inside the card's ends, clear of its rounded corners.
     const arrowHalf = 8 // half of 16px arrow size
     let arrowOffsetStyle: Record<string, string> = {}
     if (pos === 'top' || pos === 'bottom') {
       const arrowLeft = clamp(
-        targetCenterX - cardLeft - arrowHalf,
-        12,
-        cardW - 12 - 16,
+        targetCenterX - cardLeft,
+        12 + arrowHalf,
+        cardW - 12 - arrowHalf,
       )
       arrowOffsetStyle = { left: `${arrowLeft}px` }
     } else {
       const arrowTop = clamp(
-        targetCenterY - cardTop - arrowHalf,
-        12,
-        cardH - 12 - 16,
+        targetCenterY - cardTop,
+        12 + arrowHalf,
+        cardH - 12 - arrowHalf,
       )
       arrowOffsetStyle = { top: `${arrowTop}px` }
     }
     setArrowStyle(arrowOffsetStyle)
+  }
+
+  function centreCard() {
+    const cardW = cardRef?.offsetWidth ?? 340
+    const cardH = cardRef?.offsetHeight ?? 200
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    setCentred(true)
+    setCardStyle({
+      top: `${keepInside((vh - cardH) / 2, cardH, vh)}px`,
+      left: `${keepInside((vw - cardW) / 2, cardW, vw)}px`,
+    })
+    setArrowStyle({})
   }
 
   function arrowClassForPosition(
@@ -242,7 +310,11 @@ export function SpotlightTour(props: SpotlightTourProps) {
     window.addEventListener('scroll', onResize, { capture: true })
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // The viewer's keys stand down while the agent owns the screen.
+      // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+      // under the screen lock before any listener runs; kept until WP9 takes
+      // these checks out one at a time, each with its own test.
+      if (e.key === 'Escape' && !pilotOwnsKeyboard()) {
         tour.endTour()
       }
     }
@@ -252,6 +324,27 @@ export function SpotlightTour(props: SpotlightTourProps) {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('scroll', onResize, { capture: true })
       window.removeEventListener('keydown', onKeyDown)
+    })
+  })
+
+  // Chrome floating over the canvas - the tablet deck opening, closing or
+  // being resized, the glass sidebar floating or not, the rail's glass sheet
+  // rising or settling - changes what is on show of the canvas, which no
+  // resize or scroll reports. The canvas says so in its covered attributes
+  // (CanvasViewport/visibleCanvas.ts), which it writes after taking the new
+  // share, so the tour watches those, as the replay spotlight does.
+  createEffect(() => {
+    if (!tour.isActive()) return
+    const observer = new MutationObserver(() => {
+      measureAndPosition()
+    })
+    observer.observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: [...COVERED_ATTRIBUTES],
+    })
+    onCleanup(() => {
+      observer.disconnect()
     })
   })
 
@@ -408,9 +501,11 @@ export function SpotlightTour(props: SpotlightTourProps) {
             </defs>
           </svg>
 
-          {/* Blurred backdrop with a hole punched out (4 divs to bypass Chrome mask bug) */}
+          {/* A dim with a hole punched out (4 divs to bypass Chrome mask
+              bug). No blur: the four resize on every step, so a blur of
+              their own re-ran on every frame of the move, under the card
+              that is the tour's one glass layer (glass-panels.md). */}
           {(() => {
-            const blur = tour.activeTour()?.noBlur ? undefined : 'blur(2px)'
             const bg = tour.activeTour()?.noBlur
               ? 'rgba(0, 0, 0, 0.25)'
               : 'rgba(0, 0, 0, 0.4)'
@@ -425,8 +520,6 @@ export function SpotlightTour(props: SpotlightTourProps) {
                     right: 0,
                     height: `${holeRect().y}px`,
                     background: bg,
-                    'backdrop-filter': blur,
-                    '-webkit-backdrop-filter': blur,
                     transition: 'height 300ms ease',
                   }}
                 />
@@ -439,8 +532,6 @@ export function SpotlightTour(props: SpotlightTourProps) {
                     right: 0,
                     bottom: 0,
                     background: bg,
-                    'backdrop-filter': blur,
-                    '-webkit-backdrop-filter': blur,
                     transition: 'top 300ms ease',
                   }}
                 />
@@ -453,8 +544,6 @@ export function SpotlightTour(props: SpotlightTourProps) {
                     width: `${holeRect().x}px`,
                     height: `${holeRect().height}px`,
                     background: bg,
-                    'backdrop-filter': blur,
-                    '-webkit-backdrop-filter': blur,
                     transition:
                       'top 300ms ease, width 300ms ease, height 300ms ease',
                   }}
@@ -468,8 +557,6 @@ export function SpotlightTour(props: SpotlightTourProps) {
                     right: 0,
                     height: `${holeRect().height}px`,
                     background: bg,
-                    'backdrop-filter': blur,
-                    '-webkit-backdrop-filter': blur,
                     transition:
                       'top 300ms ease, left 300ms ease, height 300ms ease',
                   }}
@@ -495,15 +582,31 @@ export function SpotlightTour(props: SpotlightTourProps) {
           <div
             ref={cardRef}
             class={ui.card}
+            classList={{ [ui.glassCard!]: glassCard() }}
             style={cardStyle()}
             role="dialog"
             aria-label={step()?.title}
           >
-            <div
-              class={ui.arrow}
-              classList={{ [arrowClass()]: true }}
-              style={arrowStyle()}
-            />
+            <Show when={glassCard()}>
+              {/* The arrow's centre sits at its offset along the edge: its
+                  class pulls its box back by half its width. */}
+              <div
+                class={ui.glassLayer}
+                aria-hidden="true"
+                data-seam={centred() ? undefined : SEAM_EDGE[cardPosition()]}
+                style={{ '--seam-at': arrowStyle().left ?? arrowStyle().top }}
+              />
+            </Show>
+            <Show when={!centred()}>
+              <div
+                class={ui.arrow}
+                classList={{
+                  [arrowClass()]: true,
+                  [ui.glassArrow!]: glassCard(),
+                }}
+                style={arrowStyle()}
+              />
+            </Show>
 
             <div class={ui.stepCounter}>
               Step {stepIndex() + 1} of {tour.totalSteps()}
@@ -531,11 +634,14 @@ export function SpotlightTour(props: SpotlightTourProps) {
                   <For each={Array.from({ length: tour.totalSteps() })}>
                     {(_, i) => (
                       <button
+                        type="button"
                         class={ui.dot}
                         classList={{
                           [ui.dotActive as string]: i() === stepIndex(),
                           [ui.dotClickable as string]: true,
                         }}
+                        aria-label={`Step ${i() + 1} of ${tour.totalSteps()}`}
+                        aria-current={i() === stepIndex() ? 'step' : undefined}
                         onClick={() => {
                           const target = i()
                           if (target === stepIndex()) return

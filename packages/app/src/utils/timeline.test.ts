@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { TimelineSnapshotConfig } from '@/flame/schema/timeline'
+import * as v from '@/valibot'
 import { catmullRom } from './easing'
-import { createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
+import { applyTracksToFlame, createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
+import type { TimelineTrack } from './timeline'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 describe('Timeline Utilities', () => {
   let timeline: ReturnType<typeof createTimelineState>
@@ -64,6 +68,33 @@ describe('Timeline Utilities', () => {
           value: 0.75,
           easing: 'easeOut',
         })
+      })
+
+      it('puts a keyframe added between frames on the nearest whole one', () => {
+        // A motion-blurred export poses sub-frames, so the playhead an
+        // auto-keyframe reads can be fractional - and one fractional frame
+        // made the whole track array of a saved file fail to load.
+        timeline.addKeyframe('exposure', 12.4, 0.5, 'linear')
+        timeline.addKeyframe('exposure', 12.6, 0.7, 'linear')
+        timeline.addKeyframe('exposure', 13, 0.9, 'linear')
+        const track = timeline
+          .tracks()
+          .find((t) => t.parameterPath === 'exposure')
+        // 12.6 and 13 are one frame, so the later write is the one kept.
+        expect(track?.keyframes).toEqual([
+          { frame: 12, value: 0.5, easing: 'linear' },
+          { frame: 13, value: 0.9, easing: 'linear' },
+        ])
+      })
+
+      it('writes the value through when the rounded frame is the playhead', () => {
+        const writes: [string, unknown][] = []
+        timeline.setValueWriter((path, value) => {
+          writes.push([path, value])
+        })
+        timeline.setCurrentFrame(12.4)
+        timeline.addKeyframe('exposure', 12.4, 0.5, 'linear')
+        expect(writes).toEqual([['exposure', 0.5]])
       })
     })
 
@@ -584,6 +615,28 @@ describe('Timeline Utilities', () => {
       expect(timeline.tracks()[0]!.keyframes).toHaveLength(before)
     })
 
+    it('seamless never extends past a frame the config can be stored at', () => {
+      // The extension IS the document: it is what the stored timeline says
+      // the animation is. Past the schema's maximum the whole config fails
+      // validation on the way back in, so the entry reloads at the default
+      // 30fps over 90 frames - after Save for Later reported success and
+      // marked the workspace clean, so nothing ever retried.
+      timeline.setConfig({
+        ...timeline.config(),
+        startFrame: 0,
+        endFrame: 1200,
+      })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 1200, 0.9, 'linear')
+
+      timeline.setLoopMode('seamless')
+
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+      expect(timeline.config().endFrame).toBe(2000)
+    })
+
     it('seamless is idempotent — re-selecting does not pile up frames', () => {
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
@@ -629,6 +682,65 @@ describe('Timeline Utilities', () => {
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
       expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.9)
+    })
+  })
+
+  describe('a config the app can always store', () => {
+    // Whatever the workspace is holding has to survive the round trip
+    // through Recents, or "saved" is a claim about work that is not there.
+    it('clamps a length typed past the maximum', () => {
+      // The Frames input has no maximum of its own: the scrubber stops at
+      // 999 but a typed value goes straight in.
+      timeline.setConfig({ ...timeline.config(), endFrame: 2500 })
+      expect(timeline.config().endFrame).toBe(2000)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('clamps a frame rate and a speed out of range', () => {
+      timeline.setConfig({ ...timeline.config(), fps: 0, timeScale: 99 })
+      expect(timeline.config().fps).toBe(1)
+      expect(timeline.config().timeScale).toBe(10)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('falls back to the default for a value that is not a number', () => {
+      // A speed clamped to the low end of its range is a timeline frozen at
+      // zero, which reads as the app hanging rather than as a value being
+      // rejected. So a value that is not a number at all takes the field's
+      // default instead of its floor. An emptied number input is a different
+      // case: it sends 0, which is a number, and clamps into range.
+      timeline.setConfig({
+        ...timeline.config(),
+        fps: Number.NaN,
+        timeScale: Number.NaN,
+        endFrame: Number.NaN,
+      })
+      expect(timeline.config().fps).toBe(30)
+      expect(timeline.config().timeScale).toBe(1)
+      expect(timeline.config().endFrame).toBe(90)
+
+      timeline.setConfig({ ...timeline.config(), fps: 0, endFrame: 0 })
+      expect(timeline.config().fps).toBe(1)
+      expect(timeline.config().endFrame).toBe(1)
+      expect(
+        v.safeParse(TimelineSnapshotConfig, timeline.config()).success,
+      ).toBe(true)
+    })
+
+    it('leaves an ordinary config exactly as it was', () => {
+      const next = {
+        ...timeline.config(),
+        fps: 24,
+        timeScale: 1.5,
+        startFrame: 10,
+        endFrame: 120,
+      }
+      timeline.setConfig(next)
+      expect(timeline.config()).toEqual(next)
     })
   })
 
@@ -779,5 +891,352 @@ describe('Timeline Utilities', () => {
       timeline.moveKeyframe('exposure', 10, 25)
       expect(timeline.getKeyframeAtFrame('exposure', 25)?.interp).toBe('spline')
     })
+  })
+
+  describe('applyTracksToFlame', () => {
+    function createMockFlame(dimensions: 2 | 3 = 2): FlameDescriptor {
+      return {
+        version: '1.0.0',
+        metadata: { name: 'Test Flame' },
+        renderSettings: {
+          dimensions,
+          exposure: 1.0,
+          vibrancy: 1.0,
+          contrast: 1.0,
+          gamma: 2.2,
+          skipIters: 1,
+          highlightPower: 1.0,
+          depthColorPower: 1.0,
+          lightPower: 1.0,
+          palettePhase: 0.0,
+          paletteSpeed: 1.0,
+          densityEstimationQuality: 1.0,
+          estimatorCurve: 1.0,
+          drawMode: 'light',
+          colorInitMode: 'colorInitZero',
+          pointInitMode: 'pointInitOrigin',
+          camera: {
+            position: [0, 0],
+            zoom: 1.0,
+            rotation: 0.0,
+          },
+          ...(dimensions === 3
+            ? {
+                camera3D: {
+                  theta: 0,
+                  phi: 1.0,
+                  radius: 5.0,
+                  fov: 60,
+                  target: [0, 0, 0],
+                  roll: 0,
+                },
+              }
+            : {}),
+        },
+        transforms: {
+          t1: {
+            probability: 1.0,
+            colorSpeed: 1.0,
+            color: { x: 0.5, y: 0.5 },
+            preAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+            postAffine: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+            variations: {
+              v1: { type: 'linearVar', weight: 1.0 },
+              v2: {
+                type: 'juliaNVar',
+                weight: 0.5,
+                params: { power: 1.0, dist: 5 },
+              },
+            },
+          },
+        },
+      } as unknown as FlameDescriptor
+    }
+
+    it('applies 2D camera tracks correctly', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        { parameterPath: 'camera.x', keyframes: [{ frame: 0, value: 1.5 }] },
+        { parameterPath: 'camera.y', keyframes: [{ frame: 0, value: -2.5 }] },
+        { parameterPath: 'camera.zoom', keyframes: [{ frame: 0, value: 3.0 }] },
+        {
+          parameterPath: 'camera.rotation',
+          keyframes: [{ frame: 0, value: 0.75 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.camera?.position[0]).toBe(1.5)
+      expect(flame.renderSettings.camera?.position[1]).toBe(-2.5)
+      expect(flame.renderSettings.camera?.zoom).toBe(3.0)
+      expect(flame.renderSettings.camera?.rotation).toBe(0.75)
+    })
+
+    it('applies 3D camera tracks correctly', () => {
+      const flame = createMockFlame(3)
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'camera3D.theta',
+          keyframes: [{ frame: 0, value: 0.45 }],
+        },
+        {
+          parameterPath: 'camera3D.phi',
+          keyframes: [{ frame: 0, value: 1.85 }],
+        },
+        {
+          parameterPath: 'camera3D.radius',
+          keyframes: [{ frame: 0, value: 8.5 }],
+        },
+        {
+          parameterPath: 'camera3D.fov',
+          keyframes: [{ frame: 0, value: 75.0 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.camera3D?.theta).toBe(0.45)
+      expect(flame.renderSettings.camera3D?.phi).toBe(1.85)
+      expect(flame.renderSettings.camera3D?.radius).toBe(8.5)
+      expect(flame.renderSettings.camera3D?.fov).toBe(75.0)
+    })
+
+    it('applies render settings tracks correctly including color arrays', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        { parameterPath: 'exposure', keyframes: [{ frame: 0, value: 2.5 }] },
+        { parameterPath: 'skipIters', keyframes: [{ frame: 0, value: 3 }] },
+        { parameterPath: 'vibrancy', keyframes: [{ frame: 0, value: 0.8 }] },
+        { parameterPath: 'contrast', keyframes: [{ frame: 0, value: 1.4 }] },
+        { parameterPath: 'gamma', keyframes: [{ frame: 0, value: 1.8 }] },
+        {
+          parameterPath: 'highlightPower',
+          keyframes: [{ frame: 0, value: 0.9 }],
+        },
+        {
+          parameterPath: 'depthColorPower',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        { parameterPath: 'lightPower', keyframes: [{ frame: 0, value: 0.7 }] },
+        {
+          parameterPath: 'palettePhase',
+          keyframes: [{ frame: 0, value: 0.33 }],
+        },
+        {
+          parameterPath: 'paletteSpeed',
+          keyframes: [{ frame: 0, value: 2.0 }],
+        },
+        {
+          parameterPath: 'densityEstimationQuality',
+          keyframes: [{ frame: 0, value: 4.0 }],
+        },
+        {
+          parameterPath: 'estimatorCurve',
+          keyframes: [{ frame: 0, value: 0.6 }],
+        },
+        {
+          parameterPath: 'drawMode',
+          keyframes: [{ frame: 0, value: 'paint' }],
+        },
+        {
+          parameterPath: 'colorInitMode',
+          keyframes: [{ frame: 0, value: 'colorInitPosition' }],
+        },
+        {
+          parameterPath: 'pointInitMode',
+          keyframes: [{ frame: 0, value: 'pointInitRandom' }],
+        },
+        {
+          parameterPath: 'backgroundColor',
+          keyframes: [{ frame: 0, value: [0.1, 0.2, 0.3] }],
+        },
+        {
+          parameterPath: 'edgeFadeColor',
+          keyframes: [{ frame: 0, value: [0.4, 0.5, 0.6, 0.7] }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.renderSettings.exposure).toBe(2.5)
+      expect(flame.renderSettings.skipIters).toBe(3)
+      expect(flame.renderSettings.vibrancy).toBe(0.8)
+      expect(flame.renderSettings.contrast).toBe(1.4)
+      expect(flame.renderSettings.gamma).toBe(1.8)
+      expect(flame.renderSettings.highlightPower).toBe(0.9)
+      expect(flame.renderSettings.depthColorPower).toBe(1.1)
+      expect(flame.renderSettings.lightPower).toBe(0.7)
+      expect(flame.renderSettings.palettePhase).toBe(0.33)
+      expect(flame.renderSettings.paletteSpeed).toBe(2.0)
+      expect(flame.renderSettings.densityEstimationQuality).toBe(4.0)
+      expect(flame.renderSettings.estimatorCurve).toBe(0.6)
+      expect(flame.renderSettings.drawMode).toBe('paint')
+      expect(flame.renderSettings.colorInitMode).toBe('colorInitPosition')
+      expect(flame.renderSettings.pointInitMode).toBe('pointInitRandom')
+      expect(flame.renderSettings.backgroundColor).toEqual([0.1, 0.2, 0.3])
+      expect(flame.renderSettings.edgeFadeColor).toEqual([0.4, 0.5, 0.6, 0.7])
+    })
+
+    it('applies transform and variation tracks correctly', () => {
+      const flame = createMockFlame(2)
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'transform.t1.preAffine.a',
+          keyframes: [{ frame: 0, value: 0.9 }],
+        },
+        {
+          parameterPath: 'transform.t1.postAffine.d',
+          keyframes: [{ frame: 0, value: 1.2 }],
+        },
+        {
+          parameterPath: 'transform.t1.color.x',
+          keyframes: [{ frame: 0, value: 0.75 }],
+        },
+        {
+          parameterPath: 'transform.t1.probability',
+          keyframes: [{ frame: 0, value: 0.6 }],
+        },
+        {
+          parameterPath: 'transform.t1.colorSpeed',
+          keyframes: [{ frame: 0, value: 0.4 }],
+        },
+        {
+          parameterPath: 't1.v1',
+          keyframes: [{ frame: 0, value: 0.85 }],
+        },
+        {
+          parameterPath: 't1.v2.power',
+          keyframes: [{ frame: 0, value: 2.5 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t1 = (flame.transforms as Record<string, any>)['t1']
+      expect(t1.preAffine.a).toBe(0.9)
+      expect(t1.postAffine.d).toBe(1.2)
+      expect(t1.color.x).toBe(0.75)
+      expect(t1.probability).toBe(0.6)
+      expect(t1.colorSpeed).toBe(0.4)
+      expect(t1.variations.v1.weight).toBe(0.85)
+      expect(t1.variations.v2.params.power).toBe(2.5)
+    })
+
+    it('seeds and applies 2D finalTransform tracks', () => {
+      const flame = createMockFlame(2)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (flame as any).finalTransform
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'finalTransform.a',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        {
+          parameterPath: 'finalTransform.b',
+          keyframes: [{ frame: 0, value: 0.2 }],
+        },
+        {
+          parameterPath: 'finalTransform.c',
+          keyframes: [{ frame: 0, value: -0.2 }],
+        },
+        {
+          parameterPath: 'finalTransform.d',
+          keyframes: [{ frame: 0, value: 1.1 }],
+        },
+        {
+          parameterPath: 'finalTransform.e',
+          keyframes: [{ frame: 0, value: 0.5 }],
+        },
+        {
+          parameterPath: 'finalTransform.f',
+          keyframes: [{ frame: 0, value: -0.5 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.finalTransform).toBeDefined()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ft = flame.finalTransform as any
+      expect(ft.a).toBe(1.1)
+      expect(ft.b).toBe(0.2)
+      expect(ft.c).toBe(-0.2)
+      expect(ft.d).toBe(1.1)
+      expect(ft.e).toBe(0.5)
+      expect(ft.f).toBe(-0.5)
+    })
+
+    it('seeds and applies 3D finalTransform tracks with 12-param identity', () => {
+      const flame = createMockFlame(3)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (flame as any).finalTransform
+      const tracks: TimelineTrack[] = [
+        {
+          parameterPath: 'finalTransform.a',
+          keyframes: [{ frame: 0, value: 0.95 }],
+        },
+        {
+          parameterPath: 'finalTransform.f',
+          keyframes: [{ frame: 0, value: 1.05 }],
+        },
+      ]
+
+      applyTracksToFlame(tracks, flame, 0)
+
+      expect(flame.finalTransform).toBeDefined()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ft = flame.finalTransform as any
+      expect(ft.a).toBe(0.95)
+      expect(ft.f).toBe(1.05)
+      // Verify 3D affine properties are retained from identity seeding
+      expect(ft.k).toBe(1)
+      expect(ft.l).toBe(0)
+    })
+  })
+})
+
+describe('resolveKeyframeValue segment ownership', () => {
+  it("lets the segment's later keyframe own its interpolation mode", () => {
+    // An audit mutation read the mode from the earlier keyframe instead and all
+    // 86 tests here stayed green. Each case below differs under the two readings.
+    const holdIntoNext = [
+      { frame: 0, value: 0, interp: 'linear' as const },
+      { frame: 10, value: 10, interp: 'constant' as const },
+    ]
+    expect(resolveKeyframeValue(holdIntoNext, 5)).toBe(0)
+
+    const lerpIntoNext = [
+      { frame: 0, value: 0, interp: 'constant' as const },
+      { frame: 10, value: 10, interp: 'linear' as const },
+    ]
+    expect(resolveKeyframeValue(lerpIntoNext, 5)).toBe(5)
+  })
+})
+
+/**
+ * `loadRevision` is how the dope sheet learns that a whole animation arrived —
+ * a file, a drop, a share link, the gallery, a tool — rather than a keyframe
+ * being edited, so it can fit the new sequence into view. Editing must not
+ * look like loading, or the viewer's zoom would be taken away on every change.
+ */
+describe('loadRevision', () => {
+  it('counts whole-animation loads and ignores keyframe edits', () => {
+    const timeline = createTimelineState()
+    expect(timeline.loadRevision()).toBe(0)
+
+    timeline.loadTracks([
+      { parameterPath: 'camera.zoom', keyframes: [{ frame: 0, value: 1 }] },
+    ])
+    expect(timeline.loadRevision()).toBe(1)
+
+    timeline.addKeyframe('camera.zoom', 30, 2)
+    timeline.setKeyframeValue('camera.zoom', 30, 3)
+    timeline.removeKeyframe('camera.zoom', 30)
+    expect(timeline.loadRevision()).toBe(1)
+
+    timeline.loadTracks([])
+    expect(timeline.loadRevision()).toBe(2)
   })
 })

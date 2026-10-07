@@ -13,6 +13,7 @@ import { isParametricVariationType3D, isVariationType3D, transformVariations3D, 
 import type { WgslStruct } from 'typegpu/data'
 import type { FlameDescriptor, TransformFunction, VariationId, } from './schema/flameSchema'
 import type { TransformVariationType3D } from './variations3D'
+import type { AffineLayout } from '@/arcade/affineTerms'
 
 const FlameUniformsBase3D = struct({
   probability: f32,
@@ -74,75 +75,64 @@ function variationInvocation3D(variationType: string, vid: VariationId) {
   return `${variationType}(vec2f(pre.x, pre.y), VariationInfo(1.0, AffineParams(uniforms.preAffine.a, uniforms.preAffine.b, uniforms.preAffine.d, uniforms.preAffine.e, uniforms.preAffine.f, uniforms.preAffine.h)))`
 }
 
+/**
+ * The registered 2D types the 3D pipeline replaces with a 3D analog; every
+ * other 2D type renders as itself, lifted with the point's z. This is how a
+ * 2D flame has always rendered in 3D.
+ *
+ * Every key is a registered 2D type and every value a registered 3D type
+ * (flame/variationResolution.test.ts): before v1.0.0 the app keeps no row for
+ * a name it does not produce, so a flame that holds one draws nothing for it.
+ *
+ * The Flame Clash converts its 2D fighters by a rule of its own
+ * (flame/clash/convert2Dto3D.ts), which reads the analogs here and never
+ * changes the table.
+ */
 export const VARIATION_2D_TO_3D_MAP: Record<string, TransformVariationType3D> =
   {
-    linear: 'linear3D',
-    linearT: 'linear3D',
-    spherical: 'spherical3D',
-    sinusoidal: 'sinusoidal3D',
-    swirl: 'swirl3D',
-    swirl3: 'swirl3D',
-    horseshoe: 'horseshoe3D',
-    polar: 'polar3D',
-    polar2: 'polar3D',
-    nPolar: 'polar3D',
-    handkerchief: 'handkerchief3D',
-    heart: 'heart3D',
-    disc: 'disc3D',
-    spiral: 'spiral3D',
-    diamond: 'diamond3D',
-    ex: 'ex3D',
-    julia: 'julia3D',
-    juliaN: 'julia3D',
-    juliaScope: 'julia3D',
-    bent: 'bent3D',
-    waves: 'waves3D',
-    fisheye: 'fisheye3D',
-    exponential: 'exponential3D',
-    power: 'power3D',
-    rings: 'rings3D',
-    rings2: 'rings3D',
-    eyefish: 'eyefish3D',
-    bubble: 'bubble3D',
     bubbleVar: 'bubble3D',
-    cylinder: 'cylinder3D',
     cylinderVar: 'cylinder3D',
     cylinder2Var: 'cylindrical3D',
-    cylindrical: 'cylindrical3D',
     cylinderApoVar: 'cylinder3D',
-    gaussian: 'gaussian3D',
     gaussianVar: 'gaussian3D',
-    sphere: 'sphere3D',
-    sphereVar: 'sphere3D',
-    blur: 'blur3D',
     blurVar: 'blur3D',
-    square: 'square3D',
     squareVar: 'square3D',
-    scry: 'scry3D',
     scryVar: 'scry3D',
-    cross: 'cross3D',
     crossVar: 'cross3D',
-    curl: 'curl3D',
     curlVar: 'curl3D',
-    pdj: 'pdj3D',
     pdjVar: 'pdj3D',
-    hemisphere: 'hemisphere3D',
-    starfield: 'starfield3D',
   }
 
-export function resolveVariationType3D(type: string): string | undefined {
+/**
+ * The type the 3D pipeline runs for a variation of `type`, or undefined when
+ * it skips the variation, as it skips any name neither registry holds: a 3D
+ * type as itself, and a 2D type through VARIATION_2D_TO_3D_MAP or else as
+ * itself. A transform `from2D`, a Flame Clash 2D fighter's, bypasses the map:
+ * each 2D variation runs its own 2D function in the plane.
+ *
+ * Own keys only, as in the 2D path: `in` also finds 'constructor' and the
+ * rest of what a plain object inherits. Everything downstream only sees what
+ * this returns.
+ */
+export function resolveVariationType3D(
+  type: string,
+  from2D = false,
+): string | undefined {
   if (isVariationType3D(type)) return type
-  if (type in VARIATION_2D_TO_3D_MAP) return VARIATION_2D_TO_3D_MAP[type]
-  if (type in transformVariations) return type
-  return undefined
+  if (!Object.hasOwn(transformVariations, type)) return undefined
+  if (!from2D && Object.hasOwn(VARIATION_2D_TO_3D_MAP, type)) {
+    return VARIATION_2D_TO_3D_MAP[type]
+  }
+  return type
 }
 
 export function createFlameWgsl3D({
   variations,
-}: Pick<TransformFunction, 'variations'>) {
+  from2D,
+}: Pick<TransformFunction, 'variations' | 'from2D'>) {
   const validRecord: Record<string, { type: string }> = {}
   for (const [vid, v] of Object.entries(variations)) {
-    const resolved = resolveVariationType3D(v.type)
+    const resolved = resolveVariationType3D(v.type, from2D)
     if (!resolved) {
       console.warn(
         `[createFlameWgsl3D] skipping unknown variation type "${v.type}"`,
@@ -226,6 +216,54 @@ export function isAffine3D(
   )
 }
 
+/**
+ * Any affine as the 3D kernel's twelve numbers, read in `layout`: in the 3D
+ * layout with its missing fields at the identity's, in the 2D one lifted (its
+ * translation `c`, `f` into `d`, `h`, and z passed through unchanged), and
+ * none at all as the identity. `layout` defaults to the one the 3D renderer
+ * reads the affine in; a 2D flame's renderer reads every affine in the 2D one
+ * (affineLayoutOf in arcade/affineTerms.ts). The 3D pipeline writes a flame's
+ * final transform through this, and the Flame Clash lifts each fighter's
+ * affines with it.
+ */
+export function toAffine3D(
+  affine: Record<string, number | undefined> | undefined,
+  layout: AffineLayout = isAffine3D(affine) ? '3D' : '2D',
+): AffineParams3D {
+  const ft = affine ?? {}
+  const at = (key: string, missing: number) => ft[key] ?? missing
+  if (layout === '3D') {
+    return {
+      a: at('a', 1),
+      b: at('b', 0),
+      c: at('c', 0),
+      d: at('d', 0),
+      e: at('e', 0),
+      f: at('f', 1),
+      g: at('g', 0),
+      h: at('h', 0),
+      i: at('i', 0),
+      j: at('j', 0),
+      k: at('k', 1),
+      l: at('l', 0),
+    }
+  }
+  return {
+    a: at('a', 1),
+    b: at('b', 0),
+    c: 0,
+    d: at('c', 0), // Translation X
+    e: at('d', 0),
+    f: at('e', 1),
+    g: 0,
+    h: at('f', 0), // Translation Y
+    i: 0,
+    j: 0,
+    k: 1,
+    l: 0,
+  }
+}
+
 export function extractFlameUniforms3D({
   transforms,
 }: Pick<FlameDescriptor, 'transforms'>) {
@@ -244,6 +282,7 @@ export function extractFlameUniforms3D({
           postAffine,
           visible,
           colorSpeed,
+          from2D,
         },
       ]) => {
         const isVisible = visible
@@ -275,30 +314,30 @@ export function extractFlameUniforms3D({
           }
           if (isAffine3D(aff)) {
             return {
-              a: aff.a ?? 1,
-              b: aff.b ?? 0,
-              c: aff.c ?? 0,
-              d: aff.d ?? 0,
-              e: aff.e ?? 0,
-              f: aff.f ?? 1,
-              g: aff.g ?? 0,
-              h: aff.h ?? 0,
-              i: aff.i ?? 0,
-              j: aff.j ?? 0,
-              k: aff.k ?? 1,
-              l: aff.l ?? 0,
+              a: Number.isFinite(aff.a) ? (aff.a ?? 1) : 1,
+              b: Number.isFinite(aff.b) ? (aff.b ?? 0) : 0,
+              c: Number.isFinite(aff.c) ? (aff.c ?? 0) : 0,
+              d: Number.isFinite(aff.d) ? (aff.d ?? 0) : 0,
+              e: Number.isFinite(aff.e) ? (aff.e ?? 0) : 0,
+              f: Number.isFinite(aff.f) ? (aff.f ?? 1) : 1,
+              g: Number.isFinite(aff.g) ? (aff.g ?? 0) : 0,
+              h: Number.isFinite(aff.h) ? (aff.h ?? 0) : 0,
+              i: Number.isFinite(aff.i) ? (aff.i ?? 0) : 0,
+              j: Number.isFinite(aff.j) ? (aff.j ?? 0) : 0,
+              k: Number.isFinite(aff.k) ? (aff.k ?? 1) : 1,
+              l: Number.isFinite(aff.l) ? (aff.l ?? 0) : 0,
             }
           }
           // Correct mapping from 2D parameter keys a-f to 3D matrix elements a-l
           return {
-            a: aff.a ?? 1,
-            b: aff.b ?? 0,
+            a: Number.isFinite(aff.a) ? (aff.a ?? 1) : 1,
+            b: Number.isFinite(aff.b) ? (aff.b ?? 0) : 0,
             c: 0,
-            d: aff.c ?? 0, // Translation X
-            e: aff.d ?? 0,
-            f: aff.e ?? 1,
+            d: Number.isFinite(aff.c) ? (aff.c ?? 0) : 0, // Translation X
+            e: Number.isFinite(aff.d) ? (aff.d ?? 0) : 0,
+            f: Number.isFinite(aff.e) ? (aff.e ?? 1) : 1,
             g: 0,
-            h: aff.f ?? 0, // Translation Y
+            h: Number.isFinite(aff.f) ? (aff.f ?? 0) : 0, // Translation Y
             i: 0,
             j: 0,
             k: 1,
@@ -309,9 +348,15 @@ export function extractFlameUniforms3D({
         return [
           `flame${tid}`,
           {
-            probability: isVisible ? probability / totalProbability : 0,
-            color: vec2f(color?.x ?? 0, color?.y ?? 0),
-            colorSpeed: colorSpeed ?? 0.4,
+            probability: isVisible
+              ? (Number.isFinite(probability) ? probability : 0) /
+                totalProbability
+              : 0,
+            color: vec2f(
+              Number.isFinite(color?.x) ? (color?.x ?? 0) : 0,
+              Number.isFinite(color?.y) ? (color?.y ?? 0) : 0,
+            ),
+            colorSpeed: Number.isFinite(colorSpeed) ? (colorSpeed ?? 0.4) : 0.4,
             preAffine: mapAffine(pAffine),
             postAffine: mapAffine(postAff),
             ...Object.fromEntries(
@@ -322,7 +367,7 @@ export function extractFlameUniforms3D({
                     | undefined
                   return (
                     vtype !== undefined &&
-                    resolveVariationType3D(vtype) !== undefined
+                    resolveVariationType3D(vtype, from2D) !== undefined
                   )
                 })
                 .map(([vid, variation]) => {
@@ -337,10 +382,13 @@ export function extractFlameUniforms3D({
                     params?: Record<string, number>
                   }
                   const isVarVisible = varVisible !== false
+                  const rawWeight = Number.isFinite(rest.weight)
+                    ? rest.weight
+                    : 1
                   const typed: Record<string, unknown> = {
-                    weight: isVarVisible ? (rest.weight ?? 1) : 0,
+                    weight: isVarVisible ? rawWeight : 0,
                   }
-                  const variationType = resolveVariationType3D(_type)!
+                  const variationType = resolveVariationType3D(_type, from2D)!
                   let isParametric = false
                   let defaults: Record<string, number> | undefined
 
@@ -361,7 +409,7 @@ export function extractFlameUniforms3D({
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {
                         const val = rest.params[key]
-                        if (val !== undefined) {
+                        if (val !== undefined && Number.isFinite(val)) {
                           safe[key] = val
                         }
                       }
@@ -369,7 +417,11 @@ export function extractFlameUniforms3D({
                     typed.params = safe
                   } else {
                     if (rest.params) {
-                      typed.params = { ...rest.params }
+                      const safe: Record<string, number> = {}
+                      for (const [key, val] of Object.entries(rest.params)) {
+                        if (Number.isFinite(val)) safe[key] = val
+                      }
+                      typed.params = safe
                     }
                   }
                   return [`variation${vid}`, typed]

@@ -1,5 +1,6 @@
 import { createSignal, getOwner, onCleanup } from 'solid-js'
-import { notifyDocumentWrite, notifyTimelineTransport, } from '@/recorder/documentWriteHook'
+import { notifyDocumentWrite, notifyTimelinePlayback, notifyTimelineTransport, registerTimelinePlaybackProbe, } from '@/recorder/documentWriteHook'
+import { PLAYHEAD_MOVE_REASON } from '@/recorder/transportStep'
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
@@ -10,13 +11,10 @@ interface WindowTimelineState {
   getFrame: () => number
 }
 
-export type EasingCurve =
-  | 'linear'
-  | 'easeIn'
-  | 'easeOut'
-  | 'easeInOut'
-  | 'bounce'
-  | 'elastic'
+import { MAX_TIMELINE_FRAME, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, projectFlameToSchema, } from '@chaos-master/core'
+import type { EasingCurve } from '@chaos-master/core'
+
+export type { EasingCurve }
 
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -330,6 +328,49 @@ export type TimelineConfig = {
   loopMode?: LoopMode
 }
 
+/**
+ * A config the app can always store and read back.
+ *
+ * Everything here decides what playback does, and all of it travels: into a
+ * Recents entry, a draft, a share link, an exported PNG. Those are read back
+ * through `TimelineSnapshotConfig`, which drops the whole config when any
+ * field is out of range - so a value past the maximum does not degrade, it
+ * disappears, and the flame returns at 30fps over 90 frames having been
+ * reported as saved. Seamless loop mode extends `endFrame` by the length of
+ * the animation, which put a long one past the limit on its own, and the
+ * Frames input has no maximum of its own either.
+ *
+ * So the state clamps here, at the one place every config write goes through,
+ * rather than at each writer.
+ */
+export function clampTimelineConfig(config: TimelineConfig): TimelineConfig {
+  // A field that is not a number at all takes the default rather than the low
+  // end of its range: clearing the Frames or Speed box sends
+  // `Math.round(Number(''))`, which is NaN, and the low end of a speed is a
+  // timeline frozen at zero - indistinguishable from the app hanging.
+  const fallback = defaultConfig()
+  const inRange = (value: number, min: number, max: number, orElse: number) =>
+    Number.isFinite(value) ? clamp(value, min, max) : orElse
+  return {
+    ...config,
+    fps: Math.round(
+      inRange(config.fps, 1, MAX_TIMELINE_PLAYBACK_FPS, fallback.fps),
+    ),
+    timeScale: inRange(
+      config.timeScale,
+      0,
+      MAX_TIMELINE_TIME_SCALE,
+      fallback.timeScale,
+    ),
+    startFrame: Math.round(
+      inRange(config.startFrame, 0, MAX_TIMELINE_FRAME, fallback.startFrame),
+    ),
+    endFrame: Math.round(
+      inRange(config.endFrame, 1, MAX_TIMELINE_FRAME, fallback.endFrame),
+    ),
+  }
+}
+
 export function defaultConfig(): TimelineConfig {
   return {
     fps: 30,
@@ -490,6 +531,57 @@ function resolveCycle(
   return lerpKfValues(kn.value, k0.value, t)
 }
 
+function interpolateNumberKeyframe(
+  sorted: KeyframeData[],
+  prevIdx: number,
+  prevVal: number,
+  nextVal: number,
+  easedT: number,
+  interp: string,
+): number {
+  if (interp === 'constant') return prevVal
+  if (interp === 'spline') {
+    const before = sorted[prevIdx - 1]?.value
+    const after = sorted[prevIdx + 2]?.value
+    const p0 = typeof before === 'number' ? before : prevVal
+    const p3 = typeof after === 'number' ? after : nextVal
+    return catmullRom(p0, prevVal, nextVal, p3, easedT)
+  }
+  return prevVal + (nextVal - prevVal) * easedT
+}
+
+function interpolateArrayKeyframe(
+  sorted: KeyframeData[],
+  prevIdx: number,
+  prevArr: [number, number, number] | [number, number, number, number],
+  nextArr: [number, number, number] | [number, number, number, number],
+  easedT: number,
+  interp: string,
+): [number, number, number] | [number, number, number, number] {
+  if (interp === 'constant') {
+    return prevArr
+  }
+  if (interp === 'spline') {
+    const before = sorted[prevIdx - 1]?.value
+    const after = sorted[prevIdx + 2]?.value
+    const len = prevArr.length
+    const p0 =
+      Array.isArray(before) && before.length === len
+        ? (before as number[])
+        : prevArr
+    const p3 =
+      Array.isArray(after) && after.length === len
+        ? (after as number[])
+        : nextArr
+    return prevArr.map((v, i) =>
+      catmullRom(p0[i]!, v, nextArr[i]!, p3[i]!, easedT),
+    ) as [number, number, number] | [number, number, number, number]
+  }
+  return prevArr.map((v, i) => v + (nextArr[i]! - v) * easedT) as
+    | [number, number, number]
+    | [number, number, number, number]
+}
+
 /**
  * Resolves the value at a given frame for a set of keyframes.
  * Returns the interpolated value or the nearest keyframe value.
@@ -542,15 +634,14 @@ export function resolveKeyframeValue(
 
   // Numbers: constant (hold) / spline (Catmull-Rom) / linear (lerp).
   if (typeof prev.value === 'number' && typeof next.value === 'number') {
-    if (interp === 'constant') return prev.value
-    if (interp === 'spline') {
-      const before = sorted[prevIdx - 1]?.value
-      const after = sorted[prevIdx + 2]?.value
-      const p0 = typeof before === 'number' ? before : prev.value
-      const p3 = typeof after === 'number' ? after : next.value
-      return catmullRom(p0, prev.value, next.value, p3, easedT)
-    }
-    return prev.value + (next.value - prev.value) * easedT
+    return interpolateNumberKeyframe(
+      sorted,
+      prevIdx,
+      prev.value,
+      next.value,
+      easedT,
+      interp,
+    )
   }
 
   // Array values (RGB/RGBA colors): same modes, component-wise.
@@ -559,27 +650,14 @@ export function resolveKeyframeValue(
     Array.isArray(next.value) &&
     prev.value.length === next.value.length
   ) {
-    if (interp === 'constant') return prev.value
-    const nextArr = next.value as number[]
-    if (interp === 'spline') {
-      const before = sorted[prevIdx - 1]?.value
-      const after = sorted[prevIdx + 2]?.value
-      const len = prev.value.length
-      const p0 =
-        Array.isArray(before) && before.length === len
-          ? (before as number[])
-          : (prev.value as number[])
-      const p3 =
-        Array.isArray(after) && after.length === len
-          ? (after as number[])
-          : nextArr
-      return prev.value.map((v, i) =>
-        catmullRom(p0[i]!, v, nextArr[i]!, p3[i]!, easedT),
-      ) as [number, number, number] | [number, number, number, number]
-    }
-    return prev.value.map((v, i) => v + (nextArr[i]! - v) * easedT) as
-      | [number, number, number]
-      | [number, number, number, number]
+    return interpolateArrayKeyframe(
+      sorted,
+      prevIdx,
+      prev.value,
+      next.value,
+      easedT,
+      interp,
+    )
   }
 
   // For string interpolation (drawMode, colorInitMode, pointInitMode) or boolean
@@ -624,6 +702,11 @@ export type TimelineStateOptions = {
 export function createTimelineState(options: TimelineStateOptions = {}) {
   const seatId = options.seatId
   const [currentFrame, setCurrentFrameRaw] = createSignal(0)
+  // Frames the playback advanced since it started, while the playhead is
+  // where the last advance left it. A take's stop records the count, so a
+  // replay plays that window at the pace it ran (recorder/playWindows.ts).
+  let played = { count: 0, at: -1 }
+  const playedFrames = () => (currentFrame() === played.at ? played.count : 0)
   // Moving the playhead ends any keyframe-coalescing run: returning to a
   // frame later must start a NEW undo step, not merge into the old gesture.
   const setCurrentFrame: typeof setCurrentFrameRaw = (
@@ -632,11 +715,32 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     breakUndoCoalescing()
     return setCurrentFrameRaw(value as never)
   }
-  const [config, setConfig] = createSignal<TimelineConfig>(defaultConfig())
+  const [config, setStoredConfig] =
+    createSignal<TimelineConfig>(defaultConfig())
+  /** Every config write, from any of them: the UI, a load, undo, loop mode.
+   *  Clamped so what the workspace holds can always be stored and read back
+   *  (see clampTimelineConfig). */
+  const setConfig = (next: TimelineConfig) => {
+    setStoredConfig(clampTimelineConfig(next))
+  }
   const [tracks, setTracks] = createSignal<TimelineTrack[]>([], {
     equals: false,
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
+  // While a replay paces a window, only it moves the playhead (replayPlayback).
+  const [pacedPlayback, setPacedPlayback] = createSignal(false)
+  if (seatId !== undefined) {
+    const unregister = registerTimelinePlaybackProbe(seatId, () =>
+      isPlaying()
+        ? { frame: currentFrame(), advanced: playedFrames() }
+        : undefined,
+    )
+    if (getOwner()) onCleanup(unregister)
+  }
+  // Bumped by `loadTracks`: one number the view can watch to know that a whole
+  // animation arrived (a file, a drop, a share link, the gallery, a tool) as
+  // opposed to a keyframe being edited. The dope sheet fits itself to it.
+  const [loadRevision, setLoadRevision] = createSignal(0)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
   // Blender-like: once the playhead is moved (seek/scrub/step/play), the canvas
   // keeps showing that frame's animated state on release ("held"), instead of
@@ -949,6 +1053,9 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     easing?: EasingCurve,
     interp?: KeyframeInterpolation,
   ) {
+    // Whole frames only: the schema rejects a fractional one, and a motion
+    // blurred export leaves the playhead between frames.
+    frame = Math.round(frame)
     setTracks((prev: TimelineTrack[]) => {
       const ti = prev.findIndex(
         (t: TimelineTrack) => t.parameterPath === parameterPath,
@@ -984,7 +1091,7 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
       ]
     })
     setLastAddedKeyframe({ path: parameterPath, frame })
-    if (frame === currentFrame() && valueWriterFn) {
+    if (frame === Math.round(currentFrame()) && valueWriterFn) {
       valueWriterFn(parameterPath, value)
     }
   }
@@ -1331,7 +1438,10 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   }
 
   function advanceFrame() {
-    notifyTimelineTransport('Timeline frame transport', seatId)
+    // While playing, this is the render loop stepping the playback a Play
+    // already reported, not a seek of its own. A step while paused is.
+    const playing = isPlaying()
+    if (!playing) notifyTimelineTransport(PLAYHEAD_MOVE_REASON, seatId)
     const cfg = config()
     // Sample the achieved rate between auto-FPS advances (each advance fires
     // when a frame hits target quality). Skip manual stepping (not playing).
@@ -1351,20 +1461,25 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
       lastAdvanceTs = now
     }
     const next = currentFrame() + 1
-    if (next > cfg.endFrame) {
-      setCurrentFrame(cfg.startFrame)
-      if (!cfg.loop) {
-        setIsPlaying(false)
-        resetFpsMeter()
-      }
-    } else {
-      setCurrentFrame(next)
+    const count = playedFrames() + 1
+    const wrapped = next > cfg.endFrame
+    const target = wrapped ? cfg.startFrame : next
+    // Counted before the move: whatever the move sets off (an arena clash
+    // pauses on its last frame) must read this advance in the count.
+    if (playing) played = { count, at: target }
+    setCurrentFrame(target)
+    if (wrapped && !cfg.loop) {
+      setIsPlaying(false)
+      resetFpsMeter()
+      // Nobody pressed anything, and the playback still stopped: a take
+      // has to pin where, or its replay pauses wherever its own clock got.
+      if (playing) notifyTimelinePlayback(false, cfg.startFrame, seatId, count)
     }
     setPreviewHeld(true)
   }
 
   function goBackFrame() {
-    notifyTimelineTransport('Timeline frame transport', seatId)
+    notifyTimelineTransport(PLAYHEAD_MOVE_REASON, seatId)
     const cfg = config()
     const prev = currentFrame() - 1
     if (prev < cfg.startFrame) {
@@ -1376,32 +1491,45 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   }
 
   function goToFrame(frame: number) {
-    notifyTimelineTransport('Timeline frame transport', seatId)
+    notifyTimelineTransport(PLAYHEAD_MOVE_REASON, seatId)
     setCurrentFrame(clamp(frame, config().startFrame, config().endFrame))
     setPreviewHeld(true)
   }
 
+  // Play and Pause report the playing state they leave behind and the frame
+  // it starts or stops on, and only when that state changes (see
+  // `notifyTimelinePlayback`): the recorder turns each into a step.
   function play() {
-    notifyTimelineTransport('Timeline playback transport', seatId)
     const cfg = config()
-    if (!cfg.loop && currentFrame() >= cfg.endFrame) {
+    const wasPlaying = isPlaying()
+    const from = currentFrame()
+    if (!cfg.loop && from >= cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
     }
     resetFpsMeter()
     setPreviewHeld(true)
     setIsPlaying(true)
+    if (!wasPlaying || currentFrame() !== from) {
+      played = { count: 0, at: -1 }
+      notifyTimelinePlayback(true, currentFrame(), seatId)
+    }
   }
 
   function pause() {
-    notifyTimelineTransport('Timeline playback transport', seatId)
+    const wasPlaying = isPlaying()
     setIsPlaying(false)
     resetFpsMeter()
+    const count = playedFrames()
+    if (wasPlaying) notifyTimelinePlayback(false, currentFrame(), seatId, count)
   }
 
   function togglePlay() {
-    notifyTimelineTransport('Timeline playback transport', seatId)
-    setIsPlaying(!isPlaying())
+    const next = !isPlaying()
+    setIsPlaying(next)
     resetFpsMeter()
+    const count = next ? undefined : playedFrames()
+    if (next) played = { count: 0, at: -1 }
+    notifyTimelinePlayback(next, currentFrame(), seatId, count)
   }
 
   function hasAnyKeyframes(parameterPath: string): boolean {
@@ -1611,7 +1739,15 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
       const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
       const span = Math.max(1, userEnd - cfg.startFrame)
       const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
-      next = { ...cfg, loopMode: 'seamless', loop: true, endFrame }
+      // Clamped like every other config write: the return tail is part of
+      // the stored document, and a long animation extended past the schema's
+      // maximum on its own.
+      next = clampTimelineConfig({
+        ...cfg,
+        loopMode: 'seamless',
+        loop: true,
+        endFrame,
+      })
     }
     // Idempotent no-op — don't burn an undo entry.
     if (JSON.stringify(next) === JSON.stringify(cfg)) return
@@ -1624,6 +1760,7 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
   function loadTracks(incoming: readonly TimelineTrack[]) {
     setPreviewHeld(false)
+    setLoadRevision((n) => n + 1)
     // A track load is a document boundary: without this, Ctrl+Z after
     // loading another flame (or New Flame / 2D-3D switch) restored the
     // PREVIOUS flame's track snapshots onto the new one — orphaned
@@ -1652,11 +1789,14 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     setCurrentFrame,
     config,
     setConfig,
+    loadRevision,
     tracks,
     setTracks,
     lastAddedKeyframe,
     isPlaying,
     setIsPlaying,
+    pacedPlayback,
+    setPacedPlayback,
     measuredFps,
     isScrubbing,
     setIsScrubbing,
@@ -1724,243 +1864,254 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
 
 export type TimelineState = ReturnType<typeof createTimelineState>
 
-export function applyTracksToFlame(
-  tracks: TimelineTrack[],
-  flame: FlameDescriptor,
+function applyTrackNumber(
+  trackMap: Map<string, TimelineTrack>,
+  path: string,
   frame: number,
-  loop: LoopOptions | null = null,
+  loop: LoopOptions | null,
+  setter: (v: number) => void,
 ): void {
-  const trackMap = new Map(tracks.map((t) => [t.parameterPath, t] as const))
+  const track = trackMap.get(path)
+  if (!track) return
+  const value = resolveLoopValue(track.keyframes, frame, loop)
+  if (value !== null && typeof value === 'number') setter(value)
+}
 
-  function applyNumber(path: string, setter: (v: number) => void) {
-    const track = trackMap.get(path)
-    if (!track) return
-    const value = resolveLoopValue(track.keyframes, frame, loop)
-    if (value !== null && typeof value === 'number') setter(value)
-  }
+function applyTrackString(
+  trackMap: Map<string, TimelineTrack>,
+  path: string,
+  frame: number,
+  loop: LoopOptions | null,
+  setter: (v: string) => void,
+): void {
+  const track = trackMap.get(path)
+  if (!track) return
+  const value = resolveLoopValue(track.keyframes, frame, loop)
+  if (value !== null && typeof value === 'string') setter(value)
+}
 
-  function applyString(path: string, setter: (v: string) => void) {
-    const track = trackMap.get(path)
-    if (!track) return
-    const value = resolveLoopValue(track.keyframes, frame, loop)
-    if (value !== null && typeof value === 'string') setter(value)
-  }
-
-  // Camera
+function applyCameraTracks(
+  flame: FlameDescriptor,
+  trackMap: Map<string, TimelineTrack>,
+  frame: number,
+  loop: LoopOptions | null,
+): void {
   if (flame.renderSettings.camera?.position) {
-    applyNumber('camera.x', (v) => {
+    applyTrackNumber(trackMap, 'camera.x', frame, loop, (v) => {
       flame.renderSettings.camera.position[0] = v
     })
-    applyNumber('camera.y', (v) => {
+    applyTrackNumber(trackMap, 'camera.y', frame, loop, (v) => {
       flame.renderSettings.camera.position[1] = v
     })
   }
   if (flame.renderSettings.camera) {
-    applyNumber('camera.zoom', (v) => {
+    applyTrackNumber(trackMap, 'camera.zoom', frame, loop, (v) => {
       flame.renderSettings.camera.zoom = v
     })
-    applyNumber('camera.rotation', (v) => {
+    applyTrackNumber(trackMap, 'camera.rotation', frame, loop, (v) => {
       flame.renderSettings.camera.rotation = v
     })
   }
 
-  // Camera3D
   if (flame.renderSettings.camera3D) {
-    applyNumber('camera3D.theta', (v) => {
+    applyTrackNumber(trackMap, 'camera3D.theta', frame, loop, (v) => {
       flame.renderSettings.camera3D.theta = v
     })
-    applyNumber('camera3D.phi', (v) => {
+    applyTrackNumber(trackMap, 'camera3D.phi', frame, loop, (v) => {
       flame.renderSettings.camera3D.phi = v
     })
-    applyNumber('camera3D.radius', (v) => {
+    applyTrackNumber(trackMap, 'camera3D.radius', frame, loop, (v) => {
       flame.renderSettings.camera3D.radius = v
     })
-    applyNumber('camera3D.fov', (v) => {
+    applyTrackNumber(trackMap, 'camera3D.fov', frame, loop, (v) => {
       flame.renderSettings.camera3D.fov = v
     })
   }
+}
 
-  // Flame parameters
-  applyNumber('exposure', (v) => {
+function applyRenderSettingTracks(
+  flame: FlameDescriptor,
+  trackMap: Map<string, TimelineTrack>,
+  frame: number,
+  loop: LoopOptions | null,
+): void {
+  applyTrackNumber(trackMap, 'exposure', frame, loop, (v) => {
     flame.renderSettings.exposure = v
   })
-  applyNumber('skipIters', (v) => {
+  applyTrackNumber(trackMap, 'skipIters', frame, loop, (v) => {
     flame.renderSettings.skipIters = v
   })
-  applyNumber('vibrancy', (v) => {
+  applyTrackNumber(trackMap, 'vibrancy', frame, loop, (v) => {
     flame.renderSettings.vibrancy = v
   })
-  applyNumber('contrast', (v) => {
+  applyTrackNumber(trackMap, 'contrast', frame, loop, (v) => {
     flame.renderSettings.contrast = v
   })
-  applyNumber('gamma', (v) => {
+  applyTrackNumber(trackMap, 'gamma', frame, loop, (v) => {
     flame.renderSettings.gamma = v
   })
-  applyNumber('highlightPower', (v) => {
+  applyTrackNumber(trackMap, 'highlightPower', frame, loop, (v) => {
     flame.renderSettings.highlightPower = v
   })
-  applyNumber('depthColorPower', (v) => {
+  applyTrackNumber(trackMap, 'depthColorPower', frame, loop, (v) => {
     flame.renderSettings.depthColorPower = v
   })
-  applyNumber('lightPower', (v) => {
+  applyTrackNumber(trackMap, 'lightPower', frame, loop, (v) => {
     flame.renderSettings.lightPower = v
   })
-  applyNumber('palettePhase', (v) => {
+  applyTrackNumber(trackMap, 'palettePhase', frame, loop, (v) => {
     flame.renderSettings.palettePhase = v
   })
-  applyNumber('paletteSpeed', (v) => {
+  applyTrackNumber(trackMap, 'paletteSpeed', frame, loop, (v) => {
     flame.renderSettings.paletteSpeed = v
   })
-  applyNumber('densityEstimationQuality', (v) => {
+  applyTrackNumber(trackMap, 'densityEstimationQuality', frame, loop, (v) => {
     flame.renderSettings.densityEstimationQuality = v
   })
-  applyNumber('estimatorCurve', (v) => {
+  applyTrackNumber(trackMap, 'estimatorCurve', frame, loop, (v) => {
     flame.renderSettings.estimatorCurve = v
   })
-  applyString('drawMode', (v) => {
+  applyTrackString(trackMap, 'drawMode', frame, loop, (v) => {
     flame.renderSettings.drawMode = v as 'light' | 'paint'
   })
-  applyString('colorInitMode', (v) => {
+  applyTrackString(trackMap, 'colorInitMode', frame, loop, (v) => {
     flame.renderSettings.colorInitMode = v as
       | 'colorInitZero'
       | 'colorInitPosition'
   })
-  applyString('pointInitMode', (v) => {
+  applyTrackString(trackMap, 'pointInitMode', frame, loop, (v) => {
     flame.renderSettings.pointInitMode =
       v as typeof flame.renderSettings.pointInitMode
   })
 
   // Color arrays
-  {
-    const track = trackMap.get('backgroundColor')
-    if (track) {
-      const value = resolveLoopValue(track.keyframes, frame, loop)
-      if (
-        value !== null &&
-        Array.isArray(value) &&
-        value.length === 3 &&
-        typeof value[0] === 'number' &&
-        typeof value[1] === 'number' &&
-        typeof value[2] === 'number'
-      ) {
-        flame.renderSettings.backgroundColor = value
-      }
+  const bgTrack = trackMap.get('backgroundColor')
+  if (bgTrack) {
+    const value = resolveLoopValue(bgTrack.keyframes, frame, loop)
+    if (
+      value !== null &&
+      Array.isArray(value) &&
+      value.length === 3 &&
+      typeof value[0] === 'number' &&
+      typeof value[1] === 'number' &&
+      typeof value[2] === 'number'
+    ) {
+      flame.renderSettings.backgroundColor = value
     }
   }
 
-  {
-    const track = trackMap.get('edgeFadeColor')
-    if (track) {
-      const value = resolveLoopValue(track.keyframes, frame, loop)
-      if (
-        value !== null &&
-        Array.isArray(value) &&
-        value.length === 4 &&
-        typeof value[0] === 'number' &&
-        typeof value[1] === 'number' &&
-        typeof value[2] === 'number' &&
-        typeof value[3] === 'number'
-      ) {
-        // Lives under renderSettings (the schema's canonical location). The old
-        // top-level `flame.edgeFadeColor` write was a dead prop the renderer
-        // never read, so the animated edge fade never applied (bug exposed once
-        // the typecheck stopped widening the flame type to `any` — issue #30).
-        flame.renderSettings.edgeFadeColor = value
-      }
+  const edgeTrack = trackMap.get('edgeFadeColor')
+  if (edgeTrack) {
+    const value = resolveLoopValue(edgeTrack.keyframes, frame, loop)
+    if (
+      value !== null &&
+      Array.isArray(value) &&
+      value.length === 4 &&
+      typeof value[0] === 'number' &&
+      typeof value[1] === 'number' &&
+      typeof value[2] === 'number' &&
+      typeof value[3] === 'number'
+    ) {
+      flame.renderSettings.edgeFadeColor = value
     }
   }
+}
 
-  // Transform and variation paths
+function applyTransformField(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transforms: Record<string, any>,
+  parts: string[],
+  value: number,
+): void {
+  const [, tid, section, param] = parts
+  const transform = tid ? transforms[tid] : undefined
+  if (!transform) return
+
+  if (section === 'preAffine' || section === 'postAffine') {
+    if (param && transform[section]) {
+      transform[section][param] = value
+    }
+  } else if (section === 'color') {
+    if (param && transform.color) {
+      transform.color[param] = value
+    }
+  } else if (section === 'probability') {
+    transform.probability = value
+  } else if (section === 'colorSpeed') {
+    transform.colorSpeed = value
+  }
+}
+
+function applyVariationField(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transforms: Record<string, any>,
+  parts: string[],
+  value: number,
+): void {
+  const [tid, vid, paramName] = parts
+  const variation = tid && vid ? transforms[tid]?.variations?.[vid] : undefined
+  if (!variation) return
+
+  if (paramName !== undefined) {
+    if (!variation.params) {
+      variation.params = {}
+    }
+    variation.params[paramName] = value
+  } else {
+    variation.weight = value
+  }
+}
+
+function applyTransformTrackPath(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transforms: Record<string, any>,
+  parts: string[],
+  value: number,
+): void {
+  if (parts[0] === 'transform') {
+    applyTransformField(transforms, parts, value)
+  } else if (
+    parts[0] !== 'camera' &&
+    (parts.length === 2 || parts.length === 3)
+  ) {
+    applyVariationField(transforms, parts, value)
+  }
+}
+
+function applyTransformAndVariationTracks(
+  flame: FlameDescriptor,
+  trackMap: Map<string, TimelineTrack>,
+  frame: number,
+  loop: LoopOptions | null,
+): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transforms = flame.transforms as Record<string, any>
   for (const [path, track] of trackMap) {
-    if (typeof path !== 'string') continue
     const value = resolveLoopValue(track.keyframes, frame, loop)
     if (value === null || typeof value !== 'number') continue
 
     const parts = path.split('.')
-    // transform.{tid}.preAffine.{a-f} or transform.{tid}.postAffine.{a-f}
-    if (
-      parts[0] === 'transform' &&
-      parts.length === 4 &&
-      (parts[2] === 'preAffine' || parts[2] === 'postAffine')
-    ) {
-      const [, tid, affineType, param] = parts
-      if (tid && param && transforms[tid]?.[affineType]) {
-        transforms[tid][affineType][param] = value
-      }
-      continue
-    }
-    // transform.{tid}.color.{x,y}
-    if (
-      parts[0] === 'transform' &&
-      parts.length === 4 &&
-      parts[2] === 'color'
-    ) {
-      const [, tid, , param] = parts
-      if (tid && param && transforms[tid]?.color) {
-        transforms[tid].color[param] = value
-      }
-      continue
-    }
-    // transform.{tid}.probability
-    if (
-      parts[0] === 'transform' &&
-      parts.length === 3 &&
-      parts[2] === 'probability'
-    ) {
-      const [, tid] = parts
-      if (tid && transforms[tid]) {
-        transforms[tid].probability = value
-      }
-      continue
-    }
-    // transform.{tid}.colorSpeed
-    if (
-      parts[0] === 'transform' &&
-      parts.length === 3 &&
-      parts[2] === 'colorSpeed'
-    ) {
-      const [, tid] = parts
-      if (tid && transforms[tid]) {
-        transforms[tid].colorSpeed = value
-      }
-      continue
-    }
-    // {tid}.{vid}.{paramName} — variation param
-    if (
-      parts.length === 3 &&
-      parts[0] !== 'transform' &&
-      parts[0] !== 'camera'
-    ) {
-      const [tid, vid, paramName] = parts
-      const variation = transforms[tid!]?.variations?.[vid!]
-      if (variation) {
-        if (!variation.params) {
-          variation.params = {}
-        }
-        variation.params[paramName!] = value
-      }
-      continue
-    }
-    // {tid}.{vid} — variation weight
-    if (
-      parts.length === 2 &&
-      parts[0] !== 'transform' &&
-      parts[0] !== 'camera'
-    ) {
-      const [tid, vid] = parts
-      const variation = transforms[tid!]?.variations?.[vid!]
-      if (variation) {
-        variation.weight = value
-      }
-    }
+    applyTransformTrackPath(transforms, parts, value)
   }
+}
 
-  // Final transform. Seed a dimension-appropriate identity: a 3D flame needs a
-  // 12-param (a–l) affine — seeding a 2D one here produced 3D flames with an
-  // invalid 2D finalTransform that then failed strict schema validation on
-  // re-import.
+const AFFINE_KEYS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
+const AFFINE_KEYS_3D = [
+  ...AFFINE_KEYS_2D,
+  'g',
+  'h',
+  'i',
+  'j',
+  'k',
+  'l',
+] as const
+
+function applyFinalTransformTracks(
+  flame: FlameDescriptor,
+  trackMap: Map<string, TimelineTrack>,
+  frame: number,
+  loop: LoopOptions | null,
+): void {
   if (!flame.finalTransform) {
     flame.finalTransform =
       flame.renderSettings.dimensions === 3
@@ -1980,24 +2131,33 @@ export function applyTracksToFlame(
           }
         : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   }
-  applyNumber('finalTransform.a', (v) => {
-    flame.finalTransform!.a = v
-  })
-  applyNumber('finalTransform.b', (v) => {
-    flame.finalTransform!.b = v
-  })
-  applyNumber('finalTransform.c', (v) => {
-    flame.finalTransform!.c = v
-  })
-  applyNumber('finalTransform.d', (v) => {
-    flame.finalTransform!.d = v
-  })
-  applyNumber('finalTransform.e', (v) => {
-    flame.finalTransform!.e = v
-  })
-  applyNumber('finalTransform.f', (v) => {
-    flame.finalTransform!.f = v
-  })
+  // The terms the final transform has in its own layout: a-f in 2D, a-l in
+  // 3D. A track on g-l never turns a 2D-layout final transform into a 3D one,
+  // which would change what its a-f mean.
+  const final = flame.finalTransform as Record<string, number>
+  const is3D = ['g', 'h', 'i', 'j', 'k', 'l'].some(
+    (key) => final[key] !== undefined,
+  )
+  for (const key of is3D ? AFFINE_KEYS_3D : AFFINE_KEYS_2D) {
+    applyTrackNumber(trackMap, `finalTransform.${key}`, frame, loop, (v) => {
+      final[key] = v
+    })
+  }
+}
+
+export function applyTracksToFlame(
+  tracks: TimelineTrack[],
+  flame: FlameDescriptor,
+  frame: number,
+  loop: LoopOptions | null = null,
+): void {
+  const trackMap = new Map(tracks.map((t) => [t.parameterPath, t] as const))
+
+  applyCameraTracks(flame, trackMap, frame, loop)
+  applyRenderSettingTracks(flame, trackMap, frame, loop)
+  applyTransformAndVariationTracks(flame, trackMap, frame, loop)
+  applyFinalTransformTracks(flame, trackMap, frame, loop)
+  projectFlameToSchema(flame) // a fraction between keys is not a flame
 }
 
 /**

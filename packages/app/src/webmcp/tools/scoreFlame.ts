@@ -1,11 +1,17 @@
 import { getWebMcpContext } from '@/webmcp/contextBridge'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
 // Module scope, not per call: the duel HUD scores both flames continuously,
 // and these were being rebuilt every time.
-// Linear variations excluded from chaos accumulator
-const LINEAR = new Set(['linearVar', 'linearTVar'])
+//
+// Both sets are keyed by registered variation TYPE and read with
+// `variation.type`. A variation's key in `transform.variations` is its id (a
+// generated UUID in the editor), which never matches a type name.
+//
+// Linear variations excluded from chaos accumulator: the 2D registry's two and
+// the 3D registry's one, as in flame/stats.ts.
+const LINEAR = new Set(['linearVar', 'linearTVar', 'linear3D'])
 
 // Symmetry indicators
 const SYMMETRY = new Set([
@@ -74,57 +80,114 @@ const SYMMETRY = new Set([
   'hemisphere3D',
 ])
 
-export function calculateFlameStats(flame: FlameDescriptor) {
-  const transforms = Object.values(flame.transforms ?? {})
+export interface VariationMetrics {
+  variationCount: number
+  nonLinearWeightSum: number
+  symmetryHits: number
+  colorSpeedSum: number
+}
 
-  // 1. Complexity
-  const transformCount = transforms.length
+export function calculateVariationMetrics(
+  transforms: TransformFunction[],
+): VariationMetrics {
   let variationCount = 0
   let nonLinearWeightSum = 0
   let symmetryHits = 0
+  let colorSpeedSum = 0
 
   for (const t of transforms) {
     if (!t.visible) continue
-    const vars = Object.entries(t.variations || {})
+    colorSpeedSum += Math.abs(t.colorSpeed ?? 0.4)
+    const vars = Object.values(t.variations || {})
     variationCount += vars.length
 
-    for (const [vName, vData] of vars) {
-      const weight = Math.abs(vData.weight)
-      if (!LINEAR.has(vName)) {
+    for (const { type, weight: signedWeight } of vars) {
+      const weight = Math.abs(signedWeight)
+      if (!LINEAR.has(type)) {
         nonLinearWeightSum += weight
       }
-      if (SYMMETRY.has(vName)) {
+      if (SYMMETRY.has(type)) {
         symmetryHits += weight
       }
     }
   }
 
+  return { variationCount, nonLinearWeightSum, symmetryHits, colorSpeedSum }
+}
+
+export function calculateStructuralSymmetry(
+  transforms?: Record<string, TransformFunction>,
+): number {
+  const symTransforms = Object.entries(transforms ?? {}).filter(
+    ([k, t]) => k.startsWith('_sym__') && (t.visible ?? true),
+  ).length
+
+  return symTransforms > 0 ? Math.min(10, 2.5 + (symTransforms - 1) * 1.25) : 0
+}
+
+/**
+ * Energy on 0..10, like the other three measurements. Exposure goes down to
+ * -8, so the sum alone reaches -16, and below 0 it put the Duel verdict's
+ * curve 10 E / (E + 4) on its pole at E = -4: exposure -3.5 at the default
+ * vibrancy and colour speed scored -Infinity, -3.55 scored 10,474, and dark
+ * flames, most of them 3D, scored below 0 (arcade audit, finding 3). A flame
+ * darker than that has no energy, and every reader (the verdict, the HUD,
+ * the Arena card's bar, the Clash stances, the taste profile) sees the same
+ * floor.
+ */
+export function calculateEnergyIntensity(
+  rs: FlameDescriptor['renderSettings'],
+  transformCount: number,
+  colorSpeedSum: number,
+): number {
+  const exposure = rs?.exposure ?? 0.25
+  const vibrancy = rs?.vibrancy ?? 0.5
+  const avgColorSpeed = transformCount > 0 ? colorSpeedSum / transformCount : 0
+  const sum = exposure * 2 + vibrancy * 2 + avgColorSpeed * 5
+  return Math.max(0, Math.min(10, sum))
+}
+
+export function classifyFlameType(
+  complexity: number,
+  chaosLevel: number,
+  symmetryScore: number,
+  energyIntensity: number,
+): string {
+  if (chaosLevel > 7 && symmetryScore < 3) return 'Chaotic Vortex'
+  if (symmetryScore > 6 && chaosLevel < 5) return 'Structured Mandala'
+  if (energyIntensity > 8) return 'Energy Burst'
+  if (complexity > 8) return 'Neural Web'
+  return 'Hybrid'
+}
+
+export function calculateFlameStats(flame: FlameDescriptor) {
+  const transforms = Object.values(flame.transforms ?? {})
+  const transformCount = transforms.length
+
+  const { variationCount, nonLinearWeightSum, symmetryHits, colorSpeedSum } =
+    calculateVariationMetrics(transforms)
+
+  // 1. Complexity
   const complexity = Math.min(10, transformCount * 0.5 + variationCount * 0.2)
 
   // 2. Chaos Level (How non-linear is it?)
   const chaosLevel = Math.min(10, nonLinearWeightSum * 1.5)
 
   // 3. Symmetry Score
-  const symmetryScore = Math.min(10, symmetryHits * 2.5)
-
-  // 4. Energy Intensity
-  const rs = flame.renderSettings
-  const exposure = rs?.exposure ?? 0.25
-  const vibrancy = rs?.vibrancy ?? 0.5
-
-  let colorSpeedSum = 0
-  for (const t of transforms) {
-    if (t.visible) colorSpeedSum += Math.abs(t.colorSpeed ?? 0.4)
-  }
-  const avgColorSpeed = transformCount > 0 ? colorSpeedSum / transformCount : 0
-
-  const energyIntensity = Math.min(
+  const structuralSymScore = calculateStructuralSymmetry(flame.transforms)
+  const symmetryScore = Math.min(
     10,
-    exposure * 2 + vibrancy * 2 + avgColorSpeed * 5,
+    Math.max(symmetryHits * 2.5, structuralSymScore),
   )
 
-  // Overall Power Level
-  // Weighted sum of the stats
+  // 4. Energy Intensity
+  const energyIntensity = calculateEnergyIntensity(
+    flame.renderSettings,
+    transformCount,
+    colorSpeedSum,
+  )
+
+  // Overall Power Level (Weighted sum of the stats)
   const overallPower = Math.round(
     complexity * 100 +
       chaosLevel * 150 +
@@ -133,11 +196,12 @@ export function calculateFlameStats(flame: FlameDescriptor) {
   )
 
   // Classify Type
-  let type = 'Hybrid'
-  if (chaosLevel > 7 && symmetryScore < 3) type = 'Chaotic Vortex'
-  else if (symmetryScore > 6 && chaosLevel < 5) type = 'Structured Mandala'
-  else if (energyIntensity > 8) type = 'Energy Burst'
-  else if (complexity > 8) type = 'Neural Web'
+  const type = classifyFlameType(
+    complexity,
+    chaosLevel,
+    symmetryScore,
+    energyIntensity,
+  )
 
   return {
     powerLevel: overallPower,

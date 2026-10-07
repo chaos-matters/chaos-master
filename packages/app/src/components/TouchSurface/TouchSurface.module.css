@@ -1,0 +1,951 @@
+/* Touch Surface Styling - Clean, Dark Glassmorphism, Cross-Browser */
+
+/* The top bar's frame: it places the pill and holds the More list beside
+   it, so the list is a glass layer of its own over the art. Inside the pill
+   it was glass in glass, which the nested rule in glass.module.css leaves
+   unblurred. The frame is neither glass nor transformed (auto margins
+   centre it), so nothing on it stands between the list and the art. */
+.hudFrame {
+  position: fixed;
+  top: var(--la-hud-top);
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  margin: 0 auto;
+  /* Above the popover backdrop, so the menu the backdrop belongs to stays
+     tappable while every other surface is covered. */
+  z-index: 42;
+  pointer-events: auto;
+}
+
+.topHud {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  height: var(--la-hud-h);
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-1);
+  padding: 0 var(--la-s-1);
+  border-radius: var(--la-r-pill);
+  box-sizing: border-box;
+}
+
+/* The tablet deck's header groups its icon buttons in one of these. */
+.hudActions {
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-1);
+}
+
+.hudButton {
+  width: var(--la-tap);
+  height: var(--la-hud-h);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--la-ink);
+  border-radius: var(--la-r-pill);
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    transform var(--la-dur-press) var(--la-ease);
+}
+
+.hudButton:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.hudButton:disabled {
+  color: var(--la-ink-4);
+  cursor: default;
+}
+
+.hudButtonIcon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+.hudTitleWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* The title is a control (it opens the tooltip), so its box is the pill's
+   full height even though the text is only 20px tall. */
+.hudTitleBtn {
+  display: flex;
+  align-items: center;
+  height: var(--la-hud-h);
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--la-ink);
+  cursor: pointer;
+  border-radius: var(--la-r-pill);
+  touch-action: manipulation;
+}
+
+.hudTitleText {
+  font: 600 15px/20px var(--la-font-body);
+  color: var(--la-ink);
+  max-width: 160px;
+  padding: 0 var(--la-s-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inside the pill, which is its backdrop root: a blur here could only ever
+   sample the pill's own fill, so it is flat glass, with no blur to drop. */
+.titleTooltip {
+  composes: flat from '@/styles/designSystem/glass.module.css';
+  position: absolute;
+  top: calc(100% + var(--la-s-2));
+  left: 0;
+  background: var(--la-glass-strong);
+  border-radius: var(--la-r-sm);
+  padding: var(--la-s-2) var(--la-s-3);
+  font: var(--la-t-caption);
+  color: var(--la-ink);
+  width: max-content;
+  max-width: 220px;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: var(--la-e-3);
+  z-index: 60;
+  pointer-events: auto;
+}
+
+.titleTooltipBody {
+  margin-top: var(--la-s-1);
+  color: var(--la-ink-2);
+}
+
+/* Under the pill's trailing end, where the More button is, placed from the
+   frame. Placement only; the list's own look is Shell/MoreMenu.module.css. */
+.moreMenuPopover {
+  position: absolute;
+  top: calc(100% + var(--la-s-2));
+  right: 0;
+  z-index: 60;
+}
+
+/* Covers the screen under the top bar: the rail (40) and the canvas below it
+   are out of reach while a popover is open, and a tap anywhere closes it.
+   The cursor is what makes the tap arrive: iOS Safari synthesises a click
+   for a bare div only where it takes the element for something clickable. */
+.popoverBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hudButton {
+    transition: none;
+  }
+}
+
+/* Touch Control Surface Shared Elements */
+.surfaceRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.transformNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.transformPills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.transformPills::-webkit-scrollbar {
+  display: none;
+}
+
+.transformPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--la-tap);
+  height: var(--la-tap);
+  padding: 0 var(--la-s-3);
+  border-radius: var(--la-r-pill);
+  border: 1px solid var(--la-hairline-strong);
+  background: var(--la-control);
+  color: var(--la-ink-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    color var(--la-dur-press) var(--la-ease);
+  touch-action: manipulation;
+}
+
+.transformPillActive {
+  background: var(--la-accent);
+  color: var(--la-ink-invert);
+  border-color: var(--la-accent);
+  box-shadow: 0 0 12px var(--la-accent-edge);
+}
+
+.transformActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.iconBtnSmall {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-control);
+  color: var(--la-ink-2);
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.iconBtnSmall:hover:not(:disabled) {
+  background: var(--la-control-strong);
+  color: var(--la-ink);
+}
+
+.iconBtnSmall:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.iconBtnSmall svg {
+  color: inherit;
+  stroke: currentColor;
+}
+
+/* Tabs Header */
+.tabRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.tabChip {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-2);
+  height: 40px;
+  min-width: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-control);
+  color: var(--la-ink-2);
+  font: var(--la-t-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--la-dur-fast) var(--la-ease),
+    color var(--la-dur-fast) var(--la-ease);
+  touch-action: manipulation;
+}
+
+.tabChipActive {
+  background: var(--la-control-accent);
+  color: var(--la-accent);
+  border-color: var(--la-accent-edge);
+}
+
+.tabIcon {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* Panel Body */
+.panelContent {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The room under the last control is what keeps a slider's thumb whole: a
+     range input is as tall as its track, the thumb is drawn outside it, and
+     this box clips at its padding edge. With none, the bottom slider in a
+     panel (Color Speed) lost the lower half of its handle. */
+  padding: 0 var(--la-s-3) var(--la-s-3);
+  box-sizing: border-box;
+}
+
+/* Variations Panel */
+.variationsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.activeVariationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activeVarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--la-control);
+  border: 1px solid var(--la-hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.varName {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--la-ink);
+  flex: 0 1 72px;
+  min-width: 44px;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.varWeightSlider {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  height: 4px;
+  accent-color: var(--la-accent);
+  cursor: pointer;
+}
+
+.varWeightVal {
+  font-size: 0.75rem;
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.quickPicksHeader {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--la-ink-3);
+  margin-top: 4px;
+}
+
+.quickPicksStrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+}
+
+.quickPicksStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.quickPickCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--la-control);
+  border: 1px solid var(--la-hairline);
+  border-radius: 8px;
+  color: var(--la-ink);
+  cursor: pointer;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
+  min-width: 64px;
+  touch-action: manipulation;
+}
+
+.quickPickCard svg {
+  color: var(--la-ink);
+  stroke: currentColor;
+}
+
+.quickPickCard:hover {
+  background: var(--la-control);
+  border-color: var(--la-accent-edge);
+}
+
+.quickPickCard:hover svg {
+  color: var(--la-accent);
+}
+
+.quickPickName {
+  font-size: 0.7rem;
+  color: var(--la-ink-2);
+  text-align: center;
+}
+
+/* Shape Panel */
+.shapeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.affineGridWrap {
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--la-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.shapeFieldsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* The scrub fields are the Duel's, written in whites for its dark chips.
+   On glass they take this surface's tokens through the hooks they read
+   (Duel/ScrubField.module.css): a control's fill and edge, and ink for
+   their text. Their label, white at 58% over the floating deck's glass,
+   measured 4.43:1 over bright art, and the unit sat at half the value's
+   ink. */
+:global(:root[data-glass-panels='on']) .shapeFieldsGrid {
+  --scrub-fill: var(--la-control);
+  --scrub-fill-hover: var(--la-control-strong);
+  --scrub-edge: var(--la-hairline);
+  --scrub-label: var(--la-ink);
+  --scrub-value: var(--la-ink);
+  --scrub-unit-opacity: 1;
+  --scrub-chevron: var(--la-ink-2);
+  --scrub-chevron-hover: var(--la-ink);
+}
+
+.resetShapeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-2);
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-control);
+  color: var(--la-ink-2);
+  font: var(--la-t-body-sm);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.resetShapeBtn:hover {
+  background: var(--la-control-strong);
+  color: var(--la-ink);
+}
+
+/* Colour Panel */
+.colourContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.paletteStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+}
+
+.paletteSwatch {
+  height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline-strong);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
+  touch-action: manipulation;
+}
+
+.paletteSwatch:hover {
+  transform: scale(1.04);
+  border-color: var(--la-ink);
+}
+
+.colourControlRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.colourControlLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--la-ink-3);
+}
+
+.colourSlider {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--la-accent);
+  cursor: pointer;
+}
+
+/* Vary panel: the rail's fourth chip. The deck keeps its footer instead. */
+.varyPanel {
+  display: grid;
+  gap: var(--la-s-3);
+  padding: var(--la-s-4);
+}
+
+.varyButton {
+  height: 56px;
+  border-radius: var(--la-r-pill);
+  border: var(--la-glass-edge);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.varyButtonPrimary {
+  background: var(--la-accent);
+  color: var(--la-ink-invert);
+  border-color: transparent;
+}
+
+.varyCaption {
+  margin: 0;
+  font: var(--la-t-caption);
+  color: var(--la-ink-3);
+  text-align: center;
+}
+
+/* Action Footer Bar */
+.surfaceFooter {
+  flex: 0 0 auto;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-s-2);
+  padding: var(--la-s-2) var(--la-s-3);
+  border-top: 1px solid var(--la-hairline);
+  box-sizing: border-box;
+}
+
+/* flex: 1 shares the footer's width out between its buttons. In the
+   variations panel, a column, the same flex: 1 is a height basis of 0 that
+   outranks the height, and "Browse Full Library" shrank to its 24px of text.
+   The minimum holds the tap token in either direction. */
+.actionPillBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-2);
+  height: var(--la-tap);
+  min-height: var(--la-tap);
+  border-radius: var(--la-r-sm);
+  border: 1px solid var(--la-hairline);
+  background: var(--la-control);
+  color: var(--la-ink);
+  font: var(--la-t-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    color var(--la-dur-press) var(--la-ease);
+  touch-action: manipulation;
+}
+
+.actionPillBtn:hover {
+  background: var(--la-control-strong);
+  color: var(--la-ink);
+}
+
+.actionPillBtn svg {
+  color: inherit;
+  stroke: currentColor;
+}
+
+.actionPillBtnPrimary {
+  background: var(--la-control-accent);
+  border-color: var(--la-accent-edge);
+  color: var(--la-accent);
+}
+
+.actionPillBtnPrimary:hover {
+  background: var(--la-control-accent);
+  color: var(--la-accent-press);
+}
+
+/* Slide-over Advanced Tools Drawer. The panel is the one glass layer: the
+   dim beside it has no blur, which as a full-screen blur re-ran on every
+   frame the canvas presented, under the panel's own (glass-panels.md,
+   phase 1). */
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  /* As above: without it iOS may not synthesise the click that closes the
+     drawer from a tap beside it. */
+  cursor: pointer;
+  background: var(--la-scrim-dim);
+  z-index: 90;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+/* Glass, solid while the canvas is busy. Its card subtitles are ink, not
+   the ink-2 an 80% fill allows: each card's hairline wash lifts the fill
+   behind them, and ink-2 on it measures 4.30:1 over white-hot art. */
+.drawerPanel {
+  composes: panel from '@/styles/designSystem/glass.module.css';
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 85vw);
+  /* An edge only on the side that meets the canvas. */
+  border: 0;
+  border-left: 1px solid var(--la-hairline-strong);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+  box-sizing: border-box;
+  animation: slideInRight var(--la-dur-sheet) var(--la-ease) forwards;
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--la-hairline);
+}
+
+.drawerTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--la-ink);
+  margin: 0;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawerCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--la-hairline);
+  background: var(--la-hairline);
+  color: var(--la-ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--la-dur-press) var(--la-ease),
+    border-color var(--la-dur-press) var(--la-ease);
+  touch-action: manipulation;
+}
+
+.drawerCard:hover {
+  background: var(--la-surface-3);
+  border-color: var(--la-accent-edge);
+}
+
+.drawerCardHighlight {
+  border-color: var(--la-accent-edge);
+  background: var(--la-accent-wash);
+}
+
+.drawerCardHighlight:hover {
+  background: var(--la-accent-wash);
+  border-color: var(--la-accent-edge);
+}
+
+.drawerCardIcon {
+  width: 22px;
+  height: 22px;
+  color: var(--la-accent);
+  flex-shrink: 0;
+}
+
+.drawerCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawerCardTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--la-ink);
+}
+
+.drawerCardSubtitle {
+  font-size: 0.72rem;
+  color: var(--la-ink);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Visual Variation Preview Gallery (Phone & Tablet) */
+.variationGalleryContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.variationGalleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.variationGalleryTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--la-ink-3);
+}
+
+.searchToggleBtn {
+  background: transparent;
+  border: none;
+  color: var(--la-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background var(--la-dur-press) var(--la-ease);
+}
+
+.searchToggleBtn:hover,
+.searchToggleBtn:active {
+  background: var(--la-control-accent);
+}
+
+/* Under a finger, the two controls drawn smaller than the tap token take its
+   height: the tablet deck's tabs, 40px for a trackpad, and the search
+   toggle, a line of small text 21px tall, whose header row grows to hold it.
+   Every other control in the deck is already the token's size. */
+@media (pointer: coarse) {
+  .tabChip {
+    height: var(--la-tap);
+  }
+
+  .searchToggleBtn {
+    min-height: var(--la-tap);
+  }
+}
+
+/* With the Glass panels setting on, these panels sit on glass (the rail's
+   sheet past peek, the floating tablet deck), where two kinds of text no
+   longer reach 4.5:1 over white-hot art. Accent text falls to 3.85:1 on the
+   80% fill: the search toggle, the selected tab and the Randomize button
+   take ink, and the tab and the button keep the accent in their fill and
+   edge. Ink-2 on a control's hairline wash falls to 4.30:1, against 5.39:1
+   on the bare fill: the wash lifts what is behind it. Both take ink. */
+:global(:root[data-glass-panels='on'])
+  :is(
+    .searchToggleBtn,
+    .tabChipActive,
+    .actionPillBtnPrimary,
+    .transformPill:not(.transformPillActive),
+    .varWeightVal,
+    .quickPickName,
+    .resetShapeBtn
+  ) {
+  color: var(--la-ink);
+}
+
+.variationsCarousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 10px 2px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--la-hairline-strong) transparent;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.variationsCarousel.isDragging {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+  cursor: grabbing;
+}
+
+.variationsCarousel.isDragging * {
+  cursor: grabbing !important;
+  pointer-events: none;
+}
+
+.variationsCarousel::-webkit-scrollbar {
+  height: 4px;
+}
+
+.variationsCarousel::-webkit-scrollbar-thumb {
+  background: var(--la-hairline-strong);
+  border-radius: 2px;
+}
+
+/* On glass the hairline thumb is about the glass's own colour: it measured
+   1.34:1 on the floating deck over bright art. Ink-3, which glass maps to
+   ink-2, holds the 3:1 a mark that is not text needs. */
+:global(:root[data-glass-panels='on']) .variationsCarousel {
+  scrollbar-color: var(--la-ink-3) transparent;
+}
+
+:global(:root[data-glass-panels='on'])
+  .variationsCarousel::-webkit-scrollbar-thumb {
+  background: var(--la-ink-3);
+}
+
+.variationTile {
+  flex: 0 0 88px;
+  width: 88px;
+  height: 94px;
+  min-height: 64px;
+  border-radius: 12px;
+  background: var(--la-void);
+  border: 1.5px solid var(--la-hairline-strong);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--la-dur-press) var(--la-ease),
+    box-shadow var(--la-dur-press) var(--la-ease),
+    transform var(--la-dur-press) var(--la-ease);
+  touch-action: manipulation;
+  text-align: left;
+}
+
+.variationTile:hover {
+  border-color: var(--la-hairline-strong);
+}
+
+.variationTile:active {
+  transform: scale(0.96);
+}
+
+.variationTileSelected {
+  border-color: var(--la-accent);
+  box-shadow: 0 0 12px var(--la-accent-edge);
+}
+
+.variationTileCanvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.variationTileName {
+  composes: frost from '@/styles/designSystem/glass.module.css';
+  position: relative;
+  z-index: 2;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--la-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.8);
+  padding: 2px 4px;
+  border-radius: 4px;
+}

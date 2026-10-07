@@ -1,11 +1,23 @@
+import { MAX_TIMELINE_FRAME } from '@chaos-master/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
-import { clearRecentFlames, clearRecentFlamesCache, deleteRecentFlame, formatRecentDate, getOldestRecentFlame, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, saveRecentFlame, saveRecentFlames, upsertRecentFlame, } from './recentFlames'
+import { clearRecentFlames, clearRecentFlamesCache, deleteRecentFlame, formatRecentDate, getOldestRecentFlame, loadRecentFlame, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, saveRecentFlame, saveRecentFlames, upsertRecentFlame, } from './recentFlames'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 const STORAGE_KEY = 'chaos-master-recent-flames'
 
 const sampleFlame = () => Object.values(examples)[0] as FlameDescriptor
+
+/** A whole timeline, as the workspace hands one over. */
+const sampleConfig = () => ({
+  fps: 60,
+  timeScale: 2,
+  startFrame: 0,
+  endFrame: 300,
+  loop: false,
+  autoFps: false,
+  loopMode: 'seamless' as const,
+})
 
 /** Minimal timeline track — only its presence and cloning matter here. */
 const sampleTrack = () => ({
@@ -115,6 +127,28 @@ describe('loadRecentFlames input handling', () => {
     seed([goodEntry('a'), brokenEntry('bad'), goodEntry('b')])
     expect(ids(loadRecentFlames())).toEqual(['a', 'b'])
   })
+
+  it('reads a stored timeline back', () => {
+    seed([{ ...goodEntry('a'), config: sampleConfig() }])
+    expect(loadRecentFlames()[0]!.config).toEqual(sampleConfig())
+  })
+
+  it('drops a timeline that does not validate, and keeps its entry', () => {
+    // What the config decides is what playback does: fps 0 stops the
+    // timeline dead. The flame is still worth showing, so the entry stays
+    // and comes back at the workspace's defaults.
+    seed([{ ...goodEntry('a'), config: { fps: 0, endFrame: -5 } }])
+    const entries = loadRecentFlames()
+    expect(ids(entries)).toEqual(['a'])
+    expect(entries[0]!.config).toBeUndefined()
+  })
+
+  it('reads a record written before entries carried a timeline', () => {
+    seed([goodEntry('a')])
+    const entry = loadRecentFlames()[0]!
+    expect(entry.config).toBeUndefined()
+    expect('config' in entry).toBe(false)
+  })
 })
 
 // ── loadRecentFlames: the memo ────────────────────────────────────────────
@@ -188,6 +222,40 @@ describe('loadRecentFlames memo', () => {
       ;(entry as { name: string }).name = 'mutated'
     }).toThrow()
     expect(loadRecentFlames()[0]!.name).toBe('good a')
+  })
+})
+
+// ── loadRecentFlame (one entry, validated like the list) ──────────────────
+
+describe('loadRecentFlame', () => {
+  it('reads one entry the way the Library reads the list', () => {
+    seed([goodEntry('a'), { ...goodEntry('b'), config: sampleConfig() }])
+    expect(loadRecentFlame('b')?.name).toBe('good b')
+    expect(loadRecentFlame('b')?.config).toEqual(sampleConfig())
+  })
+
+  it('drops an entry the Library would not show', () => {
+    // The whole point of validating rather than reading structurally: an
+    // entry whose flame fails the schema is invisible in Library, so calling
+    // it a copy of anything is a lie about where the work is.
+    seed([brokenEntry('bad')])
+    expect(loadRecentFlame('bad')).toBeUndefined()
+  })
+
+  it('is undefined for an id that is not there, and for junk', () => {
+    seed([goodEntry('a')])
+    expect(loadRecentFlame('nope')).toBeUndefined()
+    seedRaw('{ not json')
+    expect(loadRecentFlame('a')).toBeUndefined()
+    seedRaw(JSON.stringify({ id: 'a' }))
+    expect(loadRecentFlame('a')).toBeUndefined()
+  })
+
+  it('agrees with the full loader, warm memo or cold', () => {
+    seed([goodEntry('a'), { ...goodEntry('b'), config: sampleConfig() }])
+    const cold = loadRecentFlame('b')
+    expect(loadRecentFlames().map((e) => e.id)).toEqual(['a', 'b'])
+    expect(loadRecentFlame('b')).toEqual(cold)
   })
 })
 
@@ -282,7 +350,9 @@ describe('saveRecentFlame', () => {
     seed(
       Array.from({ length: MAX_RECENT_FLAMES }, (_, i) => brokenEntry(`b${i}`)),
     )
-    expect(saveRecentFlame(sampleFlame(), 'nope', undefined, false)).toBe(false)
+    expect(saveRecentFlame(sampleFlame(), 'nope', undefined, false)).toBe(
+      'full',
+    )
     expect(loadRecentFlamesForRewrite()).toHaveLength(MAX_RECENT_FLAMES)
   })
 
@@ -291,8 +361,56 @@ describe('saveRecentFlame', () => {
       Array.from({ length: MAX_RECENT_FLAMES }, (_, i) => goodEntry(`g${i}`)),
     )
     const before = localStorage.getItem(STORAGE_KEY)
-    expect(saveRecentFlame(sampleFlame(), 'nope', undefined, false)).toBe(false)
+    expect(saveRecentFlame(sampleFlame(), 'nope', undefined, false)).toBe(
+      'full',
+    )
     expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
+  })
+
+  it('stores the timeline it is given', () => {
+    seed([])
+    saveRecentFlame(sampleFlame(), 'Saved', [], true, sampleConfig())
+    expect(loadRecentFlames()[0]!.config).toEqual(sampleConfig())
+  })
+
+  it('clamps a timeline past a limit instead of losing all of it', () => {
+    // Out of range is not unusable. A seamless loop over a long animation
+    // pushes `endFrame` past the ceiling on its own (utils/timeline.ts), and
+    // dropping the config for it took the frame rate and the loop mode with
+    // it - the flame came back at 30fps over 90 frames, reported as saved.
+    seed([])
+    const outcome = saveRecentFlame(sampleFlame(), 'Long', [], true, {
+      ...sampleConfig(),
+      endFrame: 5000,
+    })
+    expect(outcome).toBe('saved')
+    const stored = loadRecentFlames()[0]!.config!
+    expect(stored.endFrame).toBe(MAX_TIMELINE_FRAME)
+    expect(stored.fps).toBe(sampleConfig().fps)
+    expect(stored.loopMode).toBe(sampleConfig().loopMode)
+  })
+
+  it('does not report success for a timeline that cannot be read back', () => {
+    // A config with a string where the frame rate goes is not a timeline at
+    // all: there is nothing to clamp, so the loader still drops it and keeps
+    // the entry. The caller marks the workspace clean on success, so a write
+    // that claimed this landed would lose it with nothing left to retry.
+    seed([])
+    const outcome = saveRecentFlame(sampleFlame(), 'Broken', [], true, {
+      ...sampleConfig(),
+      fps: 'fast',
+    } as never)
+    expect(loadRecentFlames()[0]!.config).toBeUndefined()
+    expect(outcome).toBe('refused')
+  })
+
+  it('reports what it did, so a caller knows whether to ask', () => {
+    seed([])
+    expect(saveRecentFlame(sampleFlame(), 'first')).toBe('saved')
+    seed(
+      Array.from({ length: MAX_RECENT_FLAMES }, (_, i) => goodEntry(`g${i}`)),
+    )
+    expect(saveRecentFlame(sampleFlame(), 'nope')).toBe('full')
   })
 
   it('evicts the oldest when forced, staying at the cap', () => {
@@ -301,7 +419,9 @@ describe('saveRecentFlame', () => {
         goodEntry(`g${i}`, i),
       ),
     )
-    expect(saveRecentFlame(sampleFlame(), 'forced', undefined, true)).toBe(true)
+    expect(saveRecentFlame(sampleFlame(), 'forced', undefined, true)).toBe(
+      'saved',
+    )
     const after = loadRecentFlamesForRewrite()
     expect(after).toHaveLength(MAX_RECENT_FLAMES)
     expect(after[0]!.name).toBe('forced')
@@ -318,7 +438,7 @@ describe('saveRecentFlame', () => {
       },
       removeItem: () => {},
     })
-    expect(saveRecentFlame(sampleFlame(), 'doomed')).toBe(false)
+    expect(saveRecentFlame(sampleFlame(), 'doomed')).toBe('refused')
   })
 })
 
@@ -383,7 +503,7 @@ describe('getOldestRecentFlame', () => {
 describe('upsertRecentFlame', () => {
   it('inserts a new entry at the front', () => {
     seed([goodEntry('a')])
-    expect(upsertRecentFlame('auto', sampleFlame(), 'Autosaved')).toBe(true)
+    expect(upsertRecentFlame('auto', sampleFlame(), 'Autosaved')).toBe('saved')
     expect(ids(loadRecentFlamesForRewrite())).toEqual(['auto', 'a'])
   })
 
@@ -403,6 +523,42 @@ describe('upsertRecentFlame', () => {
     expect(loadRecentFlamesForRewrite()).toHaveLength(MAX_RECENT_FLAMES)
   })
 
+  it('refuses a new entry at the cap rather than evicting the oldest', () => {
+    // The autosave writes through here, on a timer and at every document
+    // boundary. Making room by dropping the last entry destroyed a flame the
+    // user deliberately kept in order to store one they never asked to save,
+    // while Save for Later - the write the user does ask for - stops and asks
+    // before the same eviction. Nothing evicts without asking, so this
+    // declines and says why.
+    seed(
+      Array.from({ length: MAX_RECENT_FLAMES }, (_, i) =>
+        goodEntry(`g${i}`, i),
+      ),
+    )
+    const before = localStorage.getItem(STORAGE_KEY)
+    const outcome = upsertRecentFlame('auto', sampleFlame(), 'Autosaved')
+    expect(ids(loadRecentFlamesForRewrite())).toContain(
+      `g${MAX_RECENT_FLAMES - 1}`,
+    )
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
+    expect(outcome).toBe('full')
+  })
+
+  it('still updates its own entry when the list is full', () => {
+    // Writing into an id already there replaces it: the list does not grow
+    // and nothing is pushed off the end, so this one is always allowed.
+    seed([
+      ...Array.from({ length: MAX_RECENT_FLAMES - 1 }, (_, i) =>
+        goodEntry(`g${i}`, i),
+      ),
+      goodEntry('auto', 0),
+    ])
+    expect(upsertRecentFlame('auto', sampleFlame(), 'Updated')).toBe('saved')
+    const after = loadRecentFlamesForRewrite()
+    expect(after).toHaveLength(MAX_RECENT_FLAMES)
+    expect(after[0]!.name).toBe('Updated')
+  })
+
   it('preserves schema-invalid entries', () => {
     seed([brokenEntry('bad')])
     upsertRecentFlame('auto', sampleFlame(), 'Autosaved')
@@ -417,6 +573,57 @@ describe('upsertRecentFlame', () => {
     expect(loadRecentFlamesForRewrite()[0]!.tracks).toHaveLength(1)
     upsertRecentFlame('auto2', sampleFlame(), 'Plain', [])
     expect(loadRecentFlamesForRewrite()[0]!.tracks).toBeUndefined()
+  })
+
+  it('does not report success for a timeline that cannot be read back', () => {
+    // The autosave marks the workspace clean on success, so the same lie
+    // here loses the timeline at the next load boundary rather than at the
+    // next launch. `loop` missing entirely is a shape the clamp cannot
+    // repair, unlike a value merely out of range.
+    seed([])
+    const { loop: _loop, ...withoutLoop } = sampleConfig()
+    const outcome = upsertRecentFlame(
+      'auto',
+      sampleFlame(),
+      'Broken',
+      [],
+      withoutLoop as never,
+    )
+    expect(loadRecentFlames()[0]!.config).toBeUndefined()
+    expect(outcome).toBe('refused')
+  })
+
+  it('clamps a timeline past a limit instead of losing all of it', () => {
+    // Same rule as saveRecentFlame: a stored `fps: 0` would stop playback
+    // dead, so it is pulled back to the low end of its range rather than
+    // taking the whole config - and with it the end frame and loop mode -
+    // out of the entry.
+    seed([])
+    const outcome = upsertRecentFlame('auto', sampleFlame(), 'Slow', [], {
+      ...sampleConfig(),
+      fps: 0,
+    })
+    expect(outcome).toBe('saved')
+    const stored = loadRecentFlames()[0]!.config!
+    expect(stored.fps).toBe(1)
+    expect(stored.endFrame).toBe(sampleConfig().endFrame)
+  })
+
+  it('stores the timeline whether or not there are keyframes', () => {
+    // Not derived from the tracks: a flame with none still has a frame rate
+    // and an end frame, and an entry that dropped this came back at 30fps
+    // over 90 frames however it was authored.
+    seed([])
+    upsertRecentFlame('auto', sampleFlame(), 'Plain', [], sampleConfig())
+    expect(loadRecentFlames()[0]!.config).toEqual(sampleConfig())
+  })
+
+  it('deep-clones the timeline it stores', () => {
+    seed([])
+    const config = sampleConfig()
+    upsertRecentFlame('auto', sampleFlame(), 'Plain', [], config)
+    config.fps = 1
+    expect(loadRecentFlames()[0]!.config!.fps).toBe(60)
   })
 
   it('falls back to "Autosave" with no name, no metadata and no prior entry', () => {
@@ -444,7 +651,7 @@ describe('upsertRecentFlame', () => {
       },
       removeItem: () => {},
     })
-    expect(upsertRecentFlame('auto', sampleFlame(), 'doomed')).toBe(false)
+    expect(upsertRecentFlame('auto', sampleFlame(), 'doomed')).toBe('refused')
   })
 })
 

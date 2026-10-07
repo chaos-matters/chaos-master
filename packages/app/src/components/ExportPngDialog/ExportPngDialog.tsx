@@ -4,6 +4,7 @@ import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { Slider } from '@/components/Sliders/Slider'
+import { useToast } from '@/contexts/ToastContext'
 import { ALLOW_CAMERA_DURING_EXPORT, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { setCameraDuringExportEnabled } from '@/flame/renderStats'
@@ -13,11 +14,14 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { lastFinishedSession } from '@/recorder/recorder'
+import { downloadBlob } from '@/utils/blob'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
 import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, snapshotExportSession, } from '@/utils/exportPreferences'
+import { defaultExportFrameRange } from '@/utils/exportRequests'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
+import { motionBlurSettings } from '@/utils/motionBlur'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { saveRecentFlame } from '@/utils/recentFlames'
 import { applyTimelineToFlameAtFrame, defaultConfig as defaultTimelineConfig, } from '@/utils/timeline'
@@ -35,8 +39,8 @@ import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
 import type { ExportMetadataPatch } from './metadataCommit'
-import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationExportConfig } from '@/utils/animationExport'
 import type { AudioMappingEntry } from '@/utils/audioAnalysis'
@@ -98,6 +102,8 @@ type RenderDialogProps = {
   onEmbedMetadataChange: (v: boolean) => void
   cameraDuringExport: boolean
   onCameraDuringExportChange: (v: boolean) => void
+  motionBlurSamples: number
+  onMotionBlurSamplesChange: (v: number) => void
   animationOffscreen: boolean
   onAnimationOffscreenChange: (v: boolean) => void
   onRenderAnimation: () => void
@@ -114,11 +120,12 @@ function RenderDialog(props: RenderDialogProps) {
     () => 0,
   )
 
-  const cameraPos = () =>
-    vec2f(
-      props.previewDescriptor.renderSettings.camera.position[0],
-      props.previewDescriptor.renderSettings.camera.position[1],
-    )
+  const cameraPos = () => {
+    const cam = props.previewDescriptor.renderSettings.camera
+    const x = Number.isFinite(cam?.position?.[0]) ? cam.position[0] : 0
+    const y = Number.isFinite(cam?.position?.[1]) ? cam.position[1] : 0
+    return vec2f(x, y)
+  }
 
   const is3D = () =>
     (props.previewDescriptor.renderSettings.dimensions ?? 2) === 3
@@ -199,18 +206,15 @@ function RenderDialog(props: RenderDialogProps) {
   }
 
   const setFlameZoom: Setter<number> = (value) => {
-    if (typeof value === 'function') {
-      const currentZoom = props.previewDescriptor.renderSettings.camera.zoom
-      const newZoom = clamp(
-        value(currentZoom),
-        MIN_CAMERA_ZOOM_VALUE,
-        MAX_CAMERA_ZOOM_VALUE,
-      )
-      props.setPreviewDescriptor('renderSettings', 'camera', 'zoom', newZoom)
-      return newZoom
-    }
+    const currentZoom =
+      Number.isFinite(props.previewDescriptor.renderSettings.camera.zoom) &&
+      props.previewDescriptor.renderSettings.camera.zoom > 0
+        ? props.previewDescriptor.renderSettings.camera.zoom
+        : 1
+    const raw = typeof value === 'function' ? value(currentZoom) : value
+    const safeRaw = Number.isFinite(raw) && raw > 0 ? raw : currentZoom
     const clampedZoom = clamp(
-      value,
+      safeRaw,
       MIN_CAMERA_ZOOM_VALUE,
       MAX_CAMERA_ZOOM_VALUE,
     )
@@ -219,21 +223,18 @@ function RenderDialog(props: RenderDialogProps) {
   }
 
   const setFlamePosition: Setter<v2f> = (value) => {
-    if (typeof value === 'function') {
-      const [px, py] = props.previewDescriptor.renderSettings.camera.position
-      const currentPos = vec2f(px, py)
-      const newPos = value(currentPos)
-      props.setPreviewDescriptor('renderSettings', 'camera', 'position', [
-        newPos.x,
-        newPos.y,
-      ])
-      return newPos
-    }
+    const rawPos = props.previewDescriptor.renderSettings.camera.position
+    const curX = Number.isFinite(rawPos[0]) ? rawPos[0] : 0
+    const curY = Number.isFinite(rawPos[1]) ? rawPos[1] : 0
+    const currentPos = vec2f(curX, curY)
+    const next = typeof value === 'function' ? value(currentPos) : value
+    const safeX = Number.isFinite(next.x) ? next.x : curX
+    const safeY = Number.isFinite(next.y) ? next.y : curY
     props.setPreviewDescriptor('renderSettings', 'camera', 'position', [
-      value.x,
-      value.y,
+      safeX,
+      safeY,
     ])
-    return value
+    return vec2f(safeX, safeY)
   }
 
   return (
@@ -335,6 +336,10 @@ function RenderDialog(props: RenderDialogProps) {
                         setFlameZoom,
                       ]}
                       position={[cameraPos, setFlamePosition]}
+                      rotation={() =>
+                        props.previewDescriptor.renderSettings.camera
+                          .rotation ?? 0
+                      }
                     >
                       <Show
                         when={
@@ -850,6 +855,22 @@ function RenderDialog(props: RenderDialogProps) {
             </label>
 
             <label class={ui.field}>
+              <span>Motion Blur</span>
+              <select
+                class={ui.select}
+                value={props.motionBlurSamples}
+                onChange={(e) => {
+                  props.onMotionBlurSamplesChange(Number(e.currentTarget.value))
+                }}
+              >
+                <option value={1}>Off (Standard)</option>
+                <option value={4}>Smooth (4x sub-sampling)</option>
+                <option value={8}>High Quality (8x sub-sampling)</option>
+                <option value={16}>Cinematic (16x sub-sampling)</option>
+              </select>
+            </label>
+
+            <label class={ui.field}>
               <span>Name</span>
               <input
                 type="text"
@@ -956,8 +977,19 @@ function RenderDialog(props: RenderDialogProps) {
   )
 }
 
+/** How long the flash export waits for the renderer before giving up. */
+const QUICK_EXPORT_DEADLINE_MS = 20_000
+
 export function createExportPngDialog(
   flameDescriptor: FlameDescriptor,
+  /**
+   * What the canvas is drawing: the authored flame with this frame of audio
+   * modulation laid over it (MainWorkspace `renderedFlame`). Every export that
+   * shows the user an image has to agree with it, so the file reproduces the
+   * picture it carries; `flameDescriptor` stays the document, and is what
+   * Recents is given.
+   */
+  getRenderedFlame: () => FlameDescriptor,
   getTimeline: () => TimelineState | undefined,
   getPixelRatio: () => number,
   setPixelRatio: Setter<number>,
@@ -975,11 +1007,20 @@ export function createExportPngDialog(
   getBlendWeight?: () => number,
   getAudioBuffer?: () => AudioBuffer | undefined,
   getAudioMapping?: () => AudioMappingEntry[],
+  /**
+   * Ends the partner gallery's hover preview (useWorkspaceBlendPick). Both
+   * exports call it before anything reads the canvas, so a press inside the
+   * gallery's leave delay exports the document and not a partner nobody
+   * picked: the pixels, the flame they carry and Recents all agree.
+   */
+  endPreview: () => void = () => {},
 ) {
   const requestModal = useRequestModal()
+  const { showToast } = useToast()
   const [exportModalIsOpen, setExportModalIsOpen] = createSignal(false)
 
   function quickExport() {
+    endPreview()
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
@@ -987,44 +1028,89 @@ export function createExportPngDialog(
     const currentRatio = getPixelRatio()
     const sessionSnapshot = snapshotExportSession(sessionForExport())
 
-    setPixelRatio(currentRatio)
-    setOnExportImage(() => (canvas: HTMLCanvasElement) => {
+    // Every way this can fail ends in a toast: a tap that does nothing is
+    // the one outcome a tester cannot report.
+    const fail = (error: unknown) => {
+      console.error('[quickExport] failed:', error)
+      const reason = error instanceof Error ? error.message : String(error)
+      showToast(`Flash export failed: ${reason}`)
+    }
+    // The renderer answers on its next tick. One that never ticks (a lost
+    // device, a pipeline still compiling) would otherwise leave the tap
+    // unanswered.
+    const timer = setTimeout(() => {
       setOnExportImage(undefined)
       setPixelRatio(currentRatio)
+      fail(new Error('the renderer produced no frame within 20 s'))
+    }, QUICK_EXPORT_DEADLINE_MS)
+
+    setPixelRatio(currentRatio)
+    setOnExportImage(() => (canvas: HTMLCanvasElement) => {
+      clearTimeout(timer)
+      setOnExportImage(undefined)
+      setPixelRatio(currentRatio)
+      // The flame behind the frame that just landed on the canvas, frozen
+      // here: the encode below is async and the audio loop publishes a new
+      // overlay 30 times a second, so reading it later would embed a flame
+      // from after the pixels were taken.
+      const capturedFlame = deepClone(getRenderedFlame())
       canvas.toBlob(
-        async (blob) => {
-          if (!blob) return
-          const imgData = await blob.arrayBuffer()
-          let pngBytes = new Uint8Array(imgData)
-          const currentTracks = timeline?.tracks() ?? []
-          const payload = hasAnimation
-            ? {
-                flame: flameDescriptor,
-                animation: { tracks: currentTracks, config },
+        (blob) => {
+          void (async () => {
+            try {
+              if (!blob) {
+                throw new Error(
+                  'the canvas gave no image (toBlob returned null)',
+                )
               }
-            : flameDescriptor
-          const encoded = await compressJsonQueryParam(payload)
-          // If a session was recorded for this flame, it rides along in a
-          // second chunk, so a dropped PNG can offer to replay how it was
-          // made (docs/plans/semantic-recorder-plan.md, M5).
-          const encodedSteps = sessionSnapshot
-            ? await compressJsonQueryParam(sessionSnapshot)
-            : undefined
-          pngBytes = new Uint8Array(
-            await addFlameDataToPng(
-              encoded,
-              pngBytes,
-              encodedSteps,
-            ).arrayBuffer(),
-          )
-          saveRecentFlame(flameDescriptor, undefined, currentTracks)
-          const fileUrlExt = URL.createObjectURL(
-            new Blob([pngBytes], { type: 'image/png' }),
-          )
-          const downloadLink = window.document.createElement('a')
-          downloadLink.href = fileUrlExt
-          downloadLink.download = 'flame.png'
-          downloadLink.click()
+              const imgData = await blob.arrayBuffer()
+              let pngBytes = new Uint8Array(imgData)
+              const currentTracks = timeline?.tracks() ?? []
+              // The artifact carries the flame that produced its pixels.
+              // Embedding the document instead shipped a PNG that reproduced
+              // a different flame than the one it shows, for anyone who
+              // exported while a track was playing.
+              const payload = hasAnimation
+                ? {
+                    flame: capturedFlame,
+                    animation: { tracks: currentTracks, config },
+                  }
+                : capturedFlame
+              const encoded = await compressJsonQueryParam(payload)
+              // If a session was recorded for this flame, it rides along in a
+              // second chunk, so a dropped PNG can offer to replay how it was
+              // made (docs/plans/semantic-recorder-plan.md, M5).
+              const encodedSteps = sessionSnapshot
+                ? await compressJsonQueryParam(sessionSnapshot)
+                : undefined
+              pngBytes = new Uint8Array(
+                await addFlameDataToPng(
+                  encoded,
+                  pngBytes,
+                  encodedSteps,
+                ).arrayBuffer(),
+              )
+              // Not forced: at the cap this declines rather than evicting
+              // the oldest kept flame for one the user exported rather than
+              // saved. The PNG carries the flame, so nothing is lost.
+              //
+              // The DOCUMENT, never `capturedFlame`. Recents holds the user's
+              // work, and one frame of a song is not it.
+              saveRecentFlame(
+                flameDescriptor,
+                undefined,
+                currentTracks,
+                false,
+                config,
+              )
+              downloadBlob(
+                new Blob([pngBytes], { type: 'image/png' }),
+                'flame.png',
+              )
+            } catch (error) {
+              fail(error)
+            }
+          })()
         },
         'image/png',
         1,
@@ -1033,6 +1119,7 @@ export function createExportPngDialog(
   }
 
   async function showExportPngDialog(initialTab?: 'image' | 'animation') {
+    endPreview()
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
@@ -1080,19 +1167,12 @@ export function createExportPngDialog(
       'export/animation-quality',
       0.9,
     )
-    // Default frame end to the last keyframe across all tracks,
-    // so we only render up to the last meaningful change.
-    const lastKeyframeFrame = tracks.reduce(
-      (max, track) =>
-        track.keyframes.reduce((m, kf) => Math.max(m, kf.frame), max),
-      0,
-    )
     // Compute frame range from the current animation's actual tracks every time
     // the dialog opens, rather than persisting stale values across sessions.
-    const [frameStart, setFrameStart] = createSignal(config.startFrame)
-    const [frameEnd, setFrameEnd] = createSignal(
-      lastKeyframeFrame > 0 ? lastKeyframeFrame : config.endFrame,
-    )
+    // Shared with the scripted exporter so both open on the same range.
+    const defaultRange = defaultExportFrameRange(tracks, config)
+    const [frameStart, setFrameStart] = createSignal(defaultRange.frameStart)
+    const [frameEnd, setFrameEnd] = createSignal(defaultRange.frameEnd)
     const [animFps, setAnimFps] = persistentSignal(
       'export/anim-fps',
       config.fps,
@@ -1110,12 +1190,35 @@ export function createExportPngDialog(
       'export/camera-during-export',
       ALLOW_CAMERA_DURING_EXPORT,
     )
+    const [motionBlurSamples, setMotionBlurSamples] = persistentSignal<number>(
+      'export/motion-blur-samples',
+      1,
+    )
     const [animationOffscreen, setAnimationOffscreen] = persistentSignal(
       'export/animation-offscreen',
       false,
     )
 
-    const initialFlame = deepClone(flameDescriptor)
+    // Seeded from what the canvas is drawing, not from the document. The
+    // workspace canvas freezes the moment this modal opens (MainWorkspace
+    // `finalRenderInterval`), so the modulated frame behind the dialog is the
+    // last thing the user saw - and the dialog's own preview, and the render
+    // the job runs, are both built from this snapshot. One snapshot, taken
+    // once: the job re-renders offscreen for as long as the quality takes,
+    // and must not chase an overlay that moves 30 times a second.
+    const initialFlame = deepClone(getRenderedFlame())
+    if (!initialFlame.renderSettings.camera) {
+      initialFlame.renderSettings.camera = {
+        zoom: 1,
+        position: [0, 0],
+        rotation: 0,
+      }
+    } else {
+      const cam = initialFlame.renderSettings.camera
+      if (!Number.isFinite(cam.zoom) || cam.zoom <= 0) cam.zoom = 1
+      if (!Number.isFinite(cam.position[0])) cam.position[0] = 0
+      if (!Number.isFinite(cam.position[1])) cam.position[1] = 0
+    }
     if (!initialFlame.metadata) {
       initialFlame.metadata = { name: '', description: '', author: 'unknown' }
     } else {
@@ -1140,8 +1243,22 @@ export function createExportPngDialog(
       const t = getTimeline()
       if (!t || !hasAnimation) return
       const frame = t.currentFrame()
-      const fresh = deepClone(flameDescriptor)
+      // Same source as the seed above: Sync re-snapshots the canvas, so the
+      // preview keeps matching it rather than sliding back to the document.
+      const fresh = deepClone(getRenderedFlame())
       applyTimelineToFlameAtFrame(t, fresh, frame)
+      if (!fresh.renderSettings.camera) {
+        fresh.renderSettings.camera = {
+          zoom: 1,
+          position: [0, 0],
+          rotation: 0,
+        }
+      } else {
+        const cam = fresh.renderSettings.camera
+        if (!Number.isFinite(cam.zoom) || cam.zoom <= 0) cam.zoom = 1
+        if (!Number.isFinite(cam.position[0])) cam.position[0] = 0
+        if (!Number.isFinite(cam.position[1])) cam.position[1] = 0
+      }
       // Keep the dialog's metadata edits — only the flame state re-snapshots.
       if (previewDescriptor.metadata) {
         fresh.metadata = { ...previewDescriptor.metadata }
@@ -1173,6 +1290,11 @@ export function createExportPngDialog(
       enqueueImageJob({
         name: previewDescriptor.metadata?.name?.trim() || 'flame',
         flame: deepClone(previewDescriptor),
+        // What Recents files when the job finishes. The flame above carries
+        // the audio overlay that was on the canvas, which is right for the
+        // PNG and wrong for the shelf: cloned after the metadata commit
+        // above, so the name the user typed in this dialog travels with it.
+        authoredFlame: deepClone(flameDescriptor),
         quality: quality(),
         dimensions,
         palette: selectedPalette(),
@@ -1203,6 +1325,12 @@ export function createExportPngDialog(
 
       // Offscreen: enqueue a background job (workspace stays usable). Renders the
       // RAW workspace flame; the job applies the timeline per frame.
+      //
+      // The document, deliberately - unlike the still image above. The runner
+      // is handed the audio buffer and the mappings and settles them onto its
+      // own per-frame clone (ExportJobs/OffscreenAnimationRender.tsx), so a
+      // flame that already carried one frame's overlay would have it baked
+      // under every frame the video renders.
       if (animationOffscreen()) {
         enqueueAnimationJob({
           name: previewDescriptor.metadata?.name?.trim() || 'flame',
@@ -1223,6 +1351,7 @@ export function createExportPngDialog(
           session: sessionSnapshot,
           audioBuffer: getAudioBuffer?.(),
           audioMapping: getAudioMapping?.(),
+          ...motionBlurSettings(motionBlurSamples()),
         })
         return
       }
@@ -1245,6 +1374,7 @@ export function createExportPngDialog(
         session: sessionSnapshot,
         audioBuffer: audioBuf,
         audioMapping: getAudioMapping?.(),
+        ...motionBlurSettings(motionBlurSamples()),
       }
       // The canvas will be obtained from the Flam3 component in App.tsx
       // For now, we pass config and the factory calls startAnimationExport
@@ -1309,6 +1439,8 @@ export function createExportPngDialog(
           onEmbedMetadataChange={setEmbedMetadata}
           cameraDuringExport={cameraDuringExport()}
           onCameraDuringExportChange={setCameraDuringExport}
+          motionBlurSamples={motionBlurSamples()}
+          onMotionBlurSamplesChange={setMotionBlurSamples}
           animationOffscreen={animationOffscreen()}
           onAnimationOffscreenChange={setAnimationOffscreen}
           onRenderAnimation={() => {

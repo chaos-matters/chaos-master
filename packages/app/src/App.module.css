@@ -12,6 +12,75 @@
   isolation: isolate;
 }
 
+.phoneLayout {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'viewport';
+}
+
+/* The deck layout: the shell's navigation rail leads, the inspector deck
+   trails, the canvas has what is left. The rail is a column of its own rather
+   than chrome over the canvas: it is a page edge, not a floating bar. */
+.tabletLayout {
+  grid-template-columns: var(--la-navrail-w) 1fr auto;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'navrail viewport inspector';
+}
+
+/* There is no sidebar to tuck under on this layout: the canvas container's
+   own -0.4rem pulled the canvas 6.4px over the navigation rail's trailing
+   edge and its hairline (measured: canvas x 73.6 in an 80px column). */
+.tabletLayout .canvas-container:not(.fullscreen) {
+  margin-left: 0;
+}
+
+/* While glass panels show (lib/glass.ts, glassAllowed), the deck floats over the
+   canvas instead of beside it (TabletDeck.module.css): the canvas spans the
+   inspector's column as well, so the art runs on under the glass, and the
+   deck keeps its cell and sits over the canvas in it. Collapsed, the column
+   is empty and the canvas is exactly as wide as it is with the setting off.
+   The camera, not this box, frames the flame in the part the deck leaves
+   visible (lib/canvasFraming.ts). */
+:global(:root[data-glass-panels='on']) .tabletLayout .canvas-container {
+  grid-column-end: inspector;
+}
+
+/* The same for the desktop sidebar, which floats over the canvas as glass
+   while the Glass panels setting applies (WorkspaceSidebar/useSidebarGlass.ts
+   decides, and marks the canvas box .underSidebar while it does): the box
+   spans the sidebar's column as well and drops the 0.4rem tuck, and the
+   sidebar keeps its cell and sits over the canvas in it. The bottom bar,
+   which paints above the sidebar, starts where the sidebar's cover ends
+   (--leading-cover, CanvasViewport.tsx), where it sits with the setting off.
+   Hidden, the sidebar covers nothing and the box is the full-screen one. The
+   camera frames the flame in the part the sidebar leaves visible
+   (lib/canvasFraming.ts). Not at the mobile widths, where the sidebar is a
+   drawer and there is no column to span: the query is the exact complement
+   of the one the code reads (SIDEBAR_DRAWER_QUERY), so a fractional width
+   such as 768.5px is on one side of it and not in a gap between two. */
+@media not all and (max-width: 768px) {
+  .canvas-container.underSidebar:not(.fullscreen) {
+    grid-column-start: sidebar;
+    margin-left: 0;
+  }
+
+  .underSidebar > .bottom-bar {
+    left: var(--leading-cover, 0px);
+  }
+
+  /* An export that sizes the canvas itself (Render in background off)
+     renders a frame with the aspect of the part on show, and across this
+     box, which spans the sidebar's column, it showed stretched and off
+     centre for the whole export. While it runs the canvas takes the part on
+     show only, where the setting-off canvas is. max-width rather than width,
+     since AutoCanvas writes its 100% inline. Only the display changes: the
+     frame's pixels are the export's either way. */
+  .underSidebar.exporting > .canvas {
+    margin-left: var(--leading-cover, 0px);
+    max-width: calc(100% - var(--leading-cover, 0px));
+  }
+}
+
 .canvas-container {
   grid-area: viewport;
   grid-row-end: viewport-controls;
@@ -162,6 +231,24 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+
+  /* The rail's sheet covers the bottom of the canvas; half of that height
+     pans the picture up so the subject stays in view (DESIGN.md, Phase A).
+     A transform, not a camera change: nothing enters the flame or its undo
+     history, and it reverts when the sheet closes. It rides the canvas
+     rather than its container because a transformed container would become
+     the containing block for the fixed progress bar and export tracker
+     inside it. This is the opaque sheet's way: while the sheet is glass,
+     CanvasViewport.tsx writes 0 here, the canvas runs on under the glass,
+     and the camera frames the flame above the sheet (lib/canvasFraming.ts). */
+  transform: translateY(calc(var(--rail-inset, 0px) / -2));
+  transition: transform var(--la-dur-sheet) var(--la-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas {
+    transition: none;
+  }
 }
 
 /* Global: prevent text selection popups on all canvas elements on touch devices */
@@ -240,59 +327,6 @@
   background: var(--color-bg, #04060c);
 }
 
-.sidebarResizeHandle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 6px;
-  cursor: ew-resize;
-  z-index: 10;
-  flex-shrink: 0;
-  touch-action: none;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 1px;
-    transform: translateX(-50%);
-    background: var(--neutral-200);
-    border-radius: 2px;
-    transition:
-      width 0.15s ease,
-      background 0.15s ease;
-    opacity: 0.5;
-  }
-
-  &:hover::after {
-    width: 3px;
-    background: var(--accent-color, #3b82f6);
-    opacity: 1;
-  }
-
-  &:active::after {
-    width: 4px;
-    background: var(--accent-color, #3b82f6);
-  }
-
-  [data-theme='dark'] &::after {
-    background: var(--neutral-700);
-    opacity: 0.4;
-  }
-
-  [data-theme='dark'] &:hover::after {
-    background: var(--accent-color, #3b82f6);
-    opacity: 1;
-  }
-
-  [data-theme='dark'] &:active::after {
-    background: var(--accent-color, #3b82f6);
-  }
-}
-
 @media (pointer: coarse) {
   /* Above the duel stage (10008), so a duel can show the real editor rather
    than growing a second one of its own. */
@@ -300,10 +334,46 @@
     z-index: 10009;
     background: var(--color-bg, #04060c);
   }
+}
 
-  .sidebarResizeHandle {
-    width: 12px;
-  }
+/* The desktop sidebar while it floats over the canvas as glass: the one
+   blurred layer, as the tablet deck is (TabletDeck.module.css, .floating).
+   WorkspaceSidebar/useSidebarGlass.ts adds it whenever the sidebar floats,
+   except over a duel's stage, and it floats only while the gate in front of
+   optionalPanel holds (lib/glass.ts, optionalPanelGlass), so the primitive it
+   composes is always glass here, and solid while the canvas is busy. Of the
+   edge, only the trailing side faces the canvas.
+
+   The cards the sidebar holds (ControlCard, CollapsibleCard) and the shared
+   Slider and PaletteSelector take their glass look from onGlass: their
+   bodies lie on the glass, the cards' headers, which are controls, take the
+   gate's opaque control fill, and no text is lighter than ink-2, the least
+   the panel's 80% fill allows over white-hot art (decision c, lumen.css).
+   The sidebar's own captions below (the transforms toolbar's label, the
+   add-transform button, the render settings' group labels) read
+   --caption-ink, with their opaque look as the fallback, so setting it here
+   reaches the glass sidebar and nothing else: their neutral greys measured
+   2.2:1 and 4.0:1 there. The fill fades as busy turns the panel solid and
+   back, beside the transform the sidebar already eases. */
+.sidebarGlass {
+  composes: optionalPanel onGlass from '@/styles/designSystem/glass.module.css';
+  border-right: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+  transition:
+    transform 200ms ease,
+    background-color var(--la-dur-fast) var(--la-ease);
+  --caption-ink: var(--la-ink-2);
+}
+
+/* One blurred layer: the sidebar. A blur inside it samples the sidebar's own
+   fill rather than the art. The overlay that locks the sidebar while the
+   animation plays or renders out would do worse: those are busy states, the
+   sidebar is solid then and no longer the blur's backdrop, so the overlay's
+   blur would take in the canvas under the sidebar and run again on every
+   frame it presents. */
+.sidebar.sidebarGlass * {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .sidebarScroll {
@@ -367,6 +437,7 @@
   inset: 0;
   z-index: 100;
   background: rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
@@ -383,6 +454,7 @@
 
 .exportOverlay {
   background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   cursor: default;
 
@@ -620,7 +692,7 @@
 
   [data-theme='dark'] & {
     border-color: var(--neutral-700);
-    color: var(--neutral-400);
+    color: var(--caption-ink, var(--neutral-400));
 
     &:hover {
       color: var(--neutral-200);
@@ -679,13 +751,18 @@
   }
 
   [data-theme='dark'] & {
-    border-color: var(--neutral-700);
-    color: var(--neutral-400);
+    border-color: var(--neutral-600);
+    color: #f1f5f9;
+
+    & > svg {
+      color: #f1f5f9;
+      stroke: currentColor;
+    }
 
     &:hover {
-      color: var(--neutral-200);
-      background: rgba(255, 255, 255, 0.05);
-      border-color: var(--neutral-600);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--neutral-500);
     }
   }
 }
@@ -846,7 +923,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--neutral-500);
+  color: var(--caption-ink, var(--neutral-500));
 }
 
 .visibility-button {
@@ -1246,30 +1323,47 @@
   transition: top 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.toast-region-touch {
+  right: auto;
+  left: max(0.75rem, env(safe-area-inset-left));
+  align-items: flex-start;
+  /* Below the top bar, from the same token the bar is placed with. */
+  top: calc(
+    var(--la-hud-bottom) + var(--la-s-2) + var(--toast-stack-offset, 0px)
+  );
+}
+
+/* Chrome glass (docs/plans/glass-panels.md, phase 1), whose text is ink.
+   The desktop's light theme keeps the light toast it had, and the theme's
+   focus ring with it: the glass is dark-only (decision b), and a touch
+   layout is glass in both themes. */
 .toast {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0.4rem 0.7rem;
   border-radius: 10px;
-  background: oklch(22% 0.025 240 / 0.88);
-  border: 1px solid oklch(50% 0.08 240 / 0.55);
-  color: oklch(90% 0.02 240);
+  color: var(--la-ink);
   font-size: 0.74rem;
   font-weight: 500;
   line-height: 1.4;
   pointer-events: none;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 16px oklch(0% 0 0 / 0.35);
   animation: toast-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 
-  [data-theme='light'] & {
+  [data-theme='light'] &:not(.toast-touch) {
     background: oklch(97% 0.008 240 / 0.92);
-    border-color: oklch(65% 0.08 240 / 0.5);
+    border: 1px solid oklch(65% 0.08 240 / 0.5);
     color: oklch(26% 0.05 240);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     box-shadow: 0 4px 16px oklch(50% 0.04 240 / 0.18);
+    --focus-ring-color: var(--focus-ring-theme);
   }
+}
+
+.toast-touch {
+  animation-name: toast-in-left;
 }
 
 /* Toast with buttons: interactive. Hiding is the store's job (sticky toasts
@@ -1286,9 +1380,11 @@
   flex-shrink: 0;
 }
 
+/* On the glass, an edge and a hairline wash from the --la-* set, and the
+   accent only as an edge. The light desktop toast keeps its own. */
 .toast-btn {
   padding: 0.15rem 0.6rem;
-  border: 1px solid oklch(60% 0.06 240 / 0.45);
+  border: 1px solid var(--la-hairline-strong);
   border-radius: 6px;
   background: transparent;
   color: inherit;
@@ -1300,16 +1396,11 @@
     background 0.15s;
 
   &:hover {
-    border-color: oklch(70% 0.12 240 / 0.85);
-    background: oklch(70% 0.12 240 / 0.16);
+    border-color: var(--la-accent-edge);
+    background: var(--la-hairline);
   }
 
-  &:focus-visible {
-    outline: 2px solid oklch(70% 0.12 240 / 0.9);
-    outline-offset: 1px;
-  }
-
-  [data-theme='light'] & {
+  [data-theme='light'] .toast:not(.toast-touch) & {
     border-color: oklch(55% 0.06 240 / 0.45);
 
     &:hover {
@@ -1320,19 +1411,31 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast {
+  .toast,
+  .toast-touch {
     animation: none;
   }
 
-  .toast-region {
+  .toast-region,
+  .toast-region-touch {
     transition: none;
   }
 }
 
+/* Chrome glass, like the toast; the desktop's light theme keeps its light
+   badge, and the theme's focus ring. The badge sits in the workspace, so the
+   layout classes above say whether it is on a touch layout. It centres on
+   the part of the canvas on show: --covered-right is the share of it the
+   floating tablet deck covers, --covered-left the share the glass desktop
+   sidebar covers (CanvasViewport.tsx), each unset otherwise. `left` takes
+   the one and `margin-left` the other, which together put the badge's centre
+   at (1 + left - right) / 2 of the box. */
 .hover-preview-badge {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
   position: absolute;
   top: 10px;
-  left: 50%;
+  left: calc((1 - var(--covered-right, 0)) * 50%);
+  margin-left: calc(var(--covered-left, 0) * 50%);
   transform: translateX(-50%);
   z-index: 101;
   display: inline-flex;
@@ -1340,24 +1443,23 @@
   gap: 0.35rem;
   padding: 0.28rem 0.75rem;
   border-radius: 20px;
-  background: oklch(22% 0.025 240 / 0.88);
-  border: 1px solid oklch(50% 0.08 240 / 0.6);
-  color: oklch(88% 0.04 240);
+  color: var(--la-ink);
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
   animation: hoverBadgeIn 0.15s cubic-bezier(0.22, 1, 0.36, 1);
   white-space: nowrap;
 
-  [data-theme='light'] & {
+  [data-theme='light'] .layout:not(.phoneLayout, .tabletLayout) & {
     background: oklch(96% 0.01 240 / 0.92);
-    border-color: oklch(65% 0.08 240 / 0.5);
+    border: 1px solid oklch(65% 0.08 240 / 0.5);
     color: oklch(28% 0.06 240);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
+    --focus-ring-color: var(--focus-ring-theme);
   }
 }
 
@@ -1386,15 +1488,23 @@
     z-index: 10009;
     background: var(--color-bg, #04060c);
   }
-
-  .sidebarResizeHandle {
-    display: none;
-  }
 }
 
 /* Tablet portrait / mobile: overlay sidebar */
 @media (max-width: 768px) {
-  .layout {
+  /*
+   * Device bands, as classified by workspaceLayoutStore:
+   *   phone   width < PHONE_MAX_WIDTH (680)          -> .phoneLayout
+   *   tablet  680 <= width <= TABLET_MAX_WIDTH (1024) -> .tabletLayout
+   *   desktop everything else, or preference 'desktop'
+   * This block is width-only and predates that classification, and it sits
+   * after .tabletLayout with equal specificity, so without the :not() it won
+   * across 680-768px: iPad Mini 6 portrait at 744, older iPads at 768 and many
+   * Android tablets lost the 'inspector' grid area while isTablet() was true.
+   * .phoneLayout is deliberately still overridden here -- that is the layout
+   * the phone chrome was built and tested against.
+   */
+  .layout:not(.tabletLayout) {
     grid-template-columns: 1fr;
     grid-template-areas:
       'viewport'
@@ -1440,10 +1550,6 @@
     background: var(--color-bg, #04060c);
   }
 
-  .sidebarResizeHandle {
-    display: none;
-  }
-
   .sidebarHidden {
     transform: translateX(-100%);
     pointer-events: none;
@@ -1476,8 +1582,8 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   cursor: pointer;
   color: rgba(255, 255, 255, 0.85);
   flex-shrink: 0;
@@ -1568,6 +1674,17 @@
   }
 }
 
+@keyframes toast-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* -- Render settings group labels -- */
 .settings-group {
   grid-column: 1 / -1;
@@ -1590,7 +1707,7 @@
   user-select: none;
 
   [data-theme='dark'] & {
-    color: var(--neutral-500);
+    color: var(--caption-ink, var(--neutral-500));
   }
 }
 
@@ -1737,11 +1854,16 @@
   }
 
   [data-theme='dark'] & {
-    color: var(--neutral-400);
+    color: #f1f5f9;
+
+    & svg {
+      color: #f1f5f9;
+      stroke: currentColor;
+    }
 
     &:hover {
       background: var(--neutral-800);
-      color: var(--neutral-200);
+      color: #ffffff;
     }
   }
 }

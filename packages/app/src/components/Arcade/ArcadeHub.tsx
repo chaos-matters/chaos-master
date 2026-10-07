@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
-import { Book, Film, Lineage, MusicNote, Swords, Zap } from '@/icons'
+import { Book, ChevronLeft, Film, Lineage, MusicNote, Swords, Zap, } from '@/icons'
 import { arcadeMode, setActiveTab } from '@/lib/activeTab'
 import ui from './ArcadeHub.module.css'
 import { ArcadeModePanel } from './ArcadeModePanel'
@@ -7,7 +7,7 @@ import { WebMcpStatusPill } from './WebMcpStatusPill'
 import type { Component } from 'solid-js'
 import type { ArcadeMode } from '@/lib/activeTab'
 
-type CardId = ArcadeMode | 'arena' | 'director'
+type CardId = ArcadeMode
 type CardDef = {
   id: CardId
   title: string
@@ -50,23 +50,23 @@ export const ARCADE_MODES: CardDef[] = [
     title: 'Beats',
     tagline: 'The agent wires your flame to a song so it dances.',
     tag: 'Agent drives',
-    ready: false,
+    ready: true,
     icon: MusicNote,
   },
   {
     id: 'arena',
     title: 'Arena',
     tagline: 'Flames clash on real stats; the winner gets a shareable card.',
-    tag: 'Roadmap',
-    ready: false,
+    tag: 'Agent clashes',
+    ready: true,
     icon: Zap,
   },
   {
     id: 'director',
     title: 'Director',
     tagline: 'The agent learns your taste and evolves flames toward it.',
-    tag: 'Roadmap',
-    ready: false,
+    tag: 'Agent drives',
+    ready: true,
     icon: Lineage,
   },
 ]
@@ -93,6 +93,20 @@ export function ArcadeHub(props: {
   })
   return (
     <section class={ui.hub} aria-label="Lumen Arcade">
+      {/* The way out, pinned. The footer carries the same action, but it is
+          below the whole card grid: on a touch device leaving meant scrolling
+          past every card, and the Esc that covers this for a keyboard is not
+          a key a tablet has. */}
+      <button
+        type="button"
+        class={ui.back}
+        data-testid="arcade-back"
+        aria-label="Back to editor"
+        title="Back to editor"
+        onClick={props.onBackToEditor}
+      >
+        <ChevronLeft class={ui.backIcon} aria-hidden="true" />
+      </button>
       <header class={ui.header}>
         <h1 class={ui.wordmark}>Lumen Arcade</h1>
         <p class={ui.promise}>
@@ -114,7 +128,7 @@ export function ArcadeHub(props: {
               aria-disabled={!card.ready}
               onClick={() => {
                 if (card.ready) {
-                  setActiveTab('arcade', card.id as ArcadeMode)
+                  setActiveTab('arcade', card.id)
                 }
               }}
             >

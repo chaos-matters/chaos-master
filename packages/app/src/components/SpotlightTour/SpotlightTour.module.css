@@ -1,3 +1,18 @@
+/*
+ * The spotlight tour: a dim with a hole over what a step is about, and a
+ * card that explains it.
+ *
+ * The card is the tour's one glass surface (docs/plans/glass-panels.md,
+ * phase 1) wherever the app is dark, which SpotlightTour.tsx decides and
+ * marks with .glassCard. The primitive's panel sits on two children of the
+ * card, .glassLayer behind the text and .glassArrow, not on the card itself
+ * (see .glassCard). On it the text is ink and ink-2, the tiers an 80% fill
+ * carries over white-hot art, and the buttons mark themselves with fills,
+ * not with coloured text. The desktop's light theme keeps the light card it
+ * had, in the `.card:not(.glassCard)` rules at the end: the glass is
+ * dark-only (decision b).
+ */
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -30,13 +45,7 @@
   min-width: 220px;
   padding: 1.25rem 1.5rem;
   border-radius: 12px;
-  background: rgba(24, 24, 27, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--la-ink);
   pointer-events: auto;
   animation: cardFadeIn 250ms ease-out;
   transition:
@@ -44,13 +53,47 @@
     left 250ms ease;
 }
 
-[data-theme='light'] .card {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
-  color: rgba(0, 0, 0, 0.85);
+/* The glass is on the card's layer and arrow, never on the card. A blur on
+   the card made it a backdrop root, so the arrow, its child, could frost
+   only the card's fill: its tip stood darker than the frosted card. Each of
+   the two blurs the art itself. For the same reason the card only rises
+   while its children fade in: below full opacity the card is a backdrop
+   root too, and the frost would snap in at the end of the fade. The card
+   keeps the panel's text contract, ink-3 raised to ink-2, and the glass
+   focus ring, neither of which reaches it from a sibling layer, and takes
+   the layer's 1px edge as padding, so its text sits where it did. */
+.glassCard {
+  --la-ink-3: var(--la-ink-2);
+  --focus-ring-color: var(--focus-ring-glass);
+  padding: calc(1.25rem + 1px) calc(1.5rem + 1px);
+  animation-name: cardRise;
+}
+
+.glassCard > * {
+  animation: cardFade 250ms ease-out;
+}
+
+/* No shadow on the card's glass. The layer's, drawn after the arrow, fell
+   across it: the arrow stood 9 to 16 grey levels darker than the card over
+   the same art. */
+.glassLayer {
+  composes: panel from '@/styles/designSystem/glass.module.css';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+/* Painted before the layer, so its blur reads the art alone. Painted after,
+   it read the layer's dark fill under its inner half as well (the clip hides
+   that half but the blur still reads it) and frosted darker than the card.
+   The clip cuts its own shadow away anyway; none spares drawing it. */
+.glassArrow {
+  composes: panel from '@/styles/designSystem/glass.module.css';
+  z-index: -2;
+  box-shadow: none;
 }
 
 @keyframes cardFadeIn {
@@ -64,18 +107,40 @@
   }
 }
 
+@keyframes cardRise {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* On the light card the arrow takes the card's fill; on glass it is a
+   panel of its own. Each side keeps only the half of the square that sticks
+   out of the card: on a see-through fill the half over the card would lay
+   the fill twice, a dark notch inside its edge over bright art. The glass
+   card has no border of its own (its layer draws it), so the cut falls on
+   the card's outer edge, beside the layer's edge and not over it. */
 .arrow {
   position: absolute;
   width: 16px;
   height: 16px;
-  background: rgba(24, 24, 27, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: var(--la-glass-edge);
   transform: rotate(45deg);
 }
 
-[data-theme='light'] .arrow {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(0, 0, 0, 0.25);
+.card:not(.glassCard) .arrow {
+  background: inherit;
 }
 
 .arrowTop {
@@ -84,6 +149,7 @@
   margin-left: -8px;
   border-top: none;
   border-left: none;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
 .arrowBottom {
@@ -92,6 +158,7 @@
   margin-left: -8px;
   border-bottom: none;
   border-right: none;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
 .arrowLeft {
@@ -100,6 +167,7 @@
   margin-top: -8px;
   border-left: none;
   border-bottom: none;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
 }
 
 .arrowRight {
@@ -108,19 +176,112 @@
   margin-top: -8px;
   border-right: none;
   border-top: none;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+
+/* The layer's edge ran on across the arrow's base: a line as bright as the
+   card's outline between the card and its own arrow (1.37:1 on the card's
+   fill over white-hot art), which made the arrow read as a piece set
+   against the card. The layer masks that stretch of its edge out, 10px to
+   either side of --seam-at on the side data-seam names (SpotlightTour.tsx
+   sets both from the arrow's place), and on glass the arrow keeps a 2px band
+   past its diagonal as well as its outer half, so that stretch shows the
+   arrow's glass rather than the art. At 1px the band left a pixel of art
+   where the card's edge falls between device pixels. The break stops short
+   of the base's ends, 11.31px out: the band narrows toward them, and a
+   break out to 11px left the art showing in the edge between the two. */
+.glassLayer[data-seam='bottom'] {
+  mask:
+    linear-gradient(to top, transparent 1px, black 1px),
+    linear-gradient(
+        to right,
+        black calc(var(--seam-at) - 10px),
+        transparent 0 calc(var(--seam-at) + 10px),
+        black 0
+      )
+      bottom / 100% 1px no-repeat;
+}
+
+.glassLayer[data-seam='top'] {
+  mask:
+    linear-gradient(to bottom, transparent 1px, black 1px),
+    linear-gradient(
+        to right,
+        black calc(var(--seam-at) - 10px),
+        transparent 0 calc(var(--seam-at) + 10px),
+        black 0
+      )
+      top / 100% 1px no-repeat;
+}
+
+.glassLayer[data-seam='right'] {
+  mask:
+    linear-gradient(to left, transparent 1px, black 1px),
+    linear-gradient(
+        to bottom,
+        black calc(var(--seam-at) - 10px),
+        transparent 0 calc(var(--seam-at) + 10px),
+        black 0
+      )
+      right / 1px 100% no-repeat;
+}
+
+.glassLayer[data-seam='left'] {
+  mask:
+    linear-gradient(to right, transparent 1px, black 1px),
+    linear-gradient(
+        to bottom,
+        black calc(var(--seam-at) - 10px),
+        transparent 0 calc(var(--seam-at) + 10px),
+        black 0
+      )
+      left / 1px 100% no-repeat;
+}
+
+/* Each outer half and a 2px band on the card's side of the diagonal: its
+   line moved 2.828px along both axes is 2px off it. Under the layer the band
+   is only in the layer's backdrop, which its blur averages away. */
+.glassCard .arrowTop {
+  clip-path: polygon(
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 calc(100% - 2.828px),
+    calc(100% - 2.828px) 0
+  );
+}
+
+.glassCard .arrowBottom {
+  clip-path: polygon(0 0, 100% 0, 100% 2.828px, 2.828px 100%, 0 100%);
+}
+
+.glassCard .arrowLeft {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    calc(100% - 2.828px) 100%,
+    0 2.828px
+  );
+}
+
+.glassCard .arrowRight {
+  clip-path: polygon(
+    0 0,
+    2.828px 0,
+    100% calc(100% - 2.828px),
+    100% 100%,
+    0 100%
+  );
 }
 
 .stepCounter {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--la-ink-2);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 0.375rem;
-}
-
-[data-theme='light'] .stepCounter {
-  color: rgba(0, 0, 0, 0.4);
 }
 
 .title {
@@ -133,12 +294,8 @@
 .description {
   font-size: 0.8125rem;
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--la-ink-2);
   margin: 0;
-}
-
-[data-theme='light'] .description {
-  color: rgba(0, 0, 0, 0.55);
 }
 
 .footer {
@@ -175,22 +332,10 @@
   background: rgba(255, 255, 255, 0.4);
 }
 
-[data-theme='light'] .dotClickable:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-[data-theme='light'] .dot {
-  background: rgba(0, 0, 0, 0.15);
-}
-
 .dotActive {
   background: rgba(255, 255, 255, 0.7);
   width: 18px;
   border-radius: 3px;
-}
-
-[data-theme='light'] .dotActive {
-  background: rgba(0, 0, 0, 0.45);
 }
 
 .navButtons {
@@ -201,47 +346,46 @@
   justify-content: flex-end;
 }
 
+/* Ink on a hairline wash: ink-2 there falls to 4.3:1 over white-hot art. */
 .prevBtn,
 .nextBtn,
 .skipBtn {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--la-hairline-strong);
   border-radius: 6px;
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 150ms ease;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--la-hairline);
+  color: var(--la-ink);
   white-space: nowrap;
 }
 
 .prevBtn:hover,
 .nextBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.95);
+  background: var(--la-hairline-strong);
 }
 
+/* The way on: marked by its fill, its label ink like the others'. */
 .nextBtn {
   background: rgba(59, 130, 246, 0.2);
   border-color: rgba(59, 130, 246, 0.3);
-  color: rgba(147, 197, 253, 0.9);
 }
 
 .nextBtn:hover {
   background: rgba(59, 130, 246, 0.35);
   border-color: rgba(59, 130, 246, 0.5);
-  color: white;
 }
 
 .skipBtn {
   background: transparent;
   border-color: transparent;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--la-ink-2);
 }
 
 .skipBtn:hover {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--la-ink);
 }
 
 .nextTourBtn {
@@ -255,60 +399,95 @@
   font-weight: 600;
   cursor: pointer;
   background: rgba(139, 92, 246, 0.15);
-  color: rgba(196, 167, 255, 0.9);
+  color: var(--la-ink);
   transition: all 150ms ease;
 }
 
 .nextTourBtn:hover {
   background: rgba(139, 92, 246, 0.28);
   border-color: rgba(139, 92, 246, 0.5);
-  color: white;
 }
 
-[data-theme='light'] .nextTourBtn {
+/* ---- The desktop's light theme: the light card, as before ------------ */
+
+[data-theme='light'] .card:not(.glassCard) {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  /* No blur: a 96% fill shows nothing of the page behind it. */
+  color: rgba(0, 0, 0, 0.85);
+}
+
+[data-theme='light'] .card:not(.glassCard) .arrow {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] .card:not(.glassCard) .stepCounter {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='light'] .card:not(.glassCard) .description {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='light'] .card:not(.glassCard) .dotClickable:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='light'] .card:not(.glassCard) .dot {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='light'] .card:not(.glassCard) .dotActive {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='light'] .card:not(.glassCard) .nextTourBtn {
   background: rgba(139, 92, 246, 0.08);
   border-color: rgba(139, 92, 246, 0.2);
   color: rgba(124, 58, 237, 0.8);
 }
 
-[data-theme='light'] .nextTourBtn:hover {
+[data-theme='light'] .card:not(.glassCard) .nextTourBtn:hover {
   background: rgba(139, 92, 246, 0.18);
   border-color: rgba(139, 92, 246, 0.4);
   color: rgba(124, 58, 237, 1);
 }
 
-[data-theme='light'] .prevBtn,
-[data-theme='light'] .nextBtn,
-[data-theme='light'] .skipBtn {
+[data-theme='light'] .card:not(.glassCard) .prevBtn,
+[data-theme='light'] .card:not(.glassCard) .nextBtn,
+[data-theme='light'] .card:not(.glassCard) .skipBtn {
   border-color: rgba(0, 0, 0, 0.12);
   background: rgba(0, 0, 0, 0.04);
   color: rgba(0, 0, 0, 0.6);
 }
 
-[data-theme='light'] .prevBtn:hover,
-[data-theme='light'] .nextBtn:hover {
+[data-theme='light'] .card:not(.glassCard) .prevBtn:hover,
+[data-theme='light'] .card:not(.glassCard) .nextBtn:hover {
   background: rgba(0, 0, 0, 0.08);
   color: rgba(0, 0, 0, 0.85);
 }
 
-[data-theme='light'] .nextBtn {
+[data-theme='light'] .card:not(.glassCard) .nextBtn {
   background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.25);
   color: rgba(37, 99, 235, 0.8);
 }
 
-[data-theme='light'] .nextBtn:hover {
+[data-theme='light'] .card:not(.glassCard) .nextBtn:hover {
   background: rgba(59, 130, 246, 0.2);
   border-color: rgba(59, 130, 246, 0.4);
   color: rgba(37, 99, 235, 1);
 }
 
-[data-theme='light'] .skipBtn {
+[data-theme='light'] .card:not(.glassCard) .skipBtn {
   border-color: transparent;
   background: transparent;
   color: rgba(0, 0, 0, 0.25);
 }
 
-[data-theme='light'] .skipBtn:hover {
+[data-theme='light'] .card:not(.glassCard) .skipBtn:hover {
   color: rgba(0, 0, 0, 0.5);
 }

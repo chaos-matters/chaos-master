@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
+import { useToast } from '@/contexts/ToastContext'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { condenseFlameDescriptor } from '@/flame/schema/flameSchema'
@@ -7,14 +8,15 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { downloadBlob } from '@/utils/blob'
 import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobFinalizing, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
-import { saveRecentFlame } from '@/utils/recentFlames'
+import { MAX_RECENT_FLAMES, saveRecentFlame } from '@/utils/recentFlames'
 import ui from './ExportJobHost.module.css'
 import { OffscreenAnimationRender } from './OffscreenAnimationRender'
 import type { Vec3 } from 'wgpu-matrix'
-import type { ExportImageType } from '@/App'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { ImageJob } from '@/utils/exportJobs'
 
 /**
@@ -69,11 +71,16 @@ export function ExportJobHost() {
 
 function OffscreenRender(props: { job: ImageJob }) {
   const { job } = props
+  const { showToast } = useToast()
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
 
   const cam = job.flame.renderSettings.camera
-  const zoom = createSignal(cam.zoom)
-  const position = createSignal(vec2f(cam.position[0], cam.position[1]))
+  const safeZoom =
+    Number.isFinite(cam?.zoom) && (cam?.zoom ?? 0) > 0 ? cam.zoom : 1
+  const safeX = Number.isFinite(cam?.position?.[0]) ? cam.position[0] : 0
+  const safeY = Number.isFinite(cam?.position?.[1]) ? cam.position[1] : 0
+  const zoom = createSignal(safeZoom)
+  const position = createSignal(vec2f(safeX, safeY))
 
   const c3d = job.flame.renderSettings.camera3D ?? {
     theta: 0,
@@ -83,12 +90,24 @@ function OffscreenRender(props: { job: ImageJob }) {
     fov: 60,
     roll: 0,
   }
-  const theta = createSignal(c3d.theta)
-  const phi = createSignal(c3d.phi)
-  const radius = createSignal(c3d.radius)
-  const target = createSignal<Vec3>(new Float32Array(c3d.target))
-  const fov = createSignal(c3d.fov)
-  const roll = createSignal(c3d.roll ?? 0)
+  const safeTheta = Number.isFinite(c3d.theta) ? c3d.theta : 0
+  const safePhi = Number.isFinite(c3d.phi) ? c3d.phi : Math.PI / 2
+  const safeRadius =
+    Number.isFinite(c3d.radius) && c3d.radius > 0 ? c3d.radius : 5
+  const safeTarget = new Float32Array([
+    Number.isFinite(c3d.target?.[0]) ? c3d.target[0] : 0,
+    Number.isFinite(c3d.target?.[1]) ? c3d.target[1] : 0,
+    Number.isFinite(c3d.target?.[2]) ? c3d.target[2] : 0,
+  ])
+  const safeFov = Number.isFinite(c3d.fov) && c3d.fov > 0 ? c3d.fov : 60
+  const safeRoll =
+    typeof c3d.roll === 'number' && Number.isFinite(c3d.roll) ? c3d.roll : 0
+  const theta = createSignal(safeTheta)
+  const phi = createSignal(safePhi)
+  const radius = createSignal(safeRadius)
+  const target = createSignal<Vec3>(safeTarget)
+  const fov = createSignal(safeFov)
+  const roll = createSignal(safeRoll)
 
   let limitAccessor: () => number = () => 0
   let accumulated = 0
@@ -124,15 +143,38 @@ function OffscreenRender(props: { job: ImageJob }) {
         await addFlameDataToPng(encoded, bytes, encodedSteps).arrayBuffer(),
       )
     }
-    saveRecentFlame(job.flame, undefined, job.tracks)
+    // Not forced: at the cap this declines rather than dropping the oldest
+    // kept flame for a flame the user exported rather than saved
+    // (utils/recentFlames.ts). Declining costs nothing WHEN the PNG carries
+    // the flame, because the file is then a copy of it - which is exactly
+    // the condition above, and with "Embed flame" off it does not hold. That
+    // export writes a plain image, so the refused entry was the only record
+    // this flame ever had, and saying nothing loses it without a trace.
+    // `authoredFlame`, never `job.flame`: the rendered one carries the audio
+    // overlay that was on the canvas when Export was pressed, and filing that
+    // would make one frame of a track the flame the user comes back to.
+    const stored = saveRecentFlame(
+      job.authoredFlame,
+      undefined,
+      job.tracks,
+      false,
+      job.config,
+    )
+    if (stored === 'full' && !job.embedFlame) {
+      showToast(
+        `Recents is full (${MAX_RECENT_FLAMES} flames), so this flame was not added to it - and the PNG carries no flame data. Delete one in Library, or use Save for Later.`,
+        12000,
+      )
+    }
     // The user may have cancelled (job removed) while we were encoding.
     if (!jobExists(job.id)) return
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
+    const png = new Blob([bytes], { type: 'image/png' })
     setJobResult(job.id, {
-      blobUrl: url,
+      blobUrl: URL.createObjectURL(png),
       width: job.dimensions.width,
       height: job.dimensions.height,
     })
+    downloadBlob(png, `${job.name?.trim() || 'flame'}.png`)
   }
 
   const handleExport: ExportImageType = (canvas, info) => {
@@ -149,9 +191,16 @@ function OffscreenRender(props: { job: ImageJob }) {
     if (!props.job.forceExport && info?.finalImageReady !== true) return
     captured = true
     setJobFinalizing(job.id)
-    void finalize(canvas).catch((err: unknown) => {
-      setJobError(job.id, err instanceof Error ? err.message : String(err))
-    })
+    void (async () => {
+      try {
+        if (info?.fence) {
+          await info.fence
+        }
+        await finalize(canvas)
+      } catch (err: unknown) {
+        setJobError(job.id, err instanceof Error ? err.message : String(err))
+      }
+    })()
   }
 
   return (
@@ -163,6 +212,7 @@ function OffscreenRender(props: { job: ImageJob }) {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={() => cam.rotation ?? 0}
               interactive={() => false}
             >
               <Flam3

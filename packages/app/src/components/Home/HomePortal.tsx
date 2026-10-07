@@ -681,7 +681,11 @@ function PortalCanvas(props: {
       <Show
         when={is3D()}
         fallback={
-          <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
+          <Camera2D
+            position={cameraPosition()}
+            zoom={cameraZoom()}
+            rotation={props.driver.flame.renderSettings.camera.rotation ?? 0}
+          >
             {flam3()}
           </Camera2D>
         }

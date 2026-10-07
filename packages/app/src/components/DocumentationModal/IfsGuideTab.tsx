@@ -8,54 +8,77 @@ import { MathSvg } from './MathSvg'
 export function IfsGuideTab() {
   return (
     <div class={ui.guide}>
-      <h3 class={ui.guideTitle}>Iterated Function Systems (IFS)</h3>
-      <p>
-        An <strong>Iterated Function System (IFS)</strong> builds fractals from
-        a finite set of contraction mappings. Lumen Apeiron evaluates them in
-        parallel on the GPU via <strong>WebGPU</strong>.
-      </p>
-      <p>
-        Generation starts from a random point and repeatedly applies one of the
-        transformation chains, chosen at random in proportion to each
-        transform's weight.
-      </p>
+      <header class={ui.guideHero}>
+        <h3 class={ui.guideTitle}>Iterated Function Systems (IFS)</h3>
+        <p class={ui.guideIntro}>
+          An <strong>Iterated Function System (IFS)</strong> builds complex
+          fractal attractors from a finite set of contraction mappings. Chaos
+          Master evaluates millions of particle trajectories simultaneously on
+          the GPU via <strong>WebGPU</strong> compute pipelines.
+        </p>
+      </header>
 
-      <h4>The transformation chain</h4>
-      <p>
-        For each chosen transform, the coordinate{' '}
-        <MathSvg tex="v" display={false} inline /> passes through three steps in
-        order:
-      </p>
-      <ol>
-        <li>
-          <strong>Pre-affine transformation</strong> — rotate, scale, and
-          translate the point:
+      <section class={ui.guideSection}>
+        <h4 class={ui.guideSectionTitle}>The Transformation Pipeline</h4>
+        <p class={ui.muted}>
+          At every iteration of the chaos game, a transform is selected at
+          random according to its relative weight. The coordinate passes
+          sequentially through three distinct stages:
+        </p>
+
+        <div class={ui.stepCard}>
+          <div class={ui.stepCardHeader}>
+            <span class={ui.stepBadge}>Step 1</span>
+            <span class={ui.stepTitle}>Pre-Affine Transformation</span>
+          </div>
+          <p class={ui.stepDesc}>
+            Linear scaling, rotation, shearing, and translation applied to the
+            input coordinate before evaluating non-linear variations:
+          </p>
           <div class={ui.formulaBlock}>
             <MathSvg tex="v_{\text{affine}} = M_{\text{pre}} \cdot v + T_{\text{pre}}" />
           </div>
-        </li>
-        <li>
-          <strong>Variation evaluation</strong> — apply the weighted sum of the
-          non-linear variations documented here:
+        </div>
+
+        <div class={ui.stepCard}>
+          <div class={ui.stepCardHeader}>
+            <span class={ui.stepBadge}>Step 2</span>
+            <span class={ui.stepTitle}>Variation Evaluation</span>
+          </div>
+          <p class={ui.stepDesc}>
+            Evaluation of the weighted sum of non-linear variation formulas
+            selected on this transform:
+          </p>
           <div class={ui.formulaBlock}>
             <MathSvg tex="v_{\text{var}} = \sum_j w_j \cdot V_j(v_{\text{affine}})" />
           </div>
-        </li>
-        <li>
-          <strong>Post-affine transformation</strong> — optionally transform the
-          variation output before it is plotted:
+        </div>
+
+        <div class={ui.stepCard}>
+          <div class={ui.stepCardHeader}>
+            <span class={ui.stepBadge}>Step 3</span>
+            <span class={ui.stepTitle}>Post-Affine Transformation</span>
+          </div>
+          <p class={ui.stepDesc}>
+            Optional secondary linear affine transform repositioning the
+            variation output before histogram accumulation:
+          </p>
           <div class={ui.formulaBlock}>
             <MathSvg tex="v_{\text{final}} = M_{\text{post}} \cdot v_{\text{var}} + T_{\text{post}}" />
           </div>
-        </li>
-      </ol>
+        </div>
+      </section>
 
-      <h4>The chaos game</h4>
-      <p>
-        Applying these functions millions of times and accumulating where the
-        points land makes the fractal emerge. Density estimation, log-exposure
-        scaling, and color grading then produce the final image on the canvas.
-      </p>
+      <div class={ui.chaosCard}>
+        <h4 class={ui.chaosTitle}>The Chaos Game &amp; Density Estimation</h4>
+        <p class={ui.chaosDesc}>
+          By repeating this three-step pipeline millions of times per frame, the
+          invariant measure of the attractor emerges in the GPU histogram
+          buffer. High-dynamic-range density estimation, logarithmic exposure
+          tonemapping, spatial filtering, and perceptual color grading are then
+          applied to render the final flame onto the display canvas.
+        </p>
+      </div>
     </div>
   )
 }

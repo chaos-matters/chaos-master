@@ -43,6 +43,17 @@ const COMMAND_ARG_HINTS: Readonly<Record<string, string>> = {
   'lesson.note': '[text] — prefer the arcade_narrate tool',
   'timeline.setFps': '[fps 1-60]',
   'timeline.setLoopMode': '["off"|"seamless"|"cycle"]',
+  'glide.setEnabled': '[boolean] — animate changes instead of snapping to them',
+  'glide.setQuality':
+    '["auto"|"responsive"|"balanced"|"full"] — quality given up while a glide moves',
+  'glide.toFlame': '[flameDescriptor, durationMs?] — land exactly on the flame',
+  'timeline.playFor': '[seconds 0-600] — playback stops itself afterwards',
+  'timeline.stop': '[]',
+  'export.renderImage':
+    '[{width, height, quality?, embedFlame?}] — px up to 4096',
+  'export.renderAnimation':
+    '[{width, height, fps 12-60, frameStart?, frameEnd?, codec?, quality?}]',
+  'export.jobStatus': '[] — returns the export queue in `result`',
   'sonification.setEnabled': '[boolean]',
   // The shape that cost a real agent several rejected calls: the first
   // argument is a COMPLETE config, not a patch, and the second names the one
@@ -111,7 +122,13 @@ export function describeAllowedCommands(allowed: readonly string[]): string[] {
       continue
     }
     for (const cmd of getAllCommands()) {
-      if (cmd.id.startsWith(entry) && cmd.replayable !== false) ids.push(cmd.id)
+      if (
+        cmd.id.startsWith(entry) &&
+        cmd.replayable !== false &&
+        cmd.agentCallable !== false
+      ) {
+        ids.push(cmd.id)
+      }
     }
   }
   return [...new Set(ids)].map((id) => {

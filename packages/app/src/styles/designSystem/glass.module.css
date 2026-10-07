@@ -1,0 +1,341 @@
+/*
+ * Glass: the one place a surface takes its see-through look from
+ * (docs/plans/glass-panels.md, section 3). The fills, the blur, the edge and
+ * the shadow are the --la-glass* tokens in lumen.css; this file decides how
+ * they combine, so that no surface can combine them wrongly.
+ *
+ * THE CLASSES
+ *
+ *   chrome  --la-glass fill (72%), blurred. Small floating chrome whose
+ *           text is ink: pills, icon buttons, toasts.
+ *   panel   --la-glass-panel fill (80%), blurred. Panels and sheets that
+ *           carry text, none of it below ink-2. Goes solid while busy.
+ *   flat    --la-glass fill, no blur. The cheap glass, for glass that is
+ *           nested or that has no artwork behind it.
+ *   solid   --la-glass-solid fill (96%), no blur. What busy and the
+ *           fallback turn a panel into, and usable on its own.
+ *
+ *   optionalPanel
+ *           A panel only while the Glass panels setting is on, in the dark
+ *           theme; the surface's own look otherwise. For the large surfaces
+ *           the setting is about (the desktop sidebar, dialogs): one
+ *           composes line, and the setting, the theme, busy, nesting, the
+ *           text tiers and the controls' fills all come with it. It sets no
+ *           edge and no shadow, which a surface's own geometry decides, and
+ *           no transition: a surface that fades its fill lists
+ *           background-color in its own.
+ *   solidControls
+ *           No glass of its own: the controls inside take opaque fills, the
+ *           --la-control*-on-glass values in lumen.css, so bright art does
+ *           not show through a chip, a row or a field. For a glass surface
+ *           the setting switches by class rather than by optionalPanel (the
+ *           tablet deck, the rail's sheet); optionalPanel carries it already.
+ *   onGlass No glass of its own either: the editor's shared components,
+ *           ControlCard, CollapsibleCard, the Slider and the PaletteSelector,
+ *           are written for the opaque sidebar and read --card-*, --slider-*
+ *           and --palette-* hooks for what they take on glass, each with its
+ *           opaque look as the fallback. This sets every one of them to a
+ *           panel's tiers: text at ink or ink-2 (decision c), the dark look's
+ *           lines, the cards' bodies clear and their headers at the control
+ *           fill. Compose it beside the glass of any surface that holds them
+ *           (the desktop sidebar, the explorer's panel). No other stylesheet
+ *           sets these hooks (glassHooks.test.ts, glassSurfaces.test.ts).
+ *
+ *   frost   Not glass: a label or a small control laid over a thumbnail
+ *           or a preview (a name bar, a frame number, a badge). The
+ *           --la-frost fill and the light --la-frost-blur, no edge, no
+ *           shadow. Nesting, busy and the fallback leave it alone: what it
+ *           blurs is the picture right under it, which a panel around it
+ *           does not change, and it is small.
+ *   frostFade
+ *           frost for a bar across the foot of a thumbnail, its fill
+ *           fading out upwards (--la-frost-fade).
+ *   scrim   Not glass either: the full-screen layer a blocking screen lays
+ *           over the app, such as the welcome screen and the crash screen.
+ *           The --la-scrim-sheet fill and --la-scrim-blur. Reduce
+ *           Transparency makes it the heavy scrim with no blur, and so does
+ *           a browser without backdrop-filter. A screen that must hide more
+ *           of the app sets the --la-scrim-heavy fill itself.
+ *
+ * The four glass classes carry --la-glass-edge and --la-glass-shadow. They
+ * and optionalPanel's glass also carry the glass focus ring
+ * (styles/index.css). Glass is dark in both themes, and on chrome's 72%
+ * fill over white-hot art the theme's rings measure 1.71:1 (light) and
+ * 2.56:1 (dark), under the 3:1 a focus indicator needs, where the glass
+ * ring measures 3.84 (glassContrast.test.ts). A surface that keeps a light
+ * fill of its own, such as the desktop's light toast, sets
+ * --focus-ring-color back to var(--focus-ring-theme) in the rule that sets
+ * that fill, and to var(--focus-ring-glass) again in a later rule that
+ * turns it to glass (glassSurfaces.test.ts).
+ *
+ * Every rule here that sets backdrop-filter writes it in both spellings,
+ * the -webkit- one first (glassBlurs.test.ts holds every stylesheet to that
+ * order). The production minifier keeps only the later of the two, so the
+ * build ships the standard spelling alone, the one Chrome, Firefox, Android
+ * and Safari 18 read. iOS Safari before 18 reads only the prefixed one and
+ * so gets its blur in dev only; it has no WebGPU either, which the canvas
+ * behind the glass needs.
+ *
+ * TEXT ON A PANEL. Nothing below ink-2 reads on an 80% fill over white-hot
+ * art (docs/plans/glass-panels.md, decision c), so a panel sets --la-ink-3
+ * to its ink-2 for everything inside it: a caption written in ink-3 moves
+ * up a tier on glass and keeps its tier on the opaque surfaces it also
+ * sits on. The value is resolved on the panel, so More Contrast's inks
+ * carry through, and it stays while busy turns the panel solid, so text
+ * never changes colour with the canvas. Accent is not remapped: it is also
+ * a fill and an edge, which are allowed on glass. A surface keeps accent
+ * out of its text there itself. Chrome gets no remap: its surfaces raise
+ * their own fill where they carry more than ink (the More list and the
+ * rail sheet at peek are --la-glass-strong, 86%, where ink-3 passes).
+ *
+ * USING THEM. Compose the class into the surface's own, as the first
+ * declaration of a rule whose selector is that one class (composes allows
+ * nothing else):
+ *
+ *     .sheet {
+ *       composes: panel from '@/styles/designSystem/glass.module.css';
+ *       border-radius: var(--la-r-sheet) var(--la-r-sheet) 0 0;
+ *     }
+ *
+ * The element then carries both class names. That was checked with the @/
+ * alias and with a relative path, in the dev server and in the build; the
+ * repo uses the alias. Where the glass is conditional - behind the Glass
+ * panels setting, say - import this module in the component and add the
+ * class there instead, since a composes cannot be switched off. The names
+ * are the same ones:
+ *
+ *     import { glassAllowed } from '@/lib/glass'
+ *     import glass from '@/styles/designSystem/glass.module.css'
+ *     <aside class={ui.deck} classList={{ [glass.panel!]: glassAllowed() }}>
+ *
+ * Composing copies this file into every module that composes it (that is
+ * how postcss-modules resolves composes), and the minifier then keeps one
+ * copy in a place of its choosing. Everything below is written so that
+ * neither the copies nor their order can change what a surface gets. Keep
+ * url() out of this file: the copies carry no file name to resolve it from,
+ * which is what the build's "did not pass the `from` option" warning is
+ * about.
+ *
+ * OVERRIDING. The classes' own declarations weigh one type selector
+ * (:where() plus :not(html)): as much as the preflight's `button` reset,
+ * which comes first and so loses, and less than any class. A surface
+ * therefore overrides them with a plain declaration in its own rule -
+ * another --la-glass* fill, another shadow, an edge on fewer sides - and
+ * wins in any order. Keep to the tokens. What this file enforces weighs more
+ * than one class and is not undone that way:
+ *
+ *   - Nested glass flattens itself. Any of the four inside any other drops
+ *     its blur and keeps its fill. A blur inside a blur samples its parent's
+ *     fill rather than the artwork (the parent is a backdrop root), so this
+ *     changes nothing on screen and saves a blur on every composited frame.
+ *   - Busy. While <html> carries data-glass="busy", a panel is solid: sharp
+ *     moving art behind text reads worse than an opaque panel. The blur goes
+ *     at once and the fill fades on the panel's background-color
+ *     transition, which is the only transition this file sets. A surface
+ *     that sets its own transition adds background-color to its list, or
+ *     the fill snaps.
+ *   - Fallback. Where neither spelling of backdrop-filter is supported, all
+ *     four are solid.
+ *   - Reduce Transparency and More Contrast reach here through the tokens
+ *     (lumen.css), and need nothing of their own.
+ *
+ * ATTRIBUTES ON <html>, for what a class cannot say. lib/glass.ts is the
+ * only writer of the first two:
+ *
+ *   data-glass="busy"       the editor canvas presents every frame: playback,
+ *                           an export, audio modulation, a drag, the tablet
+ *                           deck's divider moving. Decided in
+ *                           hooks/useWorkspaceGlassBusy.ts, and only once the
+ *                           state has held for 150 ms, so a tap or the canvas
+ *                           converging after an edit never flickers it.
+ *   data-glass-panels="on"  glass panels show: the Glass panels setting is
+ *                           on, as it is by default (Settings offers it on
+ *                           every layout, for whoever would rather have the
+ *                           frame rate), and neither Reduce Transparency nor
+ *                           More Contrast is asked for, under which lumen.css
+ *                           turns the glass fills solid anyway. It turns every
+ *                           optionalPanel to glass, it lets the Android rule
+ *                           below keep a panel's glass, it turns the rail
+ *                           sheet into a
+ *                           panel past peek (TouchSurface/EditorRail.tsx),
+ *                           and it floats the tablet deck over the canvas
+ *                           as a panel (TouchSurface/TabletInspectorDeck.tsx;
+ *                           App.module.css runs the canvas under it). The
+ *                           inspector on either keys its glass text, its
+ *                           gallery's scrollbar and its scrub fields on it
+ *                           (TouchSurface.module.css).
+ *                           A component reads glassAllowed() from
+ *                           lib/glass.ts; a CSS module reaches it as
+ *                           :global(:root[data-glass-panels='on']).
+ *   data-platform="android" written by index.tsx in the native Android app
+ *                           only; the web, Android's browsers included,
+ *                           never carries it. Mid-range Android GPUs are the
+ *                           worst case for blur, so with glass panels off a
+ *                           panel there is solid, where elsewhere it keeps
+ *                           its glass. With them on, the default, it is
+ *                           glass there too, which is not yet measured on a
+ *                           device (glass-panels.md, section 6).
+ *                           Solid rather than flat: a panel's ink-2 text
+ *                           needs 76% of fill over white-hot art, and flat
+ *                           is 72% with the art behind it unblurred.
+ */
+
+/* ---- The classes --------------------------------------------------- */
+
+:where(.chrome, .panel, .flat, .solid):not(html) {
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+  --focus-ring-color: var(--focus-ring-glass);
+}
+
+:where(.chrome):not(html) {
+  background: var(--la-glass);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  backdrop-filter: var(--la-glass-blur);
+}
+
+:where(.panel):not(html) {
+  background: var(--la-glass-panel);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  backdrop-filter: var(--la-glass-blur);
+  transition: background-color var(--la-dur-fast) var(--la-ease);
+  --la-ink-3: var(--la-ink-2);
+}
+
+:where(.flat):not(html) {
+  background: var(--la-glass);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:where(.solid):not(html) {
+  background: var(--la-glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* A single class, so a surface can compose it; lumen.css holds the values. */
+.solidControls {
+  --la-control: var(--la-control-on-glass);
+  --la-control-strong: var(--la-control-strong-on-glass);
+  --la-control-accent: var(--la-control-accent-on-glass);
+}
+
+/* The hooks the shared components read on glass. Low weight, as the four
+   classes are, so a surface's own declaration wins in any order. */
+:where(.onGlass):not(html) {
+  --card-fill: transparent;
+  --card-edge: var(--la-hairline-strong);
+  --card-head: var(--la-control);
+  --card-head-hover: var(--la-control-strong);
+  --card-ink: var(--la-ink-2);
+  --card-head-ink: var(--la-ink-2);
+  --card-head-ink-hover: var(--la-ink);
+  --slider-ink: var(--la-ink-2);
+  --slider-ink-hover: var(--la-ink);
+  --slider-ink-targeted: var(--la-ink);
+  --slider-track-filled: var(--la-ink-4);
+  --slider-track-empty: var(--la-hairline-strong);
+  --palette-ink: var(--la-ink);
+  --palette-ink-2: var(--la-ink-2);
+  --palette-edge: var(--la-hairline);
+  --palette-edge-hover: var(--la-hairline-strong);
+  --palette-edge-selected: var(--la-accent);
+}
+
+/* Not glass, so the glass rules below leave them alone; only the fallback
+   at the end names the scrim. */
+:where(.frost):not(html) {
+  background: var(--la-frost);
+  -webkit-backdrop-filter: var(--la-frost-blur);
+  backdrop-filter: var(--la-frost-blur);
+}
+
+:where(.frostFade):not(html) {
+  background: var(--la-frost-fade);
+  -webkit-backdrop-filter: var(--la-frost-blur);
+  backdrop-filter: var(--la-frost-blur);
+}
+
+:where(.scrim):not(html) {
+  background: var(--la-scrim-sheet);
+  -webkit-backdrop-filter: var(--la-scrim-blur);
+  backdrop-filter: var(--la-scrim-blur);
+}
+
+/* ---- The Glass panels setting --------------------------------------- */
+
+/* optionalPanel is glass only under both conditions, and has no declaration
+   of its own otherwise, so with the setting off, or in the light theme whose
+   surfaces keep their light look (glass-panels.md, decision b), the surface
+   is exactly what it was. The weight of the gate (four classes and a type)
+   is what lets the glass win over the surface's own background. */
+:global(:root[data-glass-panels='on'])
+  :global(body:not([data-theme='light']))
+  .optionalPanel {
+  background: var(--la-glass-panel);
+  -webkit-backdrop-filter: var(--la-glass-blur);
+  backdrop-filter: var(--la-glass-blur);
+  --la-ink-3: var(--la-ink-2);
+  --la-control: var(--la-control-on-glass);
+  --la-control-strong: var(--la-control-strong-on-glass);
+  --la-control-accent: var(--la-control-accent-on-glass);
+  --focus-ring-color: var(--focus-ring-glass);
+}
+
+/* ---- What they enforce ---------------------------------------------- */
+
+/* One blurred layer. Two classes' weight, so a surface cannot put it back. */
+:is(.chrome, .panel, .flat, .solid) :is(.chrome, .panel, .flat, .solid) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* An optionalPanel inside glass, or glass inside it, keeps one blur too. */
+:global(:root[data-glass-panels='on'])
+  :global(body:not([data-theme='light']))
+  :is(.chrome, .panel, .flat, .solid, .optionalPanel)
+  .optionalPanel,
+:global(:root[data-glass-panels='on'])
+  :global(body:not([data-theme='light']))
+  .optionalPanel
+  :is(.chrome, .panel, .flat, .solid) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* No transition here: at this weight it would replace the surface's own,
+   and a sheet's height would stop animating whenever the canvas is busy. */
+:root[data-glass='busy'] .panel,
+:global(:root[data-glass-panels='on'][data-glass='busy'])
+  :global(body:not([data-theme='light']))
+  .optionalPanel {
+  background: var(--la-glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The native Android app, while glass panels are off. */
+:root[data-platform='android']:not([data-glass-panels='on']) .panel {
+  background: var(--la-glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Written as two negations joined by `and` rather than `not (a or b)`: the
+   minifier cuts the `or` down to the unprefixed test alone, which holds on
+   iOS Safari before 18 and would turn all of its glass solid. */
+@supports (not (backdrop-filter: blur(1px))) and
+  (not (-webkit-backdrop-filter: blur(1px))) {
+  :root :is(.chrome, .panel, .flat),
+  :global(:root[data-glass-panels='on'])
+    :global(body:not([data-theme='light']))
+    .optionalPanel {
+    background: var(--la-glass-solid);
+  }
+
+  /* An unblurred 55% scrim leaves the app behind it too sharp to recede. */
+  :root .scrim {
+    background: var(--la-scrim-heavy);
+  }
+}

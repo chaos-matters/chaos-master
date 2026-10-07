@@ -35,6 +35,24 @@ export async function dismissWelcomeIfPresent(page: Page, timeout = 2000) {
   }
 }
 
+/**
+ * Docs, Settings and the console live in the workspace menu behind the version
+ * pill, not as pills of their own. The pill mounts with the main workspace,
+ * after WebGPU initializes, so wait for it rather than skipping when it is late:
+ * a missing pill is a failure, not a reason to report green.
+ */
+export async function openWorkspaceMenuItem(page: Page, item: RegExp) {
+  const pill = page.getByRole('button', { name: /^Lumen Apeiron v\S+ menu$/ })
+  await pill.waitFor({ state: 'visible', timeout: 20_000 })
+  // dispatchEvent rather than click(): the welcome backdrop can still be
+  // fading and would otherwise intercept the pointer.
+  await pill.dispatchEvent('click')
+  await page
+    .getByRole('menuitem', { name: item })
+    .first()
+    .dispatchEvent('click')
+}
+
 export async function captureConsoleErrors(
   page: Page,
 ): Promise<ConsoleError[]> {

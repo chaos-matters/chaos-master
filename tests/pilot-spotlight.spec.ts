@@ -1,4 +1,5 @@
 import { dismissWelcomeIfPresent, expect, test } from './helpers'
+import { STOP_NAME } from './pilotLock'
 import type { Page } from '@playwright/test'
 
 /**
@@ -141,7 +142,7 @@ test.describe('Teach live spotlight', () => {
         (el) => globalThis.getComputedStyle(el).pointerEvents,
       ),
     ).toBe('none')
-    await page.getByRole('button', { name: /Stop the AI/ }).click()
+    await page.getByRole('button', { name: STOP_NAME }).click()
     await expect(
       page.getByRole('dialog', { name: /Stopped by you/ }),
     ).toBeVisible()

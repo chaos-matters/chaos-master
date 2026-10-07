@@ -1,6 +1,6 @@
 import { addCustomPalette, loadCustomPalettes, paletteEntry } from './colorMap'
 import { rgbToOklab } from './flam3PaletteParser'
-import { validateFlame } from './schema/flameSchema'
+import { MAX_SKIP_ITERS_VALUE, validateFlame } from './schema/flameSchema'
 import { generateTransformId } from './transformFunction'
 import { allTransformVariations, isVariationType, variationTypes, } from './variations'
 import { getNormalizedVariationName, getVariationDefault, } from './variations/utils'
@@ -86,8 +86,12 @@ export function resolveVariationType(flam3Name: string): string | undefined {
   if (cleaned === '') return undefined
   const key = normKey(cleaned)
 
-  const alias = FLAM3_ALIASES[cleaned.toLowerCase()] ?? FLAM3_ALIASES[key]
-  if (alias !== undefined) return alias
+  // Own keys only: the table is a plain object, and `constructor` or
+  // `__proto__` would otherwise resolve to what every object inherits.
+  const alias = [cleaned.toLowerCase(), key].find((name) =>
+    Object.hasOwn(FLAM3_ALIASES, name),
+  )
+  if (alias !== undefined) return FLAM3_ALIASES[alias]
 
   const fromRegistry = NORMALIZED_TO_TYPE.get(key)
   if (fromRegistry !== undefined) return fromRegistry
@@ -486,7 +490,10 @@ function parseFlameElementWithReport(flameEl: Element): FlameXmlReport {
   // flam3 brightness (~1–20) → chaos exposure (−8…8), log approximation.
   const exposure = Math.max(-8, Math.min(8, Math.log2(brightness || 4) * 1.5))
   // Higher flam3 quality → fewer skipped iterations.
-  const skipIters = Math.max(0, Math.min(30, Math.round(50 - quality / 3)))
+  const skipIters = Math.max(
+    0,
+    Math.min(MAX_SKIP_ITERS_VALUE, Math.round(50 - quality / 3)),
+  )
 
   // ── Embedded palette (shared by every xform's colour bake) ────────────
   const paletteColors = parsePaletteColors(flameEl)
@@ -867,7 +874,14 @@ export function exportFlameXml(flame: FlameDescriptor, name?: string): string {
     1,
     Math.round(Math.pow(2, (flame.renderSettings.exposure ?? 0.25) / 1.5)),
   )
-  const quality = Math.round(50 - (flame.renderSettings.skipIters ?? 20) * 3)
+  // The exact inverse of the import mapping, skipIters = round(50 - quality/3).
+  // It used to be 50 - 3 * skipIters, which sent skipIters 17 out as quality -1
+  // and brought it back as 30. Never below 1: flam3 quality 0 draws nothing,
+  // and 1 still reads back as 50, round(50 - 1/3).
+  const quality = Math.max(
+    1,
+    Math.round(3 * (50 - (flame.renderSettings.skipIters ?? 20))),
+  )
   // flam3 background is 0–255.
   const bg = (flame.renderSettings.backgroundColor ?? [0, 0, 0])
     .map((v) => Math.round(v * 255))

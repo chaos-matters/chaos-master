@@ -8,11 +8,15 @@
  */
 
 import { vi } from 'vitest'
-import type { CommandContext } from '@/commands/types'
+import type { CommandContext, DirectorState } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
-/** Minimal flame descriptor for testing. */
+/**
+ * Minimal flame descriptor for testing, shaped like a flame the app holds:
+ * registered variation types (`linearVar`, not the legacy `linear` that
+ * `validateFlame` rewrites on load) under ids that are not type names.
+ */
 export function createTestFlame(): FlameDescriptor {
   return {
     transforms: {
@@ -24,7 +28,7 @@ export function createTestFlame(): FlameDescriptor {
         colorSpeed: 0.4,
         visible: true,
         variations: {
-          v1: { type: 'linear', weight: 1 },
+          v1: { type: 'linearVar', weight: 1 },
         },
       },
       t2: {
@@ -35,7 +39,7 @@ export function createTestFlame(): FlameDescriptor {
         colorSpeed: 0.6,
         visible: true,
         variations: {
-          v2: { type: 'sinusoidal', weight: 0.7 },
+          v2: { type: 'sinusoidalVar', weight: 0.7 },
         },
       },
     },
@@ -66,6 +70,8 @@ export function createMockCommandContext(): CommandContext {
   let flame = createTestFlame()
   const undoStack: FlameDescriptor[] = []
   const redoStack: FlameDescriptor[] = []
+  let directorOpen = false
+  let directorState: DirectorState | null = null
 
   // Honours the real `HistorySetter` contract: the recipe receives a draft,
   // usually mutates it and returns nothing. The old mock passed the live
@@ -110,13 +116,16 @@ export function createMockCommandContext(): CommandContext {
       player2Stats: () => null,
       setPlayer2Stats: vi.fn(),
       selectFighter: vi.fn(),
-    },
-    director: {
-      open: vi.fn(() => false),
-      setOpen: vi.fn(),
-      state: vi.fn(() => null),
-      setState: vi.fn(),
-      selectCandidate: vi.fn(),
+      commentary: () => null,
+      setCommentary: vi.fn(),
+      eventBanner: () => null,
+      setEventBanner: vi.fn(),
+      stance: () => 'balanced',
+      setStance: vi.fn(),
+      startClash: vi
+        .fn()
+        .mockResolvedValue({ winner: 'A', finalScore: { A: 2, B: 1 } }),
+      gameState: () => 'idle',
     },
     camera: {
       center: vi.fn(),
@@ -141,6 +150,51 @@ export function createMockCommandContext(): CommandContext {
       }),
       setConfig: vi.fn(),
       setEnabled: vi.fn(),
+    },
+    audio: {
+      snapshot: vi.fn(() => ({
+        mapping: { preset: 'custom' as const, mappings: [] },
+        enabled: false,
+        source: 'file' as const,
+        trackName: 'Ember Drift',
+      })),
+      canEnable: vi.fn(() => true),
+      setMapping: vi.fn(),
+      setEnabled: vi.fn(),
+      setSource: vi.fn(),
+      loadBundledTrack: vi.fn(() => Promise.resolve()),
+    },
+    director: {
+      open: () => directorOpen,
+      setOpen: vi.fn((open: boolean | ((prev: boolean) => boolean)) => {
+        directorOpen = typeof open === 'function' ? open(directorOpen) : open
+        return directorOpen
+      }),
+      state: () => directorState,
+      setState: vi.fn(
+        (
+          s:
+            | DirectorState
+            | null
+            | ((prev: DirectorState | null) => DirectorState | null),
+        ) => {
+          directorState = typeof s === 'function' ? s(directorState) : s
+        },
+      ),
+      selectCandidate: vi.fn((index: number) => {
+        if (directorState && directorState.candidates[index]?.flame) {
+          flame = directorState.candidates[index].flame
+          directorState.lastFeedback = {
+            selectedIndex: index,
+            candidates: directorState.candidates.map((c, i) => ({
+              index: i,
+              reaction: c.reaction ?? null,
+              tags: c.tags ?? [],
+              rationale: c.rationale,
+            })),
+          }
+        }
+      }),
     },
     modal: {
       open: vi.fn(),

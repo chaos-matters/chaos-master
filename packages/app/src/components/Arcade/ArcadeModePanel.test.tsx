@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { ArcadeModePanel } from './ArcadeModePanel'
@@ -32,5 +32,85 @@ describe('ArcadeModePanel duel setup', () => {
     select.value = 'random-3d'
     select.dispatchEvent(new Event('change', { bubbles: true }))
     expect(names()).toEqual(['3D', 'Orbit camera per side', '43 variations'])
+  })
+
+  it('renders beats mode with bundled tracks and prompt card', () => {
+    render(() => <ArcadeModePanel mode="beats" onClose={() => {}} />)
+
+    expect(screen.getByText(/Ember Drift \(100 BPM\)/i)).toBeDefined()
+    expect(screen.getByText(/Cyber Pulse \(120 BPM\)/i)).toBeDefined()
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('arcade_start_beats')
+    expect(promptCard.textContent).toContain('arcade_get_audio_catalog')
+    expect(promptCard.textContent).toContain('arcade_set_audio_mapping')
+    expect(promptCard.textContent).toContain('Ember Drift')
+
+    // Click Cyber Pulse track chip
+    const cyberChip = screen.getByText(/Cyber Pulse \(120 BPM\)/i)
+    cyberChip.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(promptCard.textContent).toContain('Cyber Pulse')
+  })
+
+  it('renders director mode with aesthetic presets and prompt card', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    render(() => <ArcadeModePanel mode="director" onClose={() => {}} />)
+
+    expect(screen.getByText(/Structured Mandalas/i)).toBeDefined()
+    expect(screen.getByText(/Deep Bioluminescence/i)).toBeDefined()
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('director_get_taste_profile')
+    expect(promptCard.textContent).toContain('director_propose')
+    expect(promptCard.textContent).toContain('director_get_feedback')
+
+    // Clicking launch button opens director modal
+    const launchBtn = screen.getByText(/Launch Art Director Overlay/i)
+    launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(ctx.director?.setOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('renders arena mode with stances, archetypes, and launch button', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    render(() => <ArcadeModePanel mode="arena" onClose={() => {}} />)
+
+    expect(screen.getByText(/Harmonic Stance/i)).toBeDefined()
+    expect(screen.getByText(/Resonance Surge/i)).toBeDefined()
+    expect(screen.getByRole('button', { name: /Chaos Lord/i })).toBeDefined()
+    // Each archetype names its class and school without an em dash.
+    const chaosLord = screen.getByRole('button', { name: /Chaos Lord/i })
+    expect(chaosLord.title).not.toContain('\u2014')
+    expect(chaosLord.title).toMatch(/School of/)
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('arena_get_stats')
+    expect(promptCard.textContent).toContain('arena_commentate')
+    expect(promptCard.textContent).toContain('simulate_clash')
+    expect(promptCard.textContent).toContain('Chaos Lord')
+
+    // Select Solar Seraph archetype
+    const seraphChip = screen.getByRole('button', { name: /Solar Seraph/i })
+    seraphChip.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(promptCard.textContent).toContain('Solar Seraph')
+
+    // Clicking launch button opens arena modal and assigns P2 archetype stats
+    const launchBtn = screen.getByText(/Launch Clash Arena/i)
+    launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(ctx.arena?.setOpen).toHaveBeenCalledWith(true)
+    // The hub is fixed over the workspace: the Arena opens only once it goes.
+    const closeHub = vi.mocked(ctx.arcade!.closeHub)
+    const setOpen = vi.mocked(ctx.arena!.setOpen)
+    expect(closeHub).toHaveBeenCalledTimes(1)
+    expect(closeHub.mock.invocationCallOrder[0]).toBeLessThan(
+      setOpen.mock.invocationCallOrder[0]!,
+    )
+    expect(ctx.arena?.setPlayer2Stats).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Sol Invictus',
+        type: 'Solar Seraph',
+      }),
+    )
   })
 })

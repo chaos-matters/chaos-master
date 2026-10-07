@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, Suspense, untrack, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { produce, unfreeze } from 'structurajs'
@@ -31,7 +31,7 @@ import { createStoreHistory } from '@/utils/createStoreHistory'
 import { hardwareTierToQuality } from '@/utils/hardwareTier'
 import { useIsScrolling } from '@/utils/isScrolling'
 import { recordEntries, recordKeys } from '@/utils/record'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
+import { createSharedIntersectionObserver, useIntersectionObserver, } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { livePreviewCount, setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
@@ -45,8 +45,8 @@ import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
-import type { ExportImageType } from '@/App'
 import type { RenderStatus } from '@/contexts/ComputeGateContext'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
@@ -99,6 +99,7 @@ export function PreviewFinalFlame(props: {
               () => vec2f(...props.flame.renderSettings.camera.position),
               props.setFlamePosition,
             ]}
+            rotation={() => props.flame.renderSettings.camera.rotation ?? 0}
           >
             <Flam3
               animationEnabled={false}
@@ -232,9 +233,10 @@ export function VariationPreview(props: {
   let activeObjectUrl: string | undefined
 
   createEffect(() => {
-    // When version increments (point init mode changed), discard the stale
-    // cached image so the Flam3 canvas becomes visible again and re-renders.
+    // When version increments (point init mode changed) or the flame descriptor changes,
+    // discard the stale cached image so the Flam3 canvas becomes visible again and re-renders.
     void props.version
+    void props.flame
     if (activeObjectUrl !== undefined) {
       URL.revokeObjectURL(activeObjectUrl)
       activeObjectUrl = undefined
@@ -348,6 +350,7 @@ export function VariationPreview(props: {
               <Camera2D
                 position={vec2f(...props.flame.renderSettings.camera.position)}
                 zoom={props.flame.renderSettings.camera.zoom}
+                rotation={props.flame.renderSettings.camera.rotation ?? 0}
               >
                 <Flam3
                   animationEnabled={false}
@@ -389,7 +392,7 @@ export function VariationPreview(props: {
     </div>
   )
 }
-type RespondType =
+export type RespondType =
   | {
       transform: TransformFunction
       variation: TransformVariationDescriptor
@@ -507,6 +510,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
   const [categoryFilter, setCategoryFilter] =
     createSignal<VariationCategory | null>(null)
+  const [galleryEl, setGalleryEl] = createSignal<HTMLElement>()
+  const trackTileVisibility = createSharedIntersectionObserver(galleryEl, {
+    rootMargin: '300px',
+  })
 
   const groupedEntries = () => {
     const items = filteredVariationEntries()
@@ -932,7 +939,11 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               </For>
             </div>
           </Show>
-          <section class={ui.gallery} onMouseLeave={handleContainerLeave}>
+          <section
+            ref={setGalleryEl}
+            class={ui.gallery}
+            onMouseLeave={handleContainerLeave}
+          >
             <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
               <For each={groupedEntries()}>
                 {({ label, entries }) => (
@@ -943,9 +954,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         const variation =
                           getVarFromPreviewFlame(variationExample)
                         const isSelected = () => selectedItemId() === id
+                        const [tileEl, setTileEl] =
+                          createSignal<HTMLButtonElement>()
+                        const nearViewport = trackTileVisibility(tileEl)
                         return (
                           variation && (
                             <button
+                              ref={setTileEl}
                               class={ui.item}
                               classList={{
                                 [ui.selected as string]: isSelected(),
@@ -963,15 +978,24 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                 e.preventDefault()
                               }}
                             >
-                              <VariationPreview
-                                version={
-                                  version() * 1_000_000 + (paramRev()[id] ?? 0)
-                                }
-                                isSelected={isSelected()}
-                                flame={variationExample}
-                                name={variation.type}
-                                hardwareTier={props.hardwareTier}
-                              />
+                              <Show
+                                when={nearViewport() && variationExample}
+                                keyed
+                              >
+                                {(example) => (
+                                  <VariationPreview
+                                    version={
+                                      version() * 1_000_000 +
+                                      (paramRev()[id] ?? 0)
+                                    }
+                                    isSelected={isSelected()}
+                                    flame={example}
+                                    name={variation.type}
+                                    hardwareTier={props.hardwareTier}
+                                    isVisible={nearViewport()}
+                                  />
+                                )}
+                              </Show>
                               <div class={ui.itemTitle}>
                                 {getNormalizedVariationName(variation.type)}
                               </div>
@@ -1021,50 +1045,106 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                             </h2>
                             <Show when={!paramsCollapsed()}>
                               <div class={ui.itemParams}>
-                                <Dynamic
-                                  {...getParamsEditor(variation)}
-                                  dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
-                                  setValue={(value) => {
-                                    setVariationExamples(
-                                      (
-                                        draft: Record<string, FlameDescriptor>,
-                                      ) => {
-                                        const variationDraft =
-                                          draft[id]?.transforms[
-                                            getTransformPreviewTid(
-                                              variation.type,
+                                <Suspense
+                                  fallback={
+                                    <div>Loading parameter editor...</div>
+                                  }
+                                >
+                                  <Dynamic
+                                    {...getParamsEditor(variation)}
+                                    dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
+                                    setValue={(value) => {
+                                      setVariationExamples(
+                                        (
+                                          draft: Record<
+                                            string,
+                                            FlameDescriptor
+                                          >,
+                                        ) => {
+                                          const variationDraft =
+                                            draft[id]?.transforms[
+                                              getTransformPreviewTid(
+                                                variation.type,
+                                              )
+                                            ]?.variations[
+                                              getTransformPreviewVid(
+                                                variation.type,
+                                              )
+                                            ]
+                                          if (
+                                            variationDraft === undefined ||
+                                            !isAnyParametricVariationType(
+                                              variationDraft.type,
                                             )
-                                          ]?.variations[
-                                            getTransformPreviewVid(
-                                              variation.type,
-                                            )
-                                          ]
-                                        if (
-                                          variationDraft === undefined ||
-                                          !isAnyParametricVariationType(
-                                            variationDraft.type,
-                                          )
-                                        ) {
-                                          throw new Error(`Unreachable code`)
-                                        }
-                                        ;(
-                                          variationDraft as {
-                                            params: Record<string, number>
+                                          ) {
+                                            throw new Error(`Unreachable code`)
                                           }
-                                        ).params = value as Record<
-                                          string,
-                                          number
-                                        >
-                                      },
-                                    )
-                                    // Invalidate this tile's cached preview so it
-                                    // re-renders live with the new params.
-                                    setParamRev((r) => ({
-                                      ...r,
-                                      [id]: (r[id] ?? 0) + 1,
-                                    }))
-                                  }}
-                                />
+                                          const v = variationDraft as {
+                                            params?: Record<string, number>
+                                          }
+                                          v.params = {
+                                            ...(v.params ?? {}),
+                                            ...(value as Record<
+                                              string,
+                                              number
+                                            >),
+                                          }
+                                        },
+                                      )
+                                      // Invalidate this tile's cached preview so it
+                                      // re-renders live with the new params.
+                                      setParamRev((r) => ({
+                                        ...r,
+                                        [id]: (r[id] ?? 0) + 1,
+                                      }))
+                                    }}
+                                    setParamValue={(
+                                      paramName: string,
+                                      value: number,
+                                    ) => {
+                                      setVariationExamples(
+                                        (
+                                          draft: Record<
+                                            string,
+                                            FlameDescriptor
+                                          >,
+                                        ) => {
+                                          const variationDraft =
+                                            draft[id]?.transforms[
+                                              getTransformPreviewTid(
+                                                variation.type,
+                                              )
+                                            ]?.variations[
+                                              getTransformPreviewVid(
+                                                variation.type,
+                                              )
+                                            ]
+                                          if (
+                                            variationDraft === undefined ||
+                                            !isAnyParametricVariationType(
+                                              variationDraft.type,
+                                            )
+                                          ) {
+                                            throw new Error(`Unreachable code`)
+                                          }
+                                          const v = variationDraft as {
+                                            params?: Record<string, number>
+                                          }
+                                          if (!v.params) {
+                                            v.params = {}
+                                          }
+                                          v.params[paramName] = value
+                                        },
+                                      )
+                                      // Invalidate this tile's cached preview so it
+                                      // re-renders live with the new params.
+                                      setParamRev((r) => ({
+                                        ...r,
+                                        [id]: (r[id] ?? 0) + 1,
+                                      }))
+                                    }}
+                                  />
+                                </Suspense>
                               </div>
                             </Show>
                           </>

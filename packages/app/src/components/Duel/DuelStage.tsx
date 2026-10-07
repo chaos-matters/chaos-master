@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { duelReady, duelRemainingMs, duelRivalSeat, duelShowing, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
-import { finishDuel } from '@/arcade/duelActions'
+import { endDuelOnRenderFailure, finishDuel } from '@/arcade/duelActions'
 import { duelHudModel } from '@/arcade/duelHud'
-import { scoreSheetJudge } from '@/arcade/duelJudge'
+import { duelJudge } from '@/arcade/duelJudge'
 import { duelResult } from '@/arcade/duelResult'
 import { drivingState } from '@/arcade/pilot'
 import { SidebarPanel } from '@/icons'
@@ -62,11 +62,12 @@ export function DuelStage(props: {
   })
 
   // Memoised: the scores are read several times per render, and each read
-  // walks both flames' transforms.
+  // walks both flames' transforms. The same judge `finishDuel` calls, so the
+  // live numbers are the ones the result card will print.
   const verdict = createMemo(() => {
     const state = runningDuel()
     if (!state) return undefined
-    return scoreSheetJudge.judge(props.playerFlame(), state.rival.flame())
+    return duelJudge.judge(props.playerFlame(), state.rival.flame())
   })
 
   const model = createMemo(() =>
@@ -132,6 +133,9 @@ export function DuelStage(props: {
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
                 interactive
+                onRenderError={(error) => {
+                  void endDuelOnRenderFailure(props.ctx, 'player', error)
+                }}
               />
               <Show when={runningDuel()}>
                 <DuelChips ctx={props.ctx} flame={props.playerFlame} />
@@ -151,6 +155,9 @@ export function DuelStage(props: {
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
                 interactive={false}
+                onRenderError={(error) => {
+                  void endDuelOnRenderFailure(props.ctx, 'rival', error)
+                }}
               />
               {/* The agent's play-by-play, in its own half. On the seam it cut
                   the divider and stacked a fourth object into the centre

@@ -1,0 +1,78 @@
+# Lumen Apeiron
+
+> An open-source WebGPU studio for creating IFS fractal flames in a web browser.
+> Shape them live, animate them, make them react to sound, breed new forms, and
+> share the result. The full name is Lumen Apeiron — The Chaos Master. It runs
+> entirely on the visitor's own GPU; there is no account and nothing to install.
+> AGPL-3.0.
+
+Lumen Apeiron is a single-page application at https://lumenapeiron.com. It is
+JavaScript and WebGPU and will not run in a fetcher, so this file is where a
+crawler can learn what it does. Prose about the product lives on the project
+site at https://about.lumenapeiron.com.
+
+It needs a WebGPU-capable browser — Chrome or Edge 113+, or Safari 17+ — and a
+GPU. Where WebGPU is unavailable the editor does not start.
+
+Following the llms.txt convention documented at https://llmstxt.org.
+
+## What you can make
+
+- **Live 2D and 3D flames** — transforms, variations, symmetry, palettes, colour
+  and cameras around a real-time WebGPU render.
+- **Fractal foundations** — exact Sierpinski, Koch, Barnsley, Heighway, Cantor
+  and Menger constructions, opened as editable flame descriptors.
+- **Generative discoveries** — a curated live Home to explore, then randomize,
+  mutate, blend and morph any flame into your own.
+- **Evolving families** — breed flames, run populations, compare structural
+  differences, and trace ancestry.
+- **Animation and motion** — keyframe render, camera, transform, variation and
+  colour across a timeline, dope sheet and curves, with loops and video export.
+- **Sound in both directions** — map music or a live microphone onto flame
+  parameters, or turn a flame's structure into sound.
+- **Your own mathematics** — author custom variations in WGSL or plain maths,
+  with built-in documentation, and create or import palettes.
+- **Portable work** — local recents, unlimited undo and redo, import of common
+  flame formats, and PNG export that carries the editable flame state inside
+  the image.
+- **Tools for exploration** — guided tours, share links, a logo and favicon
+  generator, and a dedicated Benchmark Studio at
+  https://lumenapeiron.com/benchmarks.
+
+## An agent at the controls
+
+Lumen Apeiron registers WebMCP tools on the page, so an agent can read the
+flame, run any of the editor's registered commands, and drive the Lumen Arcade
+while a person watches. Teach, Cinema and Duel are the Arcade modes with tools
+today. Every step is recorded as a replayable lesson, and every write is
+validated and guarded.
+
+- [WebMCP documentation](https://github.com/chaos-matters/chaos-master/blob/main/docs/webmcp.md)
+
+## Project
+
+- [About Lumen Apeiron](https://about.lumenapeiron.com/): What it is and who it
+  is for.
+- [Source code](https://github.com/chaos-matters/chaos-master): AGPL-3.0.
+- [Home gallery](https://lumenapeiron.com/#home): Curated flames, each one a
+  live render that opens in the editor.
+- [Discord](https://lumenapeiron.com/discord)
+- Support: https://ko-fi.com/chaosmatters and
+  https://github.com/sponsors/chaos-matters
+
+## What Lumen Apeiron is not
+
+Stated plainly because these are the assumptions most often made about
+something in this category, and repeating them as fact would mislead someone.
+
+- It is not an image generator and uses no diffusion model or trained network.
+  Every frame is the iterated-function-system maths in the descriptor, rendered
+  on the GPU.
+- It is not a general GPU benchmark. The Benchmark Studio measures this
+  renderer's own flame pipeline, and results must come from recorded runs.
+- There is no server-side rendering. Execution is local to the browser; a
+  separately attested server executor does not exist yet.
+- Custom variation code is a bounded, validated TypeGPU-like dialect, not
+  arbitrary JavaScript.
+- Do not describe it as "formerly Chaos Master". The name is Lumen Apeiron;
+  `chaos-master` survives only as the repository and worker identifier.

@@ -9,7 +9,13 @@ type TimelineCommandDispatcher = (id: string, ...args: unknown[]) => void
 
 const RECORDER_SNAPSHOT_MUTATION = Symbol('recorderSnapshotMutation')
 
-type RecorderAwareTimeline = TimelineState & {
+/**
+ * A timeline whose compound edits reach the session recorder. Distinct from a
+ * plain TimelineState at the type level so a consumer that must be recorded --
+ * Randomize and Smart Animation draw from Math.random() and can only replay
+ * from a pinned snapshot -- cannot be handed the raw timeline by mistake.
+ */
+export type RecorderAwareTimeline = TimelineState & {
   [RECORDER_SNAPSHOT_MUTATION]: <R>(
     origin: SnapshotOrigin,
     mutate: () => R,
@@ -75,7 +81,7 @@ export function createRecorderAwareTimeline(
   raw: TimelineState,
   dispatch: TimelineCommandDispatcher,
   beforeMutation?: () => void,
-): TimelineState {
+): RecorderAwareTimeline {
   let compoundDepth = 0
 
   function recordSnapshotMutation<R>(
@@ -153,8 +159,11 @@ export function createRecorderAwareTimeline(
     },
 
     togglePlay() {
+      const playing = raw.isPlaying()
       beforeMutation?.()
-      raw.togglePlay()
+      // A replay handed back inside a play window pauses there: a press that
+      // meant Pause is then done, and toggling would play it again.
+      if (raw.isPlaying() === playing) raw.togglePlay()
     },
 
     setAnimationEnabled(value) {

@@ -132,8 +132,13 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
           // makes tiles overlap before the size effect runs.
           if (props.fixedResolution) {
             const pr = props.pixelRatio ?? 1
-            el.width = floor(max(1, props.fixedResolution.width * pr))
-            el.height = floor(max(1, props.fixedResolution.height * pr))
+            const maxDim = device?.limits.maxTextureDimension2D ?? 8192
+            el.width = floor(
+              max(1, min(props.fixedResolution.width * pr, maxDim)),
+            )
+            el.height = floor(
+              max(1, min(props.fixedResolution.height * pr, maxDim)),
+            )
             el.style.width = '100%'
             el.style.height = '100%'
             el.style.display = 'block'

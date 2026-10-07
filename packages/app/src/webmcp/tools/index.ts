@@ -6,9 +6,14 @@
  */
 
 import { animateClash } from './animateClash'
+import { arcadeEndBeats, arcadeGetAudioCatalog, arcadeSetAudioMapping, arcadeStartBeats, } from './arcadeBeats'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
+import { directorGetFeedback, directorGetTasteProfile, directorPropose, openArtDirector, } from './arcadeDirector'
 import { arcadeDuelReady, arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
 import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
+import { arenaCommentate } from './arenaCommentate'
+import { arenaGetStats } from './arenaGetStats'
+import { arenaStartClash } from './arenaStartClash'
 import { breedFlamesTool } from './breedFlames'
 import { createClashFlame } from './createClashFlame'
 import { createCustomVariationTool } from './createCustomVariation'
@@ -22,7 +27,6 @@ import { listCommands } from './listCommands'
 import { listVariations } from './listVariations'
 import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
-import { openArtDirector } from './openArtDirector'
 import { randomizeFlame } from './randomizeFlame'
 import { scoreClashRound } from './scoreClashRound'
 import { scoreFlame } from './scoreFlame'
@@ -53,6 +57,9 @@ export {
   createClashFlame,
   openArena,
   openArtDirector,
+  directorPropose,
+  directorGetFeedback,
+  directorGetTasteProfile,
   breedFlamesTool,
   createCustomVariationTool,
   scoreClashRound,
@@ -69,6 +76,13 @@ export {
   arcadeStartDuel,
   arcadeDuelReady,
   arcadeEndDuel,
+  arcadeStartBeats,
+  arcadeGetAudioCatalog,
+  arcadeSetAudioMapping,
+  arcadeEndBeats,
+  arenaGetStats,
+  arenaCommentate,
+  arenaStartClash,
 }
 
 /** All Tier 1 tools, in registration order. */
@@ -81,6 +95,10 @@ export const allTools: readonly WebMcpTool[] = [
   getUndoState,
   arcadeStatus,
   arcadeGetAnimatablePaths,
+  arcadeGetAudioCatalog,
+  directorGetFeedback,
+  directorGetTasteProfile,
+  arenaGetStats,
   diffFlamesTool,
   createShareLink,
   scoreFlame,
@@ -100,11 +118,17 @@ export const allTools: readonly WebMcpTool[] = [
   arcadeStartDuel,
   arcadeDuelReady,
   arcadeEndDuel,
+  arcadeStartBeats,
+  arcadeSetAudioMapping,
+  arcadeEndBeats,
   undo,
   redo,
   loadShareLink,
   createClashFlame,
   openArena,
+  arenaStartClash,
+  arenaCommentate,
+  directorPropose,
   openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,

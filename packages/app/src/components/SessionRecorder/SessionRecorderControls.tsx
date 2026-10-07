@@ -2,11 +2,12 @@ import { createSignal, Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
 import { Book, FolderOpen, Record, Speech } from '@/icons'
 import { narrationAsStep, setNarrationAsStep } from '@/recorder/narrationMode'
-import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
+import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, uncapturedSteps, unnamedWriteCount, } from '@/recorder/recorder'
 import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
 import { storeImportedSession, storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
+import { UncapturedSteps } from './UncapturedSteps'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { SessionRecordingStartFailureReason, SessionStartExtras, } from '@/recorder/recorder'
 import type { RecordedSession } from '@/recorder/schema'
@@ -27,8 +28,8 @@ function recordingStartFailureMessage(
 /**
  * Record/stop controls for the session recorder
  * (docs/plans/semantic-recorder-plan.md): starts a recording from the current
- * document, shows the live step count next to the unnamed-write count (the
- * log's honesty marker — unnamed writes will not replay), and downloads the
+ * document, shows the live step count next to the steps it could not capture
+ * (the log's honesty marker, each one named — they will not replay), and downloads the
  * finished log as `.steps.json`. Also opens a saved log for replay, which the
  * host turns into a {@link SessionReplayPanel}.
  */
@@ -253,15 +254,19 @@ export function SessionRecorderControls(props: {
             <span class={styles.dotRecording} aria-hidden="true" />{' '}
             {recordedActionCount()} replayable steps
           </span>
+          {/* The visible count is the disclosure below, which stays out of
+              this live region so an open list is not re-read on every step. */}
           <Show when={unnamedWriteCount() > 0}>
-            <span
-              class={styles.unnamed}
-              title="Edits not yet routed through a registered command — replay will not reproduce them"
-            >
-              {unnamedWriteCount()} not captured
-            </span>
+            <span class="sr-only">, {unnamedWriteCount()} not captured</span>
           </Show>
         </span>
+        <UncapturedSteps
+          floating
+          session={{
+            unnamedWriteCount: unnamedWriteCount(),
+            uncapturedSteps: uncapturedSteps(),
+          }}
+        />
         <button type="button" class={styles.button} onClick={stopAndSave}>
           Stop &amp; save
         </button>

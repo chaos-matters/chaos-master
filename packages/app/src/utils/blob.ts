@@ -1,3 +1,6 @@
+import { saveNative } from '@/lib/nativeSave'
+import { IS_NATIVE } from '@/lib/platform'
+
 /**
  * Read a Blob as a base64 string with the `data:…;base64,` prefix stripped.
  * Used by the share endpoints (OG preview upload, Discord share) which send the
@@ -18,8 +21,17 @@ export async function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-/** Trigger a browser download of a Blob under the given filename. */
+/**
+ * Save a Blob under the given filename: a browser download on the web. The
+ * native app's WebView ignores `<a download>`, so there it goes to shared
+ * storage or the share sheet instead (lib/nativeSave). Every user-facing
+ * download and export goes through here.
+ */
 export function downloadBlob(blob: Blob, filename: string): void {
+  if (IS_NATIVE) {
+    void saveNative(blob, filename)
+    return
+  }
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -27,5 +39,9 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  // Revoking in the same task can cancel a download before the browser has
+  // read the blob; a few seconds later costs nothing.
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 5000)
 }

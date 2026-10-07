@@ -1,4 +1,4 @@
-import { createResource, createSignal, onCleanup, Show } from 'solid-js'
+import { batch, createResource, createSignal, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
@@ -6,19 +6,22 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
-import { assertReplayVideoStatePortable, createReplayVideoDriver, createReplayVideoSchedule, drawReplayVideoOverlay, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoVisualFingerprint, } from '@/recorder/replayVideo'
+import { assertReplayVideoStatePortable, createReplayVideoDriver, createReplayVideoSchedule, drawReplayVideoOverlay, replayFrameQuality, replayFramesInStateRun, replayStateAtFrame, replayVideoVisualFingerprint, } from '@/recorder/replayVideo'
 import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAnalysis'
 import { createAudioVideoEncoder } from '@/utils/audioExport'
+import { snapshotCanvas } from '@/utils/canvasSnapshot'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
+import { DEFAULT_SHUTTER_ANGLE, subFrameLimit, subFrameOffsets, } from '@/utils/motionBlur'
 import { applyTracksToFlame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
 import type { Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
-import type { ExportImageType } from '@/App'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ReplayVideoStateAt } from '@/recorder/replayVideo'
 import type { AnimationJob } from '@/utils/exportJobs'
 
 const PROGRESS_THROTTLE_MS = 100
@@ -46,19 +49,41 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
           job.fps,
           job.replayVideo.leadInMs,
           job.replayVideo.tailMs,
+          job.replayVideo.glide,
         )
       : undefined
   const replayDriver =
     replaySchedule && job.session
-      ? createReplayVideoDriver(job.session)
+      ? createReplayVideoDriver(job.session, replaySchedule)
       : undefined
-  const initialReplayActionIndex = replaySchedule
-    ? replayActionIndexAtFrame(replaySchedule, 0)
-    : -1
-  let replayState = replayDriver?.advanceTo(initialReplayActionIndex)
+  const initialReplayState: ReplayVideoStateAt = replaySchedule
+    ? replayStateAtFrame(replaySchedule, 0)
+    : { actionIndex: -1, glideT: 1 }
+  let replayState = replayDriver?.advanceTo(
+    initialReplayState.actionIndex,
+    initialReplayState.glideT,
+    initialReplayState.takeMs,
+  )
   let replayVisualKey = replayState
     ? replayVideoVisualFingerprint(replayState)
     : undefined
+  /**
+   * Quality while a glide moves.
+   *
+   * Every glide frame is a different flame, so the accumulation restarts and
+   * each one costs a full convergence: an 800 ms transition at 24 fps is
+   * nineteen extra converged renders per step. The eye does not resolve detail
+   * in motion and the settled frame is the one people screenshot, so the
+   * intermediates render at a fraction of the job's quality, at the tier the
+   * take has in force for that step, and the settled frame at all of it.
+   */
+  const frameQuality = (at: ReplayVideoStateAt) =>
+    replaySchedule
+      ? replayFrameQuality(replaySchedule, at, job.quality)
+      : job.quality
+  const [perFrameQuality, setPerFrameQuality] = createSignal(
+    frameQuality(initialReplayState),
+  )
 
   const totalFrames = job.frameEnd - job.frameStart + 1
   const totalRenders = totalFrames * Math.max(1, job.playCount)
@@ -66,6 +91,25 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const resizeHeight = Math.round(job.dimensions.height) & ~1 || 2
 
   const loopOpts = loopOptsFromConfig(job.config, job.tracks)
+
+  // Motion blur: N sub-frames per output frame, accumulated into one buffer.
+  // Replay videos composite discrete recorded states and take no blur.
+  const subOffsets = replaySchedule
+    ? [0]
+    : subFrameOffsets(
+        job.motionBlurSamples ?? 1,
+        job.shutterAngle ?? DEFAULT_SHUTTER_ANGLE,
+      )
+  const blurSamples = subOffsets.length
+  let subFrameIndex = 0
+  // Only a blurred render needs Flam3 to hold accumulation across flame
+  // changes; without blur the fingerprint-driven reset stays exactly as it was.
+  const [exportFrameKey, setExportFrameKey] = createSignal(0)
+  const frameKeyProp = () => (blurSamples > 1 ? exportFrameKey() : undefined)
+  // Each sub-frame may accumulate only up to its cumulative share of the
+  // budget; see Flam3's accumulationFraction.
+  const [subFraction, setSubFraction] = createSignal(1 / blurSamples)
+  const fractionProp = () => (blurSamples > 1 ? subFraction() : undefined)
 
   const [audioAnalyzer] = createResource(
     () =>
@@ -78,12 +122,14 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     },
   )
 
+  /** The flame at timeline `frame`, fractional for a motion blur sub-frame.
+   *  Audio stays on the whole frame, as on the main-canvas path. */
   function frameFlame(frame: number): FlameDescriptor {
     const clone = deepClone(job.flame)
     applyTracksToFlame(job.tracks, clone, frame, loopOpts)
     const analyzer = audioAnalyzer()
     if (analyzer && job.audioMapping) {
-      const audioFrame = frame % analyzer.totalFrames
+      const audioFrame = Math.floor(frame) % analyzer.totalFrames
       const frameData = analyzer.getFrameData(audioFrame)
       applyAudioMappingsToFlame(clone, frameData, job.audioMapping)
     }
@@ -135,6 +181,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       roll: 0,
     }
   const zoom = readonlySignal(() => cam().zoom)
+  const rotation = () => cam().rotation ?? 0
   const position = readonlySignal<v2f>(() =>
     vec2f(cam().position[0], cam().position[1]),
   )
@@ -240,10 +287,13 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     }, 'image/png')
   }
 
-  function updateReplayState(actionIndex: number): boolean {
+  function updateReplayState(at: ReplayVideoStateAt): boolean {
     if (!replayDriver) return false
-    const next = replayDriver.advanceTo(actionIndex)
-    assertReplayVideoStatePortable(next, actionIndex)
+    // Inside a play window every frame has its own take time, so the
+    // playhead advances as the in-app replay moves it.
+    const next = replayDriver.advanceTo(at.actionIndex, at.glideT, at.takeMs)
+    assertReplayVideoStatePortable(next, at.actionIndex)
+    setPerFrameQuality(frameQuality(at))
     const nextVisualKey = replayVideoVisualFingerprint(next)
     const visualChanged = nextVisualKey !== replayVisualKey
     replayState = next
@@ -276,11 +326,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
 
   async function captureReplayStateRuns(canvas: HTMLCanvasElement) {
     if (!encoder || !replaySchedule || !job.session) return
-    const rendered = await globalThis.createImageBitmap(canvas, {
-      resizeWidth,
-      resizeHeight,
-      resizeQuality: 'high',
-    })
+    const rendered = await snapshotCanvas(canvas, resizeWidth, resizeHeight)
     if (disposed) {
       rendered.close()
       return
@@ -291,10 +337,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
         const runFrames = replayFramesInStateRun(replaySchedule, frameIndex)
         for (let offset = 0; offset < runFrames; offset++) {
           if (disposed || (props.job.forceExport && frameIndex > 0)) return
-          const actionIndex = replayActionIndexAtFrame(
-            replaySchedule,
-            frameIndex,
-          )
+          const { actionIndex } = replayStateAtFrame(replaySchedule, frameIndex)
           composite.context.clearRect(0, 0, resizeWidth, resizeHeight)
           composite.context.drawImage(rendered, 0, 0, resizeWidth, resizeHeight)
           drawReplayVideoOverlay(composite.context, resizeWidth, resizeHeight, {
@@ -319,9 +362,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
         if (
           frameIndex >= totalRenders ||
           props.job.forceExport ||
-          updateReplayState(
-            replayActionIndexAtFrame(replaySchedule, frameIndex),
-          )
+          updateReplayState(replayStateAtFrame(replaySchedule, frameIndex))
         ) {
           return
         }
@@ -343,11 +384,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       await captureReplayStateRuns(canvas)
     } else {
       queuePoster(canvas)
-      const bitmap = await globalThis.createImageBitmap(canvas, {
-        resizeWidth,
-        resizeHeight,
-        resizeQuality: 'high',
-      })
+      const bitmap = await snapshotCanvas(canvas, resizeWidth, resizeHeight)
       if (disposed) {
         bitmap.close()
         return
@@ -366,10 +403,24 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     // Advancing the flame changes Flam3's accumulationFingerprint, which resets
     // accumulation so the next frame renders fresh.
     if (!replaySchedule) {
-      const frame = job.frameStart + (frameIndex % totalFrames)
-      setPerFrameFlame(frameFlame(frame))
-      setPerFrameBlendWeight(blendWeightAtFrame(frame))
+      subFrameIndex = 0
+      // The count Flam3 reports next is for the fresh buffer; do not let the
+      // previous frame's total skip this frame's first sub-frame.
+      accumulated = 0
+      batch(() => {
+        setExportFrameKey((key) => key + 1)
+        showSubFrame(0)
+      })
     }
+  }
+
+  /** Point the renderer at sub-frame `subIndex` of the current output frame. */
+  function showSubFrame(subIndex: number) {
+    const frame = job.frameStart + (frameIndex % totalFrames)
+    const t = frame + (subOffsets[subIndex] ?? 0)
+    setSubFraction((subIndex + 1) / blurSamples)
+    setPerFrameFlame(frameFlame(t))
+    setPerFrameBlendWeight(blendWeightAtFrame(t))
   }
 
   const handleExport: ExportImageType = (canvas, info) => {
@@ -392,6 +443,23 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       return
     }
 
+    // Motion blur: step to the next sub-frame each time the running point count
+    // crosses its share of the budget, without clearing the buffer -- Flam3
+    // holds accumulation while exportFrameKey is set. Only the last sub-frame
+    // is captured. The same rule as utils/animationExport.ts.
+    if (blurSamples > 1 && subFrameIndex < blurSamples - 1) {
+      const subLimit = subFrameLimit(
+        subFrameIndex,
+        blurSamples,
+        limitAccessor(),
+      )
+      if (accumulated >= subLimit) {
+        subFrameIndex++
+        showSubFrame(subFrameIndex)
+      }
+      return
+    }
+
     if (info?.finalImageReady !== true) return
     capturing = true
     void captureAndAdvance(canvas).catch((err: unknown) => {
@@ -409,15 +477,18 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
             <WheelZoomCamera2D
               zoom={zoom}
               position={position}
+              rotation={rotation}
               interactive={() => false}
             >
               <Flam3
-                quality={job.quality}
+                quality={perFrameQuality()}
                 pointCountPerBatch={DEFAULT_POINT_COUNT}
                 adaptiveFilterEnabled={perFrameAdaptiveFilter()}
                 stochasticFilterEnabled={perFrameStochasticFilter()}
                 animationEnabled={false}
                 exportDriver
+                exportFrameKey={frameKeyProp()}
+                accumulationFraction={fractionProp()}
                 flameDescriptor={perFrameFlame()}
                 blendFlame={perFrameBlendFlame()}
                 blendWeight={perFrameBlendWeight()}
@@ -445,12 +516,14 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
             interactive={() => false}
           >
             <Flam3
-              quality={job.quality}
+              quality={perFrameQuality()}
               pointCountPerBatch={DEFAULT_POINT_COUNT}
               adaptiveFilterEnabled={perFrameAdaptiveFilter()}
               stochasticFilterEnabled={perFrameStochasticFilter()}
               animationEnabled={false}
               exportDriver
+              exportFrameKey={frameKeyProp()}
+              accumulationFraction={fractionProp()}
               flameDescriptor={perFrameFlame()}
               blendFlame={perFrameBlendFlame()}
               blendWeight={perFrameBlendWeight()}

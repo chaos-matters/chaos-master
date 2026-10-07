@@ -1,40 +1,46 @@
-import type { DuelStartFrom } from './duelActions'
+import type { DuelStartFrom, LessonTopic, TopicId } from './types'
+import type { TacticalStance } from '@/flame/stats'
 import type { Dims } from '@/flame/variationRegistry'
 
-export type TopicId =
-  | 'variations'
-  | 'affine'
-  | 'color'
-  | 'camera'
-  | 'genetics'
-  | 'sonification'
-  | 'render'
-
-export interface LessonTopic {
-  id: TopicId
-  title: string
-  /** Sent to the agent verbatim as the lesson goal. */
-  goal: string
-  /** Exact ids or prefixes ending in "." (see guard.isCommandAllowed). */
-  allowed: readonly string[]
-  /**
-   * How many steps the agent gets, narration included.
-   *
-   * It is capped by the replay VIDEO, not by patience: a narrated step is
-   * held long enough to read, so about four seconds of finished video per step
-   * is the real exchange rate, and MAX_REPLAY_VIDEO_DURATION_MS is what a
-   * budget ultimately spends. `stepBudgetFitsVideo.test.ts` holds the two
-   * numbers together so raising one cannot silently make lessons unexportable.
-   */
-  stepBudget: number
-  defaultStartFrom: 'blank' | 'current'
-}
+export type { DuelStartFrom, LessonTopic, TopicId }
 
 /** Commands every Arcade mode may use. */
 export const ALWAYS_ALLOWED = [
   'lesson.note',
   'sidebar.open',
   'sidebar.close',
+] as const
+
+/**
+ * How a change is PRESENTED, as against what the change is.
+ *
+ * Teach, Cinema and Beats may flip these. They present to somebody watching,
+ * and an agent that wants every change from here on to flow rather than cut
+ * should not have to remember a duration on each call. The per-call
+ * `glideMs` on `execute_command` is the other half of the same permission
+ * and is gated separately, in `webmcp/tools/executeCommand.ts`. They last
+ * for the take: it holds both as the viewer left them, and `finishPilot`
+ * gives them back once whatever transition is in flight has landed.
+ *
+ * Enforced, never advertised. Each of those modes adds them to the list its
+ * lock enforces and describes its brief from the list without them: a brief
+ * is a tool result held to ~1.5 KB, and the variations brief already sits at
+ * the edge of it. An agent finds them where it already looks for what it may
+ * do: the refusal message prints the enforced list, and `list_commands`
+ * names every command, with its argument shape once the query is narrowed to
+ * a prefix.
+ *
+ * Not a duel, which refuses transitions outright: the switch would be a
+ * setting with no effect, and a duel points the tools at the rival's seat
+ * while the only glide runtime belongs to the player's workspace.
+ *
+ * Not `glide.toFlame`, in any mode. It carries a whole descriptor and
+ * REPLACES the document with it, which is the `flame.load` permission wearing
+ * a glide's name — a different thing from choosing how a change appears.
+ */
+export const PRESENTATION_SWITCHES = [
+  'glide.setEnabled',
+  'glide.setQuality',
 ] as const
 
 export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
@@ -286,6 +292,199 @@ export function duelPromptCard(
       ? ' In 3D the camera is an orbit around a point, and every camera.* command drives it: zoom is how close the orbit sits, pan moves the point it looks at in x and y, and camera.center resets the whole orbit including the angle you are viewing from. For the angle itself, the depth of that point, and the lens, read renderSettings.camera3D from get_flame and set camera3D.theta, camera3D.phi, camera3D.target, camera3D.fov or camera3D.roll with execute_command flame.setRenderSetting.'
       : ''
   return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours.${START_FROM_PHRASE[startFrom]} Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps.${camera3D} Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
+
+${WEBMCP_FALLBACK_NOTE}`
+}
+
+/**
+ * Commands an agent may use in Beats mode, ALWAYS_ALLOWED aside: the tool
+ * adds those, as every mode's does. `audio.setMapping` replaces the preset
+ * and the rows in one step, which is what a preset change or a row added,
+ * removed or cleared comes to.
+ */
+export const BEATS_ALLOWED = [
+  'audio.applySnapshot',
+  'audio.setMapping',
+  'sonification.setConfig',
+  'sonification.setEnabled',
+  'camera.center',
+  'camera.zoomTo',
+] as const
+
+export const BEATS_STEP_BUDGET = 30
+
+export interface BeatsPreset {
+  id: string
+  label: string
+  wish: string
+}
+
+export const BEATS_PRESETS: readonly BeatsPreset[] = [
+  {
+    id: 'pulse-and-breathe',
+    label: 'Pulse & Breathe',
+    wish: 'Wire sub-bass to scale and exposure so the fractal breathes on each beat, with mids driving subtle color drift.',
+  },
+  {
+    id: 'color-symphony',
+    label: 'Color Symphony',
+    wish: 'Connect frequency bands across presence and brilliance to colorSpeed and palettePhase for an evolving color show.',
+  },
+  {
+    id: 'structural-drift',
+    label: 'Structural Drift',
+    wish: 'Map bass and beat onsets to affine rotation and variation weights so the geometry morphs dynamically with the groove.',
+  },
+  {
+    id: 'chaos-morph',
+    label: 'Chaos Morph',
+    wish: 'Drive non-linear variation weights and contrast with RMS energy and beat transients for an intense, energetic response.',
+  },
+] as const
+
+export function beatsPromptCard(
+  trackName: string = 'Ember Drift',
+  styleGoal?: string,
+): string {
+  const goalText =
+    styleGoal?.trim() ||
+    'Wire sub-bass and bass to structural scale, vibrancy and exposure, map mids to color speed, and link high frequencies and beat onsets to variation weights so the flame moves expressively with the track.'
+
+  return `Make my flame dance in Lumen Apeiron to "${trackName}". Call arcade_start_beats to lock the editor and begin. Then call arcade_get_audio_catalog to see available audio features and valid flame modulation targets. Build your audio-reactive configuration using arcade_set_audio_mapping: ${goalText}. Narrate your musical choices with arcade_narrate, and finish with arcade_end_beats when your audio-reactive mapping is complete.
+
+${WEBMCP_FALLBACK_NOTE}`
+}
+
+export interface DirectorPreset {
+  id: string
+  label: string
+  wish: string
+}
+
+export const DIRECTOR_PRESETS: readonly DirectorPreset[] = [
+  {
+    id: 'mandala-symmetry',
+    label: 'Structured Mandalas',
+    wish: 'Evolve candidates toward higher rotational symmetry, clean radial boundaries, and harmonious sacred geometry.',
+  },
+  {
+    id: 'deep-bioluminescence',
+    label: 'Deep Bioluminescence',
+    wish: 'Develop rich jewel-toned palettes, deep contrasts, and organic flora-like structural complexity.',
+  },
+  {
+    id: 'chaotic-curls',
+    label: 'Chaotic Curls',
+    wish: 'Push high non-linear chaos levels, turbulent spiral curls, and energetic tendrils.',
+  },
+  {
+    id: 'minimalist-geometry',
+    label: 'Minimalist Geometry',
+    wish: 'Focus on sparse, elegant transforms with balanced weights and understated color palettes.',
+  },
+] as const
+
+export function directorPromptCard(goal?: string): string {
+  const goalText =
+    goal?.trim() ||
+    'Inspect my current flame and taste profile with director_get_taste_profile. Propose a generation of 4-6 diverse candidate flames using director_propose, explaining your artistic rationale for each. Then call director_get_feedback to review my Like/Dislike reactions and tags, and breed or mutate the next generation toward my preferences.'
+
+  return `Act as the Evolutionary Art Director in Lumen Apeiron. Call director_get_taste_profile first to read my historical aesthetic preferences. Propose a curated generation of candidates with director_propose: ${goalText}. Then call director_get_feedback to review which candidates I liked or disliked and what tags I selected. Evolve the flame across multiple generations toward what I love.
+
+${WEBMCP_FALLBACK_NOTE}`
+}
+
+export interface ArenaStanceOption {
+  id: TacticalStance
+  label: string
+  bonus: string
+  description: string
+}
+
+export const ARENA_STANCES: readonly ArenaStanceOption[] = [
+  {
+    id: 'balanced',
+    label: 'Harmonic Stance',
+    bonus: 'Balanced',
+    description: 'Balanced power allocation with stable territory defense.',
+  },
+  {
+    id: 'resonance',
+    label: 'Resonance Surge',
+    bonus: '+25% ATK',
+    description:
+      'Overcharges energy intensity for aggressive offensive expansion.',
+  },
+  {
+    id: 'bastion',
+    label: 'Symmetry Bastion',
+    bonus: '+30% DEF',
+    description: 'Constructs crystalline barriers to resist enemy attacks.',
+  },
+  {
+    id: 'entropy',
+    label: 'Entropy Overload',
+    bonus: '+35% Crit',
+    description: 'Unleashes chaotic non-linear fluctuations for critical hits.',
+  },
+] as const
+
+export interface ArenaArchetypeOption {
+  id: string
+  name: string
+  className: string
+  school: string
+}
+
+export const ARENA_ARCHETYPES_LIST: readonly ArenaArchetypeOption[] = [
+  {
+    id: 'chaos_lord',
+    name: 'Chaos Lord',
+    className: 'Entropic Warlord',
+    school: 'Void',
+  },
+  {
+    id: 'symmetry_monolith',
+    name: 'Symmetry Monolith',
+    className: 'Crystalline Bastion',
+    school: 'Crystal',
+  },
+  {
+    id: 'spiral_leviathan',
+    name: 'Spiral Leviathan',
+    className: 'Abyssal Swirl',
+    school: 'Vortex',
+  },
+  {
+    id: 'quantum_siren',
+    name: 'Quantum Siren',
+    className: 'Harmonic Phantom',
+    school: 'Tide',
+  },
+  {
+    id: 'solar_seraph',
+    name: 'Solar Seraph',
+    className: 'Radiant Core',
+    school: 'Order',
+  },
+  {
+    id: 'void_stalker',
+    name: 'Void Stalker',
+    className: 'Dark Singularity',
+    school: 'Arcane',
+  },
+] as const
+
+export function arenaPromptCard(
+  opponentName: string = 'Chaos Lord',
+  stanceName: string = 'balanced',
+  strategyGoal?: string,
+): string {
+  const goalText =
+    strategyGoal?.trim() ||
+    `Evaluate our flame with arena_get_stats to identify our school strengths, stability, and crit potential. Formulate a battle plan against ${opponentName} in ${stanceName} stance.`
+
+  return `Coach and battle with me in the Flame Clash Arena in Lumen Apeiron. Check our stats with arena_get_stats to determine our school affinities and attributes against ${opponentName} (stance: ${stanceName}). Execute combat strategy: ${goalText}. Launch and animate the visual combat in the UI using arena_start_clash (or simulate_clash), watch the fighters clash in the arena spectator HUD, and use arena_commentate to narrate turns, track remaining HP, and celebrate victory!
 
 ${WEBMCP_FALLBACK_NOTE}`
 }

@@ -182,3 +182,103 @@ describe('mutateFlameSeeded', () => {
     }
   })
 })
+
+/**
+ * The transform-count range in the config is a promise: a mutation never
+ * leaves a flame with fewer transforms than `minTransforms`, and never adds
+ * past `maxTransforms`. A one-transform base mutated under `minTransforms: 2`
+ * used to come out with one transform, which is how the arena's 3D opponents
+ * rendered nearly black.
+ */
+describe('mutateFlame transform bounds', () => {
+  const config: GenerateRandomFlameConfig = {
+    strength: 0.5,
+    minTransforms: 2,
+    maxTransforms: 4,
+    minVariations: 1,
+    maxVariations: 3,
+    allowedVariations: [],
+    dimensions: 2,
+  }
+  const options: MutateFlameOptions = {
+    mutateAffine: true,
+    affineMode: 'smart',
+    mutateVariations: 'modify',
+    mutateColors: true,
+  }
+  const withTransforms = (count: number): FlameDescriptor => {
+    const base = examples.example1
+    const entries = recordEntries(base.transforms)
+    const transforms = Object.fromEntries(
+      Array.from({ length: count }, (_, i) => {
+        const [, t] = entries[i % entries.length]!
+        return [`t${i}`, t]
+      }),
+    )
+    return { ...base, transforms }
+  }
+  const count = (flame: FlameDescriptor) => Object.keys(flame.transforms).length
+
+  it('tops a flame below minTransforms up to it', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const mutated = mutateFlameSeeded(
+        withTransforms(1),
+        config,
+        options,
+        seed,
+      )
+      expect(count(mutated)).toBe(2)
+      expect(Object.keys(mutated.transforms)).toContain('t0')
+    }
+  })
+
+  it('never adds past maxTransforms', () => {
+    const adding = { ...options, addTransformChance: 0.3 }
+    for (let seed = 0; seed < 60; seed++) {
+      const mutated = mutateFlameSeeded(withTransforms(3), config, adding, seed)
+      expect(count(mutated)).toBeGreaterThanOrEqual(3)
+      expect(count(mutated)).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('does not prune a flame that already has more than maxTransforms', () => {
+    const adding = { ...options, addTransformChance: 0.3 }
+    for (let seed = 0; seed < 30; seed++) {
+      const mutated = mutateFlameSeeded(withTransforms(6), config, adding, seed)
+      expect(Object.keys(mutated.transforms).sort()).toEqual(
+        ['t0', 't1', 't2', 't3', 't4', 't5'].sort(),
+      )
+    }
+    // The unseeded path keeps the same promise.
+    expect(count(mutateFlame(withTransforms(6), config, adding))).toBe(6)
+  })
+
+  // Symmetry copies (`_sym__`) are generated from the user's transforms, and
+  // the transform list does not show them, so the range does not count them.
+  // example26 is one user transform with four copies.
+  const userCount = (flame: FlameDescriptor) =>
+    Object.keys(flame.transforms).filter((tid) => !tid.startsWith('_sym__'))
+      .length
+
+  it('counts only user transforms, not symmetry copies, toward minTransforms', () => {
+    const base = examples.example26
+    expect(userCount(base)).toBe(1)
+    expect(count(base)).toBe(5)
+    for (let seed = 0; seed < 10; seed++) {
+      const mutated = mutateFlameSeeded(base, config, options, seed)
+      expect(userCount(mutated)).toBe(2)
+    }
+  })
+
+  it('does not let symmetry copies use up the room under maxTransforms', () => {
+    const adding = { ...options, addTransformChance: 0.3 }
+    const base = examples.example26
+    let added = 0
+    for (let seed = 0; seed < 40; seed++) {
+      const mutated = mutateFlameSeeded(base, config, adding, seed)
+      expect(userCount(mutated)).toBeLessThanOrEqual(4)
+      if (userCount(mutated) > 2) added++
+    }
+    expect(added).toBeGreaterThan(0)
+  })
+})

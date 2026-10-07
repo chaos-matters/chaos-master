@@ -216,6 +216,9 @@ export default function FlameView(props: FlameViewProps) {
     vec2f(...props.flame.renderSettings.camera.position)
   const cameraZoom = () =>
     props.cameraZoom?.() ?? props.flame.renderSettings.camera.zoom
+  // There is no override for rotation and no rotate gesture: a landing flame
+  // turns only because its own camera says so, exactly as it does in the app.
+  const cameraRotation = () => props.flame.renderSettings.camera.rotation ?? 0
 
   // Hoist every conditional (`?? `) prop that feeds Flam3 / AutoCanvas into a
   // createMemo owned by this component, and pass the *called* value below. A
@@ -251,11 +254,11 @@ export default function FlameView(props: FlameViewProps) {
   const RAD_MAX = baseRadius * ORBIT_RADIUS_MAX_FACTOR
   const clampedRadius: Signal<number> = [
     spherical.radius[0],
-    ((v: number | ((p: number) => number)) =>
+    (v: number | ((p: number) => number)) =>
       spherical.radius[1]((prev) => {
         const next = typeof v === 'function' ? v(prev) : v
         return Math.max(RAD_MIN, Math.min(RAD_MAX, next))
-      })) as Signal<number>[1],
+      }),
   ]
 
   // Pan/zoom signals (used only by the interactive 2D path), seeded from the
@@ -270,7 +273,7 @@ export default function FlameView(props: FlameViewProps) {
   const rawPos2D = createPosition(base2D)
   const pos2D: Signal<v2f> = [
     rawPos2D[0],
-    ((v: v2f | ((p: v2f) => v2f)) =>
+    (v: v2f | ((p: v2f) => v2f)) =>
       rawPos2D[1]((prev) => {
         const next = typeof v === 'function' ? v(prev) : v
         return vec2f(
@@ -283,7 +286,7 @@ export default function FlameView(props: FlameViewProps) {
             Math.min(base2D.y + PAN_CAP_WORLD, next.y),
           ),
         )
-      })) as Signal<v2f>[1],
+      }),
   ]
 
   // Flam3 hands us a live-quality getter; poll it and fire onReady once the
@@ -345,12 +348,20 @@ export default function FlameView(props: FlameViewProps) {
           <Show
             when={props.interactive2D}
             fallback={
-              <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
+              <Camera2D
+                position={cameraPosition()}
+                zoom={cameraZoom()}
+                rotation={cameraRotation()}
+              >
                 {flame()}
               </Camera2D>
             }
           >
-            <WheelZoomCamera2D zoom={zoom2D} position={pos2D}>
+            <WheelZoomCamera2D
+              zoom={zoom2D}
+              position={pos2D}
+              rotation={cameraRotation}
+            >
               <TouchPinchGuard />
               {flame()}
             </WheelZoomCamera2D>

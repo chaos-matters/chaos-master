@@ -1,5 +1,7 @@
+import { createReaction, createRoot } from 'solid-js'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, MAX_TIMELINE_TRACKS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
+import { describeTimelinePlayback, isAdvanceCount, TIMELINE_PLAYBACK_COMMAND_ID, } from '@/recorder/transportStep'
 import { registerCommand } from '../registry'
 import { num, str } from './describeArgs'
 
@@ -388,6 +390,159 @@ registerCommand({
   replayable: false,
   execute(ctx) {
     ctx.timeline.play()
+  },
+})
+
+/**
+ * Transport an agent or a script can actually use.
+ *
+ * `timeline.play` is a toggle with no end: it is `replayable: false`, so
+ * `execute_command` refuses it, and it would leave the GPU animating for as
+ * long as the caller spent composing its next call. A bounded play does have
+ * an end, and the caller knows when — so the pair below starts playback with
+ * the stop already scheduled, and `timeline.stop` ends it early.
+ *
+ * Both are `recordable: false` like the toggle: an agent's transport is not a
+ * step (a person's Play and Pause record as `timeline.setPlaying`). They are
+ * replay-validated only because that is the gate `execute_command` applies;
+ * the worst a hand-written session file gets out of them is ten minutes of
+ * playback the viewer can stop.
+ */
+
+const MAX_PLAY_FOR_SECONDS = 600
+
+/**
+ * The deadline `timeline.playFor` scheduled, and its claim on the transport.
+ *
+ * A deadline may only stop THE PLAYBACK ITS OWN CALL STARTED. Module state
+ * cannot tell one run from the next by itself, so `release` watches
+ * `isPlaying` for the end of this run: whoever ends it — the viewer, the
+ * timeline reaching its end, `timeline.stop` — retires the deadline with it,
+ * and a Play pressed afterwards belongs to whoever pressed it.
+ */
+type PendingStop = {
+  timer: ReturnType<typeof setTimeout>
+  release: () => void
+}
+
+let pendingStop: PendingStop | undefined
+
+function cancelPendingStop() {
+  if (pendingStop === undefined) return
+  const { timer, release } = pendingStop
+  pendingStop = undefined
+  clearTimeout(timer)
+  release()
+}
+
+/**
+ * Call `onEnded` the first time `isPlaying` changes, and hand back the undo.
+ *
+ * `createReaction` rather than an effect: this wants ONE notification, when
+ * the run ends, and a reaction is inert after it fires. A context with no
+ * `isPlaying` — a sandbox, the Home portal — gets no watcher, which leaves the
+ * bare deadline it has always had.
+ */
+function watchPlaybackEnd(
+  isPlaying: (() => boolean) | undefined,
+  onEnded: () => void,
+): () => void {
+  if (isPlaying === undefined) return () => {}
+  return createRoot((dispose) => {
+    const track = createReaction(() => {
+      if (!isPlaying()) onEnded()
+    })
+    track(() => isPlaying())
+    return dispose
+  })
+}
+
+function isPlaySeconds(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= MAX_PLAY_FOR_SECONDS
+  )
+}
+
+registerCommand({
+  id: 'timeline.playFor',
+  describe: ([seconds]) => `Play the timeline for ${num(seconds, 2) ?? '?'}s`,
+  label: 'Play Timeline For',
+  description:
+    'Start timeline playback and stop it again after a number of seconds (0-600). Use instead of timeline.play, which cannot be stopped from a script.',
+  recordable: false,
+  validateReplayArgs: (args) =>
+    args.length === 1 && isPlaySeconds(args[0])
+      ? undefined
+      : `play for expects one duration in seconds, up to ${MAX_PLAY_FOR_SECONDS}`,
+  execute(ctx, seconds?: unknown) {
+    if (!isPlaySeconds(seconds)) return
+    const pause = ctx.timeline.pause
+    // Refuse rather than start playback this command cannot end: a sandbox
+    // without a transport would otherwise be left running by a caller who was
+    // told the play succeeded.
+    if (pause === undefined) return
+    cancelPendingStop()
+    const isPlaying = ctx.timeline.isPlaying
+    if (isPlaying?.() !== true) ctx.timeline.play()
+    const timer = setTimeout(() => {
+      const deadline = pendingStop
+      pendingStop = undefined
+      deadline?.release()
+      if (isPlaying?.() !== false) pause()
+    }, seconds * 1000)
+    pendingStop = {
+      timer,
+      release: watchPlaybackEnd(isPlaying, cancelPendingStop),
+    }
+  },
+})
+
+/**
+ * Play or Pause as a take records it: recorder.ts `reportTimelinePlaybackIn`
+ * writes it for every change of playing state, whichever control made it. The
+ * frame is the point: the Pause must put the playhead where the take paused.
+ * A stop's optional count of frames advanced paces the replay's window
+ * (recorder/playWindows.ts); running the step ignores it. Called live it would
+ * be the unbounded play `timeline.play` is refused for: `agentCallable: false`.
+ */
+registerCommand({
+  id: TIMELINE_PLAYBACK_COMMAND_ID,
+  describe: ([playing, frame, advanced]) =>
+    isBoolean(playing) && isFrame(frame)
+      ? describeTimelinePlayback(playing, frame, isAdvanceCount(advanced))
+      : 'Play or pause the timeline',
+  label: 'Play or Pause',
+  description:
+    'Start or stop playback at an exact frame. A recording writes this step for every Play and Pause; a script uses timeline.playFor and timeline.stop instead.',
+  agentCallable: false,
+  validateReplayArgs: (args) =>
+    exactReplayArgs(
+      args,
+      [isBoolean, isFrame, isAdvanceCount].slice(0, Math.max(2, args.length)),
+    ),
+  execute(ctx, playing?: unknown, frame?: unknown) {
+    if (!isBoolean(playing) || !isFrame(frame)) return
+    ctx.timeline.setCurrentFrame(frame)
+    if (playing) ctx.timeline.play()
+    else ctx.timeline.pause?.()
+  },
+})
+
+registerCommand({
+  id: 'timeline.stop',
+  describe: () => 'Stop the timeline',
+  label: 'Stop Timeline',
+  description:
+    'Stop timeline playback now, cancelling any pending timeline.playFor',
+  recordable: false,
+  validateReplayArgs: (args) =>
+    args.length === 0 ? undefined : 'stop takes no arguments',
+  execute(ctx) {
+    cancelPendingStop()
+    if (ctx.timeline.isPlaying?.() !== false) ctx.timeline.pause?.()
   },
 })
 

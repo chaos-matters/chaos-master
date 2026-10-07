@@ -1,0 +1,295 @@
+/* The editor rail: one surface at three detents. Colour, radius, spacing,
+   duration and easing come from the --la-* set only (styles/designSystem/lumen.css);
+   a hex literal here would not follow a direction switch, and a test enforces it. */
+
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  /* The padding is the chrome the sheet may not grow into, and the rail reads
+     it back through getComputedStyle to cap the large detent: the top bar and
+     the gap under it above, the home indicator below. The box grows upward
+     from the bottom of the screen and is inert, so the padding blocks
+     nothing. */
+  padding-top: calc(var(--la-hud-bottom) + var(--la-s-2));
+  padding-right: max(var(--la-float-inset), var(--la-safe-right));
+  padding-bottom: var(--la-dock-bottom);
+  padding-left: max(var(--la-float-inset), var(--la-safe-left));
+  /* The dock is a frame around the sheet; the canvas stays reachable beside it. */
+  pointer-events: none;
+}
+
+.sheet {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  /* All four corners: the dock holds the sheet off the bottom edge as well as
+     the sides, so it is a floating card at every detent, and square bottom
+     corners read as a sheet cut off rather than one that floats. */
+  border-radius: var(--la-r-sheet);
+  background: var(--la-glass-strong);
+  box-shadow: var(--la-e-sheet);
+  box-sizing: border-box;
+  overflow: hidden;
+  contain: layout paint;
+  transition: height var(--la-dur-sheet) var(--la-ease);
+  /* The threshold between this and the tablet deck is a cross-fade, never a
+     reload (DESIGN.md section 4); the detent survives it in detents.ts.
+
+     On the sheet and not on the dock around it: an ancestor below full
+     opacity is a backdrop root, so fading the dock would make this glass
+     sample a flat fill for the 180ms and then pop. `global(...)` is what
+     keeps the keyframe in lumen.css reachable - a CSS module renames a bare
+     animation name to one scoped to this file, which no keyframe answers. */
+  animation: global(la-surface-enter) var(--la-dur-fast) var(--la-ease);
+}
+
+/* While the finger is the clock there is no easing between frames. */
+.sheet.dragging {
+  transition: none;
+}
+
+/* Glass belongs where chrome floats over the artwork. Open, the sheet covers
+   up to 88% of a canvas that repaints while the flame converges, and the
+   compositor re-blurs all of it every frame; the ground is solid instead
+   until the sheet is back at peek. */
+.sheet.opaque {
+  background: var(--la-glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Glass panels, on by default (lib/glass.ts, glassAllowed), trade that cost
+   for the look: open, the sheet is the primitive's panel instead, glass
+   while the canvas idles and solid while it is busy. Its text keeps to the
+   panel's tiers: the primitive lifts ink-3 to ink-2, and the chip that names
+   the open panel says so with its accent fill rather than accent text. */
+/* Its controls fill with the explorer panel's opaque surfaces, as the
+   floating tablet deck's do (solidControls), so a row or a field does not
+   darken and lighten with the art behind the sheet. */
+.glassPanel {
+  composes: panel solidControls from '@/styles/designSystem/glass.module.css';
+}
+
+.sheet.glassPanel {
+  background: var(--la-glass-panel);
+}
+
+/* The busy switch fades the fill, so it joins the sheet's own list; a drag
+   keeps none. */
+.sheet.glassPanel:not(.dragging) {
+  transition:
+    height var(--la-dur-sheet) var(--la-ease),
+    background-color var(--la-dur-fast) var(--la-ease);
+}
+
+.sheet.glassPanel .chip[aria-selected='true'] {
+  color: var(--la-ink);
+  background: var(--la-control-accent);
+}
+
+/* The grabber row and the peek row hold their height at every detent: the
+   body is the one part of the column that gives way. As flex items they
+   shrank with it, the grabber row furthest because nothing inside it is
+   tall, so opening the sheet squeezed it from 24px to 13 (and to 5 on a
+   landscape phone, the handle touching the sheet's edge) and the whole peek
+   row jumped up. */
+.grabberRow {
+  flex: none;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: grab;
+}
+
+.grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--la-hairline-strong);
+}
+
+/* --la-rail-h is the capsule's 56px and the 8px under it, and together with
+   the 24px grabber row and the sheet's two 1px edges it is PEEK_HEIGHT
+   (detents.ts; EditorRail.module.test.ts holds the sum). With the row at its
+   own height the controls sit as far from the sheet's bottom edge as from
+   its sides, where the old 96 left 6px nobody owned under the row. A narrow
+   phone's capsule is 48 (lumen.css) in the same 64px row: the top padding
+   takes what the capsule gives up, so the 8px under the controls holds at
+   every width instead of growing to 12. */
+.peekRow {
+  flex: none;
+  position: relative;
+  box-sizing: border-box;
+  height: var(--la-rail-h);
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  padding: calc(var(--la-rail-h) - var(--la-capsule) - var(--la-s-2))
+    var(--la-s-2) var(--la-s-2);
+}
+
+/* Narrow phones, with the smaller circles (lumen.css, --la-capsule): the
+   row's two gaps halve as well, and the 8px goes to the four chips. At 320
+   that is 43.5px a chip where it would be 41.5, against the 48 that
+   "Variations" needs. */
+@media (max-width: 374px) {
+  .peekRow {
+    gap: var(--la-s-1);
+  }
+}
+
+/* Behind the chips and the shutter, so a drag started on the row's background
+   is a drag and a drag started on a control is not. */
+.dragSurface {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+/* The shell's capsule. A fixed box, so the chips keep the same room whether
+   the capsule is collapsed or expanded over the row. */
+.leading {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--la-capsule);
+  height: var(--la-capsule);
+}
+
+/* No gap between the chips: only the selected one has a fill, so a gap
+   showed nowhere and only took width from the labels and left dead strips
+   between the targets.
+
+   The row scrolls only below the chips' 40px floor, but a scroller clips
+   whether it scrolls or not, so a label wider than its chip lost its first
+   letter at the scroller's edge ("ariations" at 360px). The scroller reaches
+   4px into the gap on either side and pads its chips back by as much: no
+   chip moves, and an overhang has room to paint. */
+.chips {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 0;
+  margin-inline: calc(var(--la-s-1) * -1);
+  padding-inline: var(--la-s-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  /* Shrink to the row rather than scroll inside it: at 360px the four chips
+     wanted 278 of 254, which cut the last one off behind the shutter and made
+     a horizontal swipe scroll the row.
+
+     WIDTH is the one dimension allowed below --la-tap, and it has to be: the
+     token rises to 48px under [data-platform='android'], where four chips
+     beside the capsule and the shutter wanted 198px of a 190px box and the
+     row began scrolling again, clipping "Vary". The tappable box keeps its
+     full --la-tap HEIGHT - 48px on Android, 44 elsewhere - so every chip
+     still clears the 40px floor. */
+  flex: 1 1 0;
+  min-width: 40px;
+  height: var(--la-tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-s-1);
+  border: 0;
+  background: none;
+  /* The selected fill is a tile, the deck's tool tabs' radius, not a pill. A
+     chip is about 50px wide and its label sits in the bottom 12px of 44,
+     where a pill's ends have already curved in: a pill there is 30px wide at
+     the baseline, and "Variations" is 48. */
+  border-radius: var(--la-r-sm);
+  color: var(--la-ink-2);
+  font: var(--la-t-tab);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background var(--la-dur-fast) var(--la-ease),
+    color var(--la-dur-fast) var(--la-ease);
+}
+
+.chip[aria-selected='true'] {
+  color: var(--la-accent);
+  background: var(--la-accent-wash);
+}
+
+/* The rail's glyphs at the icon set's one stroke, --la-icon-stroke. Shuffle
+   and the camera are drawn at 1.5 for the desktop and read lighter here than
+   the 1.8 glyphs on either side of them; the CSS property outranks the
+   SVG's own attribute, and the strokes inside inherit it. */
+.chipIcon {
+  width: 26px;
+  height: 26px;
+  stroke-width: var(--la-icon-stroke);
+}
+
+/* The strong glass, 86%: the accent icon holds 4.79:1 on it over white-hot
+   art, where the chrome's 72% left it 2.86:1, under the 3:1 an icon needs
+   (glassContrast.test.ts). In place the sheet behind lifts it further. */
+.shutter {
+  position: relative;
+  flex: 0 0 auto;
+  /* The capsule's twin at the other end of the row, so one token sizes both. */
+  width: var(--la-capsule);
+  height: var(--la-capsule);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--la-glass-strong);
+  border: var(--la-glass-edge);
+  box-shadow: var(--la-glass-shadow);
+  color: var(--la-accent);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--la-dur-press) var(--la-ease);
+}
+
+.shutter:active {
+  transform: scale(0.94);
+}
+
+.shutterIcon {
+  width: 26px;
+  height: 26px;
+  stroke-width: var(--la-icon-stroke);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  /* No safe area here: the dock already lifts the whole sheet above the home
+     indicator, and counting it twice leaves a gap under the last row. */
+  padding-bottom: var(--la-s-4);
+}
+
+/* Peek: the panel stays built but stops painting, which is what pauses the
+   variation previews through their IntersectionObserver. */
+.body[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .chip,
+  .shutter {
+    transition: none;
+  }
+  .sheet {
+    animation: none;
+  }
+}

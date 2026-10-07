@@ -31,26 +31,27 @@ git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
 
 ## Tool catalog
 
-34 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+44 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
 description is at most 500 characters and every result is kept under about
-1.5 KB of JSON. The table below lists 32: `arcade_end_duel` is registered
+1.5 KB of JSON. The table below lists 43: `arcade_end_duel` is registered
 but does nothing except refuse, so it is described where that refusal is
 explained rather than offered here as a capability.
 
-| Tool                                                                                                      | Kind  | Purpose                                                                           |
-| --------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
-| `get_flame`, `get_flame_detail`                                                                           | read  | Compact and paginated views of the active flame                                   |
-| `list_commands`                                                                                           | read  | Command ids, labels, descriptions, prefix index                                   |
-| `list_variations`                                                                                         | read  | Registered variation names, with the parameters of parametric ones                |
-| `get_undo_state`, `diff_flames`                                                                           | read  | History depth; structural diff between two flames                                 |
-| `execute_command`                                                                                         | write | Run any registered command (validated, guarded while the Arcade drives, recorded) |
-| `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`    | mixed | Document-level tools                                                              |
-| `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena` | mixed | Arena (roadmap: the scoring heuristics still need grounding)                      |
-| `breed_flames`, `create_custom_variation`, `open_art_director`                                            | mixed | Genetics and Director (roadmap: the taste loop)                                   |
-| `arcade_status`                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration, duel clock            |
-| `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                              | write | Teach mode                                                                        |
-| `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`         | mixed | Cinema mode                                                                       |
-| `arcade_start_duel`, `arcade_duel_ready`                                                                  | write | Duel mode: opens the split screen; the clock ends it and saves both takes         |
+| Tool                                                                                                                                                                  | Kind  | Purpose                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
+| `get_flame`, `get_flame_detail`                                                                                                                                       | read  | Compact and paginated views of the active flame                                                |
+| `list_commands`                                                                                                                                                       | read  | Command ids, labels, descriptions, prefix index                                                |
+| `list_variations`                                                                                                                                                     | read  | Registered variation names, with the parameters of parametric ones                             |
+| `get_undo_state`, `diff_flames`                                                                                                                                       | read  | History depth; structural diff between two flames                                              |
+| `execute_command`                                                                                                                                                     | write | Run any registered command (validated, guarded while the Arcade drives, recorded)              |
+| `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`                                                                | mixed | Document-level tools                                                                           |
+| `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena`, `arena_start_clash`, `arena_get_stats`, `arena_commentate` | mixed | Arena: grounded stats, combat simulation, 2D/3D clash staging, live animation, commentary, HUD |
+| `breed_flames`, `create_custom_variation`, `open_art_director`, `director_propose`, `director_get_feedback`, `director_get_taste_profile`                             | mixed | Genetics and Director: evolutionary proposals, like/dislike taste loop, profile                |
+| `arcade_status`                                                                                                                                                       | read  | Pilot phase, steps, budget, lock, recorder, last narration, duel clock                         |
+| `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                                                                                          | write | Teach mode                                                                                     |
+| `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`                                                                     | mixed | Cinema mode                                                                                    |
+| `arcade_start_duel`, `arcade_duel_ready`                                                                                                                              | write | Duel mode: opens the split screen; the clock ends it and saves both takes                      |
+| `arcade_start_beats`, `arcade_get_audio_catalog`, `arcade_set_audio_mapping`, `arcade_end_beats`                                                                      | mixed | Beats mode: inspects targets, wires frequency bands to parameters, records take                |
 
 ## How an agent write reaches the document
 
@@ -71,6 +72,54 @@ explained rather than offered here as a capability.
 
 No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 
+### Animating a write
+
+`execute_command` takes two optional presentation properties beside
+`commandId`/`args`: `glideMs` (0–5000, clamped rather than refused) and
+`glideQuality` (`auto` | `responsive` | `balanced` | `full`). They animate the
+transition into the change; neither reaches the recorded step, because a
+session says what the person did, not how long it took to appear. An explicit
+`glideMs: 0` turns a glide off for one call even with the workspace's Animate
+Changes setting on.
+
+**In the Arcade, only a duel turns them off.** Teach, Cinema and Beats animate
+like anywhere else — they are presentations, and a change the viewer is meant
+to watch is what a transition is for. A duel refuses for two reasons: its clock
+is wall-clock, so an agent could buy time with animation, and it points the
+tool bridge at the rival's seat while the only glide runtime belongs to the
+player's workspace, so a transition asked for there would move the viewer's own
+flame. A mode's allow-list, its step budget and the duel clock are all answered
+before the glide is resolved, so a transition can only ever present a change
+the lock already let through; and ending a session lands whatever is in flight,
+so a take never stops part-way through one.
+
+**The switches themselves are allowed in Teach, Cinema and Beats.**
+`glide.setEnabled` and `glide.setQuality` (`PRESENTATION_SWITCHES` in
+`packages/app/src/arcade/topics.ts`) let an agent make every later change flow
+without naming a duration each time. They are enforced but printed in no brief,
+which is held to the ~1.5 KB result budget; the refusal message's list of what
+a mode allows names them, and so does `list_commands`. A duel refuses both, and
+`glide.toFlame` is on no mode's list: it replaces the document with a flame
+carried in its arguments, which is `flame.load`'s permission, not a
+presentation one. Turning Glide off mid-transition lands that transition on its
+target first, as any command does; because the switch is read before it flips,
+that one call is still presented, and changes cut from the next one.
+
+The switches last for the take. It holds both as the viewer left them, and
+ending it — its end tool, or Stop — lands whatever transition is in flight and
+then gives them back (`finishPilot`); the lock keeps the viewer off them for
+the whole take, so what comes back is exactly what they left. A replay of the
+take is not covered: the switch steps are recorded like any command, and
+replaying them sets the viewer's own switches and leaves them set.
+
+The call awaits the transition, bounded by the glide's own duration plus a
+small margin (`GLIDE_DEADLINE_SLACK_MS`). If that deadline — rather than the
+animation — is what landed the change, the result carries
+`glide: { completedBy: 'deadline' }`, on the Arcade's return path as well as
+the ordinary one. The document is on exactly the target either way; the field
+says nobody watched it arrive, which is what a tab with no
+`requestAnimationFrame` (a background or hidden window) looks like.
+
 ## The Arcade
 
 `https://lumenapeiron.com/arcade` (the worker sends `/arcade` to the SPA as
@@ -78,15 +127,20 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 
 - **Teach** — pick one of seven topics (`variations`, `affine`, `color`,
   `camera`, `genetics`, `sonification`, `render`). The agent gets a brief with
-  the goal, the allowed commands and their exact argument shapes, and a step
-  budget. It narrates through
+  the goal, the topic's commands and their exact argument shapes, and a step
+  budget; the two Glide switches are allowed on top of that list without being
+  printed in it (see Animating a write, above). It narrates through
   `arcade_narrate` (a real `lesson.note` command, so the sentence replays as a
   caption between the edits it describes) and builds the example with
   `execute_command`. The recording is saved as `Lesson: <Topic> — <title>`.
 - **Cinema** — describe a move; the agent reads `arcade_get_animatable_paths`,
   sends tracks to `arcade_set_keyframes` (validated against that catalog and
   applied as one undoable `timeline.loadTimeline`), and playback starts. Saved
-  as `Animation: <title>`.
+  as `Animation: <title>`. The catalog lists each affine in the layout the
+  renderer reads it in, and says what each term is (`x from y`,
+  `z translation`): a-f on a 2D flame, and on a 3D flame a-f or a-l by the
+  affine's own layout, since a 3D flame can still hold 2D-layout affines
+  (`arcade/animatablePaths.ts`).
 - **Duel** — you and the agent edit your own flames side by side against one
   clock. `arcade_start_duel` opens the split screen, gives the agent its own
   seat (a real flame with its own history and recorder stream), and points the
@@ -163,7 +217,7 @@ your clock. They are generated by `teachPromptCard` / `cinemaPromptCard` /
 
 ```bash
 pnpm --filter chaos-master exec vitest run src/webmcp src/arcade
-pnpm test:e2e -- tests/arcade.spec.ts
+pnpm test:e2e -- tests/arcade.ci.spec.ts
 ```
 
 ## Limits
@@ -178,7 +232,15 @@ pnpm test:e2e -- tests/arcade.spec.ts
   resolution, and exports and history are closed while it drives.
 - `timeline.play` is wall-clock transport: it is deliberately not replayable,
   so `execute_command` refuses it and `arcade_set_keyframes` starts playback
-  itself. Scrub with `timeline.setCurrentFrame`.
+  itself. Scrub with `timeline.setCurrentFrame`. `timeline.setPlaying`, the
+  step a recording writes for every Play and Pause, is refused live for the
+  same reason (`agentCallable: false`): use `timeline.playFor` and
+  `timeline.stop`.
+- `flame.setBlendFlame` takes the partner and an optional weight from 0 to 1,
+  the edited flame's share of the blend (0 draws the partner alone). Without
+  the weight, the document keeps the weight it has, whether or not it had a
+  partner, and one with no weight yet gets the default 0.4. A pick in the blend
+  gallery always names 0.4.
 - A page reload during a session ends it and loses the recorder's in-memory
   take: it was never saved, so nothing appears in the library.
 - Cinema playback is started by `arcade_set_keyframes` itself and is
@@ -188,18 +250,24 @@ pnpm test:e2e -- tests/arcade.spec.ts
 
 ## What the agent cannot reach yet
 
-Audited 2026-09-03 against the registry: all 87 registered commands carry an
+Audited 2026-09-23 against the registry: all 96 registered commands carry an
 explicit replay policy, so anything the agent can execute, a session file can
-reproduce. The gaps are elsewhere.
+reproduce. One command goes only the other way: `timeline.setPlaying` replays
+from a session but is refused live. The gaps are elsewhere.
 
 - **Undo and redo run live but do not replay.** `history.undo` / `history.redo`
   are `replayable: false` on purpose — a log replays the writes, and replaying
   a takeback of a write that never happened in this run is meaningless. An
   agent that undoes mid-lesson therefore records a session whose replay
   diverges from what the viewer watched. Prefer setting the value back.
-- **Playback is wall-clock, not a step.** `timeline.play` is neither
-  recordable nor replayable; `arcade_set_keyframes` starts playback itself and
-  a replay leaves the Play button to the viewer.
+- **Agent playback is not a step.** A person's Play and Pause during a take
+  record as `timeline.setPlaying(playing, frame)`, which pins the frame, but
+  the agent cannot call that: `timeline.play` is neither recordable nor
+  replayable, `timeline.playFor` and `timeline.stop` each still count as an
+  uncaptured step in a take (the pause a `playFor` deadline makes is recorded
+  like a person's), and `arcade_set_keyframes` starts Cinema's
+  playback itself, suppressed, so a replay leaves the Play button to the
+  viewer.
 - **3D framing has no first-class commands.** The 2D camera has
   `camera.center/panTo/panBy/zoomTo/zoomBy/frame`; the 3D camera is reachable
   only as `flame.setRenderSetting` on `camera3D.*`, which records and replays

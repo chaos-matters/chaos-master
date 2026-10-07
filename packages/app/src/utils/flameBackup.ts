@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate'
 import { VERSION } from '@/version'
+import { downloadBlob } from './blob'
 import { addFlameDataToPng } from './flameInPng'
 import { compressJsonQueryParam } from './jsonQueryParam'
 import { loadHistoryEntries } from './logoHistoryDB'
@@ -95,8 +96,17 @@ export async function buildFlameBackupZip(
         savedAt: r.savedAt,
         flame: r.flame,
       }
-      if (r.tracks && r.tracks.length > 0)
-        payload.animation = { tracks: r.tracks }
+      // The share link's envelope, so one reader serves both. The timeline
+      // goes out whether or not there are tracks: a flame with none still
+      // has a frame rate and an end frame, and a backup that dropped it
+      // brought every flame home at 30fps over 90 frames.
+      const hasTracks = !!r.tracks && r.tracks.length > 0
+      if (hasTracks || r.config) {
+        payload.animation = {
+          ...(hasTracks ? { tracks: r.tracks } : {}),
+          ...(r.config ? { config: r.config } : {}),
+        }
+      }
       files[`recent-flames/${fileStem(r.name, i)}.json`] = [
         jsonBytes(payload),
         { level: 6 },
@@ -151,21 +161,12 @@ export async function buildFlameBackupZip(
   return { bytes, fileCount: Object.keys(files).length, counts }
 }
 
-/** Trigger a browser download of the backup ZIP. */
+/** Save the backup ZIP (a browser download, or shared storage in the app). */
 export function downloadBackupZip(bytes: Uint8Array, filename?: string): void {
   const name =
     filename ??
     `chaos-master-backup-${new Date().toISOString().slice(0, 10)}.zip`
   // Copy into a fresh ArrayBuffer-backed view so the Blob types cleanly.
   const blob = new Blob([new Uint8Array(bytes)], { type: 'application/zip' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => {
-    URL.revokeObjectURL(url)
-  }, 5000)
+  downloadBlob(blob, name)
 }

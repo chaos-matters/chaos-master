@@ -4,6 +4,7 @@ import { createVideoEncoder } from '@/utils/videoEncoder'
 import { closingHoldMs } from './player'
 import { createReplayVideoSchedule, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_LEAD_IN_MS, replayVideoInitialTimelineSnapshot, } from './replayVideo'
 import { validateSession } from './schema'
+import type { ReplayGlideOptions } from './glide'
 import type { RecordedSession } from './schema'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
@@ -22,6 +23,14 @@ export type ReplayVideoExportRequest =
       mode: 'artwork'
       session: RecordedSession
       playbackSpeed: number
+      /**
+       * Whether the exported frames glide between steps.
+       *
+       * Carried on the request rather than read from the workspace so the
+       * queued job renders what the panel was showing when the button was
+       * pressed, however the settings move afterwards.
+       */
+      glide?: ReplayGlideOptions
     }
   | {
       mode: 'interface'
@@ -312,11 +321,10 @@ export async function captureReplayInterfaceVideo(
 ): Promise<ReplayInterfaceVideoResult> {
   const session = validateSession(deepClone(request.session))
   if (!session) throw new Error('The recording is not a valid replay session')
-  if (session.unnamedWriteCount > 0) {
-    throw new Error(
-      `This take has ${session.unnamedWriteCount} uncaptured edit${session.unnamedWriteCount === 1 ? '' : 's'}. Record a clean take before publishing it as video.`,
-    )
-  }
+  // A take with uncaptured steps exports the way it replays: they were never
+  // in `actions`, so there is nothing to apply for them, and the embedded
+  // session keeps their count and names. The replay panel lists them before
+  // an export starts (see recorder/uncapturedSteps.ts).
   if (session.actions.length === 0) {
     throw new Error('This take has no authored steps to publish as video.')
   }

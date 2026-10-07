@@ -70,6 +70,8 @@
 /* Same translucent pill as the controls used to draw themselves; the dock owns
    the chrome now so the grip and the chrome buttons share it. */
 .bar {
+  composes: optionalPanel from '@/styles/designSystem/glass.module.css';
+  transition: background-color var(--la-dur-fast) var(--la-ease);
   margin: 0 0 var(--space-2) var(--space-2);
   display: inline-flex;
   align-items: center;
@@ -82,7 +84,6 @@
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.04em;
-  backdrop-filter: blur(6px);
   box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
   white-space: nowrap;
   max-width: 100%;

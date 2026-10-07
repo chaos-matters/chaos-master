@@ -6,7 +6,7 @@ import { PREVIEW_QUALITY } from '../lib/flame'
 import OpenInApp from './OpenInApp'
 import PosterFlame from './PosterFlame'
 import type { EarthVariant } from '../lib/earthVariants'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
 
 /**
  * "Explore Earth Flame" gallery. A large, continuously-spinning drag-to-orbit
@@ -47,7 +47,7 @@ export default function EarthVariantsModal(props: {
   const [flame, setFlame] = createStore<FlameDescriptor>(
     structuredClone(initial().flame),
   )
-  const tids = Object.keys(flame.transforms)
+  const tids = Object.keys(flame.transforms) as TransformId[]
 
   const valsOf = (f: FlameDescriptor): Vals => ({
     t: tids.map((tid) => {

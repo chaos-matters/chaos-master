@@ -389,6 +389,7 @@
 /* ---- Speed search bar ---- */
 
 .speed-search-bar {
+  composes: frost from '@/styles/designSystem/glass.module.css';
   position: sticky;
   bottom: 0;
   display: flex;
@@ -397,9 +398,9 @@
   padding: 0.25rem 0.6rem;
   margin-top: 0.25rem;
   border-radius: 6px;
+  /* Its own fill, one per theme, over the frost blur of the previews. */
   background: oklch(96% 0.006 240 / 0.92);
   border: 1px solid oklch(82% 0.01 240);
-  backdrop-filter: blur(4px);
   font-size: 0.72rem;
   box-shadow: 0 2px 8px oklch(50% 0.04 240 / 0.12);
   animation: speedSearchFadeIn 0.12s ease;

@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
+import { ALWAYS_ALLOWED, ARENA_ARCHETYPES_LIST, ARENA_STANCES, arenaPromptCard, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, PRESENTATION_SWITCHES, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -25,16 +25,47 @@ describe('lesson topics', () => {
   })
 
   // Every allow-list entry has to name something the registry actually has,
-  // or the lesson silently teaches nothing: the guard refuses the command and
-  // the agent burns its budget on rejections.
-  it('only allows commands that exist', () => {
-    const known = new Set(getAllCommands().map((command) => command.id))
-    const missing = TOPIC_IDS.flatMap((id) =>
-      LESSON_TOPICS[id].allowed
-        .filter((entry) => !entry.endsWith('.') && !known.has(entry))
-        .map((entry) => `${id}: ${entry}`),
+  // or the mode silently teaches nothing: the guard refuses the command and
+  // the agent burns its budget on rejections. A prefix has to cover at least
+  // one command.
+  it('names only registered commands, in every Arcade allow-list', () => {
+    const ids = getAllCommands().map((command) => command.id)
+    const lists: Record<string, readonly string[]> = {
+      always: ALWAYS_ALLOWED,
+      switches: PRESENTATION_SWITCHES,
+      cinema: CINEMA_ALLOWED,
+      beats: BEATS_ALLOWED,
+      duel: DUEL_ALLOWED,
+      ...Object.fromEntries(
+        TOPIC_IDS.map((id) => [`teach/${id}`, LESSON_TOPICS[id].allowed]),
+      ),
+    }
+    const unresolved = Object.entries(lists).flatMap(([name, allowed]) =>
+      allowed
+        .filter((entry) =>
+          entry.endsWith('.')
+            ? !ids.some((id) => id.startsWith(entry))
+            : !ids.includes(entry),
+        )
+        .map((entry) => `${name}: ${entry}`),
     )
-    expect(missing).toEqual([])
+    expect(unresolved).toEqual([])
+  })
+
+  // Every mode's tool adds ALWAYS_ALLOWED to its own list when it starts, so
+  // a mode list that carries one of those ids too lists it twice, in the brief
+  // and in every refusal.
+  it('leaves the always-allowed ids to the tools that add them', () => {
+    const modeLists = [
+      CINEMA_ALLOWED,
+      BEATS_ALLOWED,
+      DUEL_ALLOWED,
+      ...TOPIC_IDS.map((id) => LESSON_TOPICS[id].allowed),
+    ]
+    const always: readonly string[] = ALWAYS_ALLOWED
+    expect(
+      modeLists.flatMap((list) => list.filter((id) => always.includes(id))),
+    ).toEqual([])
   })
 
   // Every step the pilot takes is shown twice — in the live rail while the agent
@@ -125,6 +156,89 @@ describe('duel', () => {
     expect(card).toContain('arcade_duel_ready')
     expect(card).not.toContain('arcade_end_duel')
     expect(card).toContain('3 minutes')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('beats', () => {
+  it('allows audio wiring and sonification commands in beats mode', () => {
+    expect(BEATS_ALLOWED).toContain('audio.applySnapshot')
+    expect(BEATS_ALLOWED).toContain('audio.setMapping')
+    expect(BEATS_ALLOWED).toContain('sonification.setConfig')
+    expect(BEATS_STEP_BUDGET).toBeGreaterThanOrEqual(20)
+  })
+
+  it('offers beats presets that provide distinct musical goals', () => {
+    expect(BEATS_PRESETS.length).toBeGreaterThanOrEqual(3)
+    for (const preset of BEATS_PRESETS) {
+      expect(preset.label.length).toBeGreaterThan(3)
+      expect(preset.wish.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('beats prompt card includes track name and beats tools', () => {
+    const card = beatsPromptCard('Cyber Pulse', 'Map bass to scale')
+    expect(card).toContain('Cyber Pulse')
+    expect(card).toContain('Map bass to scale')
+    expect(card).toContain('arcade_start_beats')
+    expect(card).toContain('arcade_get_audio_catalog')
+    expect(card).toContain('arcade_set_audio_mapping')
+    expect(card).toContain('arcade_end_beats')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('director', () => {
+  it('offers director presets with distinct aesthetic goals', () => {
+    expect(DIRECTOR_PRESETS.length).toBeGreaterThanOrEqual(3)
+    for (const preset of DIRECTOR_PRESETS) {
+      expect(preset.label.length).toBeGreaterThan(3)
+      expect(preset.wish.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('director prompt card mentions taste profile and propose/feedback loop', () => {
+    const card = directorPromptCard('Explore organic bioluminescence')
+    expect(card).toContain('Explore organic bioluminescence')
+    expect(card).toContain('director_get_taste_profile')
+    expect(card).toContain('director_propose')
+    expect(card).toContain('director_get_feedback')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('arena', () => {
+  it('offers arena stances with distinct bonuses and descriptions', () => {
+    expect(ARENA_STANCES.length).toBe(4)
+    for (const stance of ARENA_STANCES) {
+      expect(stance.label.length).toBeGreaterThan(3)
+      expect(stance.bonus.length).toBeGreaterThan(2)
+      expect(stance.description.length).toBeGreaterThan(15)
+    }
+  })
+
+  it('offers 6 procedural challenger archetypes with schools', () => {
+    expect(ARENA_ARCHETYPES_LIST.length).toBe(6)
+    for (const arch of ARENA_ARCHETYPES_LIST) {
+      expect(arch.name.length).toBeGreaterThan(3)
+      expect(arch.className.length).toBeGreaterThan(3)
+      expect(arch.school.length).toBeGreaterThan(2)
+    }
+  })
+
+  it('arena prompt card incorporates opponent, stance, and arena tools', () => {
+    const card = arenaPromptCard(
+      'Spiral Leviathan',
+      'resonance',
+      'Focus on high energy',
+    )
+    expect(card).toContain('Spiral Leviathan')
+    expect(card).toContain('resonance')
+    expect(card).toContain('Focus on high energy')
+    expect(card).toContain('arena_get_stats')
+    expect(card).toContain('arena_commentate')
+    expect(card).toContain('simulate_clash')
+    expect(card).toContain('arena_start_clash')
     expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })
 })

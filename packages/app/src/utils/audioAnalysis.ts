@@ -1,3 +1,5 @@
+import { projectFlameValue } from '@chaos-master/core'
+
 const BAND_RANGES: [number, number][] = [
   [20, 60], // sub-bass
   [60, 250], // bass
@@ -162,14 +164,20 @@ function computeRms(data: Float32Array): number {
   return Math.sqrt(sum / data.length)
 }
 
-export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
+/** Decode encoded audio bytes -- a fetched or uploaded file -- into a buffer. */
+export async function decodeAudioBytes(
+  bytes: ArrayBuffer,
+): Promise<AudioBuffer> {
   const ctx = new AudioContext()
   try {
-    const arrayBuffer = await file.arrayBuffer()
-    return await ctx.decodeAudioData(arrayBuffer)
+    return await ctx.decodeAudioData(bytes)
   } finally {
     void ctx.close()
   }
+}
+
+export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
+  return decodeAudioBytes(await file.arrayBuffer())
 }
 
 // --- Beat detection ---
@@ -625,64 +633,335 @@ export type MappingSmoothingState = Map<
 const DIRTY_THRESHOLD = 0.005 // 0.5% change threshold
 
 /**
- * Mutates a FlameDescriptor draft in place from audio analysis data.
+ * A modulated render setting held to the domain the flame schema gives it.
+ *
+ * A mapping whose range exceeds the schema does not merely look wrong — a
+ * flame carrying the result is INVALID, and `validateFlame` then throws for
+ * everything downstream: breeding it, exporting it, opening the ancestry tree.
+ * Observed in the wild as `palettePhase: Expected <=1 but received 1.589`,
+ * back when modulation wrote the open document and left that flame unable to
+ * be bred again. The live path is a render-time overlay now, but an export
+ * still embeds the modulated flame in the file it writes, so an out-of-range
+ * value would ship inside it.
+ *
+ * A range is authored by hand in the wiring editor and shipped in presets, so
+ * neither can be trusted to respect a bound it never sees. The projection is
+ * the schema's own (`projectFlameValue`), the one the timeline and the
+ * commands use: skipIters floors as the renderer reads it, palettePhase wraps
+ * as fract() reads it, and every other bound clamps.
+ */
+function heldRenderSetting(
+  param: RenderSettingKey,
+  value: number,
+  dimensions: unknown,
+): number {
+  const path = param === 'zoom' ? ['camera', 'zoom'] : [param]
+  // NaN would fail validation as surely as an out-of-range number, and can
+  // arrive from a degenerate range. Its stand-in, 0, is projected like any
+  // other value: it is below gamma's and contrast's minimum.
+  return projectFlameValue(
+    ['renderSettings', ...path],
+    Number.isFinite(value) ? value : 0,
+    dimensions,
+  ) as number
+}
+
+interface AudioMutationContext {
+  rs?: Record<string, unknown>
+  camera?: Record<string, unknown>
+  txArr?: Record<string, unknown>[]
+}
+
+/**
+ * Calculates attack/release envelope smoothing for a normalized feature.
+ */
+function computeSmoothedEnvelope(
+  clamped: number,
+  targetKey: string,
+  mapping: AudioMappingEntry,
+  smoothingState: MappingSmoothingState | undefined,
+  dt: number,
+): number {
+  const attackMs = mapping.attackMs ?? 0
+  const releaseMs = mapping.releaseMs ?? 0
+  if (attackMs <= 0 && releaseMs <= 0) {
+    return clamped
+  }
+
+  const prev = smoothingState?.get(targetKey)?.smoothed ?? clamped
+  const rising = clamped > prev
+  const tc =
+    (rising
+      ? (mapping.attackMs ?? mapping.releaseMs ?? 0)
+      : (mapping.releaseMs ?? mapping.attackMs ?? 0)) / 1000
+  if (tc <= 0) {
+    return clamped
+  }
+
+  const coeff = dt / (tc + dt)
+  return prev + coeff * (clamped - prev)
+}
+
+/**
+ * Settles one target's value for this frame, and says whether it moved.
+ *
+ * Two answers, not one, because the overlay needs both. The value is written
+ * EVERY frame: the overlay is rebuilt from the authored flame each time, so a
+ * target left out snaps back to what the user authored and the picture
+ * judders between modulated and unmodulated. `changed` is the separate
+ * question of whether this frame is worth publishing at all.
+ *
+ * Holding `lastApplied` below the threshold is what keeps a still target
+ * still — the smoothed value keeps creeping, the written one does not.
+ */
+function settleTargetValue(
+  smoothed: number,
+  targetKey: string,
+  smoothingState: MappingSmoothingState | undefined,
+): { applied: number; changed: boolean } {
+  const prevApplied = smoothingState?.get(targetKey)?.lastApplied
+  if (
+    prevApplied !== undefined &&
+    Math.abs(smoothed - prevApplied) < DIRTY_THRESHOLD
+  ) {
+    if (smoothingState) {
+      smoothingState.set(targetKey, { smoothed, lastApplied: prevApplied })
+    }
+    return { applied: prevApplied, changed: false }
+  }
+
+  if (smoothingState) {
+    smoothingState.set(targetKey, { smoothed, lastApplied: smoothed })
+  }
+  return { applied: smoothed, changed: true }
+}
+
+function applyRenderSettingTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'renderSetting' }>,
+  val: number,
+): void {
+  ctx.rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
+  const safe = heldRenderSetting(tgt.param, val, ctx.rs.dimensions)
+  if (tgt.param === 'zoom') {
+    ctx.camera ??= (ctx.rs.camera as Record<string, unknown>) ?? {}
+    ;(ctx.camera as Record<string, number>).zoom = safe
+  } else {
+    ;(ctx.rs as Record<string, number>)[tgt.param] = safe
+  }
+}
+
+function getOrCreateTransformArray(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+): Record<string, unknown>[] {
+  ctx.txArr ??= Object.values(
+    (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
+  )
+  return ctx.txArr
+}
+
+function applyTransformAffineTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'transformAffine' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+  const mat = (tx[tgt.matrix] as Record<string, number> | undefined) ?? {}
+  mat[tgt.param] = val
+  tx[tgt.matrix] = mat
+}
+
+function applyTransformPropertyTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'transformProperty' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+
+  if (tgt.property === 'colorX' || tgt.property === 'colorY') {
+    const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
+    if (tgt.property === 'colorX') color.x = val
+    else color.y = val
+    tx.color = color
+  } else if (tgt.property === 'probability') {
+    /*
+     * Never let a transform's weight reach zero.
+     *
+     * The chaos game picks transforms by probability; at zero a branch
+     * stops receiving points and vanishes, and if every weight is driven
+     * low together the whole picture thins out to noise — the "flame
+     * collapsed and looks like nothing" people report mid-track. A
+     * negative weight is worse: it makes the cumulative distribution
+     * non-monotonic, so selection is meaningless.
+     *
+     * The schema itself only says `v.number()`, so nothing downstream
+     * would have caught either.
+     */
+    ;(tx as Record<string, number>).probability = Math.max(
+      0.001,
+      Number.isFinite(val) ? val : 0.001,
+    )
+  } else {
+    ;(tx as Record<string, number>)[tgt.property] = Number.isFinite(val)
+      ? val
+      : 0
+  }
+}
+
+function applyVariationWeightTarget(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: Extract<FlameTarget, { kind: 'variationWeight' }>,
+  val: number,
+): void {
+  const txArr = getOrCreateTransformArray(flame, ctx)
+  const tx = txArr[tgt.transformIdx]
+  if (!tx) return
+  const vars = (tx.variations as Record<string, Record<string, unknown>>) ?? {}
+  // By type only. The key of `variations` is the variation's id: looked up by
+  // the type's name, it found a variation whose id reads like another's type,
+  // and for a type named after an Object member ('__proto__', 'constructor')
+  // it wrote the weight onto the prototype chain of every object.
+  const v = Object.values(vars).find(
+    (candidate) => candidate.type === tgt.variationType,
+  )
+  if (v) {
+    ;(v as Record<string, number>).weight = val
+  }
+}
+
+function applyFinalAffineTarget(
+  flame: Record<string, unknown>,
+  tgt: Extract<FlameTarget, { kind: 'finalAffine' }>,
+  val: number,
+): void {
+  const fin = (flame.finalTransform as Record<string, number> | undefined) ?? {}
+  fin[tgt.param] = val
+  flame.finalTransform = fin
+}
+
+function dispatchAudioTargetMapping(
+  flame: Record<string, unknown>,
+  ctx: AudioMutationContext,
+  tgt: FlameTarget,
+  val: number,
+): void {
+  switch (tgt.kind) {
+    case 'renderSetting':
+      applyRenderSettingTarget(flame, ctx, tgt, val)
+      break
+    case 'transformAffine':
+      applyTransformAffineTarget(flame, ctx, tgt, val)
+      break
+    case 'transformProperty':
+      applyTransformPropertyTarget(flame, ctx, tgt, val)
+      break
+    case 'variationWeight':
+      applyVariationWeightTarget(flame, ctx, tgt, val)
+      break
+    case 'finalAffine':
+      applyFinalAffineTarget(flame, tgt, val)
+      break
+  }
+}
+
+/** One mapping's settled value for one frame. */
+export type AudioTargetValue = {
+  target: FlameTarget
+  value: number
+}
+
+/**
+ * Settles every mapping for one audio frame, touching no flame at all.
+ *
+ * Split out of `applyAudioMappingsToFlame` for the live path, which no longer
+ * writes the document: it hands these values to a render-time overlay that
+ * rebuilds them onto a copy of the authored flame. The envelope state stays
+ * here so it advances exactly once per audio frame — an overlay recomputed
+ * because the user edited the flame mid-track must not age the envelopes a
+ * second time.
+ *
+ * `changed` is false when every target held still, so the caller can drop the
+ * frame instead of publishing one nothing would look different for.
+ */
+export function resolveAudioMappingValues(
+  frameData: FrameData & { isBeat: boolean },
+  mappings: AudioMappingEntry[],
+  smoothingState?: MappingSmoothingState,
+  deltaTime?: number,
+): { values: AudioTargetValue[]; changed: boolean } {
+  const dt = deltaTime ?? 1 / 30
+  const values: AudioTargetValue[] = []
+  let changed = false
+
+  for (const mapping of mappings) {
+    const raw = getAudioFeatureNormalized(frameData, mapping.audioFeature)
+    const clamped = Math.max(0, Math.min(1, raw))
+    const targetKey = flameTargetKey(mapping.target)
+
+    const smoothed = computeSmoothedEnvelope(
+      clamped,
+      targetKey,
+      mapping,
+      smoothingState,
+      dt,
+    )
+    const settled = settleTargetValue(smoothed, targetKey, smoothingState)
+    if (settled.changed) changed = true
+    values.push({
+      target: mapping.target,
+      value: mappingToVal(settled.applied, mapping),
+    })
+  }
+
+  return { values, changed }
+}
+
+/**
+ * Writes settled values into a flame — an export's per-frame clone, or the
+ * live overlay's copy of the authored flame. Never the open document.
+ */
+export function applyAudioTargetValues(
+  flame: Record<string, unknown>,
+  values: readonly AudioTargetValue[],
+): void {
+  if (values.length === 0) return
+  const ctx: AudioMutationContext = {}
+  for (const { target, value } of values) {
+    dispatchAudioTargetMapping(flame, ctx, target, value)
+  }
+  if (ctx.rs) {
+    if (ctx.camera) ctx.rs.camera = ctx.camera
+    flame.renderSettings = ctx.rs
+  }
+}
+
+/**
+ * Settles the mappings for one frame and writes them into `flame`.
  *
  * Targets can be render settings, transform affine coefficients, transform
  * scalar properties, variation weights, or final-transform affine params.
  *
  * Supports attack/release envelope smoothing via optional `attackMs` /
- * `releaseMs` on each mapping entry, and skips redundant renders when
- * no mapped value has changed beyond a tiny threshold.
+ * `releaseMs` on each mapping entry, and leaves the flame untouched when no
+ * mapped value has moved beyond a tiny threshold.
  *
- * @param flame   - Full FlameDescriptor draft (from setFlameDescriptor producer).
+ * For callers that own the flame outright — the two export paths, each with a
+ * per-frame clone. The live path settles and applies in two steps instead, so
+ * no part of it can reach the open document.
+ *
+ * @param flame - a flame the caller owns, never the document.
  * @param smoothingState - persistent per-target state (smoothed value, last applied).
  * @param deltaTime - seconds since the previous frame (default 1/30).
  */
-/**
- * What each render setting is allowed to be, mirroring flameSchema.
- *
- * Audio modulation writes straight into the live descriptor, so a mapping whose
- * range exceeds the schema does not merely look wrong — it leaves the flame
- * PERMANENTLY INVALID. `validateFlame` then throws for everything downstream:
- * breeding it, exporting it, opening the ancestry tree. Observed in the wild as
- * `palettePhase: Expected <=1 but received 1.589`, after which that flame could
- * not be bred again.
- *
- * A range is authored by hand in the wiring editor and shipped in presets, so
- * neither can be trusted to respect a bound it never sees. Clamping happens
- * HERE, at the one place every mapping funnels through.
- *
- * Anything absent is genuinely unbounded in the schema and left alone.
- */
-const RENDER_SETTING_BOUNDS: Partial<
-  Record<RenderSettingKey, [min: number, max: number]>
-> = {
-  vibrancy: [0, 3],
-  exposure: [-8, 8],
-  palettePhase: [0, 1],
-  paletteSpeed: [0, Number.MAX_SAFE_INTEGER],
-  contrast: [0.01, 20],
-  gamma: [0.1, 8],
-  highlightPower: [0, 2],
-  lightPower: [0, 5],
-  depthColorPower: [0, 5],
-  zoom: [0.01, 500],
-  skipIters: [0, 30],
-}
-
-function clampRenderSetting(param: RenderSettingKey, value: number): number {
-  // NaN would fail validation as surely as an out-of-range number, and can
-  // arrive from a degenerate range.
-  if (!Number.isFinite(value)) return 0
-  const bounds = RENDER_SETTING_BOUNDS[param]
-  const clamped =
-    bounds === undefined
-      ? value
-      : Math.max(bounds[0], Math.min(bounds[1], value))
-  // The schema additionally requires an integer here.
-  return param === 'skipIters' ? Math.round(clamped) : clamped
-}
-
 export function applyAudioMappingsToFlame(
   flame: Record<string, unknown>,
   frameData: FrameData & { isBeat: boolean },
@@ -691,141 +970,15 @@ export function applyAudioMappingsToFlame(
   deltaTime?: number,
 ): void {
   if (mappings.length === 0) return
-  const dt = deltaTime ?? 1 / 30
-
-  // Lazily resolved sub-objects
-  let rs: Record<string, unknown> | undefined
-  let camera: Record<string, unknown> | undefined
-  let txArr: Record<string, unknown>[] | undefined
-  let anyChanged = false
-
-  for (const mapping of mappings) {
-    const raw = getAudioFeatureNormalized(frameData, mapping.audioFeature)
-    const clamped = Math.max(0, Math.min(1, raw))
-    const targetKey = flameTargetKey(mapping.target)
-
-    // Apply attack/release envelope smoothing
-    let smoothed = clamped
-    const attackMs = mapping.attackMs
-    const releaseMs = mapping.releaseMs
-    if ((attackMs ?? 0) > 0 || (releaseMs ?? 0) > 0) {
-      const state = smoothingState?.get(targetKey)
-      const prev = state?.smoothed ?? clamped
-      const rising = clamped > prev
-      const tc =
-        (rising ? (attackMs ?? releaseMs ?? 0) : (releaseMs ?? attackMs ?? 0)) /
-        1000
-      if (tc > 0) {
-        const coeff = dt / (tc + dt)
-        smoothed = prev + coeff * (clamped - prev)
-      }
-    }
-
-    // Dirty-check: skip if value hasn't changed meaningfully
-    const prevApplied = smoothingState?.get(targetKey)?.lastApplied
-    if (
-      prevApplied !== undefined &&
-      Math.abs(smoothed - prevApplied) < DIRTY_THRESHOLD
-    ) {
-      if (smoothingState) {
-        smoothingState.set(targetKey, { smoothed, lastApplied: prevApplied })
-      }
-      continue
-    }
-
-    anyChanged = true
-    const val = mappingToVal(smoothed, mapping)
-
-    if (smoothingState) {
-      smoothingState.set(targetKey, { smoothed, lastApplied: smoothed })
-    }
-
-    // --- Resolve target and write ---
-    const tgt = mapping.target
-
-    if (tgt.kind === 'renderSetting') {
-      // Render settings
-      rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
-      const safe = clampRenderSetting(tgt.param, val)
-      if (tgt.param === 'zoom') {
-        camera ??= (rs.camera as Record<string, unknown>) ?? {}
-        ;(camera as Record<string, number>).zoom = safe
-      } else {
-        ;(rs as Record<string, number>)[tgt.param] = safe
-      }
-    } else if (tgt.kind === 'transformAffine') {
-      // Transform affine matrix param
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      const mat = (tx[tgt.matrix] as Record<string, number> | undefined) ?? {}
-      mat[tgt.param] = val
-      tx[tgt.matrix] = mat
-    } else if (tgt.kind === 'transformProperty') {
-      // Transform scalar property
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      if (tgt.property === 'colorX') {
-        const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
-        color.x = val
-        tx.color = color
-      } else if (tgt.property === 'colorY') {
-        const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
-        color.y = val
-        tx.color = color
-      } else if (tgt.property === 'probability') {
-        /*
-         * Never let a transform's weight reach zero.
-         *
-         * The chaos game picks transforms by probability; at zero a branch
-         * stops receiving points and vanishes, and if every weight is driven
-         * low together the whole picture thins out to noise — the "flame
-         * collapsed and looks like nothing" people report mid-track. A
-         * negative weight is worse: it makes the cumulative distribution
-         * non-monotonic, so selection is meaningless.
-         *
-         * The schema itself only says `v.number()`, so nothing downstream
-         * would have caught either.
-         */
-        ;(tx as Record<string, number>).probability = Math.max(
-          0.001,
-          Number.isFinite(val) ? val : 0.001,
-        )
-      } else {
-        ;(tx as Record<string, number>)[tgt.property] = Number.isFinite(val)
-          ? val
-          : 0
-      }
-    } else if (tgt.kind === 'variationWeight') {
-      // Variation weight
-      txArr ??= Object.values(
-        (flame.transforms as Record<string, Record<string, unknown>>) ?? {},
-      )
-      const tx = txArr[tgt.transformIdx]
-      if (!tx) continue
-      const vars =
-        (tx.variations as Record<string, Record<string, unknown>>) ?? {}
-      const v = vars[tgt.variationType]
-      if (v) {
-        ;(v as Record<string, number>).weight = val
-      }
-    } else if (tgt.kind === 'finalAffine') {
-      // Final transform affine param
-      const fin =
-        (flame.finalTransform as Record<string, number> | undefined) ?? {}
-      fin[tgt.param] = val
-      flame.finalTransform = fin
-    }
-  }
-
-  if (!anyChanged) return
-  if (rs) {
-    if (camera) rs.camera = camera
-    flame.renderSettings = rs
-  }
+  const { values, changed } = resolveAudioMappingValues(
+    frameData,
+    mappings,
+    smoothingState,
+    deltaTime,
+  )
+  // Nothing moved: leave the flame exactly as it was. The offscreen and
+  // main-canvas exports pass no smoothing state, so every frame is a change
+  // for them and this only ever short-circuits a live caller.
+  if (!changed) return
+  applyAudioTargetValues(flame, values)
 }

@@ -1,71 +1,253 @@
-import { Book, GridIcon, Star } from '@/icons'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { Book, DeepZoom, GridIcon, Info, SidebarPanel, Star, Stopwatch, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
-import { BENCHMARKS_PATH } from '@/routing/appPath'
-import { VERSION } from '@/version'
-import { BenchmarkButton } from '../BenchmarkButton/BenchmarkButton'
+import { BENCHMARKS_PATH, EXPLORER_PATH } from '@/routing/appPath'
+import { openBenchmarkLab, openExplorer } from '@/routing/pageLinks'
+import { setTouchLayoutPreference as globalSetTouchLayoutPref } from '@/stores/workspaceLayoutStore'
+import { DISPLAY_VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
+import { provideSettingsOpener } from './settingsOpener'
 import ui from './SoftwareVersion.module.css'
+import type { TouchLayoutPreference } from '@/stores/workspaceLayoutStore'
 
-export function SoftwareVersion(props: {
+export interface SoftwareVersionProps {
   showHelp: () => void
   showDocs: () => void
   showBenchmark: () => void
-}) {
+  setTouchLayoutPreference?: (pref: TouchLayoutPreference) => void
+  /**
+   * True on every touch layout. Each one already offers this list from a More
+   * menu of its own (Shell/moreMenuItems.ts), and the floating trigger has
+   * nowhere to sit that is not on top of one: under the phone's top bar, or
+   * over the first two items of the tablet's navigation rail.
+   */
+  hideTrigger?: () => boolean
+  onPickGallery?: () => void
+}
+
+/**
+ * A menu link to a page of its own. A plain click leaves this tab, so it
+ * goes the way the touch menu goes: the editor asks first at a full Recents
+ * (routing/pageLinks.ts). A click for a new tab leaves nothing behind and
+ * stays the browser's, as does every click in the native build, where
+ * `open` is undefined.
+ */
+function leaveOnPlainClick(ev: MouseEvent, open: (() => void) | undefined) {
+  if (!open || ev.button !== 0) return
+  if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return
+  ev.preventDefault()
+  open()
+}
+
+export function SoftwareVersion(props: SoftwareVersionProps) {
+  const [open, setOpen] = createSignal(false)
+  const setTouchPref = (pref: TouchLayoutPreference) => {
+    if (props.setTouchLayoutPreference) {
+      props.setTouchLayoutPreference(pref)
+    } else {
+      globalSetTouchLayoutPref(pref)
+    }
+  }
+
+  // The welcome screen's version pill opens Settings and more by this same
+  // opener (settingsOpener.ts). On mount, not in the body: a request that was
+  // waiting for the editor runs as soon as it is provided.
+  onMount(() => {
+    onCleanup(
+      provideSettingsOpener(() => {
+        props.showHelp()
+      }),
+    )
+  })
+
+  createEffect(() => {
+    if (!open() || typeof window === 'undefined') return
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleKeyDown)
+    })
+  })
+
+  const renderMenuItems = () => (
+    <>
+      <button
+        type="button"
+        role="menuitem"
+        class={`${ui.menuItem} ${ui.menuItemHighlight}`}
+        onClick={() => {
+          setTouchPref('touch')
+          setOpen(false)
+        }}
+      >
+        <SidebarPanel class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Switch to Touch Studio</span>
+          <span class={ui.menuSub}>Touch-optimized mobile/tablet UI</span>
+        </div>
+      </button>
+      <Show when={props.onPickGallery}>
+        <button
+          type="button"
+          role="menuitem"
+          class={`${ui.menuItem} ${ui.menuItemHighlight}`}
+          onClick={() => {
+            props.onPickGallery?.()
+            setOpen(false)
+          }}
+        >
+          <GridIcon class={ui.menuIcon} />
+          <div class={ui.menuMeta}>
+            <span class={ui.menuLabel}>Browse Flame Gallery</span>
+            <span class={ui.menuSub}>Search & load presets or community</span>
+          </div>
+        </button>
+      </Show>
+      <div class={ui.menuDivider} />
+
+      <a
+        class={ui.menuItem}
+        href="#arcade"
+        role="menuitem"
+        aria-label="Open Lumen Arcade"
+        onClick={(ev) => {
+          ev.preventDefault()
+          setActiveTab('arcade')
+          setOpen(false)
+        }}
+      >
+        <Star class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Lumen Arcade</span>
+          <span class={ui.menuSub}>Interactive lessons & duels</span>
+        </div>
+      </a>
+
+      <a
+        class={ui.menuItem}
+        href={BENCHMARKS_PATH}
+        role="menuitem"
+        aria-label="Open Benchmark Lab"
+        onClick={(ev) => {
+          setOpen(false)
+          leaveOnPlainClick(ev, openBenchmarkLab)
+        }}
+      >
+        <GridIcon class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Benchmark Lab</span>
+          <span class={ui.menuSub}>Fractal performance lab</span>
+        </div>
+      </a>
+
+      <a
+        class={ui.menuItem}
+        href={EXPLORER_PATH}
+        role="menuitem"
+        aria-label="Open the deep-zoom explorer"
+        onClick={(ev) => {
+          setOpen(false)
+          leaveOnPlainClick(ev, openExplorer)
+        }}
+      >
+        <DeepZoom class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Deep zoom</span>
+          <span class={ui.menuSub}>Mandelbrot and Julia explorer</span>
+        </div>
+      </a>
+
+      <button
+        type="button"
+        class={ui.menuItem}
+        role="menuitem"
+        onClick={() => {
+          setOpen(false)
+          props.showBenchmark()
+        }}
+      >
+        <Stopwatch class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Quick GPU Benchmark</span>
+          <span class={ui.menuSub}>Run hardware speed test</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class={ui.menuItem}
+        role="menuitem"
+        onClick={() => {
+          setOpen(false)
+          props.showDocs()
+        }}
+      >
+        <Book class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Documentation</span>
+          <span class={ui.menuSub}>User guide & references</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class={ui.menuItem}
+        role="menuitem"
+        onClick={() => {
+          setOpen(false)
+          props.showHelp()
+        }}
+      >
+        <Info class={ui.menuIcon} />
+        <div class={ui.menuMeta}>
+          <span class={ui.menuLabel}>Settings and more</span>
+          <span class={ui.menuSub}>
+            Preferences, about & v{DISPLAY_VERSION}
+          </span>
+        </div>
+      </button>
+    </>
+  )
+
   return (
     <div>
       <DebugPanel />
-      <div class={ui.versionContainer}>
-        <BenchmarkButton onClick={props.showBenchmark} />
-        <a
-          class={ui.benchmarkLabPill}
-          href={BENCHMARKS_PATH}
-          aria-label="Open Benchmark Lab"
-          title="Open Benchmark Lab"
-        >
-          <GridIcon />
-          Lab
-        </a>
-        {/* A real href so the Arcade can be copied and opened in a new tab,
-            but the click switches tabs in place: the workspace stays mounted
-            underneath the hub, so a lesson starts on the flame you were
-            already looking at. */}
-        <a
-          class={ui.arcadePill}
-          href="#arcade"
-          aria-label="Open Lumen Arcade"
-          title="Open Lumen Arcade"
-          onClick={(ev) => {
-            ev.preventDefault()
-            setActiveTab('arcade')
-          }}
-        >
-          <Star />
-          Arcade
-        </a>
-        <button
-          class={ui.docsPill}
-          onClick={props.showDocs}
-          title="Documentation"
-        >
-          <Book />
-          Docs
-        </button>
-        <button class={ui.aboutPill} onClick={props.showHelp}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+      <Show when={!props.hideTrigger?.()}>
+        <div class={ui.desktopContainer}>
+          <Show when={open()}>
+            <div
+              class={ui.popoverBackdrop}
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+            />
+            <div
+              class={ui.menuPopoverUp}
+              role="menu"
+              aria-label="Lumen Apeiron menu"
+            >
+              {renderMenuItems()}
+            </div>
+          </Show>
+
+          <button
+            type="button"
+            class={ui.desktopTrigger}
+            classList={{ [ui.desktopTriggerActive as string]: open() }}
+            onClick={() => setOpen(!open())}
+            aria-expanded={open()}
+            aria-haspopup="menu"
+            aria-label={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
+            title={`Lumen Apeiron v${DISPLAY_VERSION} menu`}
           >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-          v{VERSION}
-        </button>
-      </div>
+            <Info class={ui.pillIcon} />
+            <span>v{DISPLAY_VERSION}</span>
+          </button>
+        </div>
+      </Show>
     </div>
   )
 }

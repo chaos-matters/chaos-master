@@ -4,6 +4,7 @@ import { Dynamic } from 'solid-js/web'
 import { ParamMetaCaptureProvider } from '@/components/Sliders/ParametricEditors/paramMetaCapture'
 import { allTransformVariations } from '@/flame/variations'
 import { getVariationDoc } from '@/flame/variations/docs'
+import { Info } from '@/icons'
 import ui from './DocumentationModal.module.css'
 import type { Component } from 'solid-js'
 import type { CapturedParamMeta, ParamValueType, } from '@/components/Sliders/ParametricEditors/paramMetaCapture'
@@ -85,7 +86,20 @@ export function ParametersOverview(props: { type: AnyVariationType }) {
   return (
     <Show
       when={fields().length > 0}
-      fallback={<p class={ui.muted}>This variation takes no parameters.</p>}
+      fallback={
+        <div class={ui.emptyNoticeCard}>
+          <div class={ui.emptyNoticeIcon}>
+            <Info width="18" height="18" />
+          </div>
+          <div class={ui.emptyNoticeContent}>
+            <div class={ui.emptyNoticeTitle}>No Configurable Parameters</div>
+            <div class={ui.emptyNoticeText}>
+              This variation operates directly on coordinates without requiring
+              auxiliary parameter tuning.
+            </div>
+          </div>
+        </div>
+      }
     >
       {/* Hidden probe: renders the real editor in capture mode. Its primitives
           report each param's range/type and render nothing, so there is no UI. */}
@@ -99,44 +113,60 @@ export function ParametersOverview(props: { type: AnyVariationType }) {
         </ParamMetaCaptureProvider>
       </Show>
 
-      <table class={ui.paramsTable}>
-        <thead>
-          <tr>
-            <th>Parameter</th>
-            <th>Type</th>
-            <th>Range</th>
-            <th>Default</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <For each={fields()}>
-            {(name) => {
-              const pd = (): ParamDoc | undefined => doc()?.params?.[name]
-              const def = () => entry()?.paramDefaults?.[name]
-              return (
-                <tr>
-                  <td class={ui.paramName}>{name}</td>
-                  <td>
-                    <Show when={valueTypeOf(name)} fallback="—">
-                      {(vt) => <span class={ui.paramType}>{vt()}</span>}
-                    </Show>
-                  </td>
-                  <td class={ui.paramMono}>{rangeOf(name) ?? '—'}</td>
-                  <td class={ui.paramMono}>
-                    <Show when={def() !== undefined} fallback="—">
-                      {formatNumber(def()!)}
-                    </Show>
-                  </td>
-                  <td class={ui.paramDesc}>
-                    {pd()?.description ?? 'Not yet documented.'}
-                  </td>
-                </tr>
-              )
-            }}
-          </For>
-        </tbody>
-      </table>
+      <div class={ui.paramsTableWrap}>
+        <table class={ui.paramsTable}>
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Range</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <For each={fields()}>
+              {(name) => {
+                const pd = (): ParamDoc | undefined => doc()?.params?.[name]
+                const def = () => entry()?.paramDefaults?.[name]
+                const vt = () => valueTypeOf(name)
+                return (
+                  <tr>
+                    <td>
+                      <code class={ui.paramBadge}>{name}</code>
+                    </td>
+                    <td>
+                      <Show when={vt()} fallback="—">
+                        {(valType) => (
+                          <span
+                            class={ui.paramType}
+                            classList={{
+                              [ui.paramTypeFloat!]: valType() === 'float',
+                              [ui.paramTypeAngle!]: valType() === 'angle',
+                              [ui.paramTypeBool!]: valType() === 'bool',
+                            }}
+                          >
+                            {valType()}
+                          </span>
+                        )}
+                      </Show>
+                    </td>
+                    <td class={ui.paramMono}>{rangeOf(name) ?? '—'}</td>
+                    <td class={ui.paramMono}>
+                      <Show when={def() !== undefined} fallback="—">
+                        {formatNumber(def()!)}
+                      </Show>
+                    </td>
+                    <td class={ui.paramDesc}>
+                      {pd()?.description ?? 'Not yet documented.'}
+                    </td>
+                  </tr>
+                )
+              }}
+            </For>
+          </tbody>
+        </table>
+      </div>
     </Show>
   )
 }

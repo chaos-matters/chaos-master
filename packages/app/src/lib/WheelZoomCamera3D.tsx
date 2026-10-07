@@ -1,15 +1,18 @@
 import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
 import { vec3 } from 'wgpu-matrix'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS } from '@/flame/schema/flameSchema'
 import { Camera3D } from '@/lib/Camera3D'
 import { useCamera3D } from '@/lib/Camera3DContext'
 import { cameraBasis, rollAdjustLookDelta } from '@/lib/cameraMath'
 import { useCanvas } from '@/lib/CanvasContext'
+import { NO_SHIFT } from '@/lib/canvasFraming'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import type { Accessor, ParentProps, Signal } from 'solid-js'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ViewShift } from '@/lib/canvasFraming'
 
 const ORBIT_SENSITIVITY = 0.005
 const SCROLL_SENSITIVITY = 0.001
@@ -69,6 +72,12 @@ type WheelZoomCamera3DProps = {
   flySpeed?: Signal<number>
   /** Camera roll around the view direction (radians). Q/E adjust it in fly mode. */
   roll?: Signal<number>
+  /**
+   * The view's framing shift, in clip units (Camera3D.viewShift). Every
+   * gesture here moves the camera by pointer deltas, never by where the
+   * pointer is, so none of them needs to know it.
+   */
+  viewShift?: () => ViewShift
 }
 
 export function createSpherical(
@@ -100,6 +109,8 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   const { canvas } = useCanvas()
   const el = createMemo(() => props.eventTarget ?? canvas)
   const changeHistory = useChangeHistory()
+  // An accessor, not an inline `??` in the JSX (see WheelZoomCamera2D).
+  const viewShift = () => props.viewShift?.() ?? NO_SHIFT
 
   let _clipToWorld: ((pos: Vec3) => Vec3) | undefined
 
@@ -281,6 +292,14 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   function onMouseMove(ev: MouseEvent) {
     if (!isPointerLocked()) return
+    // A pointer captured before the agent took the screen would keep turning
+    // the camera under it, as edits no recorded command made. Hand it back.
+    // Not the key gate's (arcade/lockKeyGate.ts): this is the pointer, and
+    // stays when WP9 takes the per-listener key checks out.
+    if (pilotOwnsKeyboard()) {
+      document.exitPointerLock()
+      return
+    }
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera look')
     }
@@ -346,6 +365,13 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   }
 
   const startPinch = createPinchHandler((initEvent) => {
+    // createPinchHandler already rejects degenerate gestures, but prevDistance
+    // is state this consumer holds, so guard it here too -- the 2D camera has
+    // done so since 0d239a45 and this one did not, which is how a two-finger
+    // tap wrote NaN into camera3D.radius.
+    if (!Number.isFinite(initEvent.distance) || initEvent.distance <= 0) {
+      return
+    }
     let prevDistance = initEvent.distance
     cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
@@ -353,7 +379,17 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     }
     return {
       onPinchMove(event) {
+        if (
+          !Number.isFinite(event.distance) ||
+          event.distance <= 0 ||
+          prevDistance <= 0
+        ) {
+          return
+        }
         const ratio = event.distance / prevDistance
+        if (!Number.isFinite(ratio) || ratio <= 0) {
+          return
+        }
         props.radius[1]((r) =>
           Math.max(MIN_ORBIT_RADIUS, Math.min(MAX_ORBIT_RADIUS, r / ratio)),
         )
@@ -499,6 +535,16 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   }
 
   function onKeyDown(ev: KeyboardEvent) {
+    // The camera is the agent's while it owns the screen: a pan here became a
+    // history entry no recorded command made. Nothing is claimed.
+    // Redundant since the key gate (arcade/lockKeyGate.ts) swallows every key
+    // under the screen lock before any listener runs, and hands this listener
+    // the keyup of a key held as the lock starts; kept until WP9 takes these
+    // checks out one at a time, each with its own test.
+    if (pilotOwnsKeyboard()) {
+      activeKeys.clear()
+      return
+    }
     if (keyBelongsToTarget(ev.target)) return
 
     const key = ev.key.toLowerCase()
@@ -606,6 +652,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       target={props.target[0]()}
       fov={props.fov[0]()}
       roll={props.roll?.[0]() ?? 0}
+      viewShift={viewShift()}
     >
       {(() => {
         const { js } = useCamera3D()

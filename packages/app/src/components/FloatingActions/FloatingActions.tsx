@@ -441,16 +441,12 @@ export function FloatingActions(props: Props) {
               class={ui.toggle}
               classList={{ [ui.toggleActive as string]: props.showTimeline() }}
               onClick={() => {
+                // Read and written in the same click. Applied a frame later,
+                // in a view transition, a second click read the state the
+                // first had not yet changed, and two clicks toggled once.
                 const checked = !props.showTimeline()
-                if ('startViewTransition' in document) {
-                  document.startViewTransition(() => {
-                    props.setShowTimeline(checked)
-                    if (!checked) props.setAnimationEnabled(false)
-                  })
-                } else {
-                  props.setShowTimeline(checked)
-                  if (!checked) props.setAnimationEnabled(false)
-                }
+                props.setShowTimeline(checked)
+                if (!checked) props.setAnimationEnabled(false)
               }}
               title={
                 props.showTimeline()

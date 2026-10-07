@@ -1,10 +1,24 @@
+/* The scrub field, written for the Duel's dark chips. A surface of its own
+   sets these on an ancestor to restyle every field inside it (the touch
+   inspector on glass, TouchSurface.module.css):
+
+     --scrub-fill            the field's fill
+     --scrub-fill-hover      the same while hovered
+     --scrub-edge            its edge
+     --scrub-label           the label
+     --scrub-value           the value
+     --scrub-unit-opacity    the unit, in the value's colour
+     --scrub-chevron         the step chevrons
+     --scrub-chevron-hover   the same while the field is hovered
+
+   Unset, which is everywhere else, each falls back to the white it had. */
 .field {
   display: grid;
   gap: 1px;
   padding: 3px 5px 4px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--scrub-edge, rgba(255, 255, 255, 0.1));
+  background: var(--scrub-fill, rgba(255, 255, 255, 0.04));
   /* Room for the mid-scrub bar to sit flush with the bottom edge. */
   position: relative;
   overflow: hidden;
@@ -14,14 +28,14 @@
 }
 
 .field:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--scrub-fill-hover, rgba(255, 255, 255, 0.07));
 }
 
 .label {
   text-align: center;
   font-size: 0.62rem;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--scrub-label, rgba(255, 255, 255, 0.58));
 }
 
 .row {
@@ -39,7 +53,7 @@
   font-size: 0.78rem;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--scrub-value, rgba(255, 255, 255, 0.95));
   cursor: ew-resize;
   user-select: none;
   touch-action: none;
@@ -47,7 +61,7 @@
 
 .unit {
   font-size: 0.7em;
-  opacity: 0.5;
+  opacity: var(--scrub-unit-opacity, 0.5);
 }
 
 .chevron {
@@ -58,7 +72,7 @@
   padding: 0;
   border: none;
   background: none;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--scrub-chevron, rgba(255, 255, 255, 0.45));
   cursor: pointer;
 }
 
@@ -68,7 +82,7 @@
 }
 
 .field:hover .chevron {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--scrub-chevron-hover, rgba(255, 255, 255, 0.7));
 }
 
 /* The whole mid-scrub tell: the field cools, and a bar lights along its

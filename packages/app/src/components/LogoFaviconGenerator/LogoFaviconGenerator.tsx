@@ -6,10 +6,14 @@ import { VariationMultiSelect } from '@/components/VariationMultiSelect/Variatio
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { generateRandomFlame } from '@/flame/randomize'
+import { MAX_SKIP_ITERS_VALUE } from '@/flame/schema/flameSchema'
 import { variationTypes } from '@/flame/variations'
 import { AutoCanvas } from '@/lib/AutoCanvas'
+import { shareNative } from '@/lib/nativeSave'
+import { IS_NATIVE } from '@/lib/platform'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { downloadBlob } from '@/utils/blob'
 import { deepClone } from '@/utils/clone'
 import { encodeIco } from '@/utils/icoEncoder'
 import { addHistoryEntry, clearHistory, loadHistoryEntries, } from '@/utils/logoHistoryDB'
@@ -284,6 +288,10 @@ function LogoDialog(props: LogoDialogProps) {
                   <WheelZoomCamera2D
                     zoom={props.cameraZoom}
                     position={props.cameraPosition}
+                    /* The generator frames the mark itself, starting at zoom 1
+                       on the origin rather than at the flame's camera, so it
+                       does not inherit the flame's rotation either. */
+                    rotation={() => 0}
                   >
                     <Flam3
                       quality={props.quality}
@@ -413,7 +421,7 @@ function LogoDialog(props: LogoDialogProps) {
                 <Slider
                   value={props.skipIters}
                   min={0}
-                  max={30}
+                  max={MAX_SKIP_ITERS_VALUE}
                   step={1}
                   onInput={props.onSkipItersChange}
                 />
@@ -760,7 +768,9 @@ function LogoHistory(props: {
                       e.stopPropagation()
                       props.onCopyImage(entry)
                     }}
-                    title="Copy image to clipboard"
+                    title={
+                      IS_NATIVE ? 'Share image' : 'Copy image to clipboard'
+                    }
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -851,6 +861,12 @@ export function createLogoFaviconGenerator(
         c.toBlob(r, 'image/png')
       })
       if (!blob) return
+      // A WebView cannot put an image on Android's clipboard (the write
+      // resolves, nothing arrives), so the app opens the share sheet instead.
+      if (IS_NATIVE) {
+        await shareNative(blob, 'logo.png')
+        return
+      }
       await window.navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob }),
       ])
@@ -868,12 +884,7 @@ export function createLogoFaviconGenerator(
       ctx.drawImage(img, 0, 0, 512, 512)
       c.toBlob((blob) => {
         if (!blob) return
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'logo.png'
-        a.click()
-        URL.revokeObjectURL(url)
+        downloadBlob(blob, 'logo.png')
       }, 'image/png')
     }
     img.src = entry.thumbnail
@@ -921,12 +932,7 @@ export function createLogoFaviconGenerator(
         }),
       )
       const icoBlob = encodeIco(frames)
-      const url = URL.createObjectURL(icoBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'favicon.ico'
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(icoBlob, 'favicon.ico')
     }
     img.src = entry.thumbnail
   }
@@ -1100,12 +1106,7 @@ export function createLogoFaviconGenerator(
       if (canvas === null) return
       canvas.toBlob((blob) => {
         if (blob === null) return
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'logo.png'
-        a.click()
-        URL.revokeObjectURL(url)
+        downloadBlob(blob, 'logo.png')
       }, 'image/png')
     }
 
@@ -1146,12 +1147,7 @@ export function createLogoFaviconGenerator(
           }),
         )
         const icoBlob = encodeIco(frames)
-        const url = URL.createObjectURL(icoBlob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'favicon.ico'
-        a.click()
-        URL.revokeObjectURL(url)
+        downloadBlob(icoBlob, 'favicon.ico')
       }, 'image/png')
     }
 

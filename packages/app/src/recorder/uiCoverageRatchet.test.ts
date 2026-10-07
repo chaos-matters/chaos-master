@@ -1,15 +1,49 @@
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import workspaceSource from '../MainWorkspace.tsx?raw'
+
+/**
+ * The files this ratchet reads, derived rather than listed: MainWorkspace, every
+ * sidebar section and every useWorkspace* hook it was decomposed into. The list
+ * used to be hand-maintained and was widened twice, each time inside the commit
+ * that made widening necessary; a new extraction is now covered as it lands.
+ */
+const RAW_SOURCES = import.meta.glob(
+  [
+    '../MainWorkspace.tsx',
+    '../components/WorkspaceSidebar/*.tsx',
+    '../hooks/useWorkspace*.{ts,tsx}',
+    '!**/*.test.*',
+  ],
+  { query: '?raw', import: 'default', eager: true },
+)
+
+/**
+ * Bump this deliberately when an extraction adds a file. The file is covered
+ * either way; the count makes the widening visible in review instead of silent.
+ */
+const EXPECTED_SOURCE_COUNT = 20
+
+const sources = Object.entries(RAW_SOURCES).map(([relative, text]) => ({
+  path: relative.replace(/^\.\.\//, 'src/'),
+  text,
+}))
 
 const workspacePath = 'src/MainWorkspace.tsx'
-const workspaceAst = ts.createSourceFile(
-  workspacePath,
-  workspaceSource,
-  ts.ScriptTarget.Latest,
-  true,
-  ts.ScriptKind.TSX,
-)
+
+const allAstEntries = sources.map(({ path, text }) => ({
+  path,
+  ast: ts.createSourceFile(
+    path,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  ),
+}))
+
+const workspaceAst = allAstEntries.find((e) => e.path === workspacePath)!.ast
+
+const allSources = sources.map(({ text }) => text).join('\n')
 
 /**
  * MainWorkspace owns the final callbacks for most editor controls, but mounting
@@ -25,6 +59,8 @@ function compact(text: string): string {
     .replace(/\s+/g, ' ')
     .replace(/\(\s+/g, '(')
     .replace(/\s+\)/g, ')')
+    .replace(/\{\s+/g, '{')
+    .replace(/\s+\}/g, '}')
     .trim()
 }
 
@@ -42,7 +78,9 @@ function namedDeclaration(name: string): ts.Node {
     }
     ts.forEachChild(node, visit)
   }
-  visit(workspaceAst)
+  for (const { ast } of allAstEntries) {
+    visit(ast)
+  }
   expect(
     matches,
     `expected exactly one declaration named ${name}`,
@@ -62,16 +100,18 @@ function callsWithin(node: ts.Node): ts.CallExpression[] {
 
 function jsxOpenings(tagName: string): string[] {
   const matches: string[] = []
-  const visit = (node: ts.Node) => {
-    if (
-      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
-      node.tagName.getText(workspaceAst) === tagName
-    ) {
-      matches.push(compact(node.getText(workspaceAst)))
+  for (const { ast } of allAstEntries) {
+    const visit = (node: ts.Node) => {
+      if (
+        (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+        node.tagName.getText(ast) === tagName
+      ) {
+        matches.push(compact(node.getText(ast)))
+      }
+      ts.forEachChild(node, visit)
     }
-    ts.forEachChild(node, visit)
+    visit(ast)
   }
-  visit(workspaceAst)
   return matches
 }
 
@@ -80,8 +120,9 @@ function expectNamedDeclarationToUse(
   ...fragments: string[]
 ): void {
   const declaration = namedDeclaration(name)
+  const sourceFile = declaration.getSourceFile()
   const calls = callsWithin(declaration)
-  const callText = calls.map((call) => compact(call.getText(workspaceAst)))
+  const callText = calls.map((call) => compact(call.getText(sourceFile)))
   const recorderCall = callText.find((call) =>
     fragments.every((fragment) => call.includes(fragment)),
   )
@@ -90,15 +131,16 @@ function expectNamedDeclarationToUse(
     `${name} must retain one recorder call containing ${fragments.join(', ')}`,
   ).toBeDefined()
 
-  const callees = calls.map((call) => call.expression.getText(workspaceAst))
+  const callees = calls.map((call) => call.expression.getText(sourceFile))
   expect(callees).not.toContain('setFlameDescriptor')
   expect(callees).not.toContain('history.set')
   expect(callees).not.toContain('history.setSilently')
 }
 
 function expectSomeOpeningToUse(tagName: string, ...fragments: string[]) {
+  const compactFragments = fragments.map(compact)
   const match = jsxOpenings(tagName).find((opening) =>
-    fragments.every((fragment) => opening.includes(fragment)),
+    compactFragments.every((fragment) => opening.includes(fragment)),
   )
   expect(
     match,
@@ -107,6 +149,11 @@ function expectSomeOpeningToUse(tagName: string, ...fragments: string[]) {
 }
 
 describe('real UI recorder coverage ratchet', () => {
+  it('reads every workspace source file, and says so when that grows', () => {
+    expect(sources.map(({ path }) => path).sort()).toContain(workspacePath)
+    expect(sources).toHaveLength(EXPECTED_SOURCE_COUNT)
+  })
+
   it('keeps randomize, mutate and load-result workflows value-pinned', () => {
     expectNamedDeclarationToUse(
       'executeFlameLoad',
@@ -187,7 +234,7 @@ describe('real UI recorder coverage ratchet', () => {
     )
     expectSomeOpeningToUse(
       'FlameRandomizerCard',
-      'onUpdateRenderSettings={ handleUpdateRenderSettings }',
+      'onUpdateRenderSettings={handleUpdateRenderSettings}',
     )
     expectSomeOpeningToUse(
       'Slider',
@@ -233,27 +280,25 @@ describe('real UI recorder coverage ratchet', () => {
   })
 
   it('keeps symmetry-row follow-cam anchors on the dedicated card', () => {
-    expect(workspaceSource).toContain('data-focus-id={affineFocusId(tid)}')
-    expect(workspaceSource).toContain(
-      'data-focus-id={transformVisibilityFocusId(',
-    )
+    expect(allSources).toContain('data-focus-id={affineFocusId(tid)}')
+    expect(allSources).toContain('data-focus-id={transformVisibilityFocusId(')
   })
 
   it('keeps document and transport boundaries honest', () => {
-    expect(workspaceSource).toContain("'card-randomize',")
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain("'card-randomize',")
+    expect(allSources).toContain(
       'data-focus-id={transformColorRandomizeFocusId(',
     )
-    expect(workspaceSource).toContain(
-      'Loaded animation autoplay is wall-clock transport and is not replayed',
+    expect(allSources).toContain(
+      'Autoplay of a loaded animation, which a recording does not replay',
     )
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain(
       'Stop or discard the recording before opening a Home flame',
     )
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain(
       'if (isSessionRecording()) hideMobileSidebarAsAuthoredAction()',
     )
-    expect(workspaceSource).toContain('else setSidebarHidden(true)')
-    expect(workspaceSource).toContain('primeEffects: (session) =>')
+    expect(allSources).toContain('else setSidebarHidden(true)')
+    expect(allSources).toContain('primeEffects: (session) =>')
   })
 })

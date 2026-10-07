@@ -1,7 +1,10 @@
+import { untrack } from 'solid-js'
 import { DEBUG_MODE } from '@/defaults'
-import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
+import { accumulatedPointCount, animationExportProgress, animationExportRunning, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportAccumulationFraction, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
+import { DEFAULT_SHUTTER_ANGLE, subFrameLimit, subFrameOffsets, } from '@/utils/motionBlur'
 import { applyAudioMappingsToFlame, createAudioAnalyzer } from './audioAnalysis'
 import { createAudioVideoEncoder } from './audioExport'
+import { snapshotCanvas } from './canvasSnapshot'
 import { deepClone } from './clone'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
@@ -33,6 +36,29 @@ export type AnimationExportConfig = {
   audioBuffer?: AudioBuffer
   /** Audio-reactive mappings applied per frame (requires audioBuffer). */
   audioMapping?: AudioMappingEntry[]
+  /** Number of temporal sub-frame accumulation passes per output frame (1 = disabled, 4 = smooth, 8 = high, 16 = cinematic). */
+  motionBlurSamples?: number
+  /** Shutter angle in degrees (e.g. 180 for standard cinematic 180-degree shutter). */
+  shutterAngle?: number
+}
+
+/**
+ * While an export runs, keep the playhead on the frame it is rendering.
+ *
+ * Run from an effect, so it follows the export's progress. Only a playhead
+ * outside that frame is moved: the export poses each motion blur sub-frame
+ * itself, at frame + offset, and every offset stays inside the frame.
+ * Pinning the playhead back to the whole frame on each progress update
+ * re-posed the rest of a sub-frame at the frame's own pose, so a GPU slow
+ * enough to report progress mid sub-frame drew most of the blur unblurred.
+ */
+export function holdPlayheadOnExportFrame(timeline: TimelineState): void {
+  const progress = animationExportProgress()
+  if (!animationExportRunning() || !progress || timeline.isPlaying()) return
+  const at = untrack(() => timeline.currentFrame())
+  if (Math.floor(at) !== progress.currentTimelineFrame) {
+    timeline.setCurrentFrame(progress.currentTimelineFrame)
+  }
 }
 
 function estimatePointCount(
@@ -63,9 +89,20 @@ export function createAnimationExport(
 ): { cancel: () => void; promise: Promise<Blob> } {
   let cancelled = false
 
-  // Snapshot original flame state so we can restore it after export.
+  // Snapshot the parts of the flame the per-frame writes below overwrite, so
+  // they can be put back when the export ends (see restoreFlameState).
   // baseFlame is a reactive store proxy — deep-clone to a plain object.
   const baseFlameSnapshot = deepClone(baseFlame)
+  // The playhead is the other thing the per-frame setup writes, and with
+  // motion blur it writes sub-frames: frame + offset. Left there when the
+  // export ended or was cancelled, the next auto-keyframe landed on a
+  // fractional frame, which the schema rejects, so saving the flame to a file
+  // and loading it back dropped every track. It goes back to a whole frame,
+  // the one the user was on.
+  const playheadBefore = Math.round(timeline.currentFrame())
+  const restorePlayhead = () => {
+    timeline.setCurrentFrame(playheadBefore)
+  }
 
   const totalFrames = config.frameEnd - config.frameStart + 1
   const totalRenders = totalFrames * config.playCount
@@ -169,40 +206,61 @@ export function createAnimationExport(
         }
 
         const frame = config.frameStart + (frameIndex % totalFrames)
+        const subOffsets = subFrameOffsets(
+          config.motionBlurSamples ?? 1,
+          config.shutterAngle ?? DEFAULT_SHUTTER_ANGLE,
+        )
+        const motionBlurSamples = subOffsets.length
+        let subFrameIndex = 0
 
-        // Advance the playhead so anything resolved from currentFrame outside the
-        // flame descriptor — notably the morph's animated blendWeight (read via
-        // resolvedBlendWeight on the live Flam3) — tracks this export frame.
-        timeline.setCurrentFrame(frame)
+        function applySubFrame(subIdx: number) {
+          const subFrame = frame + (subOffsets[subIdx] ?? 0)
+          // Each sub-frame accumulates only up to its cumulative share of the
+          // budget; otherwise the first export tick takes all of it.
+          setExportAccumulationFraction(
+            motionBlurSamples > 1
+              ? (subIdx + 1) / motionBlurSamples
+              : undefined,
+          )
 
-        // Clone flame and apply timeline for this frame
-        const flameClone = deepClone(baseFlame)
-        applyTimelineToFlameAtFrame(timeline, flameClone, frame)
+          // Advance the playhead so anything resolved from currentFrame tracks this subFrame.
+          timeline.setCurrentFrame(subFrame)
 
-        // Apply audio-reactive mappings if configured
-        if (audioAnalyzer && config.audioMapping) {
-          const audioFrame = frameIndex % audioAnalyzer.totalFrames
-          const frameData = audioAnalyzer.getFrameData(audioFrame)
-          applyAudioMappingsToFlame(flameClone, frameData, config.audioMapping)
+          // Clone flame and apply timeline for this subFrame
+          const flameClone = deepClone(baseFlame)
+          applyTimelineToFlameAtFrame(timeline, flameClone, subFrame)
+
+          // Apply audio-reactive mappings if configured
+          if (audioAnalyzer && config.audioMapping) {
+            const audioFrame = frameIndex % audioAnalyzer.totalFrames
+            const frameData = audioAnalyzer.getFrameData(audioFrame)
+            applyAudioMappingsToFlame(
+              flameClone,
+              frameData,
+              config.audioMapping,
+            )
+          }
+
+          // Set flame descriptor to the per-frame clone so Flam3 picks it up
+          setFlameDescriptor((draft) => {
+            draft.renderSettings = flameClone.renderSettings
+            draft.transforms = flameClone.transforms
+          })
         }
 
-        // Set flame descriptor to the per-frame clone so Flam3 picks it up
-        setFlameDescriptor((draft) => {
-          // Apply render settings
-          draft.renderSettings = flameClone.renderSettings
-          // Apply transforms
-
-          draft.transforms = flameClone.transforms
-          // edgeFadeColor lives under renderSettings (copied wholesale above);
-          // the old top-level copy was a dead no-op (issue #30 exposed it).
-        })
-
+        applySubFrame(0)
         setExportQuality(config.quality)
+        // A new output frame starts from an empty buffer. Report it now, which
+        // resets accumulation through Flam3's export-frame effect, instead of
+        // on the first export tick: that tick still reads the previous frame's
+        // total, which met every sub-frame limit and skipped straight past
+        // this frame's first sub-frames.
+        updateProgress(0, qualityPointCountLimit()())
 
         frameAccumStartMs = performance.now()
         if (DEBUG_MODE) {
           console.info(
-            `[AnimExport ${logTime()}] setup frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frame})`,
+            `[AnimExport ${logTime()}] setup frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frame}${motionBlurSamples > 1 ? `, ${motionBlurSamples}x motion blur` : ''})`,
           )
         }
         let capturing = false
@@ -224,6 +282,23 @@ export function createAnimationExport(
 
             updateProgress(current, limit)
 
+            // Accumulate subsequent sub-frames into the same buffer if motion blur is active
+            if (
+              motionBlurSamples > 1 &&
+              subFrameIndex < motionBlurSamples - 1
+            ) {
+              const subLimit = subFrameLimit(
+                subFrameIndex,
+                motionBlurSamples,
+                limit,
+              )
+              if (current >= subLimit) {
+                subFrameIndex++
+                applySubFrame(subFrameIndex)
+              }
+              return
+            }
+
             if (current < limit) return
 
             // Wait until the final color-graded image is actually on the canvas
@@ -244,17 +319,15 @@ export function createAnimationExport(
 
             const captureStartTime = performance.now()
 
-            // eslint-disable-next-line no-restricted-globals
-            createImageBitmap(exportCanvas, {
-              resizeWidth,
-              resizeHeight,
-              resizeQuality: 'high',
-            })
+            // A copy, not a view of the canvas the next frame clears: see
+            // utils/canvasSnapshot.ts for the drivers that write black video.
+            snapshotCanvas(exportCanvas, resizeWidth, resizeHeight)
               .then(async (bitmap) => {
                 const captureTime = performance.now() - captureStartTime
                 // Only clear export state after the bitmap is captured
                 setOnExportImage(undefined)
                 setExportQuality(undefined)
+                setExportAccumulationFraction(undefined)
 
                 if (cancelled) {
                   bitmap.close()
@@ -284,18 +357,30 @@ export function createAnimationExport(
               })
               .catch((err: unknown) => {
                 capturing = false
+                setExportAccumulationFraction(undefined)
                 reject(err instanceof Error ? err : new Error(String(err)))
               })
           },
         )
       }
 
+      /**
+       * Put back exactly what the export overwrote, and nothing else.
+       *
+       * The per-frame setup above writes `renderSettings` and `transforms`
+       * for every frame it renders, so both are the export's to return.
+       * `metadata` is not: nothing here ever writes it, and restoring it
+       * reverted a name or a description typed while the export ran. A
+       * main-canvas animation export takes minutes and the editor stays
+       * usable throughout, so that is a real edit being silently undone at
+       * the moment the export happens to finish.
+       */
       function restoreFlameState() {
         setFlameDescriptor((draft) => {
           draft.renderSettings = baseFlameSnapshot.renderSettings
           draft.transforms = baseFlameSnapshot.transforms
-          draft.metadata = baseFlameSnapshot.metadata
         })
+        restorePlayhead()
       }
 
       async function finishExport() {
@@ -335,6 +420,7 @@ export function createAnimationExport(
           setForceAnimationExportNow(false)
           setOnExportImage(undefined)
           setExportQuality(undefined)
+          setExportAccumulationFraction(undefined)
           restoreFlameState()
         }
       }
@@ -346,6 +432,7 @@ export function createAnimationExport(
         setForceAnimationExportNow(false)
         setOnExportImage(undefined)
         setExportQuality(undefined)
+        setExportAccumulationFraction(undefined)
         restoreFlameState()
         encoder.cancel()
       }
@@ -358,6 +445,12 @@ export function createAnimationExport(
 
   const cancel = () => {
     cancelled = true
+    // Clear the blur cap now, not when the loop next notices the cancel: if no
+    // export callback fires again, a stale fraction would cap the live view.
+    setExportAccumulationFraction(undefined)
+    // Likewise the playhead: the progress that would have pinned it back to a
+    // whole frame is cleared here, and cleanup() may never run.
+    restorePlayhead()
     setAnimationExportRunning(false)
     setAnimationExportCancel(undefined)
     setAnimationExportProgress(undefined)

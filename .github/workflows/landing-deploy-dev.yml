@@ -5,6 +5,10 @@ name: Deploy landing (dev)
 # only change won't redeploy the dev landing (per request). Note: changes to
 # packages/app that the landing bundles won't trigger this either — bump/touch the
 # landing or tag `vA.B.C-web` for those.
+#
+# Builds with `build:review`, not `build`: the dev host serves the same pages as
+# production from a different origin, so it needs its own robots.txt and a
+# noindex meta tag. See packages/landing/src/pages/robots.txt.ts.
 on:
   push:
     branches: [main]
@@ -33,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build landing (static assets → dist/)
-        run: pnpm --filter @chaos-master/landing run build
+        run: pnpm --filter @chaos-master/landing run build:review
       - name: Deploy (dev)
         if: env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3

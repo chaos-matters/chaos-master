@@ -1,10 +1,15 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
+import { glideMsForAction, selfGlideOf } from './glide'
 import { NARRATION_COMMAND_ID } from './narrationMode'
+import { createPlayerPlayWindows } from './playerPlayWindows'
 import { getLiveWorkspaceMutationGeneration, isSessionRecording, withRecordingSuppressed, } from './recorder'
 import { loadSessionStart } from './replay'
+import { createReplayGlideLease } from './replayGlideLease'
+import type { ReplayGlideOptions } from './glide'
 import type { ReplayTarget } from './replay'
 import type { RecordedAction, RecordedSession } from './schema'
+import type { GlideSwitches } from '@/flame/glide/types'
 
 /**
  * Timed playback of a recorded session (semantic-recorder-plan, M4).
@@ -169,14 +174,41 @@ export function closingHoldMs(
  * Shared with `createReplayVideoSchedule` so a live replay and an exported
  * video cannot drift — `replayInterfaceVideo` validates its encoder budget
  * from the schedule and then screen-records the live player, so a difference
- * between the two overruns the capture.
+ * between the two overruns the capture. `glideMs` is subtracted here, at the
+ * single owner of cadence, rather than at the call sites, for exactly that
+ * reason: see {@link glideMsForAction} for where the number comes from.
+ *
+ * `playing`: the take's timeline played across the gap (a play window,
+ * recorder/playWindows.ts), so the replay waits the real gap divided by speed,
+ * with no floor, ceiling, hold or glide, and lands on the recorded frame.
  */
 export function stepGapMs(
   previous: RecordedAction | undefined,
   next: RecordedAction | undefined,
   speed: number,
+  glideMs = 0,
+  playing = false,
 ): number {
   if (!next) return 0
+  if (playing && previous) return Math.max(0, next.t - previous.t) / speed
+  const base = rawStepGapMs(previous, next, speed)
+  if (glideMs <= 0) return base
+  // A glide is presentation spent INSIDE the dwell it precedes, not extra time
+  // on top of it: the transition into a step is part of looking at that step.
+  // Adding it instead would stretch a take past the duration its own schedule
+  // validated the encoder budget against.
+  //
+  // The floor never RAISES a gap — an authored `holdMs: 0` still means zero —
+  // so a take with glides on is the same length or shorter, never longer.
+  const floor = Math.min(base, MIN_STEP_GAP_MS)
+  return Math.max(floor, base - glideMs)
+}
+
+function rawStepGapMs(
+  previous: RecordedAction | undefined,
+  next: RecordedAction,
+  speed: number,
+): number {
   if (previous?.holdMs !== undefined) return previous.holdMs / speed
   const sentence = previous === undefined ? undefined : narrationText(previous)
   if (sentence !== undefined) return narrationHoldMs(sentence) / speed
@@ -207,6 +239,8 @@ export type SessionPlayer = {
   readonly isFinished: () => boolean
   /** Human-readable reason the last action was rejected, if any. */
   readonly lastError: () => string | undefined
+  /** The viewer's Glide switches, whatever the take has switched meanwhile. */
+  readonly viewerGlideSwitches: () => GlideSwitches
   readonly total: number
 }
 
@@ -221,6 +255,15 @@ export type SessionPlayerOptions = {
   beforeAction?: (action: RecordedAction) => void
   onFinished?: () => void
   onError?: (message: string) => void
+  /**
+   * Whether steps glide into place, read afresh for each step so the panel's
+   * toggle lands on the next one rather than on the next Play.
+   *
+   * Off is the behaviour replay has always had: every step is a cut. The
+   * duration it produces is SUBTRACTED from the dwell that follows, so turning
+   * it on never makes a take longer.
+   */
+  glide?: () => ReplayGlideOptions
 }
 
 export function createSessionPlayer(
@@ -247,6 +290,22 @@ export function createSessionPlayer(
    * forwards checks this first.
    */
   let baselineLoaded = false
+  /** The take's play windows, paced as the artwork export paces them. */
+  const windows = createPlayerPlayWindows(actions, target.playback, {
+    isPlaying: () => isPlaying(),
+    speed: () => speed(),
+    respeed: (waitMs) => {
+      const next = stepIndex() + 1
+      if (next >= actions.length) return
+      clearTimeout(timer)
+      armStep(next, waitMs)
+    },
+  })
+  /** Where a replay Pause stopped the take's clock inside a window. */
+  let resumeAt: number | undefined
+  /** The viewer's Glide switches, held from the first step until the replay
+   *  ends; meanwhile the take's own steps switch them. */
+  const glideLease = createReplayGlideLease()
 
   const speed = () => {
     const value = options.speed?.() ?? 1
@@ -273,6 +332,19 @@ export function createSessionPlayer(
     preservePublishedAction = false,
     preserveBaseline = false,
   ) {
+    // Land the glide before the user's edit is evaluated, so their change is
+    // made to the state the recording reached rather than to a frame of the
+    // animation that happened to be on screen.
+    target.settleGlide?.()
+    if (preserveBaseline) {
+      // A replay Pause stops the take's clock here; Resume carries on from it.
+      resumeAt = windows.now()
+      if (resumeAt !== undefined) windows.holdAt(resumeAt, false)
+    } else {
+      // An edit ends the replay: paused where it is, the viewer's switches.
+      endReplayState(true)
+    }
+    windows.stopClock()
     setIsPlaying(false)
     setIsFinished(false)
     if (!preservePublishedAction) setActionPublished(false)
@@ -288,6 +360,7 @@ export function createSessionPlayer(
 
   function openBatch() {
     if (batchOpen) return
+    glideLease.hold()
     withRecordingSuppressed(() => target.prepare?.())
     target.beginBatch?.(takeOverByUser)
     batchOpen = true
@@ -318,6 +391,7 @@ export function createSessionPlayer(
     setIsFinished(false)
     clearTimer()
     closeBatch()
+    endReplayState(true)
     options.onError?.(message)
     return false
   }
@@ -330,6 +404,7 @@ export function createSessionPlayer(
     setIsFinished(false)
     clearTimer()
     closeBatch()
+    endReplayState(true)
     options.onError?.(message)
     return false
   }
@@ -375,12 +450,83 @@ export function createSessionPlayer(
     }
   }
 
+  /** Run step `index` on the frame the take ran it on, then follow the
+   *  window the gap after it is in. A step whose command glides itself is
+   *  run with the glide `glideMs` asks for, not the one it recorded. */
+  function runStep(
+    index: number,
+    prepareUi: boolean,
+    glideMs?: number,
+  ): ActionExecution {
+    const recorded = actions[index]!
+    const selfGlide = selfGlideOf(recorded.id)
+    const action =
+      selfGlide === undefined || glideMs === undefined
+        ? recorded
+        : {
+            ...recorded,
+            args: selfGlide.withDurationMs(recorded.args, glideMs),
+          }
+    windows.holdAt(action.t, true)
+    const result = glideLease.step(() => executeAction(action, prepareUi))
+    if (result.ok) windows.afterStep(index)
+    return result
+  }
+
+  /** The playback is no longer the replay's: its own clock, the viewer's
+   *  Glide switches. A replay ended early pauses a window where it is. */
+  function endReplayState(early = false): void {
+    windows.stopClock()
+    resumeAt = undefined
+    windows.release(early)
+    glideLease.release()
+  }
+
+  /** How long the transition INTO `index` should take. 0 = a cut. */
+  function glideMsFor(action: RecordedAction | undefined): number {
+    const settings = options.glide?.()
+    if (!settings || !settings.enabled) return 0
+    if (target.glide === undefined) return 0
+    return glideMsForAction(action, settings)
+  }
+
   /** Apply one visible action, including follow-cam preparation/publication. */
   function applyAction(index: number): boolean {
     const action = actions[index]
     if (!action) return false
-    const result = executeAction(action, true)
+    // A step that glides itself is the one glide of its change: the player
+    // hands it the duration it would have glided for (its own recorded one
+    // first) and neither settles nor glides around it. The command settles
+    // what is in flight itself, keeping the frame the viewer could see.
+    if (selfGlideOf(action.id) !== undefined) {
+      const glides = options.glide?.().enabled === true
+      const result = runStep(
+        index,
+        true,
+        glides ? glideMsFor(action) : undefined,
+      )
+      if (!result.ok) return rejectAction(index, result.error)
+      setStepIndex(index)
+      setActionPublished(true)
+      return true
+    }
+    // Settled BEFORE the command runs, whether or not THIS step animates. A
+    // glide is subtracted from the gap that precedes it, so a step can be due
+    // while the previous transition is still moving; a cut applied underneath
+    // one is overwritten frame by frame and then undone by that transition's
+    // own settle, and the viewer sees the step it cut to appear and vanish.
+    const settled = target.settleGlide?.()
+    // What the viewer can currently see, so the animation starts from there
+    // while the step itself lands on the state the recording describes.
+    const from = options.glide?.().enabled
+      ? (settled ?? target.readFlame?.())
+      : undefined
+    const start = from === undefined ? undefined : deepClone(from)
+    const result = runStep(index, true)
     if (!result.ok) return rejectAction(index, result.error)
+    // Timed once the step ran, at its tier: the one the dwell and render use.
+    const durationMs = start === undefined ? 0 : glideMsFor(action)
+    if (start !== undefined && durationMs > 0) target.glide?.(start, durationMs)
     setStepIndex(index)
     setActionPublished(true)
     return true
@@ -399,16 +545,23 @@ export function createSessionPlayer(
     baselineLoaded = true
     setStepIndex(-1)
     setActionPublished(false)
+    // Every take starts paused, and with the Glide switches the viewer had:
+    // the steps before the seek point set them again as the take did.
+    windows.reset()
+    resumeAt = undefined
+    windows.release()
+    glideLease.reset()
 
     // Rebuild the historical prefix silently. Preparing and publishing every
     // intermediate action made a seek through N steps scroll/focus the UI N
     // times and re-render the transport N times, even though only the state at
     // the destination is visible. If a prefix action fails, publish the last
     // state that did apply before reporting the exact attempted step.
+    // Nothing glides into a rebuild, a step that glides itself included: its
+    // glide would write its frames over the steps rebuilt after it.
     for (let i = 0; i < index; i++) {
-      const action = actions[i]
-      if (!action) return false
-      const result = executeAction(action, false)
+      if (!actions[i]) return false
+      const result = runStep(i, false, 0)
       if (!result.ok) {
         setStepIndex(i - 1)
         return rejectAction(i, result.error)
@@ -418,9 +571,8 @@ export function createSessionPlayer(
     // The terminal action is the only seek step the viewer sees, so it alone
     // receives follow-cam preparation and becomes the published current step.
     if (index < 0) return true
-    const action = actions[index]
-    if (!action) return false
-    const result = executeAction(action, true)
+    if (!actions[index]) return false
+    const result = runStep(index, true, 0)
     if (!result.ok) {
       setStepIndex(index - 1)
       return rejectAction(index, result.error)
@@ -433,15 +585,23 @@ export function createSessionPlayer(
   /** Rebuilds are synchronous state reconstruction, not visible playback.
    *  Defer target-owned resources until the destination state is known. */
   function rebuildTo(index: number): boolean {
+    // A rebuild is not something anyone watches, so nothing glides into it —
+    // and a glide still running would write over the state being rebuilt.
+    target.settleGlide?.()
     return withDeferredEffects(() => rebuildToNow(index))
   }
 
   /** How long to wait before applying `index`. See {@link stepGapMs}. */
   function gapBefore(index: number): number {
+    const previous = index > 0 ? actions[index - 1] : undefined
+    // The glide subtracted here is the one INTO `previous`: it is spent at the
+    // start of the dwell on that step, not added to it.
     return stepGapMs(
-      index > 0 ? actions[index - 1] : undefined,
+      previous,
       actions[index],
       speed(),
+      glideMsFor(previous),
+      windows.inWindow(),
     )
   }
 
@@ -449,11 +609,29 @@ export function createSessionPlayer(
     setIsPlaying(false)
     setIsFinished(true)
     closeBatch()
+    // A take that ended playing leaves the timeline playing, on its own clock.
+    endReplayState()
     options.onFinished?.()
+  }
+
+  function armStep(next: number, wait: number) {
+    timer = setTimeout(() => {
+      if (!isPlaying()) return
+      windows.stopClock()
+      if (!applyAction(next)) return
+      scheduleNext()
+    }, wait)
   }
 
   function scheduleNext() {
     const next = stepIndex() + 1
+    // Inside a window, wait the take's own time from where its clock stopped.
+    const from = resumeAt ?? actions[stepIndex()]?.t
+    resumeAt = undefined
+    const paced =
+      windows.inWindow() && from !== undefined
+        ? windows.startClock(from, actions[next]?.t ?? Number.POSITIVE_INFINITY)
+        : undefined
     if (next >= actions.length) {
       // Hold the last step before finishing, rather than finishing on the same
       // tick that applied it. `isPlaying` stays true through the hold, because
@@ -470,11 +648,7 @@ export function createSessionPlayer(
       }, hold)
       return
     }
-    timer = setTimeout(() => {
-      if (!isPlaying()) return
-      if (!applyAction(next)) return
-      scheduleNext()
-    }, gapBefore(next))
+    armStep(next, paced ?? gapBefore(next))
   }
 
   function clearTimer() {
@@ -503,6 +677,8 @@ export function createSessionPlayer(
       // activation has expired on strict autoplay engines.
       target.primeEffects?.(session)
       setIsPlaying(true)
+      // Resuming inside a window plays on from the frame the Pause held.
+      windows.holdAt(resumeAt ?? actions[stepIndex()]?.t ?? 0, true)
       scheduleNext()
     },
     pause() {
@@ -513,6 +689,8 @@ export function createSessionPlayer(
     },
     seek(index) {
       clearTimer()
+      windows.stopClock()
+      resumeAt = undefined
       setIsFinished(false)
       setLastError(undefined)
       if (!preflight()) return
@@ -536,6 +714,9 @@ export function createSessionPlayer(
         if (!rebuildTo(clamped)) return
       }
       target.primeEffects?.(session)
+      // Landing inside a window puts the playhead where the take had it at
+      // that step, playing on only if the replay is.
+      if (clamped >= 0) windows.holdAt(actions[clamped]!.t, isPlaying())
       if (isPlaying()) {
         scheduleNext()
       } else {
@@ -543,16 +724,19 @@ export function createSessionPlayer(
       }
     },
     stop() {
+      target.settleGlide?.()
       setIsPlaying(false)
       setIsFinished(false)
       clearTimer()
       closeBatch()
+      endReplayState(true)
     },
     stepIndex,
     currentAction: () => (actionPublished() ? actions[stepIndex()] : undefined),
     isPlaying,
     isFinished,
     lastError,
+    viewerGlideSwitches: glideLease.viewer,
     total: actions.length,
   }
 }
