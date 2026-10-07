@@ -4,7 +4,7 @@ import { describeAllowedCommands } from '@/arcade/commandHints'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
-import { finishPilot } from '@/arcade/pilotActions'
+import { finishPilot, takeOutcome } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_STEP_BUDGET, PRESENTATION_SWITCHES, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
 import { captureGlideSwitches } from '@/flame/glide/runtime'
@@ -454,6 +454,7 @@ export const arcadeEndCinema: WebMcpTool = {
       sessionName: ended.sessionName,
       steps: ended.steps,
       durationMs: Math.round(ended.durationMs),
+      ...takeOutcome(ended, 'Cinema session'),
     }
   },
 }

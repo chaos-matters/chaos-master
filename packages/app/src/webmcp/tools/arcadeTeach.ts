@@ -4,7 +4,7 @@ import { qualityRank } from '@/arcade/guard'
 import { acknowledgeInterruption, interruptionMessage, } from '@/arcade/interruptedSession'
 import { clearNarration, narration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
-import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
+import { budgetExhaustedMessage, finishPilot, takeOutcome, } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, PRESENTATION_SWITCHES, TOPIC_IDS, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
 import { captureGlideSwitches } from '@/flame/glide/runtime'
@@ -266,14 +266,21 @@ export const arcadeEndLesson: WebMcpTool = {
       summary: typeof raw.summary === 'string' ? raw.summary : undefined,
     })
     if ('error' in ended) return ended
+    const outcome = takeOutcome(ended, 'Lesson')
     return {
       ok: true,
       title: ended.title,
       sessionName: ended.sessionName,
       steps: ended.steps,
       durationMs: Math.round(ended.durationMs),
-      replayHint:
-        'The user can now replay the lesson from the end card or the Arcade library.',
+      ...outcome,
+      // The end card replays the take from memory, saved or not; only a
+      // saved one is in the library.
+      ...(ended.sessionName !== undefined && {
+        replayHint: outcome.saved
+          ? 'The user can now replay the lesson from the end card or the Arcade library.'
+          : 'The user can replay the lesson from the end card until they leave it; it is not in the Arcade library.',
+      }),
     }
   },
 }

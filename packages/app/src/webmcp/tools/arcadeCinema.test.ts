@@ -209,8 +209,25 @@ describe('Cinema tools', () => {
     expect(ended).toMatchObject({
       ok: true,
       sessionName: 'Animation: Slow push-in',
+      saved: true,
+      message: 'Cinema session completed and saved to library.',
     })
     expect(pilot().phase).toBe('ended')
+  })
+
+  it('says a failed save failed instead of claiming the take was kept', async () => {
+    const ctx = ctxWithRecorder()
+    ctx.recorder!.save = vi.fn(() => Promise.reject(new Error('quota')))
+    await arcadeStartCinema.execute({}, {})
+
+    const ended = await arcadeEndCinema.execute({ title: 'Slow push-in' }, {})
+
+    expect(ended).toMatchObject({
+      ok: true,
+      saved: false,
+      message:
+        'Cinema session ended, but the take could not be saved to the library.',
+    })
   })
 
   it('keeps the paths result inside the budget for a busy flame', async () => {
