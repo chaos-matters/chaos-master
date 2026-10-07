@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import colorMapSource from '@/flame/colorMap.ts?raw'
+import registrySource from '@/flame/variations/custom/CustomVariationRegistry.ts?raw'
 import { LEGACY_DRAFT_KEY } from '@/lib/pauseSave'
 import { clearSettings, computeStorageUsage } from './storageUsage'
+
+const CUSTOM_VARIATIONS_KEY = 'chaos-master-custom-variations'
+const CUSTOM_PALETTES_KEY = 'chaos-master-custom-palettes'
 
 // The two IndexedDB-backed histories. This runtime has no IndexedDB and the
 // store throws on the way in rather than rejecting, so the module's own
@@ -100,5 +105,49 @@ describe('clearing settings', () => {
     expect(memory.getItem('chaos-master-editor/autosave-recents')).toBeNull()
     // Another app's keys were never this sweep's business.
     expect(memory.getItem('unrelated-app-key')).toBe('kept')
+  })
+
+  it('keeps custom variations and custom palettes', () => {
+    // A saved flame that uses either stops rendering it once it is gone, so
+    // sweeping them broke the dialog's promise that saved flames are not
+    // touched.
+    memory.setItem(CUSTOM_VARIATIONS_KEY, '[{"name":"swirl2"}]')
+    memory.setItem(CUSTOM_PALETTES_KEY, '[{"id":"mine"}]')
+    memory.setItem('chaos-master-theme', '"dark"')
+
+    const cleared = clearSettings()
+
+    expect(cleared.count).toBe(1)
+    expect(memory.getItem(CUSTOM_VARIATIONS_KEY)).toBe('[{"name":"swirl2"}]')
+    expect(memory.getItem(CUSTOM_PALETTES_KEY)).toBe('[{"id":"mine"}]')
+  })
+
+  it('counts them, entry by entry, in the usage and its total', async () => {
+    // Kept out of the settings bucket, they were counted nowhere, and the
+    // total shrank by whatever the user's own palettes weighed.
+    memory.setItem(CUSTOM_VARIATIONS_KEY, '[{"name":"a"},{"name":"b"}]')
+    memory.setItem(CUSTOM_PALETTES_KEY, '[{"id":"mine"}]')
+    memory.setItem('chaos-master-theme', '"dark"')
+
+    const usage = await computeStorageUsage()
+
+    expect(usage.settings.count).toBe(1)
+    expect(usage.custom.count).toBe(3)
+    expect(usage.custom.bytes).toBeGreaterThan(0)
+    expect(usage.totalBytes).toBe(
+      usage.settings.bytes +
+        usage.recentFlames.bytes +
+        usage.generatedHistory.bytes +
+        usage.logoHistory.bytes +
+        usage.custom.bytes,
+    )
+  })
+
+  it('names the keys their owners write', () => {
+    // The sweep lists the two keys rather than importing them, to keep the
+    // variation compiler out of Data Management. A rename in either owner
+    // would quietly put that work back in the sweep.
+    expect(registrySource).toContain(`'${CUSTOM_VARIATIONS_KEY}'`)
+    expect(colorMapSource).toContain(`'${CUSTOM_PALETTES_KEY}'`)
   })
 })

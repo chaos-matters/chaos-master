@@ -19,8 +19,23 @@ const RECENT_FLAMES_KEY = 'chaos-master-recent-flames'
  * exact: the app tells a user at the cap to free space, they clear settings,
  * and the work goes with the theme. It stays listed here for as long as the
  * migration does.
+ *
+ * Custom variations and custom palettes are the user's work too, and a saved
+ * flame that uses one stops rendering it once it is gone, so clearing them
+ * would touch saved flames after all. Named here rather than imported: their
+ * owners (flame/variations/custom/CustomVariationRegistry.ts,
+ * flame/colorMap.ts) would pull the variation compiler into Data Management,
+ * and storageUsage.test.ts fails if either key changes without this list.
  */
-const FLAME_KEYS = new Set<string>([RECENT_FLAMES_KEY, LEGACY_DRAFT_KEY])
+const CUSTOM_KEYS = [
+  'chaos-master-custom-variations',
+  'chaos-master-custom-palettes',
+]
+const FLAME_KEYS = new Set<string>([
+  RECENT_FLAMES_KEY,
+  LEGACY_DRAFT_KEY,
+  ...CUSTOM_KEYS,
+])
 /** Effectively "all" — histories are capped well below this. */
 const ALL = 1_000_000
 
@@ -34,6 +49,8 @@ export type StorageUsage = {
   generatedHistory: StorageBucket
   /** Logo/Favicon generator history (IndexedDB). */
   logoHistory: StorageBucket
+  /** Custom variations and palettes, counted one by one (localStorage). */
+  custom: StorageBucket
   totalBytes: number
 }
 
@@ -71,6 +88,30 @@ function localStorageBucket(keys: string[]): StorageBucket {
   return { count: keys.length, bytes }
 }
 
+/** The custom variations and palettes, counted as the entries the user made
+ *  rather than as the two keys that hold them. */
+function customBucket(): StorageBucket {
+  let count = 0
+  let bytes = 0
+  for (const key of CUSTOM_KEYS) {
+    let raw: string | null
+    try {
+      raw = localStorage.getItem(key)
+    } catch {
+      raw = null
+    }
+    if (raw === null) continue
+    bytes += utf8Bytes(key) + utf8Bytes(raw)
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      count += Array.isArray(parsed) ? parsed.length : 1
+    } catch {
+      count += 1
+    }
+  }
+  return { count, bytes }
+}
+
 function idbBucket(entries: unknown[]): StorageBucket {
   let bytes = 0
   for (const e of entries) {
@@ -102,14 +143,23 @@ export async function computeStorageUsage(): Promise<StorageUsage> {
   ])
   const generatedHistory = idbBucket(gen)
   const logoHistory = idbBucket(logo)
+  const custom = customBucket()
 
   const totalBytes =
     settings.bytes +
     recentFlames.bytes +
     generatedHistory.bytes +
-    logoHistory.bytes
+    logoHistory.bytes +
+    custom.bytes
 
-  return { settings, recentFlames, generatedHistory, logoHistory, totalBytes }
+  return {
+    settings,
+    recentFlames,
+    generatedHistory,
+    logoHistory,
+    custom,
+    totalBytes,
+  }
 }
 
 /** Remove all persisted settings (keeps flame data). Returns what was cleared. */
