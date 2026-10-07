@@ -68,7 +68,8 @@ test.describe('Lumen Arcade', () => {
     if (await menuTrigger.isVisible()) {
       await menuTrigger.click()
     }
-    await page.getByRole('link', { name: 'Open Lumen Arcade' }).click()
+    // A menu item: the version menu's links carry role="menuitem".
+    await page.getByRole('menuitem', { name: 'Open Lumen Arcade' }).click()
     await expect(page.getByTestId('arcade-card')).toHaveCount(6)
     // In place: no reload, so the mock the workspace installed is still there.
     expect(await page.evaluate(() => 'webmcp' in window)).toBe(true)

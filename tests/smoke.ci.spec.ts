@@ -93,7 +93,8 @@ test.describe('CI smoke', () => {
       await menuTrigger.click()
     }
 
-    const labLink = page.getByRole('link', { name: 'Open Benchmark Lab' })
+    // A menu item: the version menu's links carry role="menuitem".
+    const labLink = page.getByRole('menuitem', { name: 'Open Benchmark Lab' })
     await expect(labLink).toBeVisible({ timeout: 12_000 })
     await expect(labLink).toHaveAttribute('href', '/benchmarks')
 

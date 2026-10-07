@@ -100,6 +100,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       <a
         class={ui.menuItem}
         href="#arcade"
+        role="menuitem"
         aria-label="Open Lumen Arcade"
         onClick={(ev) => {
           ev.preventDefault()
@@ -117,6 +118,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       <a
         class={ui.menuItem}
         href={BENCHMARKS_PATH}
+        role="menuitem"
         aria-label="Open Benchmark Lab"
         onClick={(ev) => {
           setOpen(false)
@@ -133,6 +135,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       <a
         class={ui.menuItem}
         href={EXPLORER_PATH}
+        role="menuitem"
         aria-label="Open the deep-zoom explorer"
         onClick={(ev) => {
           setOpen(false)
