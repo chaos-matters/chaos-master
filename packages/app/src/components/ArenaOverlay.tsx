@@ -681,8 +681,8 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
   const loadFighter = (player: 1 | 2) => {
     clearAllTimers('A fighter was reloaded.')
-    releaseClashPlayback()
-    wasClashStaged = false
+    // The user's own flame and tracks first, or the clash's keep playing.
+    restoreWorkspace()
     if (props.arena.selectFighter) {
       props.arena.selectFighter(player)
       props.arena.setOpen(false)
