@@ -16,6 +16,33 @@ This file is internal (not surfaced anywhere on the site).
   the black hero instead of punching a white card through it. Nothing to add to
   a CSP — this package ships no `_headers`.
 
+### Privacy and support
+
+- `/privacy` and `/support`, linked from the footer. The privacy notice says
+  what stays on the device, what the site and app handle and why, how long it
+  is kept and who runs it; the support page covers requirements on the web,
+  iPhone, iPad and Android, saving flames, purchases and how to reach us.
+
+### Search
+
+- `llms.txt` at the site root: a plain-text map of the site for language
+  model tools, alongside the app host's own.
+- `robots.txt` is generated at build time (`src/pages/robots.txt.ts`):
+  production allows crawling and names its sitemap, while the dev deploy,
+  built with `build:review`, answers `Disallow: /` and marks every page
+  `noindex, nofollow`.
+
+### Fixes
+
+- A 2D flame turns with its own `camera.rotation`, on every mount
+  (`FlameView.tsx`), as it does in the app.
+
+### Tooling
+
+- `astro check` type-checks the landing as part of the root `typecheck`, with
+  the app's and core's sources resolved through `tsconfig.json`.
+- `valibot` `1.2.0` to `1.4.2` (dependabot).
+
 ## [0.2.1] — 2026-09-10
 
 ### Security
