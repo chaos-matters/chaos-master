@@ -12,6 +12,7 @@
 
 import '@/commands/builtins'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, } from 'vitest'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { deleteCustomVariation, getCustomVariationDef, } from '@/flame/variations/custom'
 import { clearWebMcpContext, getWebMcpContext, setWebMcpContext, } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
@@ -342,10 +343,15 @@ describe('WebMCP Foundation', () => {
       })) as Record<string, unknown>
 
       expect(result.success).toBe(true)
+      // Validated copies with the schema's defaults filled in, never the
+      // objects the agent sent: the Director previews and loads these.
       expect(cmdContext.director!.setState).toHaveBeenCalledWith({
         sessionId: expect.any(String),
         generation: 1,
-        candidates,
+        candidates: candidates.map(({ fitness, flame }) => ({
+          fitness,
+          flame: tryValidateFlame(structuredClone(flame)),
+        })),
       })
       expect(cmdContext.director!.setOpen).toHaveBeenCalledWith(true)
     })

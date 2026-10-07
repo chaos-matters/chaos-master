@@ -1,6 +1,8 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearTasteStore, extractFlameTasteFeatures, recordCandidateFeedback, } from '@/arcade/tasteStore'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { deepClone } from '@/utils/clone'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { directorGetFeedback, directorGetTasteProfile, directorPropose, openArtDirector, } from './arcadeDirector'
@@ -51,6 +53,48 @@ describe('arcade director tools', () => {
     expect(state?.candidates[0]?.rationale).toBe(
       'Higher symmetry order with 4 transforms',
     )
+  })
+
+  // skipIters becomes the renderer's per-thread warm-up loop bound, and every
+  // candidate renders in a preview tile: one out of the schema's range
+  // (0 to 50) could hang the GPU before the user ever saw the modal.
+  it('refuses candidates the flame schema rejects, naming each, and opens nothing', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+
+    const hostile = createTestFlame()
+    hostile.renderSettings.skipIters = 1_000_000_000
+    const noVariations = createTestFlame() as unknown as {
+      transforms: Record<string, Record<string, unknown>>
+    }
+    delete noVariations.transforms.t1!.variations
+
+    const result = await run(directorPropose, {
+      generation: 1,
+      candidates: [
+        { flame: createTestFlame() },
+        { flame: hostile },
+        { flame: noVariations },
+      ],
+    })
+
+    expect(result.error).toBe(
+      'Invalid candidates[1], candidates[2]: they failed schema validation. Inspect the structure with get_flame, or omit a flame to get a mutation of the workspace flame.',
+    )
+    expect(ctx.director?.open()).toBe(false)
+    expect(ctx.director?.state()).toBeNull()
+  })
+
+  it('stores each candidate as the schema reads it', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    const flame = createTestFlame()
+
+    await run(directorPropose, { generation: 1, candidates: [{ flame }] })
+
+    const stored = ctx.director?.state()?.candidates[0]?.flame
+    expect(stored).toEqual(tryValidateFlame(deepClone(flame)))
+    expect(stored).not.toBe(flame)
   })
 
   it('provides backward compatibility with open_art_director', async () => {
