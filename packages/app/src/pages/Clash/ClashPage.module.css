@@ -23,11 +23,54 @@
   top: 50%;
   left: 50%;
   translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-s-3);
   max-width: calc(100vw - 2 * var(--la-s-4));
   margin: 0;
   padding: var(--la-s-3) var(--la-s-4);
   border-radius: var(--la-r-md);
   text-align: center;
+
+  & p {
+    margin: 0;
+  }
+}
+
+/* Where the stage's header starts, for the way back when there is no stage. */
+.top {
+  position: absolute;
+  top: calc(var(--la-safe-top) + var(--la-s-3));
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+}
+
+/* The way back to the editor, a glass circle as the explorer's. */
+.back {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--la-tap);
+  height: var(--la-tap);
+  border-radius: var(--la-r-pill);
+  color: var(--la-ink);
+  /* The stage's header lets clicks through to the canvas; this one takes them. */
+  pointer-events: auto;
+
+  & svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &:hover {
+    border-color: var(--la-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--la-accent);
+    outline-offset: 2px;
+  }
 }
 
 .picker {

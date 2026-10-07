@@ -37,6 +37,14 @@
   pointer-events: none;
 }
 
+/* The page's way back, then the title, kept together at the left. */
+.lead {
+  display: flex;
+  align-items: center;
+  gap: var(--la-s-2);
+  min-width: 0;
+}
+
 .title {
   composes: glass;
   display: flex;
