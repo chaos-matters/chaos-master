@@ -1,3 +1,4 @@
+import { flameComplexityError } from '@/flame/schema/flameSchema'
 import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -189,15 +190,17 @@ function simulateTeamTrajectory(
 ): void {
   if (teamList.length === 0) return
   let p: [number, number, number] = initialPos
-  const teamEntries = transforms.filter(([id]) =>
-    teamList.some((t) => t.id === id),
-  )
+  // Each team transform with its weight, looked up once: a find per
+  // transform per sample made every sample quadratic in the transform count.
+  const probById = new Map(teamList.map((t) => [t.id, t.prob]))
+  const teamEntries = transforms
+    .filter(([id]) => probById.has(id))
+    .map(([id, t]) => [t, probById.get(id) ?? 1] as const)
   const totalProb = teamList.reduce((acc, x) => acc + x.prob, 0)
   for (let i = 0; i < iters; i++) {
     let r = rng() * totalProb
-    let chosen = teamEntries[0]?.[1]
-    for (const [id, t] of teamEntries) {
-      const prob = teamList.find((item) => item.id === id)?.prob ?? 1
+    let chosen = teamEntries[0]?.[0]
+    for (const [t, prob] of teamEntries) {
       if (r <= prob) {
         chosen = t
         break
@@ -310,6 +313,23 @@ function evaluateSpatialOwnership(
   }
 }
 
+export const DEFAULT_CLASH_SAMPLE_BUDGET = 25_000
+/**
+ * The scoring loop runs synchronously on the main thread, and the tool is
+ * read-only, so it runs even while an Arcade session holds the lock: an
+ * unbounded budget froze the tab. Ten times the default.
+ */
+export const MAX_CLASH_SAMPLE_BUDGET = 250_000
+
+/** Clamped rather than refused, as the agent's render settings are; anything
+ *  that is not a finite number is read as the default. */
+export function heldSampleBudget(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_CLASH_SAMPLE_BUDGET
+  }
+  return Math.min(MAX_CLASH_SAMPLE_BUDGET, Math.max(0, Math.floor(value)))
+}
+
 export const scoreClashRound: WebMcpTool = {
   name: 'score_clash_round',
   description:
@@ -324,7 +344,7 @@ export const scoreClashRound: WebMcpTool = {
       },
       sampleBudget: {
         type: 'integer',
-        description: 'Simulation sample budget (iterations). Default is 25000.',
+        description: `Simulation sample budget (iterations). Default is ${DEFAULT_CLASH_SAMPLE_BUDGET}, at most ${MAX_CLASH_SAMPLE_BUDGET}.`,
       },
       seed: {
         type: 'integer',
@@ -339,15 +359,27 @@ export const scoreClashRound: WebMcpTool = {
   execute: (input: unknown): ScoreClashRoundResult | { error: string } => {
     const raw = (input ?? {}) as {
       clashFlame?: FlameDescriptor
-      sampleBudget?: number
+      sampleBudget?: unknown
       seed?: number
     }
 
-    const { clashFlame, sampleBudget = 25000, seed = 4242 } = raw
+    const { seed = 4242 } = raw
+    const sampleBudget = heldSampleBudget(raw.sampleBudget)
 
-    if (!clashFlame || !clashFlame.transforms) {
+    if (!raw.clashFlame || !raw.clashFlame.transforms) {
       return { error: 'Invalid or missing clashFlame descriptor.' }
     }
+    // The schema's complexity cap, as open_arena's fighters meet it through
+    // tryValidateFlame: the tool runs on the main thread even while an Arcade
+    // session holds the lock. Not the whole schema yet: simulate_clash scores
+    // its rounds through this tool with fighters it has not validated.
+    const tooComplex = flameComplexityError(raw.clashFlame)
+    if (tooComplex) {
+      return {
+        error: `Invalid clashFlame: ${tooComplex}. Build it from two fighters with create_clash_flame.`,
+      }
+    }
+    const clashFlame = raw.clashFlame
 
     const transforms = Object.entries(clashFlame.transforms)
     if (transforms.length === 0) {
