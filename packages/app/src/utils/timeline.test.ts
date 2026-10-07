@@ -69,6 +69,33 @@ describe('Timeline Utilities', () => {
           easing: 'easeOut',
         })
       })
+
+      it('puts a keyframe added between frames on the nearest whole one', () => {
+        // A motion-blurred export poses sub-frames, so the playhead an
+        // auto-keyframe reads can be fractional - and one fractional frame
+        // made the whole track array of a saved file fail to load.
+        timeline.addKeyframe('exposure', 12.4, 0.5, 'linear')
+        timeline.addKeyframe('exposure', 12.6, 0.7, 'linear')
+        timeline.addKeyframe('exposure', 13, 0.9, 'linear')
+        const track = timeline
+          .tracks()
+          .find((t) => t.parameterPath === 'exposure')
+        // 12.6 and 13 are one frame, so the later write is the one kept.
+        expect(track?.keyframes).toEqual([
+          { frame: 12, value: 0.5, easing: 'linear' },
+          { frame: 13, value: 0.9, easing: 'linear' },
+        ])
+      })
+
+      it('writes the value through when the rounded frame is the playhead', () => {
+        const writes: [string, unknown][] = []
+        timeline.setValueWriter((path, value) => {
+          writes.push([path, value])
+        })
+        timeline.setCurrentFrame(12.4)
+        timeline.addKeyframe('exposure', 12.4, 0.5, 'linear')
+        expect(writes).toEqual([['exposure', 0.5]])
+      })
     })
 
     describe('removeKeyframe', () => {

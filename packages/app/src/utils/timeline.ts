@@ -1053,6 +1053,9 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
     easing?: EasingCurve,
     interp?: KeyframeInterpolation,
   ) {
+    // Whole frames only: the schema rejects a fractional one, and a motion
+    // blurred export leaves the playhead between frames.
+    frame = Math.round(frame)
     setTracks((prev: TimelineTrack[]) => {
       const ti = prev.findIndex(
         (t: TimelineTrack) => t.parameterPath === parameterPath,
@@ -1088,7 +1091,7 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
       ]
     })
     setLastAddedKeyframe({ path: parameterPath, frame })
-    if (frame === currentFrame() && valueWriterFn) {
+    if (frame === Math.round(currentFrame()) && valueWriterFn) {
       valueWriterFn(parameterPath, value)
     }
   }
