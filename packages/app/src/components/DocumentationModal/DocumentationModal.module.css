@@ -1174,15 +1174,60 @@
   color: var(--doc-text-main);
 }
 
-/* Single-column on narrow viewports */
+/* Single-column on narrow viewports.
+
+   At 375px the tab bar ran 19px past the dialog and the dialog panned
+   sideways, and the catalogue, capped at 280px with the filter chips
+   wrapping over four rows inside it, was left a thin strip. So the tab bar
+   and the chips each keep one line and scroll inside it, and the catalogue
+   and the detail share the height, the catalogue taking the larger part:
+   each scrolls on its own. */
 @media (max-width: 760px) {
+  .title-row {
+    flex-wrap: wrap;
+  }
+
+  .title-text-group {
+    min-width: 0;
+  }
+
+  .tab-bar {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
   .docs-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   }
 
   .gallery-pane {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
-    max-height: 280px;
+  }
+
+  .category-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .category-pill {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* A finger needs the full target; a mouse keeps the compact sizes. */
+@media (pointer: coarse) {
+  .tab,
+  .category-pill {
+    min-block-size: var(--la-tap);
   }
 }

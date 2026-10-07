@@ -19,7 +19,7 @@ const LABEL = 'Glass panels'
 
 export function GlassPanelsSetting() {
   return (
-    <label class={ui.pickerModeRow}>
+    <label class={`${ui.pickerModeRow} ${own.row}`}>
       <span class={own.text}>
         <span class={ui.pickerModeLabel}>{LABEL}</span>
         <span class={own.hint}>
