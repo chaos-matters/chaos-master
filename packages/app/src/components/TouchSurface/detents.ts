@@ -10,13 +10,19 @@ import { createSignal } from 'solid-js'
  * whose decision causes that remount (stores/workspaceLayoutStore.ts) is
  * still open, and would also let the detent's back entry survive the flip.
  *
- * Heights are CSS px measured from the bottom of the viewport; the peek
- * height includes the bottom safe area.
+ * Heights are the sheet's own, in CSS px. The safe area is not in them: the
+ * dock's padding holds the sheet above the home indicator (EditorRail.tsx,
+ * measureChrome).
  */
 export type Detent = 'peek' | 'medium' | 'large'
 
 export const DETENTS: readonly Detent[] = ['peek', 'medium', 'large']
-export const PEEK_HEIGHT = 96
+/**
+ * The sheet's two 1px glass edges, the 24px grabber row and the peek row's
+ * --la-rail-h (EditorRail.module.css). EditorRail.module.test.ts fails when
+ * the stylesheet and this number part.
+ */
+export const PEEK_HEIGHT = 90
 export const MEDIUM_FRACTION = 0.44
 export const LARGE_FRACTION = 0.88
 /** px per ms; above this a release goes one detent in the direction of travel. */

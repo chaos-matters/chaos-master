@@ -26,7 +26,10 @@
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  border-radius: var(--la-r-sheet) var(--la-r-sheet) 0 0;
+  /* All four corners: the dock holds the sheet off the bottom edge as well as
+     the sides, so it is a floating card at every detent, and square bottom
+     corners read as a sheet cut off rather than one that floats. */
+  border-radius: var(--la-r-sheet);
   background: var(--la-glass-strong);
   box-shadow: var(--la-e-sheet);
   box-sizing: border-box;
@@ -88,7 +91,14 @@
   background: var(--la-control-accent);
 }
 
+/* The grabber row and the peek row hold their height at every detent: the
+   body is the one part of the column that gives way. As flex items they
+   shrank with it, the grabber row furthest because nothing inside it is
+   tall, so opening the sheet squeezed it from 24px to 13 (and to 5 on a
+   landscape phone, the handle touching the sheet's edge) and the whole peek
+   row jumped up. */
 .grabberRow {
+  flex: none;
   height: 24px;
   display: grid;
   place-items: center;
@@ -103,12 +113,34 @@
   background: var(--la-hairline-strong);
 }
 
+/* --la-rail-h is the capsule's 56px and the 8px under it, and together with
+   the 24px grabber row and the sheet's two 1px edges it is PEEK_HEIGHT
+   (detents.ts; EditorRail.module.test.ts holds the sum). With the row at its
+   own height the controls sit as far from the sheet's bottom edge as from
+   its sides, where the old 96 left 6px nobody owned under the row. A narrow
+   phone's capsule is 48 (lumen.css) in the same 64px row: the top padding
+   takes what the capsule gives up, so the 8px under the controls holds at
+   every width instead of growing to 12. */
 .peekRow {
+  flex: none;
   position: relative;
+  box-sizing: border-box;
+  height: var(--la-rail-h);
   display: flex;
   align-items: center;
   gap: var(--la-s-2);
-  padding: 0 var(--la-s-2) var(--la-s-2);
+  padding: calc(var(--la-rail-h) - var(--la-capsule) - var(--la-s-2))
+    var(--la-s-2) var(--la-s-2);
+}
+
+/* Narrow phones, with the smaller circles (lumen.css, --la-capsule): the
+   row's two gaps halve as well, and the 8px goes to the four chips. At 320
+   that is 43.5px a chip where it would be 41.5, against the 48 that
+   "Variations" needs. */
+@media (max-width: 374px) {
+  .peekRow {
+    gap: var(--la-s-1);
+  }
 }
 
 /* Behind the chips and the shutter, so a drag started on the row's background
@@ -189,8 +221,9 @@
 .shutter {
   position: relative;
   flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
+  /* The capsule's twin at the other end of the row, so one token sizes both. */
+  width: var(--la-capsule);
+  height: var(--la-capsule);
   display: grid;
   place-items: center;
   border-radius: 50%;

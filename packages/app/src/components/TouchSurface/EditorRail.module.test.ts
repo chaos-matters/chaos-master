@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { declarationsFor, readCss } from '@/test/cssModule'
-import { SHEET_EASING, SHEET_TRANSITION_MS } from './detents'
+import { PEEK_HEIGHT, SHEET_EASING, SHEET_TRANSITION_MS } from './detents'
 
 /** The row's arithmetic lives in the stylesheet; the test DOM applies no CSS. */
 const css = readCss('components/TouchSurface/EditorRail.module.css')
@@ -85,6 +85,51 @@ describe('the editor rail stylesheet', () => {
     const app = readCss('App.module.css')
     expect(app).toMatch(
       /\n\.canvas\s*\{[^}]*transition:\s*transform var\(--la-dur-sheet\) var\(--la-ease\);/,
+    )
+  })
+
+  it('is PEEK_HEIGHT tall at peek, with nothing left over under the row', () => {
+    // detents.ts sizes the sheet and the stylesheet fills it: two glass
+    // edges, the grabber row and the peek row. When the two parted (96
+    // against 90 of rows) the controls sat 6px further from the bottom edge
+    // than from the sides. Both rows hold their height at every detent: as
+    // flex items they shrank when the sheet opened, the grabber row from 24px
+    // to 13, and the peek row jumped up.
+    const lumen = readCss('styles/designSystem/lumen.css')
+    const px = (pattern: RegExp, text: string) =>
+      Number(pattern.exec(text)?.[1] ?? Number.NaN)
+    const grabberRow = declarations('.grabberRow')
+    const peekRow = declarations('.peekRow')
+    expect(grabberRow).toMatch(/flex:\s*none;/)
+    expect(peekRow).toMatch(/flex:\s*none;/)
+    expect(peekRow).toMatch(/box-sizing:\s*border-box;/)
+    expect(peekRow).toMatch(/height:\s*var\(--la-rail-h\);/)
+    // 8px under the controls, as at their sides, whatever the capsule's size:
+    // a narrow phone's smaller capsule leaves the row's spare height above
+    // them. With the padding fixed at 0 8 8 the 48px capsule sat 12px clear
+    // of the bottom and 8 of the sides.
+    expect(peekRow).toMatch(
+      /padding:\s*calc\(var\(--la-rail-h\) - var\(--la-capsule\) - var\(--la-s-2\)\)\s+var\(--la-s-2\) var\(--la-s-2\);/,
+    )
+    // Every platform's value, Android's block included.
+    const railRows = [...lumen.matchAll(/--la-rail-h:\s*([0-9.]+)px;/g)].map(
+      (match) => Number(match[1]),
+    )
+    expect(railRows.length).toBeGreaterThan(0)
+    expect(new Set(railRows).size).toBe(1)
+    const edge = px(/--la-glass-edge:\s*([0-9.]+)px/, lumen)
+    expect(
+      px(/(?:^|\s)height:\s*([0-9.]+)px;/, grabberRow) +
+        railRows[0]! +
+        2 * edge,
+    ).toBe(PEEK_HEIGHT)
+  })
+
+  it('rounds all four corners of a sheet that floats off every edge', () => {
+    // The dock pads the sheet off the bottom of the screen as well as the
+    // sides; with only its top corners round it read as a card cut off.
+    expect(declarations('.sheet')).toMatch(
+      /border-radius:\s*var\(--la-r-sheet\);/,
     )
   })
 })
