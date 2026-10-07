@@ -22,6 +22,7 @@ import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { useCanvas } from '@/lib/CanvasContext'
 import { CLOCK_AT_START, tickClock } from './clashClock'
 import ui from './ClashStage.module.css'
+import type { JSX } from 'solid-js'
 import type { ClashCamera } from '@/flame/clash/choreographer'
 import type { ClashFighter } from '@/flame/clash/fightFlame'
 import type { Team } from '@/flame/clash/tint'
@@ -37,6 +38,8 @@ export type ClashStageProps = {
   pointCountPerBatch: number
   onReducedMotionChange: (reduced: boolean) => void
   onChangeFighters?: () => void
+  /** Shown ahead of the title, such as the page's way back to the editor. */
+  leading?: JSX.Element
 }
 
 const NO_EDGE_FADE = vec4f(0)
@@ -107,9 +110,12 @@ export function ClashStage(props: ClashStageProps) {
         />
       </AutoCanvas>
       <header class={ui.top}>
-        <p class={ui.title}>
-          Flame Clash <span class={ui.preview}>Preview</span>
-        </p>
+        <div class={ui.lead}>
+          {props.leading}
+          <p class={ui.title}>
+            Flame Clash <span class={ui.preview}>Preview</span>
+          </p>
+        </div>
         <ul class={ui.fighters} aria-label="Fighters">
           <li style={{ '--team': TEAM_COLOUR.A.css }}>
             <span class={ui.badge}>A</span>
