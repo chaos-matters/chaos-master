@@ -2,6 +2,7 @@ import { deepClone } from '@/utils/clone'
 import { parseFlameEnvelope } from '@/utils/flameImport'
 import { loadRecentFlame, newRecentFlameId, upsertRecentFlame, } from '@/utils/recentFlames'
 import { safeGetItem, safeRemoveItem, safeSetItem } from '@/utils/storage'
+import { onDocumentReplaced } from './documentLoad'
 import { onAppPause } from './lifecycle'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { PauseSaveReport } from '@/hooks/useWorkspaceAutosave'
@@ -57,8 +58,19 @@ const PAUSE_FAILED_KEY = 'chaos-master-pause-save-failed'
  * launch after a session that changed nothing would have nothing to point at,
  * and reading-to-consume would drop the user back on the starter flame after
  * their second force-stop in a row.
+ *
+ * Cleared instead when the user puts another document on screen, for the same
+ * reason: a pause cannot correct it, so nothing else would
+ * ({@link forgetReopenTarget}).
  */
 const REOPEN_KEY = 'chaos-master-reopen'
+
+/**
+ * The flame the last reopen handed over - the object itself, so the hand-off
+ * carrying it can be told apart from a tap on any other flame. See
+ * {@link isReopenedFlame}.
+ */
+let reopenedFlame: FlameDescriptor | undefined
 
 /**
  * The kept flame a forced pause write replaced, until a launch has said so.
@@ -86,7 +98,8 @@ function recordOutcome(report: PauseSaveReport): void {
   // Where the work went, for the launch that has to put it back on screen.
   // Only ever written next to a write that landed, and left alone otherwise:
   // a clean pause means the user is still on the document the last write
-  // named, so the pointer standing is the pointer being right.
+  // named - opening any other one forgets the pointer - so the pointer
+  // standing is the pointer being right.
   if (report.entryId !== undefined) safeSetItem(REOPEN_KEY, report.entryId)
   // What the write cost. At the cap, with work that existed nowhere else and
   // a process that may be ending, forcing past the guard is the smaller loss
@@ -137,6 +150,11 @@ export function installPauseSave(input: {
   save: () => PauseSaveReport
 }): void {
   if (!input.native) return
+  // A clean pause writes nothing, so it cannot move the pointer off a
+  // document the user has replaced; the replacement has to.
+  onDocumentReplaced((reopening) => {
+    if (!reopening) forgetReopenTarget()
+  })
   saveOpenDocument = input.save
   if (subscribed) return
   subscribed = true
@@ -217,11 +235,43 @@ export function reopenTarget(native: boolean): ReopenedFlame | undefined {
   // Cloned on the way out: Recents hands every caller a shared, read-only
   // record (utils/recentFlames.ts), and this one is going into a store the
   // editor writes to.
+  const flame = deepClone(entry.flame)
+  reopenedFlame = flame
   return {
-    flame: deepClone(entry.flame),
+    flame,
     ...(entry.tracks ? { tracks: deepClone(entry.tracks) } : {}),
     ...(entry.config ? { config: deepClone(entry.config) } : {}),
   }
+}
+
+/**
+ * Whether this is the flame a launch reopened, arriving in the editor.
+ *
+ * The reopen reaches the editor through the same hand-off a tap on Home
+ * does, and that hand-off is a document replacement like any other - so
+ * without telling the two apart, putting the reopened flame on screen would
+ * be what forgets where it came from, and a second force-stop in a row would
+ * land on the starter flame after all. Identity, not equality: a flame the
+ * user opens from the Library is a fresh copy even when it is the same one.
+ */
+export function isReopenedFlame(flame: FlameDescriptor): boolean {
+  return reopenedFlame !== undefined && flame === reopenedFlame
+}
+
+/**
+ * Another document is on screen: forget the entry the last pause write named.
+ *
+ * A pause writes only a dirty document, so it cannot move the pointer itself.
+ * Edit flame A and background the app, open B, background it again without
+ * touching it, and the launch after a force-stop used to bring back A. With
+ * the pointer gone the launch opens what it would have opened anyway, and B
+ * is in the Library or the gallery where the user found it.
+ *
+ * Run after every replacement except the reopen's own hand-off
+ * ({@link installPauseSave}, lib/documentLoad.ts).
+ */
+function forgetReopenTarget(): void {
+  safeRemoveItem(REOPEN_KEY)
 }
 
 /**
