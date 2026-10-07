@@ -1,13 +1,20 @@
+import { Show } from 'solid-js'
 import { Button } from '../Button/Button'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
+import { PAGE_NAME } from './ConfirmOverwriteRecentModal'
+import type { LeavingFor } from '@/routing/pageLinks'
 
 type ConfirmDiscardUnsavedModalProps = {
+  /** Set when the editor is being left for a page of its own rather than
+   *  replaced by another flame (routing/pageLinks.ts). */
+  page?: LeavingFor
   respond: (discard: boolean) => void
 }
 
 /**
- * Storage refused to store the open flame, and something else is asking to be
- * loaded over it.
+ * Storage refused to store the open flame, and something else is asking to
+ * take its place: another flame being loaded over it, or a page of the app's
+ * own opening in this tab.
  *
  * A different question from the one at the cap, and so a prompt of its own:
  * there the user chooses which of two flames of theirs gives way, and here
@@ -45,8 +52,23 @@ export function ConfirmDiscardUnsavedModal(
       >
         <p style={{ margin: 0, 'font-size': '0.95rem', 'line-height': '1.4' }}>
           This device refused to store the flame you have open, so it is not in
-          Recents. Opening another one now would lose it, and its keyframe
-          tracks with it.
+          Recents.{' '}
+          <Show
+            when={props.page}
+            fallback={
+              <>
+                Opening another one now would lose it, and its keyframe tracks
+                with it.
+              </>
+            }
+          >
+            {(page) => (
+              <>
+                {PAGE_NAME[page()]} opens in this tab, so leaving now would lose
+                it, and its keyframe tracks with it.
+              </>
+            )}
+          </Show>
         </p>
         <p style={{ margin: 0, 'font-size': '0.95rem', 'line-height': '1.4' }}>
           Keep it and you can still export a PNG or share a link from the
@@ -60,7 +82,9 @@ export function ConfirmDiscardUnsavedModal(
             'margin-top': 'var(--space-2)',
           }}
         >
-          <Button onClick={handleDiscard}>Open Anyway</Button>
+          <Button onClick={handleDiscard}>
+            {props.page ? 'Leave Anyway' : 'Open Anyway'}
+          </Button>
           <Button
             style={{ 'background-color': '#4f46e5', color: 'white' }}
             onClick={handleKeep}

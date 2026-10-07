@@ -140,6 +140,7 @@ import type { SessionStartExtras } from './recorder/recorder'
 import type { RecordedSession } from './recorder/schema'
 import type { SnapshotOrigin } from './recorder/snapshotOrigin'
 import type { SonificationSnapshot } from './recorder/sonificationState'
+import type { LeavingFor } from './routing/pageLinks'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, AudioTargetValue, LiveAudioAnalyzer, } from './utils/audioAnalysis'
 import type { HardwareTier } from './utils/hardwareTier'
@@ -2779,11 +2780,11 @@ export function MainWorkspace(props: AppProps) {
    * question, and the answer that keeps their work is the one a dismissed
    * modal gives (lib/documentLoad.ts).
    */
-  const confirmDiscardUnsaved = async () =>
+  const confirmDiscardUnsaved = async (page?: LeavingFor) =>
     await _requestModal<boolean>({
       content: ({ respond }) => (
         <Suspense>
-          <ConfirmDiscardUnsavedModal respond={respond} />
+          <ConfirmDiscardUnsavedModal page={page} respond={respond} />
         </Suspense>
       ),
     })
