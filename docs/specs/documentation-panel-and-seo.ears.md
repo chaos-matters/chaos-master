@@ -78,7 +78,7 @@ subsequent click retries the import instead of silently doing nothing.
 
 ### REQ-DS-003 — Both panels launch from the version menu, which closes first
 
-**When** the "Documentation" or "Settings and More" item in the version menu is
+**When** the "Documentation" or "Settings and more" item in the version menu is
 activated, the menu shall close before the launcher is invoked, so the expanded
 menu is never left behind the dialog.
 

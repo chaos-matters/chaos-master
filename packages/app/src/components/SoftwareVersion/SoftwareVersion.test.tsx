@@ -46,7 +46,7 @@ describe('SoftwareVersion component', () => {
 
     // Reopen menu to click About
     fireEvent.click(trigger)
-    const aboutBtn = screen.getByText('Settings and More')
+    const aboutBtn = screen.getByText('Settings and more')
     expect(aboutBtn).toBeTruthy()
     fireEvent.click(aboutBtn)
     expect(showHelp).toHaveBeenCalled()
@@ -87,7 +87,7 @@ describe('SoftwareVersion component', () => {
 
     // Help
     fireEvent.click(trigger)
-    screen.getByText('Settings and More').click()
+    screen.getByText('Settings and more').click()
     expect(showHelp).toHaveBeenCalled()
   })
 

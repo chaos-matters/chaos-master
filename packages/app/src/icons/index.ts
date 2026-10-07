@@ -58,6 +58,7 @@ import Speech from './speech.svg'
 import SplitView from './split-view.svg'
 import Star from './star.svg'
 import Stop from './stop.svg'
+import Stopwatch from './stopwatch.svg'
 import Swords from './swords.svg'
 import Terminal from './terminal.svg'
 import TriangleAlert from './triangle-alert.svg'
@@ -123,6 +124,7 @@ export {
   Sparkle,
   Star,
   Stop,
+  Stopwatch,
   Swords,
   Terminal,
   Undo,

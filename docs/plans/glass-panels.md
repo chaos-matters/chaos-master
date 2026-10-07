@@ -152,7 +152,7 @@ Built into the primitive, so no surface can get them wrong:
   only once someone changes it, so the default can still move (`glassPanels()` in
   `lib/glass.ts`). It writes `data-glass-panels='on'` on `<html>` before the first render. The
   toggle is in Settings on every layout: More, then "Settings and more", or the tablet's rail,
-  on touch; the version menu's "Settings and More" on the desktop. Only the toggle reads the
+  on touch; the version menu's "Settings and more" on the desktop. Only the toggle reads the
   setting itself. Everything else asks `glassAllowed()`: the setting is on, and neither Reduce
   Transparency nor More Contrast is asked for. Under either, `lumen.css` turns every glass fill
   solid, so a panel floating over the canvas would hide the canvas it costs; the deck and the
