@@ -306,11 +306,13 @@ export function HelpModal(props: HelpModalProps) {
           </div>
         </div>
         <button
+          type="button"
           class={ui.closeBtn}
           onClick={() => {
             props.respond()
           }}
           title="Close"
+          aria-label="Close"
         >
           <svg viewBox="0 0 24 24" width="14" height="14">
             <path
@@ -344,6 +346,7 @@ export function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'list',
             }}
+            aria-pressed={props.quickPickerMode() === 'list'}
             onClick={() => {
               props.onQuickPickerModeChange('list')
             }}
@@ -355,6 +358,7 @@ export function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'gallery',
             }}
+            aria-pressed={props.quickPickerMode() === 'gallery'}
             onClick={() => {
               props.onQuickPickerModeChange('gallery')
             }}
@@ -373,6 +377,7 @@ export function HelpModal(props: HelpModalProps) {
               [ui.pickerModeBtnActive!]:
                 props.sidebarLayoutMode() === 'compact',
             }}
+            aria-pressed={props.sidebarLayoutMode() === 'compact'}
             onClick={() => {
               props.onSidebarLayoutModeChange('compact')
             }}
@@ -384,6 +389,7 @@ export function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.sidebarLayoutMode() === 'wide',
             }}
+            aria-pressed={props.sidebarLayoutMode() === 'wide'}
             onClick={() => {
               props.onSidebarLayoutModeChange('wide')
             }}
@@ -399,6 +405,7 @@ export function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: !props.isCompact() }}
+            aria-pressed={!props.isCompact()}
             onClick={() => {
               props.onSetCompact(false)
             }}
@@ -408,6 +415,7 @@ export function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.isCompact() }}
+            aria-pressed={props.isCompact()}
             onClick={() => {
               props.onSetCompact(true)
             }}
@@ -423,6 +431,7 @@ export function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'dark' }}
+            aria-pressed={props.theme() === 'dark'}
             onClick={() => {
               props.onThemeChange('dark')
             }}
@@ -432,6 +441,7 @@ export function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'light' }}
+            aria-pressed={props.theme() === 'light'}
             onClick={() => {
               props.onThemeChange('light')
             }}
@@ -451,6 +461,7 @@ export function HelpModal(props: HelpModalProps) {
                 classList={{
                   [ui.pickerModeBtnActive!]: props.hardwareTier() === tier,
                 }}
+                aria-pressed={props.hardwareTier() === tier}
                 onClick={() => props.onHardwareTierChange?.(tier)}
                 style={{ 'text-transform': 'capitalize' }}
               >
