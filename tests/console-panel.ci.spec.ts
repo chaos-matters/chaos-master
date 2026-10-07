@@ -16,11 +16,11 @@ test.describe('Console panel', () => {
       live.state = 'after'
     })
 
-    // The console sits behind Settings and More in the workspace menu and is
+    // The console sits behind Settings and more in the workspace menu and is
     // open by default there. The version pill used to open the About modal
     // directly; it now opens the menu, so this spec failed on a dialog that
     // never appeared.
-    await openWorkspaceMenuItem(page, /Settings and More/)
+    await openWorkspaceMenuItem(page, /Settings and more/)
 
     const modal = page
       .locator('dialog')

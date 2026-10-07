@@ -2,7 +2,7 @@
  * The Glass panels row in Settings (lib/glass.ts): on by default, and the
  * one place a user turns the glass off, on every layout. Settings opens from
  * More ("Settings and more") and the tablet's rail on the touch layouts, and
- * from the version menu's "Settings and More" on the desktop.
+ * from the version menu's entry of the same name on the desktop.
  *
  * The box shows the stored choice. While the system asks for reduced
  * transparency or more contrast the panels stay solid whatever it says

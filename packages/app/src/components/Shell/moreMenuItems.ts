@@ -1,4 +1,4 @@
-import { Book, Bookmark, DeepZoom, Download, GaugeMax, Info, Menu, Share, SidebarPanel, Zap, } from '@/icons'
+import { Book, Bookmark, DeepZoom, Download, GaugeMax, Info, Menu, Share, SidebarPanel, Stopwatch, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import type { Component } from 'solid-js'
 
@@ -74,7 +74,8 @@ export function buildMoreMenu(
     { label: 'Documentation', Icon: Book, run: handlers.onOpenDocs },
     {
       label: 'Quick GPU benchmark',
-      Icon: Zap,
+      // Its own icon: it shared the Zap with the Arcade two rows up.
+      Icon: Stopwatch,
       run: handlers.onOpenBenchmark,
     },
     {
