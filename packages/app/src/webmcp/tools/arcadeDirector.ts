@@ -1,6 +1,7 @@
 import { createDirectorSessionId, deriveTasteProfile, extractFlameTasteFeatures, } from '@/arcade/tasteStore'
 import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
 import { mutateFlame } from '@/flame/randomize'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { DirectorCandidate } from '@/commands/types'
@@ -11,13 +12,43 @@ const NOT_READY = {
   error: 'Workspace not ready. The flame editor has not finished loading.',
 }
 
+type RawCandidate = Partial<DirectorCandidate> & { flame?: FlameDescriptor }
+
+function mutationOf(currentFlame: FlameDescriptor, index: number) {
+  return mutateFlame(
+    deepClone(currentFlame),
+    {
+      strength: 0.2 + index * 0.1,
+      minTransforms: 2,
+      maxTransforms: 6,
+      minVariations: 1,
+      maxVariations: 3,
+      allowedVariations: [],
+      dimensions: currentFlame.renderSettings?.dimensions ?? 2,
+    },
+    {
+      mutateAffine: true,
+      affineMode: 'smart',
+      mutateVariations: 'modify',
+      mutateColors: true,
+    },
+  )
+}
+
+/**
+ * The candidates as the Director will hold them, or the indexes of the ones
+ * the flame schema rejects. A candidate with no usable flame becomes a
+ * mutation of the workspace flame. Every flame the agent did supply goes
+ * through the schema the editor loads with, as set_flame's does: the preview
+ * tiles render it straight away, and its skipIters is the renderer's loop
+ * bound, so a value past the schema's range could hang the GPU.
+ */
 function normalizeCandidates(
-  rawCandidates: Array<
-    Partial<DirectorCandidate> & { flame?: FlameDescriptor }
-  >,
+  rawCandidates: RawCandidate[],
   currentFlame?: FlameDescriptor,
-): DirectorCandidate[] {
-  return rawCandidates.map((c, i) => {
+): { candidates: DirectorCandidate[] } | { invalid: number[] } {
+  const invalid: number[] = []
+  const candidates = rawCandidates.map((c, i) => {
     let flame = c.flame
     if (
       !flame ||
@@ -25,26 +56,10 @@ function normalizeCandidates(
       Object.keys(flame.transforms).length === 0 ||
       !flame.renderSettings?.camera
     ) {
-      if (currentFlame) {
-        flame = mutateFlame(
-          deepClone(currentFlame),
-          {
-            strength: 0.2 + i * 0.1,
-            minTransforms: 2,
-            maxTransforms: 6,
-            minVariations: 1,
-            maxVariations: 3,
-            allowedVariations: [],
-            dimensions: currentFlame.renderSettings?.dimensions ?? 2,
-          },
-          {
-            mutateAffine: true,
-            affineMode: 'smart',
-            mutateVariations: 'modify',
-            mutateColors: true,
-          },
-        )
-      }
+      if (currentFlame) flame = mutationOf(currentFlame, i)
+    } else {
+      flame = tryValidateFlame(deepClone(flame))
+      if (!flame) invalid.push(i)
     }
 
     const calculatedFitness = flame
@@ -59,6 +74,14 @@ function normalizeCandidates(
     if (c.tags !== undefined) candidate.tags = c.tags
     return candidate
   })
+  return invalid.length > 0 ? { invalid } : { candidates }
+}
+
+/** Worded as open_arena's refusal of a fighter that fails the schema. */
+function invalidCandidates(indexes: number[]): string {
+  const fields = indexes.map((i) => `candidates[${i}]`).join(', ')
+  const pronoun = indexes.length === 1 ? 'it' : 'they'
+  return `Invalid ${fields}: ${pronoun} failed schema validation. Inspect the structure with get_flame, or omit a flame to get a mutation of the workspace flame.`
 }
 
 /**
@@ -113,14 +136,15 @@ export const directorPropose: WebMcpTool = {
 
     const { generation, candidates, steeringPrompt } = input as {
       generation: number
-      candidates: Array<
-        Partial<DirectorCandidate> & { flame?: FlameDescriptor }
-      >
+      candidates: RawCandidate[]
       steeringPrompt?: string
     }
 
     const currentFlame = ctx.flameDescriptor?.()
-    const normalized = normalizeCandidates(candidates || [], currentFlame)
+    const checked = normalizeCandidates(candidates || [], currentFlame)
+    if ('invalid' in checked)
+      return { error: invalidCandidates(checked.invalid) }
+    const normalized = checked.candidates
 
     // A later generation of the running session keeps its session id, so its
     // ratings accumulate; anything else starts a new session.

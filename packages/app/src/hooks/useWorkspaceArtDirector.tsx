@@ -4,6 +4,7 @@ import { DirectorOverlay } from '@/components/DirectorOverlay'
 import { useRequestModal } from '@/components/Modal/ModalContext'
 import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
 import { mutateFlame } from '@/flame/randomize'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import type { Accessor, Setter } from 'solid-js'
 import type { DirectorState } from '@/commands/types'
@@ -33,7 +34,18 @@ export function useWorkspaceArtDirector(params: UseWorkspaceArtDirectorParams) {
   const selectCandidate = (index: number) => {
     const s = directorState()
     if (s && s.candidates[index]?.flame) {
-      const candidateFlame = s.candidates[index].flame
+      // The document takes only a flame the editor could have loaded itself:
+      // a candidate reaches the state from an agent, and its skipIters is the
+      // renderer's loop bound.
+      const candidateFlame = tryValidateFlame(
+        deepClone(s.candidates[index].flame),
+      )
+      if (!candidateFlame) {
+        showToast(
+          `Art Director: Candidate ${index + 1} is not a flame the editor can open.`,
+        )
+        return
+      }
       setFlameDescriptor(
         () => deepClone(candidateFlame),
         `Art Director: Candidate ${index + 1}`,
