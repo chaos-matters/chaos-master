@@ -298,4 +298,36 @@ describe('ShellBar', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     expect(backDepth()).toBe(0)
   })
+
+  it.each([
+    [
+      'Escape',
+      () => {
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        )
+      },
+    ],
+    [
+      'back',
+      () => {
+        popBack()
+      },
+    ],
+  ] as const)(
+    'hands focus back to More when %s closes the list',
+    (_, close) => {
+      // A click focuses nothing in the test DOM, as in Safari: the focus has
+      // to come back from the bar's own reference to the button.
+      mount('full')
+      const more = screen.getByRole('button', { name: 'More' })
+      more.click()
+      screen.getByRole('menuitem', { name: 'Settings and more' }).focus()
+
+      close()
+
+      expect(screen.queryByRole('menu')).toBeNull()
+      expect(document.activeElement).toBe(more)
+    },
+  )
 })
