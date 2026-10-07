@@ -568,7 +568,7 @@ file it did not produce.
 _(`utils/exportPreferences.ts:17-34` (`setEmbedStepsInExports`),
 `components/ExportPngDialog/ExportPngDialog.tsx:1029` (`sessionSnapshot`), `:1308` (`session`), `:1324` (`sessionSnapshot`),
 `components/ExportJobs/ExportJobHost.tsx:139-144` (`encodedSteps`),
-`utils/animationExport.ts:372-380` (`embedMetadata`); guarded by `exportPreferences.test.ts:22`
+`utils/animationExport.ts:401-409` (`embedMetadata`); guarded by `exportPreferences.test.ts:22`
 "keeps the initiation-time recording after the current session changes", and by
 `flameInPng.test.ts:134` "carries the flame and the session in separate chunks" / `flameInMp4.test.ts:94` "round-trips the flame and the session together" for the round-trip.)_
 
@@ -624,7 +624,7 @@ restore the render settings, transforms and metadata it snapshotted before the
 first frame, and shall clear the export-running, progress, cancel, force-export,
 export-image and export-quality signals — on every one of those exit paths.
 
-_(`utils/animationExport.ts:350-357` (`restoreFlameState`), `:387-401` (`setAnimationExportCancel`), `:399-415` (`cleanup`).)_
+_(`utils/animationExport.ts:378-386` (`restoreFlameState`), `:416-430` (`setAnimationExportCancel`), `:428-444` (`cleanup`).)_
 
 ### REQ-RR-039 — Capture waits for the final image, and Stop & Save keeps what rendered
 
@@ -638,8 +638,8 @@ report their count — or, **if** no frame has been encoded yet, be treated as a
 cancel, the main-canvas path resolving an empty blob and the offscreen job
 dismissing itself, so no zero-frame file is offered.
 
-_(`utils/animationExport.ts:159-172` (`forceAnimationExportNow`), `:237-289` (`ExportInfo`),
-`components/ExportJobs/OffscreenAnimationRender.tsx:379-406` (`actionIndex`), `:388-396` (`encodeFrame`),
+_(`utils/animationExport.ts:190-203` (`forceAnimationExportNow`), `:237-289` (`ExportInfo`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:346-373` (`actionIndex`), `:388-396` (`encodeFrame`),
 `components/ExportJobs/ExportJobHost.tsx:180-205` (`handleExport`), `utils/exportJobs.ts:263-265` (`requestJobForceExport`),
 `:295-302` (`dismissJob`).)_
 
@@ -839,7 +839,7 @@ one can take a take past the 300 s limit (REQ-RR-029), which a faster speed
 fits.
 
 _(`recorder/replayVideo.ts:442-539` (`createReplayVideoSchedule`), `:548-610` (`replayStateAtFrame`), `:647-659` (`pacer`), `:987-1049` (`advanceTo`),
-`components/ExportJobs/OffscreenAnimationRender.tsx:64` (`takeMs`), `:327` (`advanceTo`); guarded by
+`components/ExportJobs/OffscreenAnimationRender.tsx:64` (`takeMs`), `:294` (`advanceTo`); guarded by
 `replayVideoPlayWindows.test.ts:77` "gives a play window its real duration, and an edit inside it its recorded time", `:93` "moves the playhead frame by frame through the window onto the Pause frame", `:114` "applies the edit at the frame the take made it on", `:124` "renders the same frame for the same moment, in any order", `:137` "keeps a take that ended still playing moving through the tail", `:149` "leaves a paused take exactly as it was",
 `:164` "refuses a window longer than the video limit, and fits it at a faster speed".)_
 
@@ -925,7 +925,7 @@ schedule.
 _(`recorder/glide.ts:48-50` (`GlideQualityPreference`), `:82-109` (`presetOf`), `recorder/replayVideo.ts:84-86` (`glideMs`),
 `:453-459` (`spec`), `:527-528` (`glideMs`), `:569-577` (`replayFrameQuality`), `:612-615` (`createReplayVideoDriver`), `:1058-1075` (`glidePlanFor`),
 `flame/glide/runtime.ts:232-236` (`planned`),
-`components/ExportJobs/OffscreenAnimationRender.tsx:56` (`createReplayVideoDriver`), `:69-85` (`Quality`), `:329` (`setPerFrameQuality`),
+`components/ExportJobs/OffscreenAnimationRender.tsx:56` (`createReplayVideoDriver`), `:69-85` (`Quality`), `:296` (`setPerFrameQuality`),
 `recorder/player.ts:518-529` (`settled`), `:243` (`viewerGlideSwitches`), `:739` (`viewerGlideSwitches`), `recorder/replayGlideLease.ts:22-24` (`GlideSwitches`),
 `:66-69` (`viewer`), `components/SessionRecorder/SessionReplayPanel.tsx:705-711` (`glide`); guarded
 by `replayGlideQuality.test.ts:175` "glides into each step at the tier in force once it ran, live", `:196` "gives the same glide lengths and

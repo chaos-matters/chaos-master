@@ -371,7 +371,7 @@ one that was stopped, ran out of budget or errored — `sessionNameFor` maps
 `'cinema'` to "Animation" and `'duel'` to "Duel" and every other mode,
 including `'beats'`, to "Lesson".
 
-_(`pilotActions.ts:36-52` (`sessionNameFor`))_
+_(`pilotActions.ts:59-75` (`sessionNameFor`))_
 
 ### REQ-AB-029 — A failed save is surfaced to the human, not to the agent
 
@@ -450,18 +450,18 @@ Requirements with no test that goes red when they are violated:
 - **REQ-AB-002, REQ-AB-003** — `bundledTracks.ts` has no test of its own.
   Since #90 `fetchBundledTrackBuffer` runs from the workspace's
   `loadBundledTrack`, but the tool tests replace that loader with a mock
-  (`arcadeBeats.test.ts:165-181` (`loadBundledTrack`)), so the fetch and the
+  (`arcadeBeats.test.ts:238-254` (`loadBundledTrack`)), so the fetch and the
   decode run in no test. `getBundledTrack` still has no caller.
 - **REQ-AB-005** — the tool side is guarded since #90:
-  `arcadeBeats.test.ts:183` "loads the requested bundled track before recording starts" and the
+  `arcadeBeats.test.ts:256` "loads the requested bundled track before recording starts" and the
   rest of its `track loading` block. The workspace's fetch and decode are not
   (see REQ-AB-002).
 - **REQ-AB-007, REQ-AB-008** — no test starts a second session, starts over a
   running recording, or forces `startPilot` to refuse after `recorder.start()`
   succeeded, so the cancel-on-rollback path is unexercised.
 - **REQ-AB-010** — guarded since #90 by the `track loading` block,
-  `arcadeBeats.test.ts:223` "loads the default track when nothing usable is loaded", `:230`
-  "keeps a track that is already loaded instead of reloading it" and `:239`
+  `arcadeBeats.test.ts:296` "loads the default track when nothing usable is loaded", `:303`
+  "keeps a track that is already loaded instead of reloading it" and `:312`
   "refuses an unknown track and starts nothing".
 - **REQ-AB-014, REQ-AB-015** — the non-object argument branch and the preset
   degradation are both unexercised.
@@ -473,7 +473,7 @@ Requirements with no test that goes red when they are violated:
   (`webmcp/testUtils.ts:161` (`canEnable`)), so the mapping test never reaches the real
   authorization. That stub is why the HIGH defect behind REQ-AB-020 shipped
   green; REQ-AB-020 itself is guarded since #90 by
-  `arcadeBeats.test.ts:257` "says whether the mapping actually left reactivity on", which
+  `arcadeBeats.test.ts:330` "says whether the mapping actually left reactivity on", which
   makes `canEnable` refuse.
 - **REQ-AB-021** — the step count is asserted indirectly via `remainingSteps:
 29`; nothing asserts the log line's text or the `lesson.note` dispatch.
