@@ -422,8 +422,8 @@ export function SessionReplayPanel(props: {
           onClick={() => setReplayGlideEnabled((on) => !on)}
           title={
             replayGlideEnabled()
-              ? 'Glide on — each step animates into place instead of snapping'
-              : 'Glide off — each step appears in one move'
+              ? 'Glide on: each step animates into place'
+              : 'Glide off: each step cuts straight in'
           }
           aria-pressed={replayGlideEnabled()}
           aria-label={

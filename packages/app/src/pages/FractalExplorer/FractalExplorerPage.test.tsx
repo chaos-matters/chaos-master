@@ -129,6 +129,16 @@ function writtenHash(): string {
   return window.location.hash
 }
 
+describe('FractalExplorerPage tab title', () => {
+  it('names the page as the menus do, and gives the old title back', () => {
+    document.title = 'Lumen Apeiron'
+    open(DEFAULT_LOCATION)
+    expect(document.title).toBe('Deep zoom \u00b7 Lumen Apeiron')
+    cleanup()
+    expect(document.title).toBe('Lumen Apeiron')
+  })
+})
+
 describe('FractalExplorerPage palette', () => {
   function saveCustom() {
     return addCustomPalette({
