@@ -7,6 +7,170 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.13] - 2026-10-07
+
+The fork's work since 0.9.11, Komediruzecki/chaos-master-fp #73 to #159, landed
+as one commit per feature or real bug: fixes to a feature are folded into it,
+and each commit's message lists the commits it squashes. 0.9.12 was a native
+test build only (`mobile-v0.9.12`), so its changes are counted here. One line
+per commit, in the order they landed, with the fork PRs it came from; the
+user-facing summary is in `CHANGELOG.md`.
+
+### Added
+
+- **app,core:** implement dynamic variation editors and phase 6 next-gen
+  features (fp#73)
+- **arcade:** implement beats mode, bundled audio tracks, and webmcp tools
+  (fp#74)
+- **arcade:** implement evolutionary art director mode and webmcp tools (fp#75)
+- **arcade:** Arena mode, with grounded stats, 2D and 3D fight choreography and
+  the champion card (fp#76)
+- **touch:** the mobile bottom surface, the tablet split layout and the touch
+  galleries (fp#77)
+- **arena:** C1 to C8 symmetry in the clash arena, with the shared flame gallery
+  picker (fp#77)
+- **docs:** the documentation and help panel redesigned, and About becomes
+  Settings and More (fp#77)
+- **seo:** an llms.txt on both hosts, and keep the review deploys out of search
+  (fp#79)
+- **export:** make motion blur actually blur, offscreen and on the main canvas
+  (fp#91)
+- **mobile:** the Capacitor iOS and Android shell, native build mode and mobile
+  CI (fp#94)
+- **landing:** privacy notice and support pages (fp#94)
+- **app:** Lumen Apeiron design tokens, direction D2 (fp#95)
+- **native:** the editor rail, top bar and tablet deck (Phase A) (fp#95)
+- **shell:** the shell, back and lifecycle (Phase B) (fp#96)
+- **export:** scripted export and playback, and a loaded animation fits the
+  timeline (fp#99, fp#102)
+- **recorder:** synthesized creation replay (fp#100, fp#102)
+- **glide:** Glide between flame states, live, in replays and in their exports
+  (fp#100, fp#102)
+- **arcade:** Glide in Teach, Cinema and Beats, agent Glide switches, and a
+  share card that follows the camera (fp#103, fp#104)
+- **explorer:** a deep-zoom Mandelbrot and Julia explorer at /explore (fp#108,
+  fp#153)
+- **arcade:** leaving or reloading asks first while an agent's take records
+  (fp#138)
+- **clash:** Flame Clash phase 1, a scripted bout on its own stage at /clash
+  (fp#125)
+- **glass:** glass panels across the app, on by default; production keeps its
+  blur (fp#126)
+- **explorer:** a saved picture reopens its place when dropped, and the explorer
+  gains undo and redo (fp#154)
+- **explorer:** Back walks your jumps, and leaving for the explorer asks at a
+  full Recents (fp#158)
+- **editor:** leaving for the Benchmark Lab asks first when Recents is full
+
+### Changed
+
+- **app:** modularize MainWorkspace with ModalsHost, CanvasViewport, BottomBar,
+  and WorkspaceSidebar (fp#73)
+- **app:** encapsulate UI state into workspace layout, selection, and export
+  stores (fp#73)
+- **app:** enforce visibility gating and cross-browser preview layout across
+  galleries (fp#73)
+- **flame:** extract interactive and export render loops into renderDrivers
+  (fp#73)
+- **worker:** decompose monolithic worker into routes and middleware (fp#73)
+- **core:** extract @chaos-master/core pure monorepo package (fp#73)
+- **arch:** eliminate circular deps, decompose builtins, split workspace, and
+  enforce complexity (fp#73)
+- **workspace:** decompose MainWorkspace into focused hooks (fp#78)
+- **commands:** modularize flame command registry and reduce complexity (fp#78)
+- **render-driver:** decompose export loop and eliminate complexity warning
+  (fp#78)
+- **recorder:** decompose focus hints, focus prep, and session recording into
+  modular helpers (fp#78)
+- **timeline:** decompose clash choreography and timeline track application into
+  modular subroutines (fp#80)
+- **webmcp:** decompose the WebMCP tools and the clash simulation into modules
+  (Phase 9) (fp#81)
+- modularize audio analysis modulation and wiring shortcuts (Phase 10) (fp#82)
+- decompose benchmark lab, runner, and modal card renderer (Phase 11) (fp#83)
+- **arena:** modularize ArenaOverlay and duelActions routines (fp#84)
+- **flame:** modularize breeding crossover and mutation operators (fp#86)
+- break both import cycles so pnpm arch exits 0 (WP1) (fp#114)
+- **wp2:** hygiene sweep: dead files, core twins, tests that could not fail,
+  stray e2e, sidebar stub (fp#115)
+- **WP3:** guards G1 to G6, and the metric fixes (fp#116)
+- **docs:** WP4 docs truth pass and a file:line citation checker (fp#118)
+- close the CI guard holes (WP3b) (fp#123)
+
+### Fixed
+
+- **flame:** yinYangVar's rotation step, whorlVar at r == w, cotVar's safe
+  denominator and shared-link errors (fp#73)
+- stage 1 audit remediation, the confirmed high and medium defects (fp#90)
+- **export:** report a flash export that fails (fp#94)
+- **workspace:** a flame that arrives blended no longer kills the app (fp#98)
+- **export:** animation export wrote black video on some drivers (fp#99)
+- **camera:** a 2D flame turns with camera.rotation, on every mount (fp#99,
+  fp#102)
+- **recorder:** replays follow the take (fp#105, fp#107, fp#109)
+- **arcade:** the screen lock holds keys and dialogs, and the hover preview
+  stays out of saves (fp#106, fp#110, fp#112, fp#113)
+- **replay:** Glide flips, the export's Glide quality, seat and portal glide,
+  replay exports (fp#111)
+- **arena:** symmetry transforms carry the registered 2D linear (fp#117)
+- **palette:** drag gradient stops and the colour plane's point with a finger or
+  a pen (fp#108)
+- glide.toFlame glides once; a plain-flame load records its Pause (fp#119)
+- **render:** on Apple WebKit the canvas shows the flame picked from a dialog,
+  with no view transition (fp#122, fp#131)
+- **arcade:** a key gate at boot swallows every key under the screen lock
+  (fp#120)
+- **arcade:** the screen lock holds history, and the view with it (fp#129)
+- **timeline:** keep every animated frame a valid flame (fp#127)
+- **arcade:** the approved Arcade and arena hotfixes (fp#121)
+- **flame:** Mutate's remove chance removes transforms (fp#143)
+- **commands:** render setting commands hold values to the schema domain
+  (fp#142)
+- **arcade:** a duel seat that cannot render ends the duel, not the editor
+  (fp#147)
+- **scoring:** score by variation type, 3D stats from the 3x3 part, no energy
+  pole, fixture guards (fp#124)
+- **autosave:** the auto-save question waits while the Arena is open (fp#148)
+- **symmetry:** a 3D mirror survives a Folds change, and the angle editor writes
+  3D terms (fp#130, fp#135)
+- **arcade:** agents keyframe each affine's own terms, a-l in 3D (fp#145)
+- **flame:** an open canvas shows a custom variation's edit, in 2D and 3D
+  (fp#141)
+- **mutate:** keep the symmetry copies' weights through a Mutate (fp#149)
+- **breed:** keep a parent's symmetry (fp#150)
+- **brand:** the arena trophy and the deep-zoom back link say Lumen Apeiron
+  (fp#151)
+- **dev:** the pre-commit hook lint-fixes before it formats (fp#132)
+- **tour:** the card's arrow points at its target's centre (fp#128)
+- **app:** dialogs and toggles change state at the input, not a frame later
+  (fp#133)
+- **deps:** coverage-v8 matches vitest 5 (fp#157)
+
+### Security
+
+- **security:** bump astro to 7.2.8 to resolve AVIF RCE (GHSA-26w7-cxv4-gfx2)
+  (fp#85)
+
+### Internal
+
+- **flame:** pin what breeding draws, and in what order (fp#97)
+- stage 2 characterization net, checked against v0.9.11 and main (fp#92)
+- audit stage 3 -- kill the surviving mutants, a CI-safe e2e project, derived UI
+  ratchet (fp#93)
+- **agent:** generated module index and a code-health harness (fp#77, fp#87)
+- **agent:** audit of v0.9.11..main, EARS specs and the remediation backlog
+  (fp#88, fp#89)
+- health gates on main only, scoped tests on pull requests (fp#101, fp#102)
+- prepare the repo for going public (signing-name mask, Beside Cue notes)
+  (fp#134)
+- every pull request runs the full suite and health, in parallel jobs (fp#140)
+- **index:** no counts in the agent index, and unpadded tables (fp#146)
+- **mobile:** stop publishing the ad-hoc IPA (fp#144)
+- **deps:** bump the npm_and_yarn group across 4 directories with 2 updates
+  (fp#137)
+- **agent:** upstream is no longer frozen (fp#159)
+- pin citations to commits in this history
+
 ## [0.9.11] - 2026-09-04
 
 Agent-facing correctness, from three recorded Arcade sessions: what the tools

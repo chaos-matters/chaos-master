@@ -3,6 +3,87 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.13] - 2026-10-07
+
+### Added
+
+- **A deep-zoom explorer.** Open Deep zoom from the menu, or visit
+  `/explore`, to dive into the Mandelbrot set beside the Julia set of a point
+  you drag. Scrub a number field by dragging it sideways, undo and redo, and
+  step Back and Forward through the places you jumped to. Drop a picture
+  saved from the explorer on the editor and the explorer reopens at that
+  place.
+- **Glide.** One flame turns into the next instead of cutting to it: live in
+  the editor, between the steps of a replay, and in the video a replay
+  exports. Teach, Cinema and Beats glide too; only a duel still cuts.
+- **Replays for flames nobody recorded.** A finished flame can be rebuilt as
+  a plausible run of steps and played back, and the replay says it is a
+  reconstruction, not a recording.
+- **Beats, Director and Arena are playable.** Beats drives a flame from a
+  bundled track, Ember Drift or Cyber Pulse. Director proposes flames,
+  explains each one and learns from your Like and Dislike. Arena sets two
+  flames against each other with stats drawn from what they are made of,
+  choreographs the fight in 2D or 3D and ends on a champion card. Its
+  fighters come from the flame gallery and can take C1 to C8 symmetry.
+- **Flame Clash, a first look.** `/clash` plays a scripted bout between two
+  flames you pick, with strikes, a beam clash and a devour, on a stage of its
+  own.
+- **Touch layouts, rebuilt.** Phones get a top bar and an editor rail,
+  tablets an inspector deck beside the canvas, and gradient stops and the
+  colour plane follow a finger or a pen.
+- **Glass panels.** In the dark themes, panels float over the artwork as
+  frosted glass, and go solid while the canvas is busy presenting every
+  frame. The Glass panels setting turns them off.
+- **Motion blur in animation exports.** Fast motion blurs across sub-frames
+  in exported video, whichever renderer draws it.
+- **Documentation, redesigned.** The documentation and help panel has a new
+  layout, and About is now Settings and More, with every setting back in it.
+- **Leaving asks before it costs you a flame.** At a full Recents, opening
+  the explorer or the Benchmark Lab, or dropping a deep-zoom picture, asks
+  before the open flame takes the oldest one's place. While an agent's take
+  records, leaving or reloading the page asks first too.
+
+### Fixed
+
+- **Audio modulation no longer rewrites your flame.** After a track played,
+  the flame stayed on whatever frame the music stopped on, out of reach of
+  undo, and the autosave filed that frame as your work. Modulation now draws
+  over the flame and leaves it as you made it.
+- **Recents never drops a kept flame without asking.** Opening another flame
+  at a full Recents, from a file, a drop or a link, asks before the open one
+  takes the oldest one's place, and one restore makes one entry.
+- **A flame keeps its timeline.** Backups, saved files and dropped flames
+  bring back the timeline the animation was written at, and a new flame
+  starts on a fresh one.
+- **A PNG saved mid-animation opens again.** Between two keyframes a setting
+  could land outside its allowed range, so a PNG exported while paused there
+  would not reopen, and an undo there left a flame that no longer shared.
+  Every animated frame is now a valid flame.
+- **Exports that fail say so.** Animation exports are no longer black on some
+  graphics drivers, and a Quick Export that fails gives its reason instead
+  of looking like a dead button.
+- **A flame that arrives blended no longer crashes the app.**
+- **On iPhone, iPad and Safari, the canvas shows the flame you pick from a
+  dialog**, instead of the one before it.
+- **A 2D flame turns with its camera rotation** every time it appears.
+- **The screen lock holds while an agent drives.** Keys, dialogs, history and
+  the view stay locked, keys pressed while the app boots included, and the
+  hover preview stays out of saves.
+- **Mutate and Breed respect symmetry.** Mutate's chance to remove a
+  transform removes one, symmetry copies keep their weights through a
+  Mutate, Breed keeps a parent's symmetry, and a 3D mirror survives a change
+  of Folds.
+- **A custom variation's edit shows on the open canvas**, in 2D and 3D.
+- **Three variations render as written:** `yinYang`'s rotation step, `whorl`
+  at r = w and `cot`'s denominator.
+- **Dialogs and toggles change at the press**, not a frame later, and the
+  tour card's arrow points at the centre of its target.
+- **Agents and the Arena.** Agents keyframe each affine's own terms, a to l in
+  3D, and render settings they set stay in range. A duel seat that cannot
+  render ends the duel, not the editor, the live score matches the verdict,
+  a clash plays its three rounds once, and the auto-save question waits
+  while the Arena is open.
+
 ## [0.9.11] - 2026-09-04
 
 ### Added
