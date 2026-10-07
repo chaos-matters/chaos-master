@@ -30,11 +30,13 @@ describe('SoftwareVersion component', () => {
     fireEvent.click(trigger)
     expect(screen.getByRole('menu')).toBeTruthy()
 
-    const labLink = screen.getByRole('link', { name: 'Open Benchmark Lab' })
+    const labLink = screen.getByRole('menuitem', { name: 'Open Benchmark Lab' })
     expect(labLink).toBeTruthy()
     expect(labLink.getAttribute('href')).toBe('/benchmarks')
 
-    const arcadeLink = screen.getByRole('link', { name: 'Open Lumen Arcade' })
+    const arcadeLink = screen.getByRole('menuitem', {
+      name: 'Open Lumen Arcade',
+    })
     expect(arcadeLink).toBeTruthy()
 
     const docsBtn = screen.getByText('Documentation')
@@ -156,7 +158,7 @@ describe.each([
     fireEvent.click(
       screen.getByRole('button', { name: /lumen apeiron.*menu/i }),
     )
-    return screen.getByRole('link', { name: label })
+    return screen.getByRole('menuitem', { name: label })
   }
 
   it('leaves by the same way as the touch menu, so the editor can ask first', async () => {
