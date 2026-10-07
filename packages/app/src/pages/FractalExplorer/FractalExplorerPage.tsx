@@ -87,7 +87,7 @@ const PAN_HINT =
 export function FractalExplorerPage() {
   const { showToast } = useToast()
   const previousTitle = document.title
-  document.title = 'Mandelbrot Explorer — Lumen Apeiron'
+  document.title = 'Deep zoom · Lumen Apeiron'
   onCleanup(() => {
     document.title = previousTitle
   })
