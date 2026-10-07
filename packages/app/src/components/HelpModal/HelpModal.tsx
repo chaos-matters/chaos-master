@@ -3,6 +3,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { Changelog, Discord, GitHub, Globe, Heart, Terminal, TriangleAlert, } from '@/icons'
 import { IS_NATIVE } from '@/lib/platform'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
+import { toursOffered } from '@/tours/offered'
 import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
@@ -515,63 +516,67 @@ export function HelpModal(props: HelpModalProps) {
         </For>
       </div>
 
-      <h2 class={ui.sectionTitle}>Guided Tours</h2>
-      <div class={ui.tourButtons}>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=example1-creation'
-            props.respond()
-          }}
-        >
-          Example 1 Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=example2-creation'
-            props.respond()
-          }}
-        >
-          Example 2 Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=flame-creation'
-            props.respond()
-          }}
-        >
-          Flame Creation
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=app'
-            props.respond()
-          }}
-        >
-          App Tour
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=sidebar'
-            props.respond()
-          }}
-        >
-          Sidebar Tour
-        </button>
-        <button
-          class={ui.tourBtn}
-          onClick={() => {
-            window.location.hash = '#tour=timeline'
-            props.respond()
-          }}
-        >
-          Timeline Tour
-        </button>
-      </div>
+      {/* No tour on a touch layout: its surfaces carry none of the targets
+          the steps point at (tours/offered.ts). */}
+      <Show when={toursOffered()}>
+        <h2 class={ui.sectionTitle}>Guided Tours</h2>
+        <div class={ui.tourButtons}>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=example1-creation'
+              props.respond()
+            }}
+          >
+            Example 1 Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=example2-creation'
+              props.respond()
+            }}
+          >
+            Example 2 Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=flame-creation'
+              props.respond()
+            }}
+          >
+            Flame Creation
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=app'
+              props.respond()
+            }}
+          >
+            App Tour
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=sidebar'
+              props.respond()
+            }}
+          >
+            Sidebar Tour
+          </button>
+          <button
+            class={ui.tourBtn}
+            onClick={() => {
+              window.location.hash = '#tour=timeline'
+              props.respond()
+            }}
+          >
+            Timeline Tour
+          </button>
+        </div>
+      </Show>
 
       <div class={ui.gpuHeader}>
         <h2 class={ui.sectionTitle}>GPU / Device Info</h2>
