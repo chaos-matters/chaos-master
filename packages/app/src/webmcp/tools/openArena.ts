@@ -172,6 +172,9 @@ export const openArena: WebMcpTool = {
         fighter2,
       ),
     )
+    // The Arcade hub is fixed above the workspace; an Arena opened under it
+    // would run where the user cannot see it.
+    ctx.arcade?.closeHub()
     arena.setOpen(true)
 
     if (raw.autoStart && arena.startClash) {

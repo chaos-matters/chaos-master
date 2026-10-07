@@ -160,6 +160,27 @@ describe('openArena tool execution contract', () => {
     expect(setOpen).not.toHaveBeenCalled()
     expect(setPlayer1Stats).not.toHaveBeenCalled()
   })
+
+  // The Arcade hub is fixed above the workspace; an Arena opened under it
+  // cannot be seen, so the tool leaves the hub first, as arcade_teach does.
+  it('leaves the Arcade hub before it opens the Arena', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+
+    const res = openArena.execute(
+      { player1Stats: {}, player2Stats: {} },
+      {},
+    ) as { success?: boolean }
+
+    expect(res.success).toBe(true)
+    const closeHub = vi.mocked(ctx.arcade!.closeHub)
+    const setOpen = vi.mocked(ctx.arena!.setOpen)
+    expect(closeHub).toHaveBeenCalledTimes(1)
+    expect(setOpen).toHaveBeenCalledWith(true)
+    expect(closeHub.mock.invocationCallOrder[0]).toBeLessThan(
+      setOpen.mock.invocationCallOrder[0]!,
+    )
+  })
 })
 
 describe('mutateFlame and randomizeFlame tool execution contract', () => {
