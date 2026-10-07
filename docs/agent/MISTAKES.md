@@ -70,8 +70,8 @@ at setup and the component stops updating.
 
 ### A lazy import is defeated by any static import of the same module
 
-**What happened.** At a5c2f26f `MainWorkspace.tsx:38` loaded `DiffViewModal`
-with `lazy(() => import(...))`, but a5c2f26f `WorkspaceSidebar.tsx:5` imported
+**What happened.** At 08428e6e `MainWorkspace.tsx:38` loaded `DiffViewModal`
+with `lazy(() => import(...))`, but 08428e6e `WorkspaceSidebar.tsx:5` imported
 `DiffViewContent` from that same module statically. Vite said so at build time:
 `dynamic import will not move module into another chunk`. The modal shipped in
 the `MainWorkspace` chunk regardless of the `lazy()`, and `AudioWiringModal`

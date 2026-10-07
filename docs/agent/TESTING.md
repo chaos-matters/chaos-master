@@ -137,7 +137,7 @@ the two updates below record how that changed.
 **A Playwright spec outside the CI project is effectively unenforced.** At
 the first audit three specs were actively misleading:
 
-- a5c2f26f `tests/documentation.spec.ts:20` called `test.skip(!docsVisible, ...)` gated on
+- 08428e6e `tests/documentation.spec.ts:20` called `test.skip(!docsVisible, ...)` gated on
   a `Docs` button. That button existed at `v0.9.11` and the selector no longer
   matches, so the spec **skips green** — it reports success while testing
   nothing. A green skip is worse than no spec.

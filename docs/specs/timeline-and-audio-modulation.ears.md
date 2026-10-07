@@ -201,7 +201,7 @@ _(`utils/timeline.ts:553-586` (`interpolateArrayKeyframe`), `:646-667` (`isArray
 The monorepo shall hold exactly one implementation of `applyEasing`,
 `catmullRom`, `lerp` and `clamp`, so that a fix to a curve reaches every caller.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#115, `984926e4`; this note describes the code at `a5c2f26f`): `packages/core/src/math/easing.ts` is byte-identical to
 > `packages/app/src/utils/easing.ts` (`diff` reports no difference). The core copy
@@ -311,7 +311,7 @@ edits that parameter, the value resolver shall return the freshly edited value
 from the flame descriptor, so auto-keyframing overwrites the keyframe with the
 edit.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `abd83151`; this note describes the code at `a5c2f26f`): `packages/app/src/hooks/useWorkspaceTimelineBinding.ts:87-96`
 > — `getFlameCameraSetting` consults `getTimelineCameraKeyframeValue` (`:35-45`)
@@ -338,7 +338,7 @@ paths that the timeline overlay, rather than the base flame, owns
 `camera3D.radius`, `camera3D.fov`). Every other path shall resolve from the live
 flame descriptor.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `abd83151`; this note describes the code at `a5c2f26f`): `packages/app/src/hooks/useWorkspaceTimelineBinding.ts:87-96`
 > — the override is reached for every non-render-setting path, not just the seven

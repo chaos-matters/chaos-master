@@ -89,7 +89,7 @@ and decode that track into the workspace audio buffer and set the workspace
 track name to it, so that the snapshot `arcade_set_audio_mapping` later
 dispatches satisfies `canEnable` and the flame actually moves to the music.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `f1b74bb9`; this note describes the code at `a5c2f26f`): `packages/app/src/webmcp/tools/arcadeBeats.ts:141-146` —
 > nothing loads a bundled track. `fetchBundledTrackBuffer`
@@ -260,7 +260,7 @@ mismatch — **then** `arcade_set_audio_mapping` shall report that audio
 reactivity is not running and why, rather than returning an unqualified
 success, so the agent can load a track instead of wiring further into silence.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `f1b74bb9`; this note describes the code at `a5c2f26f`): `packages/app/src/webmcp/tools/arcadeBeats.ts:332-361` —
 > the tool ignores the outcome and always returns `{ ok: true, appliedCount,

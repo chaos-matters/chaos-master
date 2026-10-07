@@ -461,7 +461,7 @@ DEF/CRIT tiles, the five grounded metric bars and the stance footer, and trigger
 download named `champion-<slugified-name>.png`. The busy flag shall be cleared whether
 the export succeeds or throws.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `b940415b`; this note describes the code at `a5c2f26f`): `packages/app/src/components/ArenaOverlay.tsx:104-170` —
 > `getVictorImage` returns promises that resolve only on the image's `load` or `error`

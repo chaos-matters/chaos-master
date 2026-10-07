@@ -226,7 +226,7 @@ animation rather than re-rolling it. **If** the mutation leaves the serialized
 snapshot unchanged, no action shall be emitted and the last finished session
 shall not be invalidated.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `b6838992`; this note describes the code at `a5c2f26f`): `packages/app/src/MainWorkspace.tsx:2388-2396` passes the
 > **raw** `timeline` to `useWorkspaceAnimationGen`, not the `recorderTimeline`

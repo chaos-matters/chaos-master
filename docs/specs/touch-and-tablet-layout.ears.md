@@ -105,7 +105,7 @@ and, for devices, `:34-88` (`classifyLayout`).)_
 > registers no media-query pair of its own. The requirement below describes the
 > code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **When** the viewport crosses a band boundary, the store shall update its raw
 classification from `matchMedia` `change` events rather than a `resize`
@@ -125,7 +125,7 @@ two raw signals, seeds them on mount, and removes its listeners in `onCleanup`.)
 > `classifyLayout` puts in the tablet band. The requirement below describes the
 > code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **If** `window` is undefined — server-side rendering or a non-DOM test
 environment — **then** both raw classification signals shall initialise to
@@ -167,7 +167,7 @@ covers the native app.)_
 > "honours the preference". The requirement below describes the code at
 > `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **While** the preference is `'touch'`, `isTablet()` shall report the negation of
 the raw phone signal — so a 1920 px desktop window renders the tablet split
@@ -186,7 +186,7 @@ the same expression, so the preference never changes the phone verdict.)_
 > pointer by the width bands of REQ-TL-001 (`workspaceLayoutStore.ts:48-64`
 > (`classifyLayout`)). The requirement below describes the code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **While** the preference is `'auto'`, `isPhone()` and `isTablet()` shall be the
 raw media-query signals unmodified.
@@ -212,7 +212,7 @@ The `isPhone`, `isTablet` and `isTouchLayout` memos shall be created under a
 reactive owner, so that they are disposed with the app and the console stays
 free of ownership warnings on boot.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `b17c7b6e`; this note describes the code at `a5c2f26f`): `packages/app/src/stores/workspaceLayoutStore.ts:114`,
 > `:120` and `:126` are bare module-scope `createMemo` calls with no
@@ -299,7 +299,7 @@ _(`MainWorkspace.tsx:3760` (`railLayout`); `App.module.css:15-19` (`.phoneLayout
 > narrower tablet gets the rail layout. The requirement and the fixed deviation
 > below describe the code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **While** `isTablet()` holds, the workspace root shall carry `.tabletLayout` and
 present a two-column `'viewport inspector'` grid for the entire 680–1024 px
@@ -325,7 +325,7 @@ band, so the inspector deck sits beside the canvas rather than over or under it.
 > `var(--la-safe-bottom)`. The requirement below describes the code at
 > `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **Where** the tablet inspector deck is mounted, it shall occupy the `inspector`
 grid area at `clamp(340px, 35vw, 420px)` wide and full height, scroll its own
@@ -367,7 +367,7 @@ written and cleared at `ExportJobTracker.tsx:28-49` (`createEffect`).)_
 > (`EditorRail.tsx`, `detents.ts`). The requirement below describes the code at
 > `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **When** a chip in the collapsed pill bar is tapped, the mobile bottom surface
 shall expand the sheet **and** select that chip's tab (`variations`, `shape` or
@@ -383,7 +383,7 @@ guarded by `TouchSurface.test.tsx:177-200`.)_
 > **Superseded** by #95 (`fac9214a`), with REQ-TL-020. The requirement below
 > describes the code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **When** the drag-handle row of the expanded sheet is tapped, the bottom surface
 shall collapse back to the pill bar, keeping the last selected tab for the next
@@ -403,7 +403,7 @@ collapse.)_
 > `canUndo` / `canRedo` (`:130` (`canUndo`), `:147` (`canRedo`)). The requirement
 > below describes the code at `a5c2f26f`.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 **While** the phone HUD is mounted, it shall present a gallery button, the
 truncated flame title, a horizontally scrollable rail of Undo / Redo / Snapshot,
