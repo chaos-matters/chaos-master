@@ -127,37 +127,39 @@ export function ClashStage(props: ClashStageProps) {
           </li>
         </ul>
       </header>
-      <p class={ui.caption} aria-live="polite" data-beat={beat()}>
-        {caption()}
-      </p>
-      <div class={ui.controls}>
-        <button
-          type="button"
-          class={ui.button}
-          onClick={play}
-          data-done={done() ? '' : undefined}
-        >
-          <Reset aria-hidden="true" />
-          Replay
-        </button>
-        <button
-          type="button"
-          class={ui.button}
-          aria-pressed={props.reducedMotion}
-          onClick={() => {
-            props.onReducedMotionChange(!props.reducedMotion)
-          }}
-        >
-          Reduce motion
-        </button>
-        <button
-          type="button"
-          class={ui.button}
-          hidden={!props.onChangeFighters}
-          onClick={() => props.onChangeFighters?.()}
-        >
-          Change fighters
-        </button>
+      <div class={ui.bottom}>
+        <p class={ui.caption} aria-live="polite" data-beat={beat()}>
+          {caption()}
+        </p>
+        <div class={ui.controls}>
+          <button
+            type="button"
+            class={ui.button}
+            onClick={play}
+            data-done={done() ? '' : undefined}
+          >
+            <Reset aria-hidden="true" />
+            Replay
+          </button>
+          <button
+            type="button"
+            class={ui.button}
+            aria-pressed={props.reducedMotion}
+            onClick={() => {
+              props.onReducedMotionChange(!props.reducedMotion)
+            }}
+          >
+            Reduce motion
+          </button>
+          <button
+            type="button"
+            class={ui.button}
+            hidden={!props.onChangeFighters}
+            onClick={() => props.onChangeFighters?.()}
+          >
+            Change fighters
+          </button>
+        </div>
       </div>
     </div>
   )
