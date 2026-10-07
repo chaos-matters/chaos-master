@@ -3,6 +3,7 @@ import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit,
 import { DEFAULT_SHUTTER_ANGLE, subFrameLimit, subFrameOffsets, } from '@/utils/motionBlur'
 import { applyAudioMappingsToFlame, createAudioAnalyzer } from './audioAnalysis'
 import { createAudioVideoEncoder } from './audioExport'
+import { snapshotCanvas } from './canvasSnapshot'
 import { deepClone } from './clone'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
@@ -288,12 +289,9 @@ export function createAnimationExport(
 
             const captureStartTime = performance.now()
 
-            // eslint-disable-next-line no-restricted-globals
-            createImageBitmap(exportCanvas, {
-              resizeWidth,
-              resizeHeight,
-              resizeQuality: 'high',
-            })
+            // A copy, not a view of the canvas the next frame clears: see
+            // utils/canvasSnapshot.ts for the drivers that write black video.
+            snapshotCanvas(exportCanvas, resizeWidth, resizeHeight)
               .then(async (bitmap) => {
                 const captureTime = performance.now() - captureStartTime
                 // Only clear export state after the bitmap is captured
