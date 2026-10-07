@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MAX_FLAME_TRANSFORMS } from '@/flame/schema/flameSchema'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { formatSummarizedMetadata, formatSummarizedRenderSettings, formatSummarizedTransforms, formatTransformSummary, } from './getFlame'
@@ -6,8 +7,8 @@ import { resolveTransformDetail } from './getFlameDetail'
 import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
 import { randomizeFlame } from './randomizeFlame'
-import { scoreClashRound } from './scoreClashRound'
-import type { TransformFunction } from '@/flame/schema/flameSchema'
+import { heldSampleBudget, MAX_CLASH_SAMPLE_BUDGET, scoreClashRound, } from './scoreClashRound'
+import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 
 describe('getFlame modular subroutines', () => {
   it('formats transform summary correctly', () => {
@@ -238,6 +239,83 @@ describe('scoreClashRound tool execution contract', () => {
     expect(res.contested).toBeGreaterThanOrEqual(0)
     expect(['A', 'B', 'draw']).toContain(res.verdict)
     expect(res.ownershipA + res.ownershipB + res.contested).toBeCloseTo(1, 2)
+  })
+})
+
+describe('scoreClashRound complexity cap', () => {
+  // Scoring scans the team's transforms for every sample, on the main thread,
+  // even under the Arcade lock; past the schema's cap it refuses.
+  it('refuses a clash flame with more transforms than the schema allows', () => {
+    const transform = {
+      probability: 1,
+      color: { x: 0.5, y: 1 },
+      preAffine: { a: 0.5, b: 0, c: 0, d: 0, e: 0.5, f: 0 },
+      postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+      variations: { v1: { type: 'linearVar', weight: 1 } },
+    }
+    const transforms = Object.fromEntries(
+      Array.from({ length: MAX_FLAME_TRANSFORMS + 1 }, (_, i) => [
+        `p${(i % 2) + 1}_t${i}`,
+        transform,
+      ]),
+    )
+
+    const res = scoreClashRound.execute({ clashFlame: { transforms } }, {})
+
+    expect(res).toEqual({
+      error: `Invalid clashFlame: a flame may contain at most ${MAX_FLAME_TRANSFORMS} transforms. Build it from two fighters with create_clash_flame.`,
+    })
+  })
+})
+
+describe('scoreClashRound sample budget', () => {
+  // A two-team clash; the budget sets how many points each team throws.
+  const clashFlame = () => {
+    const transform = (x: number, d: number) => ({
+      probability: 1,
+      visible: true,
+      color: { x, y: 1 },
+      colorSpeed: 0.5,
+      preAffine: { a: 0.6, b: 0, c: 0, d, e: 0.6, f: 0 },
+      postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+      variations: { v1: { type: 'sphericalVar', weight: 1 } },
+    })
+    return {
+      version: '1',
+      transforms: {
+        p1_t1_0: transform(0.2, -0.4),
+        p2_t1_0: transform(0.8, 0.4),
+      },
+      renderSettings: { dimensions: 2 },
+    } as unknown as FlameDescriptor
+  }
+  const score = (sampleBudget?: unknown) =>
+    scoreClashRound.execute({ clashFlame: clashFlame(), sampleBudget }, {})
+
+  // The loop runs on the main thread, and the tool is read-only, so it runs
+  // even while an Arcade session holds the lock: 2e9 froze the tab. The
+  // shares saturate long before the ceiling, so the budget is pinned where
+  // it is read, and the tool must still answer for an absurd one.
+  it('holds the budget to the ceiling, whole and not below zero', () => {
+    expect(heldSampleBudget(MAX_CLASH_SAMPLE_BUDGET * 4)).toBe(
+      MAX_CLASH_SAMPLE_BUDGET,
+    )
+    expect(heldSampleBudget(2e9)).toBe(250_000)
+    expect(heldSampleBudget(1234.9)).toBe(1234)
+    expect(heldSampleBudget(-5)).toBe(0)
+  })
+
+  it('reads a budget that is not a finite number as the default', () => {
+    expect(heldSampleBudget(Number.NaN)).toBe(25_000)
+    expect(heldSampleBudget('lots')).toBe(25_000)
+    expect(heldSampleBudget(Number.POSITIVE_INFINITY)).toBe(25_000)
+    expect(heldSampleBudget(undefined)).toBe(25_000)
+  })
+
+  it('answers for a budget of a trillion', () => {
+    const result = score(1e12) as { verdict?: string }
+    expect(result).toEqual(score(MAX_CLASH_SAMPLE_BUDGET))
+    expect(result.verdict).toBeDefined()
   })
 })
 
