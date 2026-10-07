@@ -207,6 +207,21 @@ export const ALWAYS_ON = [
     why: 'reads four SessionRecorder stylesheets',
     genre: 'filesystem',
   },
+  {
+    file: 'src/components/HelpModal/HelpModal.module.test.ts',
+    why: 'reads HelpModal.module.css and GlassPanelsSetting.module.css',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/components/DocumentationModal/DocumentationModal.module.test.ts',
+    why: 'reads DocumentationModal.module.css',
+    genre: 'filesystem',
+  },
+  {
+    file: 'src/pages/Benchmarks/BenchmarksPage.module.test.ts',
+    why: 'reads BenchmarksPage.module.css',
+    genre: 'filesystem',
+  },
 
   // Enumerate a directory at run time, so a new or edited entry in it is
   // invisible to the graph.
