@@ -160,12 +160,23 @@
   height: var(--la-capsule);
 }
 
+/* No gap between the chips: only the selected one has a fill, so a gap
+   showed nowhere and only took width from the labels and left dead strips
+   between the targets.
+
+   The row scrolls only below the chips' 40px floor, but a scroller clips
+   whether it scrolls or not, so a label wider than its chip lost its first
+   letter at the scroller's edge ("ariations" at 360px). The scroller reaches
+   4px into the gap on either side and pads its chips back by as much: no
+   chip moves, and an overhang has room to paint. */
 .chips {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  gap: var(--la-s-1);
+  gap: 0;
+  margin-inline: calc(var(--la-s-1) * -1);
+  padding-inline: var(--la-s-1);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -195,7 +206,11 @@
   gap: var(--la-s-1);
   border: 0;
   background: none;
-  border-radius: var(--la-r-pill);
+  /* The selected fill is a tile, the deck's tool tabs' radius, not a pill. A
+     chip is about 50px wide and its label sits in the bottom 12px of 44,
+     where a pill's ends have already curved in: a pill there is 30px wide at
+     the baseline, and "Variations" is 48. */
+  border-radius: var(--la-r-sm);
   color: var(--la-ink-2);
   font: var(--la-t-tab);
   cursor: pointer;
@@ -210,9 +225,14 @@
   background: var(--la-accent-wash);
 }
 
+/* The rail's glyphs at the icon set's one stroke, --la-icon-stroke. Shuffle
+   and the camera are drawn at 1.5 for the desktop and read lighter here than
+   the 1.8 glyphs on either side of them; the CSS property outranks the
+   SVG's own attribute, and the strokes inside inherit it. */
 .chipIcon {
   width: 26px;
   height: 26px;
+  stroke-width: var(--la-icon-stroke);
 }
 
 /* The strong glass, 86%: the accent icon holds 4.79:1 on it over white-hot
@@ -243,6 +263,7 @@
 .shutterIcon {
   width: 26px;
   height: 26px;
+  stroke-width: var(--la-icon-stroke);
 }
 
 .body {
