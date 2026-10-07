@@ -6,7 +6,7 @@
 import { DEFAULT_LOCATION, formatExplorerHash } from '@chaos-master/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BENCHMARKS_PATH, EXPLORER_PATH } from './appPath'
-import { askBeforeLeavingForExplorer, openBenchmarkLab, openExplorer, openExplorerAt, } from './pageLinks'
+import { askBeforeLeaving, openBenchmarkLab, openExplorer, openExplorerAt, } from './pageLinks'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -35,26 +35,33 @@ describe('page links', () => {
   })
 })
 
-describe('leaving for the explorer while the editor has a say', () => {
+describe('leaving for a page of its own while the editor has a say', () => {
   const julia = { ...DEFAULT_LOCATION, kind: 'julia' as const }
   const disposers: (() => void)[] = []
   afterEach(() => {
     for (const dispose of disposers.splice(0)) dispose()
   })
   const editorSays = (answer: boolean) => {
-    const ask = vi.fn(() => Promise.resolve(answer))
-    disposers.push(askBeforeLeavingForExplorer(ask))
+    const ask = vi.fn((_page: string) => Promise.resolve(answer))
+    disposers.push(askBeforeLeaving(ask))
     return ask
   }
 
   it.each([
-    ['the menu link', () => openExplorer?.(), EXPLORER_PATH],
+    [
+      'the Benchmark Lab link',
+      () => openBenchmarkLab?.(),
+      'benchmarks',
+      BENCHMARKS_PATH,
+    ],
+    ['the explorer link', () => openExplorer?.(), 'explorer', EXPLORER_PATH],
     [
       'a dropped picture',
       () => openExplorerAt?.(julia),
+      'explorer',
       `${EXPLORER_PATH}${formatExplorerHash(julia)}`,
     ],
-  ])('leaves by %s once the editor agrees', async (_, leave, url) => {
+  ])('leaves by %s once the editor agrees', async (_, leave, page, url) => {
     const assign = vi.fn()
     vi.stubGlobal('location', { assign })
     const ask = editorSays(true)
@@ -62,11 +69,13 @@ describe('leaving for the explorer while the editor has a say', () => {
     await vi.waitFor(() => {
       expect(assign).toHaveBeenCalledExactlyOnceWith(url)
     })
-    expect(ask).toHaveBeenCalledOnce()
+    // The editor is told where to, so its question can name the page.
+    expect(ask).toHaveBeenCalledExactlyOnceWith(page)
   })
 
   it.each([
-    ['the menu link', () => openExplorer?.()],
+    ['the Benchmark Lab link', () => openBenchmarkLab?.()],
+    ['the explorer link', () => openExplorer?.()],
     ['a dropped picture', () => openExplorerAt?.(julia)],
   ])('stays when the editor says no, by %s', async (_, leave) => {
     const assign = vi.fn()
@@ -80,13 +89,13 @@ describe('leaving for the explorer while the editor has a say', () => {
     expect(assign).not.toHaveBeenCalled()
   })
 
-  it('asks nothing once the editor has gone, and keeps a newer editor', () => {
+  it('asks nothing once the editor has gone, and keeps a newer editor', async () => {
     const assign = vi.fn()
     vi.stubGlobal('location', { assign })
     const older = vi.fn(() => Promise.resolve(false))
     const newer = vi.fn(() => Promise.resolve(false))
-    const disposeOlder = askBeforeLeavingForExplorer(older)
-    disposers.push(askBeforeLeavingForExplorer(newer))
+    const disposeOlder = askBeforeLeaving(older)
+    disposers.push(askBeforeLeaving(newer))
     // The older one letting go must not take the newer one with it.
     disposeOlder()
     openExplorer?.()
@@ -97,6 +106,9 @@ describe('leaving for the explorer while the editor has a say', () => {
     })
     openBenchmarkLab?.()
     openExplorer?.()
-    expect(assign).toHaveBeenLastCalledWith(EXPLORER_PATH)
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledTimes(2)
+    })
+    expect(assign.mock.calls).toEqual([[BENCHMARKS_PATH], [EXPLORER_PATH]])
   })
 })

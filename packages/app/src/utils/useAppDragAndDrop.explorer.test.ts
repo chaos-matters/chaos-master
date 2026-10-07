@@ -7,7 +7,7 @@ import { DEFAULT_LOCATION, formatExplorerHash } from '@chaos-master/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { EXPLORER_PATH } from '@/routing/appPath'
-import { askBeforeLeavingForExplorer } from '@/routing/pageLinks'
+import { askBeforeLeaving } from '@/routing/pageLinks'
 import { deepClone } from './clone'
 import { addExplorerLocationToPng, addFlameDataToPng } from './flameInPng'
 import { compressJsonQueryParam } from './jsonQueryParam'
@@ -70,8 +70,8 @@ describe('dropping a PNG on the editor', () => {
 
   it('stays in the editor when the editor says no to leaving', async () => {
     // At a full Recents the editor asks first (hooks/useWorkspaceAutosave.ts).
-    const ask = vi.fn(() => Promise.resolve(false))
-    const dispose = askBeforeLeavingForExplorer(ask)
+    const ask = vi.fn((_page: string) => Promise.resolve(false))
+    const dispose = askBeforeLeaving(ask)
     try {
       const png = await addExplorerLocationToPng(PNG_SIGNATURE, LOCATION)
       const target = dropTarget()
@@ -80,7 +80,7 @@ describe('dropping a PNG on the editor', () => {
         new File([png], 'Julia set.png', { type: 'image/png' }),
       )
 
-      expect(ask).toHaveBeenCalledOnce()
+      expect(ask).toHaveBeenCalledExactlyOnceWith('explorer')
       expect(target.assign).not.toHaveBeenCalled()
       expect(target.replace).not.toHaveBeenCalled()
       expect(target.prepareReplace).not.toHaveBeenCalled()

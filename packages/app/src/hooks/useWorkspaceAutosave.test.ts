@@ -5,14 +5,15 @@ import { setArenaShowing } from '@/arcade/editorCover'
 import { examples } from '@/flame/examples'
 import { parseFlameXml } from '@/flame/flameXml'
 import { setActiveTab } from '@/lib/activeTab'
-import { EXPLORER_PATH } from '@/routing/appPath'
-import { openExplorer } from '@/routing/pageLinks'
+import { BENCHMARKS_PATH, EXPLORER_PATH } from '@/routing/appPath'
+import { openBenchmarkLab, openExplorer } from '@/routing/pageLinks'
 import { autosaveRecents, setAutosaveRecents, setSaveReminderDismissed, } from '@/utils/autosaveSettings'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { clearRecentFlames, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, } from '@/utils/recentFlames'
 import { useWorkspaceAutosave } from './useWorkspaceAutosave'
 import { BREED_PREVIEW_DELAY_MS, useWorkspaceBlendPick, } from './useWorkspaceBlendPick'
 import type { BlendIntent } from './useWorkspaceBlendPick'
+import type { OverwriteOccasion } from '@/components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 // Same reason as draft.test.ts: localStorage is not usable in this runtime, so
@@ -74,7 +75,7 @@ const keepUnsaved = () => Promise.resolve(false)
 const workspace = (
   options: {
     muted?: () => boolean
-    confirmOverwriteOldest?: (occasion?: 'save' | 'leave') => Promise<boolean>
+    confirmOverwriteOldest?: (occasion?: OverwriteOccasion) => Promise<boolean>
     confirmDiscardUnsaved?: () => Promise<boolean>
   } = {},
 ) => {
@@ -756,7 +757,7 @@ describe('the save reminder over a view with its own top bar', () => {
   })
 })
 
-describe('leaving for the explorer when the shelf is full', () => {
+describe('leaving for a page of its own when the shelf is full', () => {
   /** The question, answered `answer`, and what it was asked about. */
   const asks = (answer: boolean) => {
     const occasions: (string | undefined)[] = []
@@ -766,10 +767,11 @@ describe('leaving for the explorer when the shelf is full', () => {
     }
     return { occasions, confirmOverwriteOldest }
   }
-  const leaving = () => {
+  /** Follows a menu link out of the editor: the explorer's, unless told. */
+  const leaving = (open = openExplorer) => {
     const assign = vi.fn()
     vi.stubGlobal('location', { assign })
-    openExplorer?.()
+    open?.()
     return assign
   }
   /** Lets the question and the leaving that follows it run. */
@@ -790,7 +792,7 @@ describe('leaving for the explorer when the shelf is full', () => {
       const assign = leaving()
       await settle()
 
-      expect(question.occasions).toEqual(['leave'])
+      expect(question.occasions).toEqual(['explorer'])
       expect(assign).not.toHaveBeenCalled()
       // Nothing written and nothing let go: the shelf is as it was.
       const kept = loadRecentFlamesForRewrite()
@@ -818,6 +820,26 @@ describe('leaving for the explorer when the shelf is full', () => {
       expect(kept[0]?.flame.metadata?.name).toBe('Unsaved work')
       expect(kept.some((e) => e.id === `kept-${MAX_RECENT_FLAMES - 1}`)).toBe(
         false,
+      )
+      dispose()
+    })
+  })
+
+  it('asks the same on the way to the Benchmark Lab, naming it', async () => {
+    fillRecents()
+    const question = asks(true)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving(openBenchmarkLab)
+      await settle()
+
+      expect(question.occasions).toEqual(['benchmarks'])
+      expect(assign).toHaveBeenCalledExactlyOnceWith(BENCHMARKS_PATH)
+      expect(loadRecentFlamesForRewrite()[0]?.flame.metadata?.name).toBe(
+        'Unsaved work',
       )
       dispose()
     })

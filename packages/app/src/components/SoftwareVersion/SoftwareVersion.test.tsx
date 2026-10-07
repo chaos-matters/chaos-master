@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { askBeforeLeavingForExplorer } from '@/routing/pageLinks'
+import { askBeforeLeaving } from '@/routing/pageLinks'
 import workspaceSource from '../../MainWorkspace.tsx?raw'
 import { SoftwareVersion } from './SoftwareVersion'
 
@@ -136,7 +136,10 @@ describe('where the version menu is offered', () => {
   })
 })
 
-describe('the Deep zoom link', () => {
+describe.each([
+  ['Deep zoom', 'Open the deep-zoom explorer', '/explore', 'explorer'],
+  ['Benchmark Lab', 'Open Benchmark Lab', '/benchmarks', 'benchmarks'],
+])('the %s link', (_, label, href, page) => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
@@ -153,23 +156,23 @@ describe('the Deep zoom link', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /lumen apeiron.*menu/i }),
     )
-    return screen.getByRole('link', { name: 'Open the deep-zoom explorer' })
+    return screen.getByRole('link', { name: label })
   }
 
   it('leaves by the same way as the touch menu, so the editor can ask first', async () => {
-    const ask = vi.fn(() => Promise.resolve(false))
-    const dispose = askBeforeLeavingForExplorer(ask)
+    const ask = vi.fn((_page: string) => Promise.resolve(false))
+    const dispose = askBeforeLeaving(ask)
     try {
       const assign = vi.fn()
       vi.stubGlobal('location', { assign })
       const link = openMenu()
-      expect(link.getAttribute('href')).toBe('/explore')
+      expect(link.getAttribute('href')).toBe(href)
       const click = new MouseEvent('click', { bubbles: true, cancelable: true })
       link.dispatchEvent(click)
       // The browser's own navigation would leave without asking.
       expect(click.defaultPrevented).toBe(true)
       await vi.waitFor(() => {
-        expect(ask).toHaveBeenCalledOnce()
+        expect(ask).toHaveBeenCalledExactlyOnceWith(page)
       })
       expect(assign).not.toHaveBeenCalled()
     } finally {
@@ -179,7 +182,7 @@ describe('the Deep zoom link', () => {
 
   it('leaves a click for a new tab to the browser', () => {
     const ask = vi.fn(() => Promise.resolve(false))
-    const dispose = askBeforeLeavingForExplorer(ask)
+    const dispose = askBeforeLeaving(ask)
     try {
       const link = openMenu()
       const click = new MouseEvent('click', {

@@ -2,7 +2,7 @@ import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { Book, DeepZoom, GridIcon, Info, SidebarPanel, Star, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { BENCHMARKS_PATH, EXPLORER_PATH } from '@/routing/appPath'
-import { openExplorer } from '@/routing/pageLinks'
+import { openBenchmarkLab, openExplorer } from '@/routing/pageLinks'
 import { setTouchLayoutPreference as globalSetTouchLayoutPref } from '@/stores/workspaceLayoutStore'
 import { DISPLAY_VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
@@ -22,6 +22,20 @@ export interface SoftwareVersionProps {
    */
   hideTrigger?: () => boolean
   onPickGallery?: () => void
+}
+
+/**
+ * A menu link to a page of its own. A plain click leaves this tab, so it
+ * goes the way the touch menu goes: the editor asks first at a full Recents
+ * (routing/pageLinks.ts). A click for a new tab leaves nothing behind and
+ * stays the browser's, as does every click in the native build, where
+ * `open` is undefined.
+ */
+function leaveOnPlainClick(ev: MouseEvent, open: (() => void) | undefined) {
+  if (!open || ev.button !== 0) return
+  if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return
+  ev.preventDefault()
+  open()
 }
 
 export function SoftwareVersion(props: SoftwareVersionProps) {
@@ -104,7 +118,10 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
         class={ui.menuItem}
         href={BENCHMARKS_PATH}
         aria-label="Open Benchmark Lab"
-        onClick={() => setOpen(false)}
+        onClick={(ev) => {
+          setOpen(false)
+          leaveOnPlainClick(ev, openBenchmarkLab)
+        }}
       >
         <GridIcon class={ui.menuIcon} />
         <div class={ui.menuMeta}>
@@ -119,14 +136,7 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
         aria-label="Open the deep-zoom explorer"
         onClick={(ev) => {
           setOpen(false)
-          // A plain click leaves this tab, so it goes the way the touch
-          // menu and a dropped picture go: the editor asks first at a full
-          // Recents (routing/pageLinks.ts). A click for a new tab leaves
-          // nothing behind and stays the browser's.
-          if (!openExplorer || ev.button !== 0) return
-          if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return
-          ev.preventDefault()
-          openExplorer()
+          leaveOnPlainClick(ev, openExplorer)
         }}
       >
         <DeepZoom class={ui.menuIcon} />

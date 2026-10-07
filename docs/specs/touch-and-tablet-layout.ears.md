@@ -266,7 +266,7 @@ actions, and the desktop version pill — and shall mount no TouchSurface
 component except the `AdvancedToolsDrawer`, which is always mounted but renders
 nothing while closed.
 
-_(`MainWorkspace.tsx:3814` (`isPhone`), `:4056` (`isPhone`), `:4356` (`showArena`); `SoftwareVersion.tsx:194` (`hideTrigger`)
+_(`MainWorkspace.tsx:3814` (`isPhone`), `:4056` (`isPhone`), `:4356` (`showArena`); `SoftwareVersion.tsx:204` (`hideTrigger`)
 renders only the desktop trigger, and `MainWorkspace.tsx:4476` (`hideVersionTrigger`) hides it
 under `isTouchLayout()`; `AdvancedToolsDrawer.tsx:128` (`open`)
 wraps the whole panel in `<Show when={props.open}>`.)_
@@ -594,8 +594,8 @@ preference to the current layout — "Switch to Touch Studio" writing `'touch'`
 from the desktop pill, "Switch to Desktop Layout" writing `'desktop'` from the
 touch layout's tools drawer — and shall close the menu in the same click.
 
-_(`SoftwareVersion.tsx:49-65` (`renderMenuItems`); the writer prefers the injected
-`setTouchLayoutPreference` prop and falls back to the module setter at `:28-34` (`setTouchPref`).
+_(`SoftwareVersion.tsx:64-80` (`renderMenuItems`); the writer prefers the injected
+`setTouchLayoutPreference` prop and falls back to the module setter at `:43-49` (`setTouchPref`).
 The touch direction is `AdvancedToolsDrawer.tsx:50-62` (`onSwitchToDesktop`), wired to
 `setTouchLayoutPreference('desktop')` at `MainWorkspace.tsx:4019-4020` (`onSwitchToDesktop`).
 Guarded by `SoftwareVersion.test.tsx:52-56` (`fireEvent`) and `TouchSurface.test.tsx:236-237`
