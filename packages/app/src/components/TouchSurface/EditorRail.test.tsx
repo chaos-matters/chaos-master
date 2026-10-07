@@ -123,6 +123,26 @@ describe('EditorRail', () => {
     ).toBe('true')
   })
 
+  it('names the panel after its chip, and points every chip at the panel', () => {
+    mount()
+    const shape = () => screen.getByRole('tab', { name: 'Shape' })
+    // The panel is built on the first open. Before it there is nothing to
+    // point at, and a reference to a missing id is an error of its own.
+    expect(shape().hasAttribute('aria-controls')).toBe(false)
+
+    fireEvent.click(shape())
+    // Four tabs with no tab panel: a screen reader announced the chips as
+    // tabs and then found nothing they controlled.
+    const panel = screen.getByRole('tabpanel', { name: 'Shape' })
+    expect(panel.id).not.toBe('')
+    for (const chip of screen.getAllByRole('tab'))
+      expect(chip.getAttribute('aria-controls')).toBe(panel.id)
+
+    // One panel for the four chips: it takes the name of whichever is open.
+    fireEvent.click(screen.getByRole('tab', { name: 'Colour' }))
+    expect(screen.getByRole('tabpanel', { name: 'Colour' })).toBe(panel)
+  })
+
   it('follows a drag and settles by velocity, never below peek', () => {
     mount()
     const grabber = screen.getByTestId('editor-rail-grabber')
@@ -344,6 +364,20 @@ describe('EditorRail', () => {
     expect(props.onOpenExportOptions).toHaveBeenCalledTimes(1)
     expect(props.onQuickExport).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
+  })
+
+  it('says what holding the shutter does, without drawing anything', () => {
+    mount()
+    const shutter = screen.getByRole('button', { name: 'Save image' })
+    // The name says what a tap does. The hold was announced nowhere and
+    // shown nowhere, so only someone who already knew could find it.
+    expect(shutter.title).toBe('Save image, or hold for export options')
+    const hint = document.getElementById(
+      shutter.getAttribute('aria-describedby') ?? '',
+    )
+    expect(hint?.textContent).toBe('Hold for export options')
+    // Read out, never drawn: the peek row keeps the controls it has.
+    expect(hint?.hidden).toBe(true)
   })
 
   it('re-reports the covered height when the viewport changes', () => {
