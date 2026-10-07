@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { setTouchLayoutPreference } from '@/stores/workspaceLayoutStore'
 import { ModalContext } from '../Modal/ModalContext'
 import { HelpModal } from './HelpModal'
 import type { RequestModalFn } from '../Modal/ModalContext'
@@ -81,5 +82,50 @@ describe('HelpModal haptics switch', () => {
     platform.native = false
     mount()
     expect(screen.queryByLabelText('Haptics')).toBeNull()
+  })
+})
+
+describe('HelpModal guided tours', () => {
+  afterEach(() => {
+    cleanup()
+    setTouchLayoutPreference('auto')
+  })
+
+  it('are offered on the desktop layout', () => {
+    setTouchLayoutPreference('desktop')
+    mount()
+    expect(screen.getByRole('button', { name: 'App Tour' })).toBeTruthy()
+  })
+
+  it('are not offered on a touch layout, which has none of their targets', () => {
+    // On a phone 13 of the App Tour's 15 steps highlighted nothing.
+    setTouchLayoutPreference('touch')
+    mount()
+    expect(screen.queryByText('Guided Tours')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'App Tour' })).toBeNull()
+  })
+})
+
+describe('HelpModal controls for assistive tech', () => {
+  afterEach(cleanup)
+
+  it('names its close button', () => {
+    mount()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy()
+  })
+
+  it('says which option of each segmented setting is on', () => {
+    // Mounted with the list picker, the wide sidebar, compact off and dark.
+    mount()
+    const pressed = (name: string) =>
+      screen.getByRole('button', { name }).getAttribute('aria-pressed')
+    expect(pressed('List')).toBe('true')
+    expect(pressed('Gallery')).toBe('false')
+    expect(pressed('Wide')).toBe('true')
+    expect(pressed('Compact')).toBe('false')
+    expect(pressed('Off')).toBe('true')
+    expect(pressed('On')).toBe('false')
+    expect(pressed('Dark')).toBe('true')
+    expect(pressed('Light')).toBe('false')
   })
 })

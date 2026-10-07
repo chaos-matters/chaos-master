@@ -1,4 +1,4 @@
-import { batch, createEffect, createResource, createSignal, ErrorBoundary, lazy, onCleanup, onMount, Show, Suspense, } from 'solid-js'
+import { batch, createEffect, createResource, createSignal, ErrorBoundary, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { interruptionAnnouncement } from './arcade/interruptedSession'
 import { ArcadeHub } from './components/Arcade/ArcadeHub'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
@@ -28,6 +28,7 @@ import { createWorkspaceHandoff } from './lib/workspaceHandoff'
 const MainWorkspace = lazy(() =>
   import('./MainWorkspace').then((m) => ({ default: m.MainWorkspace })),
 )
+import { toursOffered } from './tours/offered'
 import { getTour } from './tours/registry'
 import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
 import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryParam'
@@ -290,7 +291,10 @@ export function Wrappers() {
         setShowWelcome(false)
       }
       const match = /#tour=([a-zA-Z0-9_-]+)/.exec(fragment)
-      if (match) {
+      // A touch layout offers no tour (tours/offered.ts), by link either.
+      // Untracked: read inside this effect, the layout would re-run it on
+      // every flip, and a linked tour would restart at step 1.
+      if (match && untrack(toursOffered)) {
         const tourId = match[1]!
         setShowWelcome(false)
         spotlightState.startTour(tourId)
@@ -468,7 +472,9 @@ export function Wrappers() {
                             enterWorkspace: true,
                           })
                         }}
-                        onStartTour={handleStartTour}
+                        onStartTour={
+                          toursOffered() ? handleStartTour : undefined
+                        }
                         onShowAbout={() => {
                           setShowWelcome(false)
                           openSettings()
