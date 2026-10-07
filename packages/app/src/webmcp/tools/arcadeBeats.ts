@@ -3,7 +3,7 @@ import { describeAllowedCommands } from '@/arcade/commandHints'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
-import { finishPilot } from '@/arcade/pilotActions'
+import { budgetExhaustedMessage, finishPilot, takeOutcome, } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, BEATS_ALLOWED, BEATS_STEP_BUDGET, PRESENTATION_SWITCHES, } from '@/arcade/topics'
 import { executeCommand } from '@/commands/registry'
 import { captureGlideSwitches } from '@/flame/glide/runtime'
@@ -469,16 +469,20 @@ export const arcadeEndBeats: WebMcpTool = {
     const summary =
       parsedArgs.summary?.trim() || 'Audio-reactive modulation take'
 
-    await finishPilot(ctx, 'finished', {
+    const ended = await finishPilot(ctx, 'finished', {
       title,
       summary,
     })
+    if ('error' in ended) return ended
 
+    // Say whether the take was saved: a save can fail, and an empty one has
+    // nothing to save.
     return {
       ok: true,
       title,
       summary,
-      message: 'Beats session completed and saved to library.',
+      sessionName: ended.sessionName,
+      ...takeOutcome(ended, 'Beats session'),
     }
   },
 }

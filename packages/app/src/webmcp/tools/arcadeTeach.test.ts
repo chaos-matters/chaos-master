@@ -123,6 +123,10 @@ describe('Teach tools', () => {
       ok: true,
       steps: 2,
       sessionName: 'Lesson: Colour and tone — Warm tones',
+      saved: true,
+      message: 'Lesson completed and saved to library.',
+      replayHint:
+        'The user can now replay the lesson from the end card or the Arcade library.',
     })
     expect(ctx.recorder!.save).toHaveBeenCalledWith(
       expect.anything(),
@@ -132,6 +136,40 @@ describe('Teach tools', () => {
     expect(await arcadeNarrate.execute({ text: 'late' }, {})).toHaveProperty(
       'error',
     )
+  })
+
+  // With storage full the agent was told the lesson was in the library.
+  it('says a failed save failed, and points only at the end card', async () => {
+    const ctx = ctxWithRecorder()
+    ctx.recorder!.save = vi.fn(() => Promise.reject(new Error('quota')))
+    await arcadeStartLesson.execute({ topic: 'color' }, {})
+
+    const ended = await arcadeEndLesson.execute({ title: 'Warm tones' }, {})
+
+    expect(ended).toMatchObject({
+      ok: true,
+      saved: false,
+      message: 'Lesson ended, but the take could not be saved to the library.',
+      replayHint:
+        'The user can replay the lesson from the end card until they leave it; it is not in the Arcade library.',
+    })
+  })
+
+  it('says nothing was saved when nothing was recorded', async () => {
+    setWebMcpContext(createMockCommandContext())
+    await arcadeStartLesson.execute({ topic: 'color' }, {})
+
+    const ended = (await arcadeEndLesson.execute(
+      { title: 'Warm tones' },
+      {},
+    )) as Record<string, unknown>
+
+    expect(ended).toMatchObject({
+      ok: true,
+      saved: false,
+      message: 'Lesson ended. Nothing was recorded, so nothing was saved.',
+    })
+    expect(ended).not.toHaveProperty('replayHint')
   })
 
   it('leaves the driving phase before the save resolves', async () => {
