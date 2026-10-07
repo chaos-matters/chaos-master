@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on, onCleanup } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, untrack } from 'solid-js'
 import { setArenaShowing } from '@/arcade/editorCover'
 import { mutateFlame } from '@/flame/randomize'
 import { calculateGroundedStats } from '@/flame/stats'
@@ -7,6 +7,8 @@ import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { Accessor, Setter } from 'solid-js'
 import type { ArenaFighterStats } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+
+type Fighter = ArenaFighterStats | null
 
 export interface UseWorkspaceArenaParams {
   flameDescriptor: FlameDescriptor
@@ -32,8 +34,17 @@ export function useWorkspaceArena(params: UseWorkspaceArenaParams) {
     setArenaShowing(showArena())
   })
   onCleanup(() => setArenaShowing(false))
-  const [arenaP1Stats, setArenaP1Stats] =
+  const [arenaP1Stats, writeArenaP1Stats] =
     createSignal<ArenaFighterStats | null>(null)
+  // A player 1 written while the Arena is closed is a fighter chosen for the
+  // next open: open_arena seats the agent's fighters and then opens. That open
+  // keeps it; every other open seats the editor's flame, so a fighter left
+  // from an earlier clash never stands in for what the user is editing.
+  let p1ChosenForOpen = false
+  const setArenaP1Stats = ((value: Fighter | ((prev: Fighter) => Fighter)) => {
+    if (!untrack(showArena)) p1ChosenForOpen = true
+    return writeArenaP1Stats(value)
+  }) as Setter<Fighter>
   const [arenaP2Stats, setArenaP2Stats] =
     createSignal<ArenaFighterStats | null>(null)
   const [arenaCommentary, setArenaCommentary] = createSignal<string | null>(
@@ -71,17 +82,20 @@ export function useWorkspaceArena(params: UseWorkspaceArenaParams) {
     if (isArenaModalOpen) return
     isArenaModalOpen = true
     const current = deepClone(flameDescriptor)
-    const p1Stats = calculateFlameStats(current)
-    const p1Grounded = calculateGroundedStats(current)
-    setArenaP1Stats({
-      name: current.metadata?.name || 'Cyan Guardian',
-      type: p1Stats.type,
-      school: p1Grounded.school,
-      powerLevel: p1Grounded.powerLevel,
-      flame: current,
-      groundedStats: p1Grounded,
-      metrics: p1Stats.metrics,
-    })
+    if (!p1ChosenForOpen) {
+      const p1Stats = calculateFlameStats(current)
+      const p1Grounded = calculateGroundedStats(current)
+      writeArenaP1Stats({
+        name: current.metadata?.name || 'Cyan Guardian',
+        type: p1Stats.type,
+        school: p1Grounded.school,
+        powerLevel: p1Grounded.powerLevel,
+        flame: current,
+        groundedStats: p1Grounded,
+        metrics: p1Stats.metrics,
+      })
+    }
+    p1ChosenForOpen = false
 
     const p2 = arenaP2Stats()
     if (!p2) {
