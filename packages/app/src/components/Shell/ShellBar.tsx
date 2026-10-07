@@ -40,6 +40,13 @@ export interface ShellBarProps {
 export function ShellBar(props: ShellBarProps) {
   const [expanded, setExpanded] = createSignal(false)
   const [held, setHeld] = createSignal(false)
+  /**
+   * The keyboard is working in the bar: one of its buttons has the focus,
+   * and the focus came from the keys. Chrome focuses a tapped button as well,
+   * without the ring, and that focus keeps nothing up: a bar a finger opened
+   * still gives the editor its band back on the countdown.
+   */
+  const [keyboardIn, setKeyboardIn] = createSignal(false)
   const [moreOpen, setMoreOpen] = createSignal(false)
   /** Escape and back hand focus back to it (MoreMenu's `trigger`). */
   let moreButton: HTMLButtonElement | undefined
@@ -66,13 +73,45 @@ export function ShellBar(props: ShellBarProps) {
 
   // A finger resting on the capsule is a request to keep the bar up, so the
   // countdown only runs once nothing is holding it.
+  //
+  // The keyboard working in the bar holds it too: the countdown ran from the
+  // open whatever had the focus, and Library went from under a keyboard user
+  // three seconds after it appeared. Reading keyboardIn restarts the
+  // countdown when the focus leaves. The countdown still runs while the keys
+  // hold the bar, and looks again when it ends, because a button that leaves
+  // the page or turns inert with the focus in it takes the focus with it and
+  // fires no focusout: the bar would otherwise stay up for good.
   createEffect(() => {
     if (props.mode === 'full' || !expanded() || held()) return
-    const timer = setTimeout(collapse, CAPSULE_OPEN_MS)
+    keyboardIn()
+    let timer: ReturnType<typeof setTimeout>
+    const end = () => {
+      if (keyboardIn() && dockEl?.contains(document.activeElement)) {
+        timer = setTimeout(end, CAPSULE_OPEN_MS)
+        return
+      }
+      collapse()
+    }
+    timer = setTimeout(end, CAPSULE_OPEN_MS)
     onCleanup(() => {
       clearTimeout(timer)
     })
   })
+
+  /**
+   * Whether the focus that just arrived came from the keys. The browser
+   * already decides that for its own focus ring, and :focus-visible asks it.
+   */
+  function focusFromKeys(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false
+    try {
+      return target.matches(':focus-visible')
+    } catch {
+      // No :focus-visible is Safari before 15.4, which never focuses a
+      // tapped button: a focus there came from the keys.
+      return true
+    }
+  }
 
   // Expanded over the rail, the bar is the topmost layer: back gives the
   // editor its band back before anything else answers (lib/backStack.ts).
@@ -175,6 +214,17 @@ export function ShellBar(props: ShellBarProps) {
       classList={{
         [ui.capsuleDock!]: props.mode === 'capsule',
         [ui.expanded!]: expanded(),
+      }}
+      ref={dockEl}
+      onFocusIn={(event) => {
+        setKeyboardIn(focusFromKeys(event.target))
+      }}
+      onFocusOut={(event) => {
+        // Between two of the bar's own buttons the focusin that follows
+        // decides; only a focus leaving the bar lets it go.
+        const next = event.relatedTarget
+        if (next instanceof Node && dockEl?.contains(next)) return
+        setKeyboardIn(false)
       }}
     >
       {/* More is the full bar's, and only the full bar's: in Create the top

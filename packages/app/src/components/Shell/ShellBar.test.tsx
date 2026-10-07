@@ -268,6 +268,58 @@ describe('ShellBar', () => {
     vi.useRealTimers()
   })
 
+  it('stays open while the keyboard is in it, and counts down once it leaves', () => {
+    vi.useFakeTimers()
+    mount('capsule')
+    capsule().focus()
+    capsule().click()
+    const library = screen.getByRole('button', { name: 'Library' })
+    library.focus()
+
+    // The countdown ran from the open whatever held the focus, so Library
+    // went from under a keyboard user three seconds after it appeared.
+    vi.advanceTimersByTime(CAPSULE_OPEN_MS * 2)
+    expect(screen.getByRole('button', { name: 'Library' })).toBe(library)
+
+    library.blur()
+    vi.advanceTimersByTime(CAPSULE_OPEN_MS - 1)
+    expect(screen.getByRole('button', { name: 'Library' })).toBe(library)
+    vi.advanceTimersByTime(1)
+    expect(screen.queryByRole('button', { name: 'Library' })).toBeNull()
+    vi.useRealTimers()
+  })
+
+  it('counts down after a tap, whose focus is not the keyboard', () => {
+    vi.useFakeTimers()
+    mount('capsule')
+    const button = capsule()
+    // Chrome focuses a tapped button without a focus ring. The bar a finger
+    // opened still gives the editor its band back on its own. The test DOM
+    // treats every focus as visible, so this one is told it is not.
+    vi.spyOn(button, 'matches').mockReturnValue(false)
+    fireEvent.pointerDown(button, { pointerId: 1 })
+    fireEvent.pointerUp(button, { pointerId: 1 })
+    button.focus()
+    button.click()
+    vi.advanceTimersByTime(CAPSULE_OPEN_MS)
+    expect(screen.queryByRole('button', { name: 'Library' })).toBeNull()
+    vi.useRealTimers()
+  })
+
+  it('does not stay open for a focus the bar took away with it', () => {
+    vi.useFakeTimers()
+    mount('capsule')
+    capsule().click()
+    screen.getByRole('button', { name: 'Library' }).focus()
+    // Back with the keyboard on Library: the button goes, and with it the
+    // focus, but no focusout says so. The next open must still count down.
+    expect(popBack()).toBe(true)
+    capsule().click()
+    vi.advanceTimersByTime(CAPSULE_OPEN_MS)
+    expect(screen.queryByRole('button', { name: 'Library' })).toBeNull()
+    vi.useRealTimers()
+  })
+
   it('collapses on back', () => {
     vi.useFakeTimers()
     mount('capsule')
