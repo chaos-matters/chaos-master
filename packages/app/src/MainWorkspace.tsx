@@ -87,7 +87,7 @@ import { initExample3D } from './flame/examples/initExample3D'
 import { createGlideRuntime, setGlideRuntime, settleGlideBeforeTimeTravel, yieldGlideToDocumentWrite, } from './flame/glide/runtime'
 import { newDefaultTransform } from './flame/newTransform'
 import { generateRandomFlame, mutateFlame, randomizeAllColors, randomRange, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, qualityPointCountLimit, setExportQuality, setForceAnimationExportNow, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportRunning, qualityPointCountLimit, setExportQuality, setForceAnimationExportNow, } from './flame/renderStats'
 import { tryValidateFlame } from './flame/schema/flameSchema'
 import { extractFlameUniforms, generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { extractFlameUniforms3D } from './flame/transformFunction3D'
@@ -102,7 +102,7 @@ import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { openBenchmarkLab, openExplorer } from './routing/pageLinks'
-import { createAnimationExport } from './utils/animationExport'
+import { createAnimationExport, holdPlayheadOnExportFrame, } from './utils/animationExport'
 import { applyAudioTargetValues, createAudioAnalyzer, decodeAudioBytes, } from './utils/audioAnalysis'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
@@ -1601,12 +1601,7 @@ export function MainWorkspace(props: AppProps) {
   let stashedTracks3D: TimelineTrack[] | undefined
 
   createEffect(() => {
-    const progress = animationExportProgress()
-    if (animationExportRunning() && progress) {
-      if (!timeline.isPlaying()) {
-        timeline.setCurrentFrame(progress.currentTimelineFrame)
-      }
-    }
+    holdPlayheadOnExportFrame(timeline)
   })
 
   const onDrop = useAppDragAndDrop(
