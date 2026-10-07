@@ -5,13 +5,14 @@
  * (packages/core/src/schema/flameSchema.clash.test.ts); a stage that
  * validated its own flame would render the two fighters as one.
  */
-import { cleanup, render } from '@solidjs/testing-library'
+import { cleanup, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clashFighter } from '@/flame/clash/fightFlame'
 import { examples } from '@/flame/examples'
 import { validateFlame } from '@/flame/schema/flameSchema'
+import { declarationsFor, readCss } from '@/test/cssModule'
 import { ClashStage } from './ClashStage'
-import type { ParentProps } from 'solid-js'
+import type { JSX, ParentProps } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 const rendered = vi.hoisted(() => ({ flames: [] as unknown[] }))
@@ -61,5 +62,52 @@ describe('ClashStage', () => {
       teams.map(() => undefined),
     )
     expect(validated.renderSettings.clash).toBeUndefined()
+  })
+})
+
+describe('ClashStage layout', () => {
+  const renderStage = (leading?: JSX.Element) =>
+    render(() => (
+      <ClashStage
+        a={clashFighter(examples.example37)}
+        b={clashFighter(examples.goldenApollonianGasket)}
+        winner="A"
+        reducedMotion={false}
+        renderScale={1}
+        pointCountPerBatch={1000}
+        onReducedMotionChange={() => {}}
+        onChangeFighters={() => {}}
+        leading={leading}
+      />
+    ))
+
+  // At 375 px the three controls wrap into two rows. A caption placed one
+  // fixed row above the bottom then sat on the second row of buttons; in one
+  // column with them it stays above however many rows there are.
+  it('stacks the caption and the controls in one bottom column', () => {
+    renderStage()
+    const replay = screen.getByRole('button', { name: 'Replay' })
+    const caption = document.querySelector('[data-beat]')
+    const column = replay.parentElement?.parentElement
+    expect(caption?.parentElement).toBe(column)
+    expect(column?.querySelector('header')).toBeNull()
+    expect(
+      Array.from(column!.children).indexOf(caption as Element),
+    ).toBeLessThan(Array.from(column!.children).indexOf(replay.parentElement!))
+
+    const css = readCss('components/ClashStage/ClashStage.module.css')
+    const rule = (selector: string) =>
+      declarationsFor(css, selector, { topLevel: true })
+    expect(rule('.bottom')).toMatch(/display:\s*flex;/)
+    expect(rule('.bottom')).toMatch(/flex-direction:\s*column;/)
+    expect(rule('.caption')).not.toMatch(/position:/)
+    expect(rule('.controls')).not.toMatch(/position:/)
+  })
+
+  it('puts what the page leads with ahead of the title', () => {
+    renderStage(<a href="#editor">Back</a>)
+    const back = screen.getByRole('link', { name: 'Back' })
+    const title = screen.getByText('Flame Clash', { exact: false })
+    expect(back.nextElementSibling).toBe(title)
   })
 })
