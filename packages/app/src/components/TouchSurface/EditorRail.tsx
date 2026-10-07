@@ -1,4 +1,4 @@
-import { children, createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { children, createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, } from 'solid-js'
 import { CameraIcon, ColourWedge, ShapeTriangle, Shuffle, VariationSpiral, } from '@/icons'
 import { workspaceIsVisible } from '@/lib/activeTab'
 import { createBackLayer } from '@/lib/backStack'
@@ -256,6 +256,18 @@ export function EditorRail(props: EditorRailProps) {
     { preventDefault: false },
   )
 
+  /**
+   * The chips are tabs over one panel, the sheet's body, whose content is
+   * the open chip's: each chip points at it, and it takes its name from the
+   * chip it is showing. A tablist still fits chips that also open and close
+   * the sheet: at peek no tab is selected and the panel is hidden, which is
+   * the closed state of the same widget rather than a second one.
+   */
+  const panelId = createUniqueId()
+  const chipId = (chip: TouchTab) => `${panelId}-${chip}`
+  /** Read out with the shutter's name, and never drawn. */
+  const shutterHintId = createUniqueId()
+
   // The shutter: tap saves, a long press opens the options.
   const shutterHandlers = createLongPress({
     onPressStart: () => {
@@ -319,8 +331,13 @@ export function EditorRail(props: EditorRailProps) {
                 <button
                   type="button"
                   role="tab"
+                  id={chipId(chip.tab)}
                   class={ui.chip}
                   aria-selected={tab() === chip.tab && detent() !== 'peek'}
+                  // The panel is built on the first open; until then there
+                  // is nothing to point at, and a reference to a missing id
+                  // is an error of its own.
+                  aria-controls={bodyBuilt() ? panelId : undefined}
                   onPointerDown={() => {
                     haptic.impactLight()
                   }}
@@ -334,19 +351,31 @@ export function EditorRail(props: EditorRailProps) {
               )}
             </For>
           </div>
+          {/* The name says what a tap does; the hold had no word anywhere,
+              so only someone who already knew could find the options. The
+              description is read after the name and the title shows under a
+              pointer, and the row draws nothing new. */}
           <button
             type="button"
             class={ui.shutter}
             aria-label="Save image"
+            aria-describedby={shutterHintId}
+            title="Save image, or hold for export options"
             {...shutterHandlers}
           >
             <CameraIcon class={ui.shutterIcon} />
           </button>
+          <span id={shutterHintId} hidden>
+            Hold for export options
+          </span>
         </div>
         <Show when={bodyBuilt()}>
           <div
             class={ui.body}
             ref={bodyEl}
+            role="tabpanel"
+            id={panelId}
+            aria-labelledby={chipId(tab())}
             data-testid="editor-rail-body"
             hidden={!bodyShown()}
             onFocusIn={() => {
