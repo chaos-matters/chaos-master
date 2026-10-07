@@ -29,6 +29,18 @@ describe('the shell bar stylesheet', () => {
     expect(Number(z?.[1])).toBeGreaterThan(0)
   })
 
+  it('opens the capsule over the chips without showing them through it', () => {
+    // Expanded, the bar paints over the rail's first chips. At the strong
+    // glass's 86% the covered label showed on both sides of Library. The bar
+    // is opaque, as tall as the capsule it grows from (narrow phones shrink
+    // the capsule, lumen.css), and the capsule is its end cap rather than
+    // sitting 5px inside it.
+    const bar = declarations('.capsuleDock .bar')
+    expect(bar).toMatch(/background:\s*var\(--la-ground\);/)
+    expect(bar).toMatch(/height:\s*var\(--la-capsule\);/)
+    expect(bar).toMatch(/padding-inline-start:\s*0;/)
+  })
+
   it('lets the More backdrop take the tap that closes the menu', () => {
     // The backdrop sits inside `.dock`, which is `pointer-events: none` so
     // the canvas stays reachable beside the bar. `.row`, `.more` and `.menu`
