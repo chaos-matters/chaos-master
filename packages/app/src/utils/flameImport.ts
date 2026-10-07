@@ -105,8 +105,50 @@ export function emptyImportSummary(): ImportSummary {
  *  timeline schema so a hand-edited file can't inject junk into the timeline. */
 function parseTracks(raw: unknown): TimelineTrack[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined
-  const result = v.safeParse(v.array(TimelineTrack), raw)
+  const result = v.safeParse(v.array(TimelineTrack), raw.map(onWholeFrames))
   return result.success ? result.output : undefined
+}
+
+/**
+ * A track whose keyframes sit between frames, put back on whole ones.
+ *
+ * Development builds of the motion blur export left the playhead on a
+ * sub-frame, and the next auto-keyframe landed there (utils/animationExport.ts
+ * now puts it back). The schema holds a keyframe's frame to an integer, so one
+ * such keyframe failed the whole array and the file opened with no animation.
+ * A rounded keyframe that lands on a frame the track already has gives way to
+ * the one placed there. Anything else malformed still fails the schema.
+ */
+function onWholeFrames(track: unknown): unknown {
+  if (track === null || typeof track !== 'object') return track
+  const keyframes: unknown = (track as { keyframes?: unknown }).keyframes
+  if (!Array.isArray(keyframes)) return track
+  const frameOf = (kf: unknown): number | undefined => {
+    if (kf === null || typeof kf !== 'object') return undefined
+    const frame: unknown = (kf as { frame?: unknown }).frame
+    return typeof frame === 'number' && Number.isFinite(frame)
+      ? frame
+      : undefined
+  }
+  const fractional = (kf: unknown) => {
+    const frame = frameOf(kf)
+    return frame !== undefined && !Number.isInteger(frame)
+  }
+  if (!keyframes.some(fractional)) return track
+  const taken = new Set(keyframes.filter((kf) => !fractional(kf)).map(frameOf))
+  const repaired: unknown[] = []
+  for (const kf of keyframes) {
+    const frame = frameOf(kf)
+    if (frame === undefined || Number.isInteger(frame)) {
+      repaired.push(kf)
+      continue
+    }
+    const whole = Math.round(frame)
+    if (taken.has(whole)) continue
+    taken.add(whole)
+    repaired.push({ ...(kf as object), frame: whole })
+  }
+  return { ...track, keyframes: repaired }
 }
 
 /**

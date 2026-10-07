@@ -139,6 +139,60 @@ describe('parseFlameEnvelope', () => {
     expect(parsed?.tracks).toBeUndefined()
   })
 
+  it('puts keyframes a development build left between frames back on whole ones', () => {
+    // Motion blur left the playhead on a sub-frame and the next auto-keyframe
+    // landed there. One such keyframe failed the whole track array, so the
+    // file opened with no animation at all.
+    const parsed = parseFlameEnvelope({
+      flame: flame('Sub-frame keyframes'),
+      animation: {
+        tracks: [
+          {
+            parameterPath: 'renderSettings.exposure',
+            keyframes: [
+              { frame: 0, value: 1 },
+              { frame: 29.75, value: 2 },
+              { frame: 60, value: 3 },
+            ],
+          },
+        ],
+      },
+    })
+    expect(parsed?.tracks?.[0]?.keyframes.map((kf) => kf.frame)).toEqual([
+      0, 30, 60,
+    ])
+  })
+
+  it('lets a whole-frame keyframe win over one rounded onto its frame', () => {
+    const parsed = parseFlameEnvelope({
+      flame: flame('Two keyframes, one frame'),
+      animation: {
+        tracks: [
+          {
+            parameterPath: 'renderSettings.exposure',
+            keyframes: [
+              { frame: 9.6, value: 1 },
+              { frame: 10, value: 2 },
+              { frame: 20.2, value: 3 },
+              { frame: 20.4, value: 4 },
+            ],
+          },
+        ],
+      },
+    })
+    // 9.6 gives way to the keyframe placed at 10, and of the two that round
+    // to 20 the first is kept.
+    expect(
+      parsed?.tracks?.[0]?.keyframes.map(({ frame, value }) => ({
+        frame,
+        value,
+      })),
+    ).toEqual([
+      { frame: 10, value: 2 },
+      { frame: 20, value: 3 },
+    ])
+  })
+
   it('rejects anything that is not a flame', () => {
     expect(parseFlameEnvelope(null)).toBeUndefined()
     expect(parseFlameEnvelope([flame('In an array')])).toBeUndefined()
