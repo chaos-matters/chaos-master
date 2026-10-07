@@ -6,8 +6,9 @@ import { useWorkspaceAutosave } from '@/hooks/useWorkspaceAutosave'
 import { clearRecentFlames, deleteRecentFlame, loadRecentFlames, loadRecentFlamesForRewrite, MAX_RECENT_FLAMES, } from '@/utils/recentFlames'
 import { safeSetItem } from '@/utils/storage'
 import { defaultConfig } from '@/utils/timeline'
+import { replaceOpenDocument } from './documentLoad'
 import { useLifecyclePorts } from './lifecycle'
-import { installPauseSave, LEGACY_DRAFT_KEY, migrateLegacyDraft, reopenTarget, stopPauseSave, takePauseSaveEviction, takePauseSaveFailure, } from './pauseSave'
+import { installPauseSave, isReopenedFlame, LEGACY_DRAFT_KEY, migrateLegacyDraft, reopenTarget, stopPauseSave, takePauseSaveEviction, takePauseSaveFailure, } from './pauseSave'
 import { createWorkspaceHandoff } from './workspaceHandoff'
 import type { LifecyclePorts } from '@chaos-master/mobile-runtime/lifecycle'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -614,6 +615,67 @@ describe('where the next launch lands', () => {
         (entry) => entry.flame.metadata?.name === 'What they were working on',
       ),
     ).toBe(true)
+  })
+
+  it('forgets the flame the pause wrote once another one is opened', () => {
+    // A pause writes only a dirty document, so opening B over A and leaving
+    // the app without touching B wrote nothing, and the launch after a
+    // force-stop brought back A. The replacement forgets the pointer instead.
+    const platform = fakePlatform()
+    createRoot((dispose) => {
+      const { autosave, setOpen } = workspace()
+      setOpen('metadata', 'name', 'Edited and left')
+      platform.pause()
+      const replaced = replaceOpenDocument({
+        flushUnsaved: autosave.flushDirtyToRecents,
+        replace: () => {
+          setOpen('metadata', 'name', 'Opened from Library')
+          autosave.markLoadedBaseline()
+        },
+      })
+      expect(replaced).toBe(true)
+      platform.pause()
+      dispose()
+    })
+    stopPauseSave()
+
+    expect(reopenTarget(true)).toBeUndefined()
+  })
+
+  it('keeps pointing at the reopened flame once it is on screen', () => {
+    // The reopen arrives through the same hand-off as a tap on Home, and that
+    // is a replacement too. Forgetting the pointer there would land a second
+    // force-stop in a row on the starter flame.
+    const platform = fakePlatform()
+    createRoot((dispose) => {
+      const { setOpen } = workspace()
+      setOpen('metadata', 'name', 'Reopened twice')
+      platform.pause()
+      dispose()
+    })
+    stopPauseSave()
+
+    const reopen = reopenTarget(true)
+    expect(reopen).toBeDefined()
+    // The same flame opened from the Library is a copy, and the user leaving.
+    const copy = JSON.parse(JSON.stringify(reopen!.flame)) as FlameDescriptor
+    expect(isReopenedFlame(copy)).toBe(false)
+    createRoot((dispose) => {
+      const { autosave, setOpen } = workspace()
+      replaceOpenDocument({
+        flushUnsaved: autosave.flushDirtyToRecents,
+        reopening: isReopenedFlame(reopen!.flame),
+        replace: () => {
+          setOpen('metadata', 'name', reopen!.flame.metadata?.name)
+          autosave.markLoadedBaseline()
+        },
+      })
+      platform.pause()
+      dispose()
+    })
+    stopPauseSave()
+
+    expect(reopenTarget(true)?.flame.metadata?.name).toBe('Reopened twice')
   })
 })
 

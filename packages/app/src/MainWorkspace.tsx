@@ -93,7 +93,7 @@ import { extractFlameUniforms, generateTransformId, generateVariationId, } from 
 import { extractFlameUniforms3D } from './flame/transformFunction3D'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
-import { installPauseSave } from './lib/pauseSave'
+import { installPauseSave, isReopenedFlame } from './lib/pauseSave'
 import { IS_NATIVE } from './lib/platform'
 import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
 import { canEnableReplayAudio } from './recorder/replay'
@@ -740,6 +740,8 @@ export function MainWorkspace(props: AppProps) {
           // Reads the OUTGOING flame and its tracks, so it has to run before
           // the reset drops them (lib/documentLoad.ts).
           flushUnsaved: flushDirtyToRecents,
+          // A launch's own reopen keeps its pointer (lib/pauseSave.ts).
+          reopening: isReopenedFlame(newFlame),
           // Then a clean slate, THEN this flame's own state. Every hand-off
           // starts from the same baseline, so the second flame you open from
           // Home looks exactly like the first one would have. See
