@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { arenaCommentate } from './arenaCommentate'
@@ -106,6 +106,20 @@ describe('arena WebMCP tools', () => {
 
       expect(res).toMatchObject({ success: false, cancelled: true })
       expect(res.message).toMatch(/The arena was closed/)
+    })
+
+    it('leaves the Arcade hub, which would cover the Arena, before the clash', async () => {
+      const ctx = createMockCommandContext()
+      setWebMcpContext(ctx)
+
+      await run(arenaStartClash)
+
+      const closeHub = vi.mocked(ctx.arcade!.closeHub)
+      const setOpen = vi.mocked(ctx.arena!.setOpen)
+      expect(closeHub).toHaveBeenCalledTimes(1)
+      expect(closeHub.mock.invocationCallOrder[0]).toBeLessThan(
+        setOpen.mock.invocationCallOrder[0]!,
+      )
     })
 
     it('opens arena and initiates animated clash in UI with mapped archetype stats', async () => {

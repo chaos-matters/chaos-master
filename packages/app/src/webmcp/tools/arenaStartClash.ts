@@ -83,6 +83,9 @@ export const arenaStartClash: WebMcpTool = {
       })
     }
 
+    // Leave the Arcade hub, which is fixed above the workspace: a clash
+    // staged under it plays into the user's document out of sight.
+    ctx.arcade?.closeHub()
     // Ensure arena overlay is opened
     if (!arena.open()) {
       arena.setOpen(true)
