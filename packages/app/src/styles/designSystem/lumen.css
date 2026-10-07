@@ -242,7 +242,7 @@
   --la-safe-right: env(safe-area-inset-right, 0px);
 
   --la-hud-h: 44px;
-  --la-rail-h: 64px;
+  --la-rail-h: 64px; /* the rail's peek row: a 56px capsule and 8px under it */
   --la-hud-top: max(var(--la-s-2), calc(var(--la-safe-top) + var(--la-s-2)));
   /* Where the top bar ends. Everything that floats under it is placed from
      here, so a bar that moves takes the tracker and the toasts with it. */
@@ -283,6 +283,20 @@
   --la-tap-icon: 48px;
   --la-tap-row: 60px;
   --la-rail-h: 64px; /* M3 navigation bar height stays 64dp */
+}
+
+/* Narrow phones: anything under the iPhone's 375, which takes in the 360px
+   most Android phones report and the 320 of an iPhone SE with Display Zoom.
+   Two 56px circles took 112px of the rail's row: at 320 they left the four
+   tool chips 40px each, so the row scrolled and cut "Vary" off behind the
+   shutter, and at 360 "Variations" was still wider than its chip. At 48 the
+   circles are still a full Android target, and the capsule still holds its
+   label when it opens; the row keeps --la-rail-h, so the rail is the same
+   height (detents.ts, PEEK_HEIGHT). */
+@media (max-width: 374px) {
+  :root {
+    --la-capsule: 48px;
+  }
 }
 
 /* =====================================================================
