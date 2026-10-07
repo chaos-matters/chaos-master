@@ -490,6 +490,9 @@ export function ArcadeModePanel(props: {
                     metrics: opp.metrics,
                   })
                 }
+                // The hub is fixed above the workspace and would cover the
+                // Arena, so leave it first, as Teach, Cinema and Beats do.
+                ctx.arcade?.closeHub()
                 ctx.arena.setOpen(true)
               }
             }}

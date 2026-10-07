@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { ArcadeModePanel } from './ArcadeModePanel'
@@ -95,6 +95,13 @@ describe('ArcadeModePanel duel setup', () => {
     const launchBtn = screen.getByText(/Launch Clash Arena/i)
     launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(ctx.arena?.setOpen).toHaveBeenCalledWith(true)
+    // The hub is fixed over the workspace: the Arena opens only once it goes.
+    const closeHub = vi.mocked(ctx.arcade!.closeHub)
+    const setOpen = vi.mocked(ctx.arena!.setOpen)
+    expect(closeHub).toHaveBeenCalledTimes(1)
+    expect(closeHub.mock.invocationCallOrder[0]).toBeLessThan(
+      setOpen.mock.invocationCallOrder[0]!,
+    )
     expect(ctx.arena?.setPlayer2Stats).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Sol Invictus',
