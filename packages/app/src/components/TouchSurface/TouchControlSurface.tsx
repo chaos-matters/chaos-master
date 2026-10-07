@@ -632,14 +632,17 @@ export function TouchControlSurface(props: TouchControlSurfaceProps) {
           >
             <Shuffle class={ui.hudButtonIcon} /> Randomize
           </button>
+          {/* "More" here sat beside the tablet rail's own More, which opens
+              a different list. This one opens the Advanced tools drawer, by
+              the name the More list gives it. */}
           <Show when={props.onOpenDrawer}>
             <button
               type="button"
               class={ui.actionPillBtn}
-              title="More Tools"
+              title="Advanced tools"
               onClick={props.onOpenDrawer}
             >
-              <SidebarPanel class={ui.hudButtonIcon} /> More
+              <SidebarPanel class={ui.hudButtonIcon} /> Tools
             </button>
           </Show>
         </div>

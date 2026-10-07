@@ -91,8 +91,11 @@ export function TouchHUD(props: TouchHUDProps) {
             onClick={() => {
               props.onPickGallery?.()
             }}
-            title="Library"
-            aria-label="Library"
+            // It opens the Flame Gallery. "Library" is the shell's way to
+            // Home (Shell/destinations.ts), so the two shared a name and not
+            // a place.
+            title="Gallery"
+            aria-label="Gallery"
           >
             <GridIcon class={ui.hudButtonIcon} />
           </button>
