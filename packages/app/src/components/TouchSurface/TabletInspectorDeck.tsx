@@ -175,8 +175,8 @@ export function TabletInspectorDeck(props: TabletInspectorDeckProps) {
           <button
             type="button"
             class={ui.iconButton}
-            title="Library"
-            aria-label="Library"
+            title="Gallery"
+            aria-label="Gallery"
             onClick={() => {
               props.onPickGallery?.()
             }}

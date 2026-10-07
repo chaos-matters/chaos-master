@@ -28,7 +28,7 @@ describe('TouchSurface Components', () => {
   afterEach(cleanup)
 
   describe('TouchHUD', () => {
-    it('renders the flame name, Library and the history buttons', () => {
+    it('renders the flame name, Gallery and the history buttons', () => {
       const ctx = createMockCommandContext()
       const onPickGallery = vi.fn()
       const onUndo = vi.fn()
@@ -48,8 +48,12 @@ describe('TouchSurface Components', () => {
 
       expect(screen.getByRole('banner')).toBeTruthy()
 
-      const library = screen.getByRole('button', { name: 'Library' })
-      library.click()
+      // It opens the Flame Gallery. "Library" is the shell's destination,
+      // which goes to Home, so the two buttons shared a name and not a place.
+      const gallery = screen.getByRole('button', { name: 'Gallery' })
+      expect(gallery.title).toBe('Gallery')
+      expect(screen.queryByRole('button', { name: 'Library' })).toBeNull()
+      gallery.click()
       expect(onPickGallery).toHaveBeenCalled()
 
       // The title button keeps its tap tooltip.
@@ -194,7 +198,7 @@ describe('TouchSurface Components', () => {
       expect(hud.hasAttribute('inert')).toBe(true)
       // Still mounted, still holding its state: Home covers the editor, it
       // does not unmount it.
-      expect(screen.getByRole('button', { name: 'Library' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Gallery' })).toBeTruthy()
 
       setActiveTab('workspace')
       expect(hud.hasAttribute('inert')).toBe(false)
@@ -313,6 +317,28 @@ describe('TouchSurface Components', () => {
       const t1 = ctx.flameDescriptor().transforms['t1' as TransformId]
       expect(t1?.variations['v1' as VariationId]?.weight).toBe(0.85)
     })
+
+    it('names the drawer button for the drawer it opens', () => {
+      const ctx = createMockCommandContext()
+      const onOpenDrawer = vi.fn()
+
+      render(() => (
+        <TouchControlSurface
+          ctx={ctx}
+          flame={ctx.flameDescriptor}
+          mode="tablet-deck"
+          onOpenDrawer={onOpenDrawer}
+        />
+      ))
+
+      // It read "More", beside the tablet rail's own More, which opens a
+      // different list.
+      expect(screen.queryByRole('button', { name: 'More' })).toBeNull()
+      const tools = screen.getByRole('button', { name: 'Tools' })
+      expect(tools.title).toBe('Advanced tools')
+      tools.click()
+      expect(onOpenDrawer).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('TabletInspectorDeck', () => {
@@ -341,7 +367,9 @@ describe('TouchSurface Components', () => {
       ))
 
       expect(deck()).toBeTruthy()
-      screen.getByRole('button', { name: 'Library' }).click()
+      const gallery = screen.getByRole('button', { name: 'Gallery' })
+      expect(gallery.title).toBe('Gallery')
+      gallery.click()
       expect(onPickGallery).toHaveBeenCalled()
       expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Redo' })).toBeTruthy()
