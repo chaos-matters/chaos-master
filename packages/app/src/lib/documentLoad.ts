@@ -56,9 +56,30 @@ export function replaceOpenDocument(steps: {
   flushUnsaved: () => FlushOutcome
   /** Then, and only then, put the new document in its place. */
   replace: () => void
+  /**
+   * Set only for a launch putting back the flame a force-stop interrupted
+   * (lib/pauseSave.ts): the one replacement that is not the user leaving
+   * the document the reopen pointer names.
+   */
+  reopening?: boolean
 }): boolean {
   const flushed = steps.flushUnsaved()
   if (flushed !== 'clean' && flushed !== 'saved') return false
   steps.replace()
+  afterReplace?.(steps.reopening === true)
   return true
+}
+
+/**
+ * Told after every replacement that went in, and whether it was a launch
+ * reopening the flame a force-stop interrupted. One slot, set by the pause
+ * save for its reopen pointer (lib/pauseSave.ts): a setter rather than an
+ * import of it, because that module depends on this one.
+ */
+let afterReplace: ((reopening: boolean) => void) | undefined
+
+export function onDocumentReplaced(
+  listener: ((reopening: boolean) => void) | undefined,
+): void {
+  afterReplace = listener
 }

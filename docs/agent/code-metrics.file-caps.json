@@ -1,5 +1,5 @@
 {
-  "packages/app/src/MainWorkspace.tsx": 4504,
+  "packages/app/src/MainWorkspace.tsx": 4502,
   "packages/app/src/benchmarks/validation.ts": 1175,
   "packages/app/src/commands/builtins/timeline.ts": 800,
   "packages/app/src/components/AffineEditor/AffineEditor.tsx": 1172,
