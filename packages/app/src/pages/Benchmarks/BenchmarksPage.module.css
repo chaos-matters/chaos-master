@@ -2017,3 +2017,14 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+/* A finger needs the full target: at 375px the header's "Classic" and
+   "Editor" measured 50x30 and 44x30. Last in the file so it outranks the
+   narrow layout's 30px. A mouse keeps the compact sizes. */
+@media (pointer: coarse) {
+  .headerActions .button,
+  .headerActions .buttonQuiet {
+    min-block-size: var(--la-tap);
+    min-inline-size: var(--la-tap);
+  }
+}

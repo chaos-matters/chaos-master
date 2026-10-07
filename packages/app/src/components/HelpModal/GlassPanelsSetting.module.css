@@ -16,3 +16,15 @@
     color: var(--neutral-400);
   }
 }
+
+/* The row is the checkbox's label, so the whole row toggles it: on a coarse
+   pointer it is the target, at full height, rather than the 19px box. */
+.row {
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .row {
+    min-block-size: var(--la-tap);
+  }
+}
