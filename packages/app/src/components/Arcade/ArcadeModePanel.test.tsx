@@ -79,6 +79,10 @@ describe('ArcadeModePanel duel setup', () => {
     expect(screen.getByText(/Harmonic Stance/i)).toBeDefined()
     expect(screen.getByText(/Resonance Surge/i)).toBeDefined()
     expect(screen.getByRole('button', { name: /Chaos Lord/i })).toBeDefined()
+    // Each archetype names its class and school without an em dash.
+    const chaosLord = screen.getByRole('button', { name: /Chaos Lord/i })
+    expect(chaosLord.title).not.toContain('\u2014')
+    expect(chaosLord.title).toMatch(/School of/)
 
     const promptCard = screen.getByTestId('prompt-card')
     expect(promptCard.textContent).toContain('arena_get_stats')
