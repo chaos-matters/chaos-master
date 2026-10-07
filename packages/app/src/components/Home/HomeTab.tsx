@@ -10,6 +10,7 @@ import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserve
 import { createHomeEdgeSwipe } from './edgeSwipe'
 import { installHomeEscapeBoundary } from './homeEscape'
 import { HomeFlame } from './HomeFlame'
+import { HomeFooter } from './HomeFooter'
 import { createPlaybackCoordinator } from './homePlayback'
 import { HomePortal } from './HomePortal'
 import ui from './HomeTab.module.css'
@@ -916,13 +917,7 @@ export function HomeTab(props: HomeTabProps) {
                 </div>
               </section>
 
-              <footer class={ui.footer}>
-                <a href="https://about.lumenapeiron.com/">About</a>
-                <a href="/discord">Discord</a>
-                <a href="https://github.com/chaos-matters/chaos-master">
-                  Source
-                </a>
-              </footer>
+              <HomeFooter />
             </ComputeGate>
           </Show>
         </Show>
