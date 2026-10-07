@@ -6,6 +6,7 @@ import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
 import { NativeSaveToasts } from './components/NativeSaveToasts/NativeSaveToasts'
 import { HomeShellBar } from './components/Shell/HomeShellBar'
+import { openSettings } from './components/SoftwareVersion/settingsOpener'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { WorkspaceSkeleton } from './components/WorkspaceSkeleton'
@@ -470,14 +471,7 @@ export function Wrappers() {
                         onStartTour={handleStartTour}
                         onShowAbout={() => {
                           setShowWelcome(false)
-                          // Trigger the floating version pill to open About
-                          requestAnimationFrame(() => {
-                            const pill =
-                              document.querySelector<HTMLButtonElement>(
-                                '[class*="about-pill"]',
-                              )
-                            pill?.click()
-                          })
+                          openSettings()
                         }}
                         hardwareTier={hardwareTier()}
                         onHardwareTierChange={setHardwareTier}
