@@ -41,6 +41,9 @@ export function ShellBar(props: ShellBarProps) {
   const [expanded, setExpanded] = createSignal(false)
   const [held, setHeld] = createSignal(false)
   const [moreOpen, setMoreOpen] = createSignal(false)
+  /** Escape and back hand focus back to it (MoreMenu's `trigger`). */
+  let moreButton: HTMLButtonElement | undefined
+  let dockEl: HTMLDivElement | undefined
 
   const isCapsule = (destination: ShellDestination) =>
     props.mode === 'capsule' && destination === 'create'
@@ -193,6 +196,7 @@ export function ShellBar(props: ShellBarProps) {
           setMoreOpen(false)
         }}
         menuClass={ui.menu!}
+        trigger={() => moreButton}
       />
 
       <div class={ui.row}>
@@ -254,6 +258,7 @@ export function ShellBar(props: ShellBarProps) {
             length guard that stood here could not fire. */}
         <Show when={props.mode === 'full'}>
           <button
+            ref={moreButton}
             type="button"
             class={ui.more}
             aria-label="More"

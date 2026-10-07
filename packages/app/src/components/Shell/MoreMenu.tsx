@@ -1,4 +1,5 @@
-import { For, Show } from 'solid-js'
+import { createEffect, For, onCleanup, Show } from 'solid-js'
+import { pilotOwnsKeyboard } from '@/arcade/pilot'
 import { createBackLayer } from '@/lib/backStack'
 import ui from './MoreMenu.module.css'
 import type { MoreMenuItem } from './moreMenuItems'
@@ -13,6 +14,13 @@ export interface MoreMenuProps {
    * while the list's own look lives in MoreMenu.module.css.
    */
   menuClass: string
+  /**
+   * The button that opens the list. Escape and back hand focus back to it,
+   * so a keyboard user is not dropped on <body>. Without one, the element
+   * that had focus when the list opened gets it back, which is the trigger
+   * wherever a click focuses a button.
+   */
+  trigger?: () => HTMLElement | undefined
 }
 
 /**
@@ -31,13 +39,46 @@ export interface MoreMenuProps {
  * sample that element's fill (glass-panels.md, phase 1).
  */
 export function MoreMenu(props: MoreMenuProps) {
-  createBackLayer(
-    () => props.open,
-    () => {
-      props.onClose()
-    },
-    'more menu',
-  )
+  let opener: HTMLElement | undefined
+  createEffect(() => {
+    if (!props.open || typeof document === 'undefined') return
+    const active = document.activeElement
+    opener =
+      active instanceof HTMLElement && active !== document.body
+        ? active
+        : undefined
+  })
+
+  /** Closes the list from Escape or back, and puts focus where it was. An
+   *  item's own close does not: what it opens takes the focus. */
+  function dismiss() {
+    const back = props.trigger?.() ?? opener
+    props.onClose()
+    back?.focus()
+  }
+
+  createBackLayer(() => props.open, dismiss, 'more menu')
+
+  // Escape closes it too, as it closes the desktop dialogs and the Advanced
+  // tools drawer: a tablet with a keyboard, or a desktop window in the touch
+  // layout, has no back gesture. Taken in capture on the window, ahead of
+  // Home's own Escape boundary (Home/homeEscape.ts) and the editor's
+  // shortcuts, so one press closes the nearest layer and nothing under it.
+  createEffect(() => {
+    if (!props.open) return
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || ev.defaultPrevented) return
+      // Under the Arcade's screen lock Escape is the pilot's (arcade/pilot.ts).
+      if (pilotOwnsKeyboard()) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      dismiss()
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    onCleanup(() => {
+      window.removeEventListener('keydown', onKeyDown, true)
+    })
+  })
 
   return (
     <Show when={props.open}>
