@@ -145,6 +145,35 @@ user-facing summary is in `CHANGELOG.md`.
 - **app:** dialogs and toggles change state at the input, not a frame later
   (fp#133)
 - **deps:** coverage-v8 matches vitest 5 (fp#157)
+- **release review**, fixed on the release branch:
+  - **export:** the main-canvas export copies each frame before encoding,
+    like the offscreen job; the playhead returns to a whole frame when an
+    export ends or is cancelled, and motion blur sub-frames keep their pose
+  - **timeline:** keyframes are added on whole frames, and a file with
+    sub-frame keyframes from a development build opens with them rounded
+  - **editor:** leaving for the explorer or the Benchmark Lab asks when
+    storage refused the open flame
+  - **native:** the reopen pointer is forgotten once another flame is opened
+  - **home:** the footer links open in a new tab
+  - **settings:** Clear settings keeps custom variations and palettes, and
+    Data Management counts them
+  - **arcade:** Director candidates are validated before preview and load;
+    the hub closes before the Arena opens; `open_arena` keeps the agent's
+    player 1; Load Victor restores the workspace first; Beats mappings spend
+    the step budget; Beats, Teach and Cinema say whether the take was saved;
+    `score_clash_round` caps its flame's complexity and clamps its sample
+    budget, and `breed_flames` clamps its count
+  - **clash:** Cancel dismisses the picker after a load error, the caption
+    sits over the controls, and the page has a back link and a title
+  - **ui:** no guided tours on touch layouts; the tour card stays on screen;
+    the Documentation dialog no longer pans sideways on phones; the version
+    pill opens Settings and more; Escape closes the More menu and returns
+    focus; touch targets in Settings, Documentation and the Benchmark Lab;
+    menu roles, labels and icons
+  - **rail:** the phone rail's sheet has rounded corners and no slack at
+    peek, the grabber keeps its height, chips fit at 320 px, the expanded
+    capsule bar is opaque, keyboard focus holds the capsule open, the rail
+    body is a tabpanel, and Gallery and Tools say what they open
 
 ### Security
 

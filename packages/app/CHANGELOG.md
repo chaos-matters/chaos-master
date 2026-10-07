@@ -75,9 +75,16 @@ developer history lives in `dev.changelog.md`.
   of Folds.
 - **A custom variation's edit shows on the open canvas**, in 2D and 3D.
 - **Three variations render as written:** `yinYang`'s rotation step, `whorl`
-  at r = w and `cot`'s denominator.
+  at r = w and `cot`'s denominator. `yinYang` used to apply its Outside
+  setting the wrong way round, so a flame saved with it now turns the other
+  way. For the old look, set Outside to 1 minus its value: 0 becomes 1.
 - **Dialogs and toggles change at the press**, not a frame later, and the
   tour card's arrow points at the centre of its target.
+- **Clear settings keeps your custom variations and palettes.** It swept
+  them with your preferences, and a saved flame that used one stopped
+  rendering it. Data Management now counts them on a line of their own.
+- **Home's About, Discord and Source links open in a new tab**, so the
+  editor stays where you left it.
 - **Agents and the Arena.** Agents keyframe each affine's own terms, a to l in
   3D, and render settings they set stay in range. A duel seat that cannot
   render ends the duel, not the editor, the live score matches the verdict,
