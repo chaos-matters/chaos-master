@@ -17,6 +17,15 @@ const CARD_PADDING = 16
 const HOLE_PADDING = 8
 
 /**
+ * The start of a card of `size` moved, if it has to, so the card keeps
+ * CARD_PADDING from both ends of a viewport `extent` long. A card longer than
+ * the viewport keeps its start on screen, where its title is.
+ */
+function keepInside(start: number, size: number, extent: number): number {
+  return Math.max(CARD_PADDING, Math.min(start, extent - size - CARD_PADDING))
+}
+
+/**
  * The edge of a card placed on `side` of its target that carries the arrow:
  * where the glass layer breaks its own edge for the arrow's base
  * (SpotlightTour.module.css, .glassLayer[data-seam]).
@@ -54,6 +63,13 @@ export function SpotlightTour(props: SpotlightTourProps) {
   const [cardPosition, setCardPosition] = createSignal<
     'top' | 'bottom' | 'left' | 'right'
   >('bottom')
+  /**
+   * The step's target is not on screen: a tour written for the desktop
+   * started on a touch layout, or a panel a step expects is closed. The card
+   * sits in the middle with no arrow, rather than where the last step left it
+   * pointing at nothing.
+   */
+  const [centred, setCentred] = createSignal(false)
   let cardRef: HTMLDivElement | undefined
 
   const stepIndex = () => tour.currentStepIndex()
@@ -99,8 +115,10 @@ export function SpotlightTour(props: SpotlightTourProps) {
     const target = findTarget(s.target, s.targetLast)
     if (!target) {
       setHoleRect({ x: 0, y: 0, width: 0, height: 0 })
+      centreCard()
       return
     }
+    setCentred(false)
 
     // Force browser to flush pending layout so getBoundingClientRect
     // returns accurate geometry (needed when flex/grid containers haven't
@@ -217,9 +235,15 @@ export function SpotlightTour(props: SpotlightTourProps) {
       )
     }
 
+    // Whatever side it took, the card stays inside the viewport. Placed
+    // below a target low on the screen it ran off the bottom (the App Tour's
+    // step 2 at 1440x900 ended 12px past it, Next at the edge). Covering part
+    // of the target beats a card that cannot be read or advanced.
+    cardLeft = keepInside(cardLeft, cardW, vw)
+    cardTop = keepInside(cardTop, cardH, vh)
     setCardStyle({
-      top: `${Math.max(CARD_PADDING, cardTop)}px`,
-      left: `${Math.max(CARD_PADDING, cardLeft)}px`,
+      top: `${cardTop}px`,
+      left: `${cardLeft}px`,
     })
 
     // Point the arrow at the target's centre. Its offset along the edge is
@@ -244,6 +268,19 @@ export function SpotlightTour(props: SpotlightTourProps) {
       arrowOffsetStyle = { top: `${arrowTop}px` }
     }
     setArrowStyle(arrowOffsetStyle)
+  }
+
+  function centreCard() {
+    const cardW = cardRef?.offsetWidth ?? 340
+    const cardH = cardRef?.offsetHeight ?? 200
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    setCentred(true)
+    setCardStyle({
+      top: `${keepInside((vh - cardH) / 2, cardH, vh)}px`,
+      left: `${keepInside((vw - cardW) / 2, cardW, vw)}px`,
+    })
+    setArrowStyle({})
   }
 
   function arrowClassForPosition(
@@ -556,18 +593,20 @@ export function SpotlightTour(props: SpotlightTourProps) {
               <div
                 class={ui.glassLayer}
                 aria-hidden="true"
-                data-seam={SEAM_EDGE[cardPosition()]}
+                data-seam={centred() ? undefined : SEAM_EDGE[cardPosition()]}
                 style={{ '--seam-at': arrowStyle().left ?? arrowStyle().top }}
               />
             </Show>
-            <div
-              class={ui.arrow}
-              classList={{
-                [arrowClass()]: true,
-                [ui.glassArrow!]: glassCard(),
-              }}
-              style={arrowStyle()}
-            />
+            <Show when={!centred()}>
+              <div
+                class={ui.arrow}
+                classList={{
+                  [arrowClass()]: true,
+                  [ui.glassArrow!]: glassCard(),
+                }}
+                style={arrowStyle()}
+              />
+            </Show>
 
             <div class={ui.stepCounter}>
               Step {stepIndex() + 1} of {tour.totalSteps()}
@@ -595,11 +634,14 @@ export function SpotlightTour(props: SpotlightTourProps) {
                   <For each={Array.from({ length: tour.totalSteps() })}>
                     {(_, i) => (
                       <button
+                        type="button"
                         class={ui.dot}
                         classList={{
                           [ui.dotActive as string]: i() === stepIndex(),
                           [ui.dotClickable as string]: true,
                         }}
+                        aria-label={`Step ${i() + 1} of ${tour.totalSteps()}`}
+                        aria-current={i() === stepIndex() ? 'step' : undefined}
                         onClick={() => {
                           const target = i()
                           if (target === stepIndex()) return
