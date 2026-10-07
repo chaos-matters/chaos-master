@@ -15,6 +15,7 @@ import { BREED_PREVIEW_DELAY_MS, useWorkspaceBlendPick, } from './useWorkspaceBl
 import type { BlendIntent } from './useWorkspaceBlendPick'
 import type { OverwriteOccasion } from '@/components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { LeavingFor } from '@/routing/pageLinks'
 
 // Same reason as draft.test.ts: localStorage is not usable in this runtime, so
 // Recents round-trips through an in-memory store. `storageRefuses` is the
@@ -76,7 +77,7 @@ const workspace = (
   options: {
     muted?: () => boolean
     confirmOverwriteOldest?: (occasion?: OverwriteOccasion) => Promise<boolean>
-    confirmDiscardUnsaved?: () => Promise<boolean>
+    confirmDiscardUnsaved?: (page?: LeavingFor) => Promise<boolean>
   } = {},
 ) => {
   const toasts: string[] = []
@@ -841,6 +842,82 @@ describe('leaving for a page of its own when the shelf is full', () => {
       expect(loadRecentFlamesForRewrite()[0]?.flame.metadata?.name).toBe(
         'Unsaved work',
       )
+      dispose()
+    })
+  })
+
+  /** The refusal question, answered `answer`, and the pages it named. */
+  const asksToDiscard = (answer: boolean) => {
+    const pages: (LeavingFor | undefined)[] = []
+    const confirmDiscardUnsaved = (page?: LeavingFor) => {
+      pages.push(page)
+      return Promise.resolve(answer)
+    }
+    return { pages, confirmDiscardUnsaved }
+  }
+
+  it('asks before leaving work storage refused, and stays on a no', async () => {
+    // A refusal read as nothing to save: the page went, the pagehide flush
+    // could not land either, and the open flame was lost without a word.
+    storageRefuses = true
+    const question = asksToDiscard(false)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving()
+      await settle()
+
+      expect(question.pages).toEqual(['explorer'])
+      expect(assign).not.toHaveBeenCalled()
+      expect(autosave.isFlameDirty()).toBe(true)
+      dispose()
+    })
+  })
+
+  it('leaves work storage refused only on the user saying so', async () => {
+    storageRefuses = true
+    const question = asksToDiscard(true)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace(question)
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving(openBenchmarkLab)
+      await settle()
+
+      expect(question.pages).toEqual(['benchmarks'])
+      expect(assign).toHaveBeenCalledExactlyOnceWith(BENCHMARKS_PATH)
+      // Given up on purpose, so the pagehide on the way out has nothing left
+      // to force past the cap.
+      expect(autosave.isFlameDirty()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('asks the refusal question when a yes at the cap still does not land', async () => {
+    // They agreed to give up the oldest kept flame and storage refused the
+    // write anyway. Leaving regardless lost the open flame as well.
+    fillRecents()
+    const discard = asksToDiscard(false)
+    await createRoot(async (dispose) => {
+      const { autosave, setOpen } = workspace({
+        confirmOverwriteOldest: () => {
+          storageRefuses = true
+          return Promise.resolve(true)
+        },
+        confirmDiscardUnsaved: discard.confirmDiscardUnsaved,
+      })
+      autosave.markLoadedBaseline()
+      setOpen('metadata', 'name', 'Unsaved work')
+
+      const assign = leaving()
+      await settle()
+
+      expect(discard.pages).toEqual(['explorer'])
+      expect(assign).not.toHaveBeenCalled()
+      expect(autosave.isFlameDirty()).toBe(true)
       dispose()
     })
   })

@@ -14,8 +14,8 @@ import type { LeavingFor } from '@/routing/pageLinks'
  */
 export type OverwriteOccasion = 'save' | LeavingFor
 
-/** The page being opened, as the question names it. */
-const PAGE_NAME: Record<LeavingFor, string> = {
+/** The page being opened, as the questions on the way out name it. */
+export const PAGE_NAME: Record<LeavingFor, string> = {
   benchmarks: 'The Benchmark Lab',
   explorer: 'The explorer',
 }
