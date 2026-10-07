@@ -104,7 +104,7 @@ names a path with no track, `clearAllTracks` runs on an empty timeline, or
 return without pushing an undo entry and without clearing the redo stacks — a
 Ctrl+Z must never be spent on a no-op, and must never destroy a live redo.
 
-_(`utils/timeline.ts:1128-1133` (`removeKeyframe`), `:1536-1541` (`removeAllKeyframesForPath`), `:1710-1714` (`clearAllTracks`), `:1745-1747` (`stringify`); guarded by
+_(`utils/timeline.ts:1128-1133` (`removeKeyframe`), `:1536-1541` (`removeAllKeyframesForPath`), `:1710-1714` (`clearAllTracks`), `:1748-1750` (`stringify`); guarded by
 `timelineUndo.test.ts:84-107` (`nothing`), `:300` "an idempotent loop-mode set burns no undo entry".)_
 
 ### REQ-TA-005 — Structural operations refuse non-interpolatable keyframes
@@ -117,7 +117,7 @@ cannot blend.
 
 _(`utils/timeline.ts:1154-1163` `setKeyframeInterp`, `:1291-1311` `splitKeyframeAtFrame`,
 `:1365-1386` `applyMirroredValueFromTrack`, `:1659-1678` `moveKeyframe`,
-`:1699-1700` `relocateKeyframe`; guarded by `utils/timeline.test.ts:225` "should handle boolean values correctly", `:327` "should return false if source value is boolean".)_
+`:1699-1700` `relocateKeyframe`; guarded by `utils/timeline.test.ts:252` "should handle boolean values correctly", `:354` "should return false if source value is boolean".)_
 
 ### REQ-TA-006 — A keyframe drag never clobbers its neighbour
 
@@ -161,7 +161,7 @@ frame, it shall return the earlier one's value. A track with no keyframes shall
 resolve to `null`.
 
 _(`utils/timeline.ts:601-611` (`sort`), `:625` (`frameRange`); the after-last hold is exercised indirectly by
-`utils/timeline.test.ts:732` "seamless ramps from the held end value back to the start value", the empty case by `:412` "should return null for non-existent track".)_
+`utils/timeline.test.ts:759` "seamless ramps from the held end value back to the start value", the empty case by `:439` "should return null for non-existent track".)_
 
 ### REQ-TA-010 — Six easing curves, applied to the normalized segment position
 
@@ -194,7 +194,7 @@ resolver shall interpolate them component-wise (RGB and RGBA colour tracks);
 snap to the target only once the segment completes.
 
 _(`utils/timeline.ts:553-586` (`interpolateArrayKeyframe`), `:646-667` (`isArray`), `:439-458` (`lerpKfValues`); array blending guarded by
-`utils/timeline.test.ts:818` "interpolates array (colour) values with spline", `:417` "should handle array values".)_
+`utils/timeline.test.ts:845` "interpolates array (colour) values with spline", `:444` "should handle array values".)_
 
 ### REQ-TA-013 — One implementation of the interpolation math
 
@@ -222,7 +222,7 @@ The monorepo shall hold exactly one implementation of `applyEasing`,
 **Where** `config.loopMode` is `'off'` or absent, `loopOptsFromConfig` shall
 return `null` and `resolveLoopValue` shall be exactly `resolveKeyframeValue`.
 
-_(`utils/timeline.ts:417-435` (`loopOptsFromConfig`), `:460-474` (`resolveLoopValue`); guarded by `utils/timeline.test.ts:726` "equals resolveKeyframeValue when opts is null", `:653` "off leaves resolution unchanged".)_
+_(`utils/timeline.ts:417-435` (`loopOptsFromConfig`), `:460-474` (`resolveLoopValue`); guarded by `utils/timeline.test.ts:753` "equals resolveKeyframeValue when opts is null", `:680` "off leaves resolution unchanged".)_
 
 ### REQ-TA-015 — Seamless mode synthesizes a there-and-back tail
 
@@ -234,7 +234,7 @@ resolves to `null`, or `endFrame <= userEnd`, **then** it shall fall back to
 ordinary keyframe resolution. `userEnd` is the last keyframe frame across all
 tracks.
 
-_(`utils/timeline.ts:387-399` (`getUserEndFrame`), `:477-502` (`resolveSeamless`); guarded by `utils/timeline.test.ts:633` "seamless resolves endFrame back to the start value", `:732` "seamless ramps from the held end value back to the start value".)_
+_(`utils/timeline.ts:387-399` (`getUserEndFrame`), `:477-502` (`resolveSeamless`); guarded by `utils/timeline.test.ts:660` "seamless resolves endFrame back to the start value", `:759` "seamless ramps from the held end value back to the start value".)_
 
 ### REQ-TA-016 — Cycle mode wraps each track on its own phase
 
@@ -246,7 +246,7 @@ keyframe's curve. **If** the track has fewer than two keyframes, `P <= 0`, or th
 track's keyframes already span the full period, **then** it shall fall back to
 ordinary resolution.
 
-_(`utils/timeline.ts:505-532` (`resolveCycle`); guarded by `utils/timeline.test.ts:642` "cycle resolves start and end to the same value (seamless wrap)", `:746` "cycle interior interpolates normally", `:752` "cycle wraps the last keyframe back to the first across the period".)_
+_(`utils/timeline.ts:505-532` (`resolveCycle`); guarded by `utils/timeline.test.ts:669` "cycle resolves start and end to the same value (seamless wrap)", `:773` "cycle interior interpolates normally", `:779` "cycle wraps the last keyframe back to the first across the period".)_
 
 ### REQ-TA-017 — Selecting a loop mode adds no keyframes and is undoable
 
@@ -257,7 +257,7 @@ as long as the forward animation) only when `endFrame` does not already exceed
 `userEnd`. `'cycle'` shall never extend `endFrame`. The whole change shall record
 one undo entry, because a silently rewritten `endFrame` must be reversible.
 
-_(`utils/timeline.ts:1725-1753` (`setLoopMode`); guarded by `utils/timeline.test.ts:576` "seamless: adds no keyframes, enables loop, extends endFrame by span", `:613` "seamless is idempotent — re-selecting does not pile up frames", `:623` "cycle: enables loop and never extends endFrame" and
+_(`utils/timeline.ts:1725-1753` (`setLoopMode`); guarded by `utils/timeline.test.ts:603` "seamless: adds no keyframes, enables loop, extends endFrame by span", `:640` "seamless is idempotent — re-selecting does not pile up frames", `:650` "cycle: enables loop and never extends endFrame" and
 `timelineUndo.test.ts:287` "seamless loop mode is undoable, including its endFrame rewrite".)_
 
 ---
@@ -274,8 +274,8 @@ the target's type (number for scalars, string for `drawMode`/`colorInitMode`/
 Camera tracks shall additionally be skipped when the flame carries no
 `camera`/`camera3D` object to write into.
 
-_(`utils/timeline.ts:1861-2012` (`applyTrackNumber`), `:2138-2153` (`applyTracksToFlame`); guarded by `utils/timeline.test.ts:929` "applies 2D camera tracks correctly", `:949` "applies 3D camera tracks correctly",
-`:978` "applies render settings tracks correctly including color arrays", `:1054` "applies transform and variation tracks correctly".)_
+_(`utils/timeline.ts:1861-2012` (`applyTrackNumber`), `:2138-2153` (`applyTracksToFlame`); guarded by `utils/timeline.test.ts:956` "applies 2D camera tracks correctly", `:976` "applies 3D camera tracks correctly",
+`:1005` "applies render settings tracks correctly including color arrays", `:1081` "applies transform and variation tracks correctly".)_
 
 ### REQ-TA-019 — The final transform is seeded before it is animated
 
@@ -285,7 +285,7 @@ dimensionality — the 12-parameter 3D identity when `renderSettings.dimensions 
 the 6-parameter 2D identity otherwise — before applying the `finalTransform.*`
 tracks.
 
-_(`utils/timeline.ts:2093-2136` (`applyFinalTransformTracks`); guarded by `utils/timeline.test.ts:1100` "seeds and applies 2D finalTransform tracks", `:1144` "seeds and applies 3D finalTransform tracks with 12-param identity".)_
+_(`utils/timeline.ts:2093-2136` (`applyFinalTransformTracks`); guarded by `utils/timeline.test.ts:1127` "seeds and applies 2D finalTransform tracks", `:1171` "seeds and applies 3D finalTransform tracks with 12-param identity".)_
 
 ---
 
@@ -407,7 +407,7 @@ shall additionally stop playback and reset the FPS meter. `play` shall rewind to
 `startFrame` first **if** looping is off and the playhead is already at or past
 the end.
 
-_(`utils/timeline.ts:1462-1470` (`setIsPlaying`), `:1496-1502` (`play`); guarded by `utils/timeline.test.ts:442-463` "should wrap to start frame when at end".)_
+_(`utils/timeline.ts:1462-1470` (`setIsPlaying`), `:1496-1502` (`play`); guarded by `utils/timeline.test.ts:469-490` "should wrap to start frame when at end".)_
 
 ---
 

@@ -61,7 +61,7 @@ into the Player 1 slot together with its `calculateFlameStats` type and metrics 
 
 _(`useWorkspaceArena.ts:63-77` (`openFlameClashUI`); the same seeding runs whether entry came from the
 Arcade hub's Launch Clash Arena button, the `open_arena` tool, or the effect at
-`useWorkspaceArena.ts:121-125` (`openFlameClashUI`) that reacts to `showArena` flipping true.)_
+`useWorkspaceArena.ts:135-139` (`openFlameClashUI`) that reacts to `showArena` flipping true.)_
 
 ### REQ-AA-002 — An empty opponent slot is filled with a mutated nemesis
 
@@ -297,7 +297,7 @@ voxels quantised at half-unit resolution and clamped to `±8` on each axis — s
 calls with the same clash flame and seed return byte-identical ownership numbers and
 neither team is advantaged by generator order.
 
-_(`scoreClashRound.ts:175-215` (`toVoxelKey`), `:385-406` (`rngA`); determinism is asserted at
+_(`scoreClashRound.ts:175-215` (`toVoxelKey`), `:417-438` (`rngA`); determinism is asserted at
 `webmcp.test.ts:508-541` "score_clash_round".)_
 
 ### REQ-AA-023 — Territory ownership blends space with probability, and a verdict needs a margin
@@ -512,7 +512,7 @@ available, **then** it shall return an error. The tool shall be annotated
 `readOnlyHint`, as shall `simulate_clash`, `score_clash_round` and `create_clash_flame`.
 
 _(`arenaGetStats.ts:30-56` (`annotations`); annotations at `simulateClash.ts:334-336` (`annotations`),
-`scoreClashRound.ts:336-338` (`annotations`), `createClashFlame.ts:427-429` (`annotations`))_
+`scoreClashRound.ts:353-355` (`annotations`), `createClashFlame.ts:427-429` (`annotations`))_
 
 ### REQ-AA-041 — `arena_commentate` writes into the live HUD
 
@@ -532,7 +532,7 @@ HUD's `startClash` and return its combat result — contesting the requested num
 rounds. **If** the flame editor has no active flame, or the HUD has not yet published a
 `startClash`, **then** it shall return an error rather than hanging.
 
-> **Known deviation:** `packages/app/src/webmcp/tools/arenaStartClash.ts:92-95` (`result`) forwards
+> **Known deviation:** `packages/app/src/webmcp/tools/arenaStartClash.ts:95-98` (`result`) forwards
 > `rounds: raw.rounds ?? 3` and `packages/app/src/commands/types.ts:130-133` carries it,
 > but the only implementation reads `opts?.stance` alone
 > (`packages/app/src/components/ArenaOverlay.tsx:486-495`) and `runSimulation` hard-codes
@@ -558,7 +558,7 @@ file in the `Tests:` block is not the same as being guarded, so these are listed
 - REQ-AA-005, REQ-AA-006 — `ArenaOverlay.test.tsx` always mounts with a Player 2 already set and never asserts on capture/restore. The document-restore path — the one that can leave a staged clash in the user's flame — has zero coverage.
 - REQ-AA-011 — no test asserts the `disabled` state of any control during a clash.
 - REQ-AA-015, REQ-AA-016 (angle-detection branch), REQ-AA-017 — no test feeds `calculateGroundedStats` a transformless flame, an angle-symmetric flame, or a flame with `visible` absent.
-- REQ-AA-024 (equal-probability and empty-transform branches) — only the missing-descriptor branch is covered (`flameToolsModular.test.ts:178` "handles missing clashFlame gracefully").
+- REQ-AA-024 (equal-probability and empty-transform branches) — only the missing-descriptor branch is covered (`flameToolsModular.test.ts:199` "handles missing clashFlame gracefully").
 - REQ-AA-026 — `simulateClash.test.ts:138-174` "detects narrative events across diverse clash scenarios" exercises `Entangled` and `Collapse` only; `Nova`, `Symmetry Lock` and `Chaos Cascade` are unreached.
 - REQ-AA-027 — nothing asserts that `territoryWinner` overrides the HP comparison.
 - REQ-AA-028 (tie-break chain) — `stats.test.ts:431` "deterministically resolves 3 rounds with battle log" checks one deterministic 3-round run; the HP → round-wins → beauty → draw ladder is untested.
@@ -566,7 +566,7 @@ file in the `Tests:` block is not the same as being guarded, so these are listed
 - REQ-AA-030 — `webmcp/tools/animateClash.ts` has no test file.
 - REQ-AA-032, REQ-AA-033 — spectator pacing, the VFX timers and the keyboard handler are untested; the `ArenaOverlay.test.tsx:257` "immediately presents the Center Winner Trophy Card upon results state" results test drives `startClash` directly.
 - REQ-AA-035 — neither `loadFighter` nor the workspace's `selectFighter` is exercised.
-- REQ-AA-039 (`autoStart`) — `webmcp.test.ts:353` (`open_arena`) covers the stats/flame fallbacks but never sets `autoStart`.
+- REQ-AA-039 (`autoStart`) — `webmcp.test.ts:360` (`open_arena`) covers the stats/flame fallbacks but never sets `autoStart`.
 
 **Covered in shape only** — a test names the code but would survive the requirement being
 violated:
@@ -575,7 +575,7 @@ violated:
 - REQ-AA-010 — `ArenaOverlay.test.tsx:228` "rerolling opponent updates opponent stats and triggers new archetype" asserts only that the rerolled opponent has a name and a flame; the state reset (rounds, battle log, cached simulation, restore) is not checked.
 - REQ-AA-012 — `ArenaOverlay.test.tsx:216` "renders Sync Active and From Gallery action buttons" asserts the buttons render, not what they do.
 - REQ-AA-034 — `ArenaOverlay.test.tsx:257` "immediately presents the Center Winner Trophy Card upon results state" asserts the trophy card renders; the winner mapping, the streak rules and the draw-leaves-streak branch are not asserted.
-- REQ-AA-023 — `simulateClash.test.ts:86` "runs multi-round simulation and produces round outcomes" checks ownership sums to 1 and `webmcp.test.ts:533` "score_clash_round" checks determinism; the `0.7/0.3` contested split, the symmetry weighting and the `0.01` verdict margin have no direct assertion.
+- REQ-AA-023 — `simulateClash.test.ts:86` "runs multi-round simulation and produces round outcomes" checks ownership sums to 1 and `webmcp.test.ts:539` "score_clash_round" checks determinism; the `0.7/0.3` contested split, the symmetry weighting and the `0.01` verdict margin have no direct assertion.
 
 **End-to-end:** `tests/arcade.spec.ts` covers Teach and Cinema. No Playwright test opens
 the arena, so nothing verifies that the overlay renders on a real GPU, that a clash plays

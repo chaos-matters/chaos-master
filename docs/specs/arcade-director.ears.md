@@ -49,7 +49,7 @@ Arcade modes.
 array ahead of every write tool.
 
 _(`webmcp/tools/index.ts:99-100` (`directorGetFeedback`) read half, `:131-132` (`directorPropose`) write half;
-`arcadeDirector.ts:179-181` (`annotations`), `:244-246` (`annotations`))_
+`arcadeDirector.ts:203-205` (`annotations`), `:268-270` (`annotations`))_
 
 ### REQ-AD-002 — The Arcade panel hands the agent the whole loop, not just a goal
 
@@ -71,7 +71,7 @@ return immediately while a modal is already mounted, and shall clear both the
 re-entrancy latch and the `open` signal when the modal settles — whether it was
 dismissed by the close button, by Load Candidate, or by the modal host.
 
-_(`useWorkspaceArtDirector.tsx:58-62` (`isDirectorModalOpen`) the latch, `:112-116` (`respond`) the overlay's
+_(`useWorkspaceArtDirector.tsx:70-74` (`isDirectorModalOpen`) the latch, `:112-116` (`respond`) the overlay's
 `respond`, `:120-123` the `finally`. Note the state itself survives a close: the
 candidates and generation stay in the signal, so reopening resumes the same
 generation rather than reseeding.)_
@@ -83,8 +83,8 @@ mounted, the workspace shall request the Director modal — this is the only sea
 by which `director_propose`'s `setOpen(true)` and the Arcade panel's launch
 button reach the UI, since neither calls `openArtDirectorUI` directly.
 
-_(`useWorkspaceArtDirector.tsx:126-130` (`createEffect`); the tool side at
-`arcadeDirector.ts:145-146` (`setState`))_
+_(`useWorkspaceArtDirector.tsx:138-142` (`createEffect`); the tool side at
+`arcadeDirector.ts:169-170` (`setState`))_
 
 ### REQ-AD-005 — An empty session seeds four mutants of the current flame
 
@@ -96,7 +96,7 @@ and mutating colours, and each carrying its own `scoreFlame(...).composite` as
 fitness.
 
 _(`useWorkspaceArtDirector.tsx:63-96` (`directorState`). The four preset names — Subtle, Moderate,
-Chaotic, Structural — are declared at `:66` (`presets`) and used only for their count and
+Chaotic, Structural — are declared at `:78` (`presets`) and used only for their count and
 index; they are never displayed.)_
 
 ### REQ-AD-006 — A Director tool without a workspace refuses by name
@@ -108,7 +108,7 @@ and `director_get_feedback` shall return
 the replay renderer or a duel rival seat installs — **then** they shall return
 `{ error: 'Director context not found in workspace.' }` instead of throwing.
 
-_(`arcadeDirector.ts:10-12` (`NOT_READY`), `:109-112` (`getWebMcpContext`), `:183-186` (`getWebMcpContext`); the optional member is
+_(`arcadeDirector.ts:10-12` (`NOT_READY`), `:132-135` (`getWebMcpContext`), `:207-210` (`getWebMcpContext`); the optional member is
 declared at `commands/types.ts:104-110` (`director`). `director_get_taste_profile` needs no
 context at all — see REQ-AD-030.)_
 
@@ -122,7 +122,7 @@ falsy `generation` shall become 1, a missing `candidates` array shall become
 empty, and each candidate's fitness shall be the caller's `fitness` when given
 and `scoreFlame(flame).composite` otherwise.
 
-_(`arcadeDirector.ts:114-155` (`input`), fitness at `:50-56` (`calculatedFitness`). Replacement is total: the
+_(`arcadeDirector.ts:114-155` (`input`), fitness at `:65-71` (`calculatedFitness`). Replacement is total: the
 previous generation's in-session reactions and tags are discarded, though their
 persisted taste records survive per REQ-AD-035.)_
 
@@ -144,7 +144,7 @@ shall render a "Candidate N" placeholder in place of a preview, and
 `director_get_feedback` shall report `features: undefined` for it — never a
 crash and never a fabricated feature set.
 
-_(`arcadeDirector.ts:50-54` (`calculatedFitness`) the 0.85 default and the `as FlameDescriptor` cast,
+_(`arcadeDirector.ts:65-69` (`calculatedFitness`) the 0.85 default and the `as FlameDescriptor` cast,
 `:200-202` (`features`) the feature guard; `DirectorOverlay.tsx:316-328` (`camera`) the placeholder
 fallback.)_
 
@@ -155,7 +155,7 @@ execute `director_propose`'s implementation and input schema unchanged, differin
 only in `name` and `description`, so a proposal made under either name lands in
 the same state and opens the same modal.
 
-_(`arcadeDirector.ts:161-166` (`openArtDirector`) spreads `directorPropose`.)_
+_(`arcadeDirector.ts:185-190` (`openArtDirector`) spreads `directorPropose`.)_
 
 ### REQ-AD-011 — Reaction toggles are three-state
 
@@ -318,7 +318,7 @@ descriptor is never parsed through the schema before it reaches the taste store.
 continue`, so a candidate composed as plain JSON with no `visible` key yields
 > `variationCategories: []` and `paletteTemperature: 'balanced'` for every
 > transform. `director_propose` passes agent input through untouched
-> (`webmcp/tools/arcadeDirector.ts:114-120`) and `normalizeCandidates` only
+> (`webmcp/tools/arcadeDirector.ts:137-141`) and `normalizeCandidates` only
 > replaces a flame that is missing transforms entirely (`:20-48` (`rawCandidates`)), so this is
 > the normal shape of the tool's main input path. The sibling helper
 > `calculateStructuralSymmetry` in `webmcp/tools/scoreFlame.ts` uses
@@ -361,7 +361,7 @@ The profile's `preferredPalette` shall be `warm` when liked records with a warm
 palette outnumber cool ones, `cool` in the mirror case, and `balanced` on a tie —
 liked records whose own temperature is `balanced` count toward neither side.
 
-_(`arcade/tasteStore.ts:297-304` (`warmCount`); guarded by `arcadeDirector.test.ts:160-170` (`updated`)
+_(`arcade/tasteStore.ts:297-304` (`warmCount`); guarded by `arcadeDirector.test.ts:204-214` (`updated`)
 for the warm case.)_
 
 ### REQ-AD-029 — The summary is one sentence naming at most five signals
@@ -380,7 +380,7 @@ field but is deliberately absent from the sentence.)_
 rating history and shall return `{ ok: true, profile }` unconditionally — with no
 workspace context, no open modal and no active generation required.
 
-_(`arcadeDirector.ts:236-254` (`directorGetTasteProfile`); guarded by `arcadeDirector.test.ts:122-171` "retrieves aggregated taste profile",
+_(`arcadeDirector.ts:260-278` (`directorGetTasteProfile`); guarded by `arcadeDirector.test.ts:122-171` "retrieves aggregated taste profile",
 which asserts the empty profile before any rating and the aggregated one after.)_
 
 ### REQ-AD-031 — `director_get_feedback` reads the session, never the store

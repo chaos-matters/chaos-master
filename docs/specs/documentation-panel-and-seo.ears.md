@@ -82,7 +82,7 @@ subsequent click retries the import instead of silently doing nothing.
 activated, the menu shall close before the launcher is invoked, so the expanded
 menu is never left behind the dialog.
 
-_(`SoftwareVersion.tsx:165-179` (`showDocs`) and `:181-197` (`showHelp`) — each handler calls
+_(`SoftwareVersion.tsx:180-194` (`showDocs`) and `:181-197` (`showHelp`) — each handler calls
 `setOpen(false)` before `props.showDocs()` / `props.showHelp()`.)_
 
 ### REQ-DS-004 — The panel opens on Variations with tablist semantics
@@ -390,7 +390,7 @@ is the help surface named in scope.)_
 rendered device row and the copied text shall fall back to the WebGL renderer
 string, and shall print "Not exposed by browser" only when that is empty too.
 
-_(`HelpModal.tsx:114-116` (`renderer`), `:158-161` (`deviceName`), `:578-584` (`deviceName`).)_
+_(`HelpModal.tsx:114-116` (`renderer`), `:158-161` (`deviceName`), `:594-600` (`deviceName`).)_
 
 ### REQ-DS-032 — Hardware re-detection is guarded and reported
 
