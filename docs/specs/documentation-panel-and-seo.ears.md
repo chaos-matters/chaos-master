@@ -454,7 +454,7 @@ not the production origin — the `dev` route, the `preview` deploy, and any
 future staging origin — so that a duplicate origin can never hand a crawler
 production's sitemap.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `c37f8aae`; this note describes the code at `a5c2f26f`): `packages/app/src/worker/middleware/reviewHost.ts:14-18` —
 > `isReviewHost` is exact equality against the single constant

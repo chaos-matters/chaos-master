@@ -194,7 +194,7 @@ This example is the Beats defect as it stood at commit `a5c2f26f`. #90 fixed
 it, so the blockquote's citations are pinned to that commit: the markers around
 it are how a note about old code stays checkable (see **Citations** below).
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Known deviation:** `packages/app/src/webmcp/tools/arcadeBeats.ts:333-349` —
 > nothing loads a bundled track. `fetchBundledTrackBuffer`

@@ -258,7 +258,7 @@ A taste record's identity shall distinguish the Director session it came from,
 so that ratings made in a later session are appended to the profile rather than
 overwriting same-numbered candidates from an earlier one.
 
-<!-- cite-check: pinned a5c2f26f -->
+<!-- cite-check: pinned 08428e6e -->
 
 > **Fixed deviation** (#90, `404db62a`; this note describes the code at `a5c2f26f`): `packages/app/src/arcade/tasteStore.ts:164` — the id is
 > `cand-${generation}-${candidateIndex}` and nothing else. `generation` comes

@@ -3,11 +3,11 @@
 Status: decided 2026-09-23 (section 2) and widened 2026-09-24 (decision (d)). Phases 0 to 2
 and 4 are built on `feat/glass-panels`, with the desktop sidebar, and the Glass panels setting
 is on by default. Phase 3, the dialogs, waits on a decision (section 4). Drafted from a survey of every panel, menu, dialog and overlay in
-`packages/app/src`. Its line references are pinned to `9fc08078`, the fork main that phase 0
-started from, where every cited file is as the survey read it; the phases have moved them
-since. Paths below are relative to `packages/app/src`.
+`packages/app/src`. Its line references are pinned to `578d0055`, where every cited file is as
+the survey read it at `9fc08078`, the fork main that phase 0 started from; the phases have
+moved them since. Paths below are relative to `packages/app/src`.
 
-<!-- cite-check: pinned 9fc08078 -->
+<!-- cite-check: pinned 578d0055 -->
 
 Goal: give the other panels, tablet and phone first, the semi-transparent glossy look of the
 explorer's side panel, without losing legibility over bright flames or frame rate on phones.
