@@ -9,6 +9,7 @@ import { Suspense } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { ClashPage } from './ClashPage'
+import type { JSX } from 'solid-js'
 import type * as ClashFighters from './clashFighters'
 import type { FighterRef, LoadedFighter } from './clashFighters'
 import type { GalleryListItem } from '@/lib/galleryContent'
@@ -33,8 +34,10 @@ vi.mock('@/components/ClashStage/ClashStage', () => ({
     a: { name: string }
     b: { name: string }
     onChangeFighters?: () => void
+    leading?: JSX.Element
   }) => (
     <div data-testid="stage">
+      {props.leading}
       {props.a.name} vs {props.b.name}
       <button type="button" onClick={() => props.onChangeFighters?.()}>
         Change fighters
@@ -133,6 +136,57 @@ describe('ClashPage', () => {
         'gallery:spiral-2',
       )
     })
+  })
+
+  it('lets Cancel put the picker away after a fighter fails to load', async () => {
+    mocks.loadFighter.mockResolvedValue(undefined)
+    renderPage('?a=gallery:gone&b=example:example2')
+    expect(
+      await screen.findByText('Fighter A could not be loaded.'),
+    ).toBeTruthy()
+    const picker = () =>
+      screen.queryByRole('form', { name: 'Choose the fighters' })
+    expect(picker()).toBeTruthy()
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    cancel.focus()
+    fireEvent.click(cancel)
+
+    expect(picker()).toBeNull()
+    expect(screen.getByText('Fighter A could not be loaded.')).toBeTruthy()
+    // Cancel went with the picker; focus lands on the way back to it, not on
+    // the page body.
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Choose fighters' }),
+    )
+    // The error keeps a way back to the picker.
+    fireEvent.click(screen.getByRole('button', { name: 'Choose fighters' }))
+    expect(picker()).toBeTruthy()
+  })
+
+  it('links back to the editor and names its tab', async () => {
+    renderPage('')
+    await screen.findByTestId('stage')
+    const back = screen.getByRole('link', { name: 'Back to Lumen Apeiron' })
+    expect(back.getAttribute('href')).toBe('/')
+    expect(document.title).toBe('Flame Clash \u00b7 Lumen Apeiron')
+  })
+
+  it('keeps the way back while the fighters load and after an error', async () => {
+    mocks.loadFighter.mockResolvedValue(undefined)
+    renderPage('')
+    await screen.findByText('Fighter A could not be loaded.')
+    expect(
+      screen.getByRole('link', { name: 'Back to Lumen Apeiron' }),
+    ).toBeTruthy()
+  })
+
+  it('gives the tab its old title back when the page goes', async () => {
+    document.title = 'Lumen Apeiron'
+    const { unmount } = renderPage('')
+    await screen.findByTestId('stage')
+    unmount()
+    expect(document.title).toBe('Lumen Apeiron')
   })
 
   it('fights the fighters picked, whatever was chosen before', async () => {

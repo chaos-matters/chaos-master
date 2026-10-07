@@ -12,6 +12,7 @@ import { ClashStage } from '@/components/ClashStage/ClashStage'
 import { usePrefersReducedMotion } from '@/components/Home/homePlayback'
 import { clashFighter, unfitReason } from '@/flame/clash/fightFlame'
 import { loadCustomVariations } from '@/flame/variations/custom'
+import { ChevronLeft } from '@/icons'
 import { fetchGallery } from '@/lib/galleryContent'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { loadRecentFlames } from '@/utils/recentFlames'
@@ -99,6 +100,18 @@ export function ClashPage() {
   })
   const { bout, loading } = createBout(refs)
   const [picking, setPicking] = createSignal(false)
+  // A failed bout opens the picker by itself; Cancel puts it away for that
+  // bout, and the next failure opens it again.
+  const [dismissedBout, setDismissedBout] = createSignal<Bout>()
+  let chooseButton: HTMLButtonElement | undefined
+  const pickerShown = () =>
+    picking() || (bout()?.error !== undefined && bout() !== dismissedBout())
+
+  const previousTitle = document.title
+  document.title = 'Flame Clash \u00b7 Lumen Apeiron'
+  onCleanup(() => {
+    document.title = previousTitle
+  })
 
   const prefersReduced = usePrefersReducedMotion()
   const [reducedChoice, setReducedChoice] = createSignal<boolean>()
@@ -129,11 +142,24 @@ export function ClashPage() {
     setRefs(next)
   }
 
+  // The way back to the editor, as the explorer has: in the stage's header
+  // while there is a stage, and in the same place while there is not.
+  const backLink = () => (
+    <a class={ui.back} href="/" aria-label="Back to Lumen Apeiron">
+      <ChevronLeft aria-hidden="true" />
+    </a>
+  )
+
   return (
     <main class={ui.page}>
-      <Show when={bout()?.fighters} keyed>
+      <Show
+        when={bout()?.fighters}
+        keyed
+        fallback={<header class={ui.top}>{backLink()}</header>}
+      >
         {(fighters) => (
           <ClashStage
+            leading={backLink()}
             a={fighters.a}
             b={fighters.b}
             winner={winner}
@@ -149,14 +175,35 @@ export function ClashPage() {
         <p class={ui.status}>Loading the fighters...</p>
       </Show>
       <Show when={bout()?.error}>
-        {(error) => <p class={ui.status}>{error()}</p>}
+        {(error) => (
+          <div class={ui.status}>
+            <p>{error()}</p>
+            <Show when={!pickerShown()}>
+              <button
+                ref={chooseButton}
+                type="button"
+                class={ui.button}
+                onClick={() => setPicking(true)}
+              >
+                Choose fighters
+              </button>
+            </Show>
+          </div>
+        )}
       </Show>
-      <Show when={picking() || bout()?.error !== undefined}>
+      <Show when={pickerShown()}>
         <FighterPicker
           current={refs()}
           names={names()}
           onFight={fight}
-          onClose={() => setPicking(false)}
+          onClose={() => {
+            setPicking(false)
+            setDismissedBout(bout())
+            // Cancel unmounted with the picker; without this, focus falls
+            // to the page body. After a failed load the way back to the
+            // picker is the next thing to reach.
+            if (bout()?.error !== undefined) chooseButton?.focus()
+          }}
         />
       </Show>
     </main>
