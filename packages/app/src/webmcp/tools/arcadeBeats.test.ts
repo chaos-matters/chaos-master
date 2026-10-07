@@ -162,6 +162,79 @@ describe('arcade beats tools', () => {
     expect(agentDriving()).toBe(false)
   })
 
+  it('refuses a new mapping once the step budget is spent, and applies nothing', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await run(arcadeStartBeats, {})
+    const mapping = {
+      mappings: [
+        {
+          audioFeature: 'bass',
+          target: { kind: 'renderSetting', param: 'exposure' },
+          sensitivity: 1,
+          range: [0.2, 1.0],
+        },
+      ],
+    }
+    for (let i = 0; i < 30; i++) {
+      expect((await run(arcadeSetAudioMapping, mapping)).ok).toBe(true)
+    }
+    const applied = vi.mocked(ctx.audio!.snapshot).mock.calls.length
+
+    const refused = await run(arcadeSetAudioMapping, mapping)
+
+    expect(refused.error).toBe(
+      'Step budget exhausted. Finish now with arcade_end_beats.',
+    )
+    expect(vi.mocked(ctx.audio!.snapshot).mock.calls.length).toBe(applied)
+  })
+
+  describe('what arcade_end_beats reports', () => {
+    const recording = () => {
+      const ctx = createMockCommandContext()
+      ctx.recorder!.stop = vi.fn(
+        () =>
+          ({
+            version: 1,
+            actions: [{ t: 0, id: 'flame.setExposure', args: [0.3] }],
+          }) as never,
+      )
+      setWebMcpContext(ctx)
+      return ctx
+    }
+
+    it('says the take is in the library once the save lands', async () => {
+      recording()
+      await run(arcadeStartBeats, {})
+      const result = await run(arcadeEndBeats, { title: 'Pulse' })
+      expect(result).toMatchObject({ ok: true, saved: true })
+      expect(result.message).toBe(
+        'Beats session completed and saved to library.',
+      )
+    })
+
+    it('says the save failed when it did', async () => {
+      const ctx = recording()
+      ctx.recorder!.save = vi.fn(() => Promise.reject(new Error('quota')))
+      await run(arcadeStartBeats, {})
+      const result = await run(arcadeEndBeats, { title: 'Pulse' })
+      expect(result).toMatchObject({ ok: true, saved: false })
+      expect(result.message).toBe(
+        'Beats session ended, but the take could not be saved to the library.',
+      )
+    })
+
+    it('says nothing was saved when nothing was recorded', async () => {
+      setWebMcpContext(createMockCommandContext())
+      await run(arcadeStartBeats, {})
+      const result = await run(arcadeEndBeats, { title: 'Pulse' })
+      expect(result).toMatchObject({ ok: true, saved: false })
+      expect(result.message).toBe(
+        'Beats session ended. Nothing was recorded, so nothing was saved.',
+      )
+    })
+  })
+
   describe('track loading', () => {
     const setup = (loadedTrack: string | undefined) => {
       const ctx = createMockCommandContext()
