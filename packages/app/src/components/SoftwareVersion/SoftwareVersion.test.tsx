@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { askBeforeLeaving } from '@/routing/pageLinks'
 import workspaceSource from '../../MainWorkspace.tsx?raw'
+import { openSettings } from './settingsOpener'
 import { SoftwareVersion } from './SoftwareVersion'
 
 describe('SoftwareVersion component', () => {
@@ -106,6 +107,51 @@ describe('SoftwareVersion component', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
+
+describe('the version menu for assistive tech', () => {
+  afterEach(cleanup)
+
+  it('announces every entry of the menu as a menu item', () => {
+    // The Arcade, Benchmark Lab and Deep zoom links sat in the menu without
+    // the role, so a screen reader announced a menu that left them out.
+    render(() => (
+      <SoftwareVersion
+        showHelp={vi.fn()}
+        showDocs={vi.fn()}
+        showBenchmark={vi.fn()}
+      />
+    ))
+    fireEvent.click(
+      screen.getByRole('button', { name: /lumen apeiron.*menu/i }),
+    )
+    const menu = screen.getByRole('menu')
+    const entries = menu.querySelectorAll('a, button')
+    expect(entries.length).toBeGreaterThan(0)
+    for (const entry of entries) {
+      expect(entry.getAttribute('role')).toBe('menuitem')
+    }
+  })
+})
+
+describe('opening Settings and more from outside the menu', () => {
+  afterEach(cleanup)
+
+  it("runs the menu's own opener", () => {
+    // The welcome screen's version pill clicked a class name that 8bfe95cb
+    // removed, so it closed the welcome screen and opened nothing.
+    const showHelp = vi.fn()
+    render(() => (
+      <SoftwareVersion
+        showHelp={showHelp}
+        showDocs={vi.fn()}
+        showBenchmark={vi.fn()}
+        hideTrigger={() => true}
+      />
+    ))
+    openSettings()
+    expect(showHelp).toHaveBeenCalledOnce()
   })
 })
 

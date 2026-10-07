@@ -6,6 +6,7 @@ import { openBenchmarkLab, openExplorer } from '@/routing/pageLinks'
 import { setTouchLayoutPreference as globalSetTouchLayoutPref } from '@/stores/workspaceLayoutStore'
 import { DISPLAY_VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
+import { provideSettingsOpener } from './settingsOpener'
 import ui from './SoftwareVersion.module.css'
 import type { TouchLayoutPreference } from '@/stores/workspaceLayoutStore'
 
@@ -47,6 +48,17 @@ export function SoftwareVersion(props: SoftwareVersionProps) {
       globalSetTouchLayoutPref(pref)
     }
   }
+
+  // The welcome screen's version pill opens Settings and more by this same
+  // opener (settingsOpener.ts). On mount, not in the body: a request that was
+  // waiting for the editor runs as soon as it is provided.
+  onMount(() => {
+    onCleanup(
+      provideSettingsOpener(() => {
+        props.showHelp()
+      }),
+    )
+  })
 
   createEffect(() => {
     if (!open() || typeof window === 'undefined') return
