@@ -161,7 +161,7 @@ and row 65 with the pull request whose review found it.
 
 ---
 
-<!-- cite-check: pinned 08428e6e -->
+<!-- cite-check: pinned 9dfe19c7 -->
 
 ## Confirmed — high
 

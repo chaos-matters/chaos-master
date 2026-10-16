@@ -233,8 +233,8 @@ test title" ``, which passes when the title (or an `it.each` template that
    and the check refuses a tag pin and names its commit (`v0.9.11` is
    `84ae0286`). The fork's commits reached upstream rebuilt, one per feature
    or fix, so prose here can name fork revisions upstream lacks: `a5c2f26f`
-   is `08428e6e` in this history, with the same code, and `9fc08078` (fork
-   main after #108) has no exact twin, since `578d0055` carries #108 with
+   is `9dfe19c7` in this history, with the same code, and `9fc08078` (fork
+   main after #108) has no exact twin, since `52680662` carries #108 with
    #153 folded in.
 6. **Whole documents.** Changelogs, anything under `archive/`, and documents
    with a date in the file name (dated plans, reports and audits) describe the
