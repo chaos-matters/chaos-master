@@ -5,7 +5,7 @@
  * settings (the picker mode, the sidebar width, the theme), and the version
  * menu opens it through the `showHelp` the editor hands it. The welcome
  * screen's version pill sits outside the editor and used to reach that menu
- * by clicking a DOM node by class name. 8bfe95cb turned the pill into a menu
+ * by clicking a DOM node by class name. 77f9ed5d turned the pill into a menu
  * and took the class away, so the welcome screen closed and nothing opened.
  *
  * So the version menu provides its opener here while it is mounted, and

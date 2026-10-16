@@ -139,7 +139,7 @@ describe('opening Settings and more from outside the menu', () => {
   afterEach(cleanup)
 
   it("runs the menu's own opener", () => {
-    // The welcome screen's version pill clicked a class name that 8bfe95cb
+    // The welcome screen's version pill clicked a class name that 77f9ed5d
     // removed, so it closed the welcome screen and opened nothing.
     const showHelp = vi.fn()
     render(() => (

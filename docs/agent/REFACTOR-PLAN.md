@@ -38,7 +38,7 @@ against.
 
 ---
 
-<!-- cite-check: pinned 08428e6e -->
+<!-- cite-check: pinned 9dfe19c7 -->
 
 ## Stage 1 — Confirmed defects that reach the user
 
