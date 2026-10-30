@@ -1,7 +1,7 @@
-import { createEffect, createRoot } from 'solid-js'
+import { createEffect, createRoot, createSignal } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { parseFlameXml } from '@/flame/flameXml'
-import { createWorkspaceHandoff } from './workspaceHandoff'
+import { createWorkspaceHandoff, onHandoffSeeded } from './workspaceHandoff'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const flame = parseFlameXml(`<?xml version="1.0" encoding="UTF-8"?>
@@ -99,5 +99,52 @@ describe('the workspace hand-off', () => {
         })
       })
     })
+  })
+})
+
+describe('draining the hand-off', () => {
+  it('opens each seeding once, however much the open writes', async () => {
+    // The shape of MainWorkspace's consumer: the cap question reads the open
+    // document synchronously, awaits, then the replacement resets the
+    // document, reads the seeded tracks and clears the hand-off. A re-run
+    // queued by that reset replaced the document again after the clear, and
+    // found no tracks to load.
+    const opened: string[] = []
+    let loaded: TimelineTrack[] | undefined
+    let settle!: () => void
+    const done = new Promise<void>((resolve) => {
+      settle = resolve
+    })
+    const dispose = createRoot((dispose) => {
+      const seat = handoff()
+      const [document, setDocument] = createSignal(0)
+      const [timeline, setTimeline] = createSignal<TimelineTrack[]>([])
+      onHandoffSeeded(seat.flame, (next) => {
+        opened.push(next.metadata?.name ?? '')
+        // flushDirtyToRecents, the synchronous half of the question.
+        void document()
+        void timeline()
+        void (async () => {
+          await Promise.resolve()
+          // resetWorkspaceForHandoff, then the flame, then its tracks.
+          setTimeline([])
+          setDocument((n) => n + 1)
+          setTimeline(seat.tracks() ?? [])
+          seat.seed()
+          loaded = timeline()
+          settle()
+        })()
+      })
+      queueMicrotask(() => {
+        seat.seed({ flame, tracks })
+      })
+      return dispose
+    })
+    await done
+    // Let any re-run queued behind the first one finish.
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(opened).toEqual([flame.metadata?.name])
+    expect(loaded).toEqual(tracks)
+    dispose()
   })
 })

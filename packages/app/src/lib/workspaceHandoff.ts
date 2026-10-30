@@ -1,4 +1,5 @@
-import { batch, createSignal } from 'solid-js'
+import { batch, createEffect, createSignal, untrack } from 'solid-js'
+import type { Accessor } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
@@ -60,4 +61,30 @@ export function createWorkspaceHandoff(input: {
     capability,
     seed,
   }
+}
+
+/**
+ * Call `open` once for each flame seeded into the hand-off.
+ *
+ * Only the seeded flame is tracked. `open` asks the Recents-cap question
+ * before it replaces anything, and the synchronous part of that question
+ * reads the open document's flame and tracks (`flushDirtyToRecents`). Read
+ * inside the effect, those became its dependencies, so the replacement's own
+ * writes re-ran it while the hand-off was still standing: each re-run queued
+ * another replacement behind the await, and those ran after the first had
+ * loaded the tracks and cleared the hand-off - resetting the timeline and
+ * finding no tracks to put back. A Home card or a welcome-grid animation
+ * opened with an empty timeline (0.9.13, from feccdfe9).
+ */
+export function onHandoffSeeded(
+  flame: Accessor<FlameDescriptor | undefined>,
+  open: (flame: FlameDescriptor) => void,
+): void {
+  createEffect(() => {
+    const next = flame()
+    if (next === undefined) return
+    untrack(() => {
+      open(next)
+    })
+  })
 }

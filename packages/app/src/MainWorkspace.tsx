@@ -14,6 +14,7 @@ import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { replaceOpenDocument } from '@/lib/documentLoad'
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics'
 import { trackAppInit } from '@/lib/telemetry'
+import { onHandoffSeeded } from '@/lib/workspaceHandoff'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { duelShowing, duelSidebarOpen } from './arcade/duel'
@@ -704,9 +705,9 @@ export function MainWorkspace(props: AppProps) {
    */
   const [pendingCapability, setPendingCapability] = createSignal<string>()
 
-  createEffect(() => {
-    const newFlame = props.flameFromWelcome?.()
-    if (newFlame !== undefined) {
+  onHandoffSeeded(
+    () => props.flameFromWelcome?.(),
+    (newFlame) => {
       // Home overlays this still-mounted workspace. Replacing its document
       // mid-take would be an unbounded workspace hand-off rather than a
       // semantic editor step, so fail closed and keep the recorded session
@@ -728,13 +729,11 @@ export function MainWorkspace(props: AppProps) {
           props.resetFlameFromWelcome?.()
           return
         }
-        // Read after the answer, not before it. Everything this hand-off
-        // needs is either live state or a prop accessor, so the only thing
-        // that could go stale across the question is the outgoing palette
-        // provenance - and taking it here means there is nothing to go
-        // stale. The signal is read outside the effect's tracking scope now,
-        // which is also what stops a palette edit from replaying a hand-off
-        // that has already happened.
+        // Read after the answer: the outgoing palette provenance is the one
+        // thing that could go stale across the question. Nothing in this
+        // callback is tracked (onHandoffSeeded), so neither this read nor the
+        // question's read of the open document can replay a hand-off that has
+        // already happened, which is how 0.9.13 lost a Home flame's tracks.
         const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
         replaceOpenDocument({
           // Reads the OUTGOING flame and its tracks, so it has to run before
@@ -802,8 +801,8 @@ export function MainWorkspace(props: AppProps) {
         // nobody had touched.
         markLoadedBaseline()
       })()
-    }
-  })
+    },
+  )
 
   const symTransforms = createMemo(() =>
     sortedTransformEntries(recordEntries(flameDescriptor.transforms)).filter(
