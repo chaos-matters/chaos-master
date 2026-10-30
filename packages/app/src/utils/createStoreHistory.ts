@@ -276,6 +276,11 @@ export function createStoreHistory<T extends object>(
     onTakeover?: () => void,
   ) {
     relinquishOwnedPreview()
+    // A gesture opening is the first write of its edit, so the host hears of
+    // it here, while the stack still ends on the entry the edit is made
+    // against. `onPreviewStarted` is too late for that: the preview is open
+    // by then, and a transition handed back from it cannot amend its entry.
+    onBeforeDocumentWrite?.()
     const preview_ = preview()
     if (preview_) {
       // Auto-commit the stale preview (e.g. orphaned by wheel debounce or
