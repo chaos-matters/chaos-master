@@ -43,6 +43,13 @@ developer history lives in `dev.changelog.md`.
   before the open flame takes the oldest one's place. While an agent's take
   records, leaving or reloading the page asks first too.
 
+### Changed
+
+- **Pan and zoom keep the held frame.** While the timeline holds a frame, a
+  2D pan or zoom used to drop the canvas back to the flame without its
+  animation. The frame now stays, its palette, transforms and turn
+  included, unless the pan or zoom itself is keyframed.
+
 ### Fixed
 
 - **Audio modulation no longer rewrites your flame.** After a track played,
