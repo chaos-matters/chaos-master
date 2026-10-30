@@ -382,10 +382,14 @@ _(`utils/timeline.ts:774-775` (`isDrivingView`); consumed at `Flam3.tsx:567-570`
 keeps showing that frame's animated state after the pointer is released instead of
 snapping back to the base flame. **While** a scrub drag is in progress
 `isScrubbing` shall be true, and it shall be cleared on pointerup, pointercancel
-or unmount; only `loadTracks`, `clearAllTracks` and the Home hand-off reset shall
-clear `previewHeld`.
+or unmount. `previewHeld` shall be cleared only by `loadTracks`, `clearAllTracks`,
+the Home hand-off reset, and a camera edit the held frame would hide: any
+`camera3D` write, a whole `camera` write, and a 2D pan or zoom whose own track
+(`camera.x`, `camera.y` or `camera.zoom`) has keyframes. A 2D pan or zoom on an
+untracked camera keeps the frame held, its `camera.rotation` included.
 
-_(`utils/timeline.ts:1437-1505` (`advanceFrame`), `:1710-1711` (`clearAllTracks`), `:1755-1756` (`loadTracks`);
+_(`commands/builtins/renderSettings.ts:98-111` (`tracksDriveAny`), `:142-148` (`camera3D`), `:170-176` (`camera`), `:235-240` (`setPreviewHeld`);
+`utils/timeline.ts:1437-1505` (`advanceFrame`), `:1710-1711` (`clearAllTracks`), `:1755-1756` (`loadTracks`);
 `useSeekScrubber.ts:11-17` (`finishSeek`), `:33-36` (`finishSeek`), `:68-70` (`onCleanup`); `MainWorkspace.tsx:2358-2364` (`pause`).)_
 
 ### REQ-TA-026 — Playback advances at the configured rate, or on quality with Auto FPS
