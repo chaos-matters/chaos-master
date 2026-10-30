@@ -123,8 +123,9 @@ export type CreateStoreHistoryOptions = {
    *  the recorder coalesces a drag's repeated commands into one action. */
   onPreviewStarted?: () => void
   /** Called immediately BEFORE an ordinary edit writes the store (`set`,
-   *  `replace`), while it still holds the frame the viewer can see and the
-   *  stack still ends on the entry that edit is being made against. Anything
+   *  `replace`, and a gesture opening, `startPreview`, whose writes then land
+   *  in the preview), while it still holds the frame the viewer can see and
+   *  the stack still ends on the entry that edit is being made against. Anything
    *  that has to hand the document back — a transition writing interpolated
    *  frames through `replaceSilently` — does it here, because afterwards the
    *  edit's own entry is on top and the transition's is not. */

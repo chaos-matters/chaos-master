@@ -208,7 +208,17 @@ describe('the history walk after an interrupted transition', () => {
     renderSettings: { gamma: 3 },
   })
 
-  function interruptedWalk(second: FlameDescriptor) {
+  /**
+   * `edit` is a discrete change (`set`). `gesture` is a slider drag, which
+   * opens a preview first and writes inside it: the Gamma and Vibrancy
+   * sliders. The two reach the history through different hooks, and the
+   * gesture's opened the preview before the transition was handed back, so
+   * its entry was never amended and redo landed on the target (G5 F1).
+   */
+  function interruptedWalk(
+    second: FlameDescriptor,
+    by: 'edit' | 'gesture' = 'edit',
+  ) {
     const world = workspace(START)
     // E1 and E2, the two entries the walk unwinds.
     world.history.replace(deepClone(START), 'First')
@@ -222,9 +232,11 @@ describe('the history walk after an interrupted transition', () => {
     expect(world.runtime.isGliding()).toBe(true)
 
     // E3: the edit that cut it short, made on the frame that was on screen.
+    if (by === 'gesture') world.history.startPreview('Third')
     world.setFlame((draft) => {
       draft.renderSettings.gamma = 1.25
     }, 'Third')
+    if (by === 'gesture') world.history.commit()
     world.advance(400)
     const edited = deepClone(world.flame)
     expect(world.runtime.isGliding()).toBe(false)
@@ -260,6 +272,30 @@ describe('the history walk after an interrupted transition', () => {
       world.history.undo()
       expect(world.flame).toEqual(first)
 
+      world.history.redo()
+      expect(world.flame).toEqual(interrupted)
+      world.history.redo()
+      expect(world.flame).toEqual(edited)
+
+      world.dispose()
+      dispose()
+    })
+  })
+
+  it('walks back and forward exactly when a slider drag cut it short', () => {
+    createRoot((dispose) => {
+      const { world, first, interrupted, edited } = interruptedWalk(
+        MOVED,
+        'gesture',
+      )
+
+      world.history.undo()
+      expect(world.flame).toEqual(interrupted)
+      world.history.undo()
+      expect(world.flame).toEqual(first)
+
+      // The frame the drag started from, not MOVED: the transition was cut
+      // short there, and MOVED was never on screen.
       world.history.redo()
       expect(world.flame).toEqual(interrupted)
       world.history.redo()
