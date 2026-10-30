@@ -31,6 +31,14 @@ describe('the Documentation dialog on a phone', () => {
     expect(narrow('.category-pill')).toMatch(/flex-shrink: 0;/)
   })
 
+  it('holds the one column to the dialog, so the chip row cannot widen it', () => {
+    // A bare 1fr keeps an automatic minimum: the one-line chip row's width
+    // (652px at 375px) became the column's, and both panes were clipped.
+    expect(narrow('.docs-layout')).toMatch(
+      /grid-template-columns: minmax\(0, 1fr\);/,
+    )
+  })
+
   it('gives the catalogue the larger share of the height, uncapped', () => {
     expect(narrow('.docs-layout')).toMatch(
       /grid-template-rows: minmax\(0, 3fr\) minmax\(0, 2fr\);/,

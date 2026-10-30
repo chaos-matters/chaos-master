@@ -405,10 +405,14 @@ both paths.)_
 ### REQ-DS-033 — The panel collapses to one column on narrow viewports
 
 **Where** the viewport is at most 760 px wide, the documentation layout shall
-collapse from the catalog/detail split to a single column, with the catalog
-capped at 280 px tall and separated by a bottom border rather than a right one.
+collapse from the catalog/detail split to a single column held to the dialog's
+width (`minmax(0, 1fr)`, so no content can widen it), with the catalog taking
+three fifths of the height and the detail two fifths, separated by a bottom
+border rather than a right one. The tab bar and the category chips shall each
+stay on one line and scroll sideways inside the dialog; the page never pans.
 
-_(`DocumentationModal.module.css:1178-1188` (`@media`); the desktop shell is
+_(`DocumentationModal.module.css:1185-1210` (`@media`), `:1208-1210` (`.docs-layout`),
+`:1213-1215` (`.gallery-pane`), `:1218-1220` (`.category-row`); the desktop shell is
 `min(1220px, 91vw) × min(84vh, 850px)` at `:44-45`, inside a dialog capped at
 `min(96vw, 1320px) × min(92vh, 920px)` at `:2-3`.)_
 

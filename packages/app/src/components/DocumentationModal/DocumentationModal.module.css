@@ -1202,8 +1202,11 @@
     white-space: nowrap;
   }
 
+  /* minmax(0, 1fr), not 1fr: a bare 1fr keeps an automatic minimum, so the
+     one-line chip row's full width set the column's, and both panes ran
+     past the dialog, clipped, with nothing left to scroll. */
   .docs-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   }
 
