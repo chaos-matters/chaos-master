@@ -203,7 +203,7 @@ the union.
 
 _(`workspaceLayoutStore.ts:202` (`isTouchLayout`); read by `Toast.tsx:20` (`toastRegionTouch`), `:30` (`toastTouch`),
 `ExportJobTracker.tsx:55` (`trackerTouch`), and
-`MainWorkspace.tsx:4015` (`isTouchLayout`), `:4007` (`isTouchLayout`), `:4016` (`isTouchLayout`), `:4015` (`isTouchLayout`). Guarded by
+`MainWorkspace.tsx:3982` (`isTouchLayout`), `:3992` (`isTouchLayout`), `:4001` (`isTouchLayout`), `:4010` (`isTouchLayout`). Guarded by
 `workspaceLayoutStore.test.ts:215-216` (`isTouchLayout`), `:232-233` (`isTouchLayout`).)_
 
 ### REQ-TL-009 — The shared classification memos are owned
