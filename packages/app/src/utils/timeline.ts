@@ -744,8 +744,8 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   const [isScrubbing, setIsScrubbing] = createSignal(false)
   // Blender-like: once the playhead is moved (seek/scrub/step/play), the canvas
   // keeps showing that frame's animated state on release ("held"), instead of
-  // snapping back to the base flame. Editing the base view (camera pan/zoom)
-  // detaches by clearing this. Drives `isDrivingView` below.
+  // snapping back to the base flame. A camera edit the frame would hide (see
+  // flame.setRenderSetting) detaches by clearing this. Drives `isDrivingView`.
   const [previewHeld, setPreviewHeld] = createSignal(false)
   // Achieved playback FPS while Auto FPS is on. With Auto FPS each frame only
   // advances once it reaches target quality, so the real rate is below the

@@ -6,6 +6,7 @@ import { deepClone } from '@/utils/clone'
 import * as v from '@/valibot'
 import { registerCommand } from '../registry'
 import { projectRenderSetting } from './settingDomain'
+import type { CommandContext } from '../types'
 
 /**
  * One command for every scalar render setting, addressed by the same
@@ -85,6 +86,28 @@ function matchesDefaultShape(path: string, expected: unknown, value: unknown) {
   const enumSchema = STRING_SETTING_SCHEMAS[path]
   if (enumSchema) return v.safeParse(enumSchema, value).success
   return typeof value === typeof expected
+}
+
+/**
+ * The tracks a held frame reads in place of each 2D camera setting. A pan or
+ * zoom leaves the held frame only when one of them is keyframed, because only
+ * then would the frame hide the edit. Otherwise the frame stays, and with it
+ * its camera.rotation: leaving it would snap a turned view unturned in the
+ * middle of the gesture, which then lands the pan somewhere else.
+ */
+const HELD_2D_CAMERA_TRACKS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['camera.position', ['camera.x', 'camera.y']],
+  ['camera.zoom', ['camera.zoom']],
+])
+
+function tracksDriveAny(
+  ctx: CommandContext,
+  paths: readonly string[] | undefined,
+): boolean {
+  if (!paths) return false
+  return ctx.timeline
+    .tracks()
+    .some((t) => paths.includes(t.parameterPath) && t.keyframes.length > 0)
 }
 
 registerCommand({
@@ -204,14 +227,14 @@ registerCommand({
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
       return
     }
-    // Camera edits take ownership from a held timeline frame. Keep this
-    // semantic inside the replayed command rather than only in the live UI
-    // setters; otherwise the same recorded pan/zoom can remain hidden behind
-    // timeline.previewHeld when played back.
+    // A camera edit the held timeline frame would hide takes ownership from
+    // it: every 3D one, and a 2D pan or zoom whose track is keyframed
+    // (HELD_2D_CAMERA_TRACKS). Keep this semantic inside the replayed command
+    // rather than only in the live UI setters; otherwise the same recorded
+    // pan/zoom can remain hidden behind timeline.previewHeld when played back.
     if (
-      path === 'camera.zoom' ||
-      path === 'camera.position' ||
-      (typeof path === 'string' && path.startsWith('camera3D.'))
+      path.startsWith('camera3D.') ||
+      tracksDriveAny(ctx, HELD_2D_CAMERA_TRACKS.get(path))
     ) {
       ctx.timeline.setPreviewHeld?.(false)
     }
