@@ -361,8 +361,14 @@ export function createSessionPlayer(
   function openBatch() {
     if (batchOpen) return
     glideLease.hold()
-    withRecordingSuppressed(() => target.prepare?.())
-    target.beginBatch?.(takeOverByUser)
+    // Suppressed like every other write the replay makes: opening the batch
+    // opens a history preview, and a preview opened outside suppression reads
+    // as a person's gesture, which takes the flame off a glide in flight and
+    // leaves it on a half-way frame for the next step to land on.
+    withRecordingSuppressed(() => {
+      target.prepare?.()
+      target.beginBatch?.(takeOverByUser)
+    })
     batchOpen = true
   }
 

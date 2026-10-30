@@ -334,7 +334,7 @@ having changed nothing (the video driver throwing with the 1-based step number).
 **If** a session recording is active, **then** replay shall refuse outright and
 close any batch it had opened.
 
-_(`recorder/replay.ts:199-203` (`isSessionRecording`), `recorder/player.ts:399-425` (`rejectBeforeStart`),
+_(`recorder/replay.ts:199-203` (`isSessionRecording`), `recorder/player.ts:405-431` (`rejectBeforeStart`),
 `recorder/replayVideo.ts:620-625` (`validatedSession`); guarded by
 `player.test.ts:1142` "preflights every action before opening a batch or loading
 state", `replayVideo.test.ts:150` "rejects an imported action before touching replay state", `recorder.test.ts:1535` "refuses to replay while a recording is active" and
@@ -812,8 +812,8 @@ window is not waited for.
 
 _(`recorder/playWindows.ts:83-150` (`planPlayWindows`), `recorder/playWindowPace.ts:18-178` (`nominalFramesPerMs`),
 `recorder/playerPlayWindows.ts:34-138` (`createPlayerPlayWindows`), `recorder/player.ts:185-193` (`stepGapMs`),
-`:294-305` (`createPlayerPlayWindows`), `:339-346` (`preserveBaseline`), `:385-408` (`rejectAction`), `:455-470` (`runStep`), `:548-553` (`reset`), `:608-652` (`finish`),
-`:680-681` (`holdAt`), `:717-719` (`holdAt`), `:726-733` (`stop`), `recorder/timelineActions.ts:161-167` (`togglePlay`),
+`:294-305` (`createPlayerPlayWindows`), `:339-346` (`preserveBaseline`), `:391-414` (`rejectAction`), `:461-476` (`runStep`), `:554-559` (`reset`), `:614-658` (`finish`),
+`:686-687` (`holdAt`), `:723-725` (`holdAt`), `:732-739` (`stop`), `recorder/timelineActions.ts:161-167` (`togglePlay`),
 `recorder/replayPlayback.ts:13-35` (`timelineReplayPlayback`), `recorder/replay.ts:171-184` (`playback`),
 `hooks/useWorkspaceReplay.ts:456-459` (`replayTarget`), `flame/Flam3.tsx:584-593` (`createEffect`), `:1240-1247` (`isAutoFpsReady`),
 `utils/timeline.ts:729-731` (`setIsPlaying`); guarded by `playWindows.test.ts`,
@@ -880,8 +880,8 @@ glides it on its own plans (REQ-RR-045). A seat and the portal have canvases of
 their own but no glide of their own: a duel refuses transitions, and the
 portal's tours animate through their own `animateValue`.
 
-_(`recorder/replayGlideLease.ts`, `recorder/player.ts:306-308` (`glideLease`), `:361-367` (`openBatch`),
-`:455-470` (`runStep`), `:548-553` (`reset`), `:608-615` (`finish`), `:726-733` (`stop`),
+_(`recorder/replayGlideLease.ts`, `recorder/player.ts:306-308` (`glideLease`), `:361-373` (`openBatch`),
+`:461-476` (`runStep`), `:554-559` (`reset`), `:614-621` (`finish`), `:732-739` (`stop`),
 `commands/builtins/glide.ts:14-17` (`context`), `:44-46` (`preservesFinishedSession`), `:50` (`setGlideEnabled`), `:61-62` (`preservesFinishedSession`), `:65` (`setGlideQualityPreference`), `:98` (`runtime`),
 `commands/types.ts:315-323` (`glideSwitches`), `:351-361` (`reproduces`), `:369-374` (`presentationSwitch`),
 `commands/registry.ts:537-543` (`beforeCommand`), `webmcp/tools/executeCommand.ts:286-295` (`presentationSwitch`),
@@ -926,7 +926,7 @@ _(`recorder/glide.ts:48-50` (`GlideQualityPreference`), `:82-109` (`presetOf`), 
 `:453-459` (`spec`), `:527-528` (`glideMs`), `:569-577` (`replayFrameQuality`), `:612-615` (`createReplayVideoDriver`), `:1058-1075` (`glidePlanFor`),
 `flame/glide/runtime.ts:232-236` (`planned`),
 `components/ExportJobs/OffscreenAnimationRender.tsx:56` (`createReplayVideoDriver`), `:69-85` (`Quality`), `:296` (`setPerFrameQuality`),
-`recorder/player.ts:518-529` (`settled`), `:243` (`viewerGlideSwitches`), `:739` (`viewerGlideSwitches`), `recorder/replayGlideLease.ts:22-24` (`GlideSwitches`),
+`recorder/player.ts:524-535` (`settled`), `:243` (`viewerGlideSwitches`), `:745` (`viewerGlideSwitches`), `recorder/replayGlideLease.ts:22-24` (`GlideSwitches`),
 `:66-69` (`viewer`), `components/SessionRecorder/SessionReplayPanel.tsx:705-711` (`glide`); guarded
 by `replayGlideQuality.test.ts:175` "glides into each step at the tier in force once it ran, live", `:196` "gives the same glide lengths and
 step times as the live replay", `:207` "plans each glide with the inputs the
@@ -984,7 +984,7 @@ another's frame for its target.
 _(`flame/glide/runtime.ts:220-225` (`landInFlight`), `:280-301` (`landInFlight`), `flame/glide/types.ts:188-193` (`plannedDurationMs`),
 `commands/types.ts:326-332` (`SelfGlide`), `:375-388` (`glidesItself`), `commands/builtins/glide.ts:78-94` (`glidesItself`),
 `webmcp/tools/executeCommand.ts:137-162` (`withCallGlideMs`), `:236-306` (`withCallGlideMs`), `recorder/glide.ts:53-75` (`glideMsForAction`),
-`recorder/player.ts:452-472` (`runStep`), `:497-512` (`selfGlideOf`), `:560-575` (`runStep`); guarded by
+`recorder/player.ts:458-478` (`runStep`), `:503-518` (`selfGlideOf`), `:566-581` (`runStep`); guarded by
 `runtime.test.ts:260` "finishes the replaced glide, so its caller hears back",
 `:275` "reads its target from the settled document, not from a frame", `:289` "glideTo also lands the replaced glide before reading its start", `:304` "leaves no deadline armed to cut the next glide short",
 `runtimeReplaceExamples.test.ts:48` "lands every pair on its target", `executeCommandSelfGlide.test.ts:71`
