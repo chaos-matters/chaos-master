@@ -449,7 +449,7 @@ _(`ArenaOverlay.tsx:610-644` (`finishSimulation`), log panel at
 load, and the workspace facade shall write a deep clone of that fighter's flame into the
 document under the label `Arena: <name>` and surface a confirmation toast.
 
-_(`ArenaOverlay.tsx:674-684` (`loadFighter`), `MainWorkspace.tsx:3233-3243` (`selectFighter`))_
+_(`ArenaOverlay.tsx:674-684` (`loadFighter`), `MainWorkspace.tsx:3215-3225` (`selectFighter`))_
 
 ### REQ-AA-036 — Champion-card export composes a 540×780 PNG from the winner's preview
 
@@ -543,7 +543,7 @@ rounds. **If** the flame editor has no active flame, or the HUD has not yet publ
 
 _(Entry from outside the overlay goes through the workspace's placeholder `startClash`,
 which opens the HUD and polls every 50 ms for the real implementation, giving up with
-`{ error: 'Arena clash startup timed out.' }` after 4 s — `MainWorkspace.tsx:3131-3155` (`initialStartClash`).)_
+`{ error: 'Arena clash startup timed out.' }` after 4 s — `MainWorkspace.tsx:3113-3137` (`initialStartClash`).)_
 
 ---
 

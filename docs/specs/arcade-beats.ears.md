@@ -20,8 +20,8 @@ the seam Beats mode touches.
 - `packages/app/src/commands/builtins/audio.ts` — `audio.applySnapshot` and the disable-first wiring swap every Beats mapping goes through
 - `packages/app/src/commands/types.ts:207-226` — the `ctx.audio` facade contract, including `canEnable` as a workspace-supplied resource authorization
 - `packages/app/src/recorder/replay.ts:39-52` — `canEnableReplayAudio`, the only implementation of that authorization
-- `packages/app/src/MainWorkspace.tsx:3345-3362` (`audio`) — the live facade: signals, and `canEnable` wired to the decoded buffer, track name and live analyzer
-- `packages/app/src/MainWorkspace.tsx:3155-3162` (`adoptAudioBuffer`) — the one writer of the audio buffer and track name, which the audio panel and Beats mode (`loadBundledTrack`, `:3191-3192` (`fetchBundledTrackBuffer`)) both go through
+- `packages/app/src/MainWorkspace.tsx:3327-3344` (`audio`) — the live facade: signals, and `canEnable` wired to the decoded buffer, track name and live analyzer
+- `packages/app/src/MainWorkspace.tsx:3137-3144` (`adoptAudioBuffer`) — the one writer of the audio buffer and track name, which the audio panel and Beats mode (`loadBundledTrack`, `:3173-3174` (`fetchBundledTrackBuffer`)) both go through
 - `packages/app/src/components/AudioReactivePanel/AudioReactivePanel.tsx:446-494` (`handleFile`) — file decode and microphone acquisition, and their failure paths
 - `packages/app/src/utils/useAudioReactive.ts` — what "enabled" actually gates: modulation, not transport
 - `packages/app/src/arcade/topics.ts:305-314` (`BEATS_ALLOWED`), `:345-356` (`beatsPromptCard`) — `BEATS_ALLOWED`, `BEATS_STEP_BUDGET`, the prompt card
@@ -251,7 +251,7 @@ track name; **if** it names `source: 'mic'`, only when a live analyzer already
 exists. Otherwise the wiring is applied with reactivity left off.
 
 _(`commands/builtins/audio.ts:74` (`mayEnable`); `recorder/replay.ts:39-52` (`canEnableReplayAudio`); live wiring at
-`MainWorkspace.tsx:3356-3361` (`canEnable`))_
+`MainWorkspace.tsx:3338-3343` (`canEnable`))_
 
 ### REQ-AB-020 — A mapping call that could not enable reactivity says so
 
@@ -439,7 +439,7 @@ reactivity (and sonification) before swapping the document, because the
 modulation loop writes render settings continuously and would otherwise keep
 driving the incoming flame.
 
-_(`MainWorkspace.tsx:2364-2369` (`setAudioEnabled`))_
+_(`MainWorkspace.tsx:2346-2351` (`setAudioEnabled`))_
 
 ---
 
