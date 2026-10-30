@@ -1002,7 +1002,7 @@ the load's own writes out of the take, so the take records the Pause (REQ-RR-040
 ahead of the load's timeline snapshot, and its replay shall stop the timeline
 there and run the rest of the take on the stopped playhead, as the viewer saw it.
 
-_(`MainWorkspace.tsx:2678-2679` (`withRecordingSuppressed`); guarded by `MainWorkspace.plainLoad.test.ts:17`
+_(`MainWorkspace.tsx:2660-2661` (`withRecordingSuppressed`); guarded by `MainWorkspace.plainLoad.test.ts:17`
 "stops playback through pause(), before the unrecorded block", `:23` "never stops it through the raw setter, which reports nothing", and
 `playWindowReplay.test.ts:793` "records the Pause, so the replay stops where the
 take did", `:818` "the raw setter it replaces left the replay playing (the bug)".)_

@@ -71,8 +71,8 @@ subsequent click retries the import instead of silently doing nothing.
 > (and `:75-97` (`showHelp`) for Help) — there is no `.catch` and no reset of
 > `instancePromise`, so the rejected promise is cached for the life of the page
 > and every later click resolves to the same rejection. The call sites discard
-> it: `packages/app/src/MainWorkspace.tsx:4464` is `void showDocumentation()`
-> and `:4467` is `void showHelp()`, neither wrapped. The button appears inert
+> it: `packages/app/src/MainWorkspace.tsx:4446` is `void showDocumentation()`
+> and `:4449` is `void showHelp()`, neither wrapped. The button appears inert
 > and only a full reload recovers. Tracked in
 > [docs/agent/BUGS.md](../agent/BUGS.md).
 

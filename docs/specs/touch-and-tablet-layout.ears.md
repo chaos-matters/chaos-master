@@ -25,7 +25,7 @@ desktop sidebar, the timeline, the Arena/Arcade overlays, or the export pipeline
   memos, the persisted `touchLayoutPreference`, and `createWorkspaceLayoutStore`
 - `packages/app/src/MainWorkspace.tsx` — the `railLayout` memo (`:329`
   (`railLayout`)), the touch-device offer toast (`:1511-1535` (`isTouchDevice`)),
-  the layout class string (`:3760` (`railLayout`)) and every `isPhone()` /
+  the layout class string (`:3742` (`railLayout`)) and every `isPhone()` /
   `isTablet()` / `isTouchLayout()` mount gate
 - `packages/app/src/App.module.css` — `.layout`, `.phoneLayout`, `.tabletLayout`,
   the legacy `@media (max-width: 768px)` block, and the touch toast column
@@ -203,7 +203,7 @@ the union.
 
 _(`workspaceLayoutStore.ts:202` (`isTouchLayout`); read by `Toast.tsx:20` (`toastRegionTouch`), `:30` (`toastTouch`),
 `ExportJobTracker.tsx:55` (`trackerTouch`), and
-`MainWorkspace.tsx:4015` (`isTouchLayout`), `:4025` (`isTouchLayout`), `:4034` (`isTouchLayout`), `:4033` (`isTouchLayout`). Guarded by
+`MainWorkspace.tsx:4015` (`isTouchLayout`), `:4007` (`isTouchLayout`), `:4016` (`isTouchLayout`), `:4015` (`isTouchLayout`). Guarded by
 `workspaceLayoutStore.test.ts:215-216` (`isTouchLayout`), `:232-233` (`isTouchLayout`).)_
 
 ### REQ-TL-009 — The shared classification memos are owned
@@ -242,7 +242,7 @@ offer returns on the next mount.)_
 `EditorRail`, and shall mount neither the desktop sidebar, the bottom bar, nor
 the floating action cluster.
 
-_(`MainWorkspace.tsx:329` (`railLayout`) defines the layout; `:3911-3949` (`railLayout`) mounts the pair; `:3814` (`isPhone`), `:4056` (`isPhone`) and `:4356` (`showArena`)
+_(`MainWorkspace.tsx:329` (`railLayout`) defines the layout; `:3893-3931` (`railLayout`) mounts the pair; `:3796` (`isPhone`), `:4038` (`isPhone`) and `:4338` (`showArena`)
 gate the three desktop surfaces on `!isPhone() && !isTablet()`.)_
 
 ### REQ-TL-012 — Tablet chrome is the inspector deck alone
@@ -254,7 +254,7 @@ as a sibling of the canvas viewport, and shall mount neither `TouchHUD` nor
 Undo, Redo and Save image (a tap saves, a hold opens the export options). A
 tablet narrower than that gets the rail layout of REQ-TL-011 instead.
 
-_(`MainWorkspace.tsx:3952-3988` (`deckFits`); `TabletInspectorDeck.tsx:137-196` (`header`). #95
+_(`MainWorkspace.tsx:3934-3970` (`deckFits`); `TabletInspectorDeck.tsx:137-196` (`header`). #95
 deleted the unmounted `TabletSplitLayout` wrapper this requirement used to
 mention.)_
 
@@ -266,8 +266,8 @@ actions, and the desktop version pill — and shall mount no TouchSurface
 component except the `AdvancedToolsDrawer`, which is always mounted but renders
 nothing while closed.
 
-_(`MainWorkspace.tsx:3814` (`isPhone`), `:4056` (`isPhone`), `:4356` (`showArena`); `SoftwareVersion.tsx:219` (`hideTrigger`)
-renders only the desktop trigger, and `MainWorkspace.tsx:4476` (`hideVersionTrigger`) hides it
+_(`MainWorkspace.tsx:3796` (`isPhone`), `:4038` (`isPhone`), `:4338` (`showArena`); `SoftwareVersion.tsx:219` (`hideTrigger`)
+renders only the desktop trigger, and `MainWorkspace.tsx:4458` (`hideVersionTrigger`) hides it
 under `isTouchLayout()`; `AdvancedToolsDrawer.tsx:128` (`open`)
 wraps the whole panel in `<Show when={props.open}>`.)_
 
@@ -276,7 +276,7 @@ wraps the whole panel in `<Show when={props.open}>`.)_
 **While** either touch layout is active, the canvas viewport shall suppress the
 mobile sidebar-toggle button, because the sidebar it opens is not mounted.
 
-_(`MainWorkspace.tsx:3767` passes `hideMobileSidebarToggle={isPhone() ||
+_(`MainWorkspace.tsx:3749` passes `hideMobileSidebarToggle={isPhone() ||
 isTablet()}`; `CanvasViewport.tsx:237` (`hideMobileSidebarToggle`) gates the button on
 `props.isMobile() && !props.hideMobileSidebarToggle`.)_
 
@@ -286,7 +286,7 @@ isTablet()}`; `CanvasViewport.tsx:237` (`hideMobileSidebarToggle`) gates the but
 `.phoneLayout`, collapsing the grid to a single `viewport` area with one column
 and one row, so the canvas fills the screen under the fixed HUD and bottom rail.
 
-_(`MainWorkspace.tsx:3760` (`railLayout`); `App.module.css:15-19` (`.phoneLayout`). The HUD and rail are
+_(`MainWorkspace.tsx:3742` (`railLayout`); `App.module.css:15-19` (`.phoneLayout`). The HUD and rail are
 `position: fixed` with `z-index` 42 and 40 — `TouchSurface.module.css:8-20` (`.hudFrame`, around the HUD pill),
 `EditorRail.module.css:5-10` (`.dock`) — so neither consumes grid space.)_
 
@@ -295,7 +295,7 @@ _(`MainWorkspace.tsx:3760` (`railLayout`); `App.module.css:15-19` (`.phoneLayout
 > **Superseded** by #95 (`fac9214a`) and #96 (`68a4ef51`). `.tabletLayout` is
 > now a three-column `'navrail viewport inspector'` grid (`App.module.css:24-28`
 > (`.tabletLayout`)), applied only while the deck fits: a tablet at least
-> `DECK_MIN_WIDTH` (900 px) wide (`MainWorkspace.tsx:3760` (`deckFits`)). A
+> `DECK_MIN_WIDTH` (900 px) wide (`MainWorkspace.tsx:3742` (`deckFits`)). A
 > narrower tablet gets the rail layout. The requirement and the fixed deviation
 > below describe the code at `a5c2f26f`.
 
@@ -345,7 +345,7 @@ device, or its accumulated render.
 
 _(`MainWorkspace.tsx:3798-3934` (`CanvasViewport`) mounts one `CanvasViewport` outside every
 layout gate; `CanvasViewport.tsx:251-260` (`AutoCanvas`) mounts one `AutoCanvas`. The layout
-reads beside it, `MainWorkspace.tsx:3760` (`railLayout`) and `:3767`
+reads beside it, `MainWorkspace.tsx:3742` (`railLayout`) and `:3749`
 (`hideMobileSidebarToggle`), only feed a class string and a boolean prop.)_
 
 ### REQ-TL-019 — Corner overlays move away from the inspector
@@ -579,12 +579,12 @@ the requested tool — because none of those panels have a touch layout.
 > — the drawer's `tools()` list contains gallery, switch-desktop, art-director,
 > arena-clash, genetics-breeding, audio-reactive, timeline-animation and
 > high-res-export. There is **no Sonification card**, and the `onSonification?`
-> prop declared at `:12` (`onSonification`) has zero call sites even though `MainWorkspace.tsx:4022-4030` (`onSonification`)
+> prop declared at `:12` (`onSonification`) has zero call sites even though `MainWorkspace.tsx:4004-4012` (`onSonification`)
 > passes a complete handler. The Sonification half of this requirement therefore
 > describes a path a user cannot take today. Tracked in `docs/agent/BUGS.md`.
 
-_(`MainWorkspace.tsx:4004-4039` (`onBreed`); the "Switch to Desktop Layout" card itself at
-`:3995-4001` (`onSwitchToDesktop`). `TouchSurface.test.tsx:205-241` "renders cards and dispatches actions when open" asserts only that the callbacks
+_(`MainWorkspace.tsx:3986-4021` (`onBreed`); the "Switch to Desktop Layout" card itself at
+`:3977-3983` (`onSwitchToDesktop`). `TouchSurface.test.tsx:205-241` "renders cards and dispatches actions when open" asserts only that the callbacks
 fire — the preference write and toast live in `MainWorkspace`, which has no test.)_
 
 ### REQ-TL-039 — The app menu switches layouts in both directions
@@ -597,7 +597,7 @@ touch layout's tools drawer — and shall close the menu in the same click.
 _(`SoftwareVersion.tsx:64-80` (`renderMenuItems`); the writer prefers the injected
 `setTouchLayoutPreference` prop and falls back to the module setter at `:43-49` (`setTouchPref`).
 The touch direction is `AdvancedToolsDrawer.tsx:50-62` (`onSwitchToDesktop`), wired to
-`setTouchLayoutPreference('desktop')` at `MainWorkspace.tsx:4019-4020` (`onSwitchToDesktop`).
+`setTouchLayoutPreference('desktop')` at `MainWorkspace.tsx:4001-4002` (`onSwitchToDesktop`).
 Guarded by `SoftwareVersion.test.tsx:52-56` (`fireEvent`) and `TouchSurface.test.tsx:236-237`
 (`onSwitchToDesktop`). SoftwareVersion's touch hamburger, which this requirement named until
 2026-09-25, was removed then: every touch layout hid it through `hideTrigger`, so it never

@@ -106,6 +106,7 @@ import { openBenchmarkLab, openExplorer } from './routing/pageLinks'
 import { createAnimationExport, holdPlayheadOnExportFrame, } from './utils/animationExport'
 import { applyAudioTargetValues, createAudioAnalyzer, decodeAudioBytes, } from './utils/audioAnalysis'
 import { downloadBlob } from './utils/blob'
+import { captureFinalFrame } from './utils/captureFinalFrame'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
@@ -1715,37 +1716,18 @@ export function MainWorkspace(props: AppProps) {
     // audio loop republishes 30 times a second is in those pixels, and the
     // flame the PNG carries has to be the one that drew them.
     let capturedFlame: FlameDescriptor | undefined
-    const rawBlob = await new Promise<Blob | null>((resolve) => {
-      let settled = false
-      const finish = (b: Blob | null) => {
-        if (settled) return
-        settled = true
-        setOnExportImage(undefined)
-        setExportQuality(undefined)
-        resolve(b)
-      }
-      // Best-effort with a generous safety net — never hang the share flow.
-      const timer = setTimeout(() => {
-        finish(null)
-      }, 20000)
-      setOnExportImage(
-        () =>
-          (canvas: HTMLCanvasElement, info?: { finalImageReady: boolean }) => {
-            // Wait for the export driver's clean, quality-graded frame.
-            if (info?.finalImageReady !== true) return
-            clearTimeout(timer)
-            capturedFlame = deepClone(renderedFlame())
-            canvas.toBlob(
-              (b) => {
-                finish(b)
-              },
-              'image/png',
-              1,
-            )
-          },
-      )
+    // Only the first final frame is encoded; captureFinalFrame says why.
+    const rawBlob = await captureFinalFrame({
+      setHook: (hook) => setOnExportImage(() => hook),
       // Same render path as PNG export; current quality keeps the canvas as-is.
-      setExportQuality(qualityPresets[qualityPreset()])
+      start: () => setExportQuality(qualityPresets[qualityPreset()]),
+      stop: () => {
+        setExportQuality(undefined)
+      },
+      onTaken: () => {
+        capturedFlame = deepClone(renderedFlame())
+      },
+      timeoutMs: 20000,
     })
     // No frame, or no flame behind it, means no honest preview to upload.
     if (!rawBlob || !capturedFlame) return null
