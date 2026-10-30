@@ -173,7 +173,21 @@ user-facing summary is in `CHANGELOG.md`.
   - **rail:** the phone rail's sheet has rounded corners and no slack at
     peek, the grabber keeps its height, chips fit at 320 px, the expanded
     capsule bar is opaque, keyboard focus holds the capsule open, the rail
-    body is a tabpanel, and Gallery and Tools say what they open
+    body is a tabpanel, Gallery and Tools say what they open, and the
+    shutter says a long press opens the export options
+- **dev pass**, fixed before the tag:
+  - **home:** an animated flame opened from Home or the welcome grid keeps
+    its keyframes
+  - **share:** the /og card encodes the first final frame, not a later
+    transparent copy of the canvas
+  - **camera:** a 2D pan or zoom lets go of the held frame only when its own
+    track has keyframes, so a frame turned by a camera.rotation track stays
+    turned and the drag follows the pointer
+  - **glide:** Redo after a glide cut short lands where the glide stopped
+  - **replay:** with Glide on, a step click, seek or Resume during a glide
+    lands on the recorded flame
+  - **ui:** the Documentation dialog fits a phone screen, and its chip row
+    scrolls
 
 ### Security
 
