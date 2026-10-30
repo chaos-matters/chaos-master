@@ -7,7 +7,7 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.13] - 2026-10-07
+## [0.9.13] - 2026-10-31
 
 The fork's work since 0.9.11, Komediruzecki/chaos-master-fp #73 to #159, landed
 as one commit per feature or real bug: fixes to a feature are folded into it,

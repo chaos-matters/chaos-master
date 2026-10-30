@@ -3,7 +3,7 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
-## [0.9.13] - 2026-10-07
+## [0.9.13] - 2026-10-31
 
 ### Added
 
