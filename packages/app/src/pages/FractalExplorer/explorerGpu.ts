@@ -20,7 +20,7 @@
 import { arrayOf, atomic, u32, vec2f, vec2u, vec4f } from 'typegpu/data'
 import { colourEntry, presentFragment, presentVertex, } from './explorerColourShaders'
 import { createDisplays, readBack } from './explorerDisplays'
-import { bindingEntries, createOrbitBuffers, deviceErrors, fittedCapacity, } from './explorerOrbitBuffers'
+import { bindingEntries, createOrbitBuffers, deviceComplaint, deviceErrors, fittedCapacity, } from './explorerOrbitBuffers'
 import { colourLayout, ColourUniforms, FLAG_DERIVATIVE, FLAG_HAS_DC, FLAG_USE_BLA, initEntry, iterateEntry, iterateLayout, IterateUniforms, Pixel, presentLayout, Shade, WORKGROUP, } from './explorerShaders'
 import type { TgpuBindGroup, TgpuRoot } from 'typegpu'
 import type { BackdropMapping, ColourSetup, GridSize, IterationSetup, StepResult, } from './explorerTypes'
@@ -71,6 +71,18 @@ export function createExplorerGpu(root: TgpuRoot, format: GPUTextureFormat) {
     vertex: presentVertex,
     fragment: presentFragment,
     targets: { format },
+  })
+  /**
+   * Every pipeline built now, in error scopes, rather than at first use. A
+   * shader the browser will not compile then names its line and the rule
+   * it broke, where at first use each step would only fail. Resolves to
+   * that complaint, or undefined once all four have built.
+   */
+  const pipelineCheck = deviceComplaint(device, () => {
+    initPipeline.initSync()
+    iteratePipeline.initSync()
+    colourPipeline.initSync()
+    presentPipeline.initSync()
   })
 
   let iterateGroup: TgpuBindGroup | undefined
@@ -394,6 +406,7 @@ export function createExplorerGpu(root: TgpuRoot, format: GPUTextureFormat) {
   }
 
   return {
+    pipelineCheck,
     maxPixels,
     maxOrbitEntries: orbitBuffers.maxOrbitEntries,
     uploadOrbits,

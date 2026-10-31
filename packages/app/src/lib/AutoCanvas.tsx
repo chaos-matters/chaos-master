@@ -1,6 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { PreviewPoster } from '@/components/ErrorHandling/PreviewPoster'
-import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
+import { gpuStatus, setGpuError, setGpuStatus } from '@/lib/gpuStatus'
 import { useElementSize } from '@/utils/useElementSize'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
@@ -105,6 +105,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       // App-level full-screen takeover. Flipping the status re-renders this
       // gate to the poster instead.
       console.error('[WebGPU] canvas.getContext("webgpu") returned null')
+      setGpuError('the canvas gave no WebGPU context')
       setGpuStatus('unavailable')
       return null
     }
