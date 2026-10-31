@@ -20,6 +20,7 @@
   height: 100%;
   font-size: 0.62rem;
   color: var(--neutral-500);
+  -webkit-user-select: none;
   user-select: none;
 }
 

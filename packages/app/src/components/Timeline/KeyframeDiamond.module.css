@@ -9,6 +9,7 @@
   cursor: pointer;
   margin-right: 2px;
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
   /* Expand touch target to at least 44px */
   &::after {

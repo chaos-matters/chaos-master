@@ -194,6 +194,7 @@
   background: oklch(94% 0.03 150);
   color: oklch(38% 0.08 150);
   border: 1px solid oklch(88% 0.04 150);
+  -webkit-user-select: all;
   user-select: all;
 
   [data-theme='dark'] & {

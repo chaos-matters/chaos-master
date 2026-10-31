@@ -41,6 +41,7 @@
   font-weight: 700;
   font-family: 'Inter', 'Roboto', sans-serif;
   pointer-events: none;
+  -webkit-user-select: none;
   user-select: none;
   text-anchor: middle;
   dominant-baseline: central;

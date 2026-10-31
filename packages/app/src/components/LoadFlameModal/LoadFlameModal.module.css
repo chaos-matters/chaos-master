@@ -181,6 +181,7 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   transition: all 0.12s ease;
+  -webkit-user-select: none;
   user-select: none;
   white-space: nowrap;
 
@@ -231,6 +232,7 @@
   text-align: center;
   margin-bottom: var(--space-3);
   gap: var(--space-2);
+  -webkit-user-select: none;
   user-select: none;
 
   [data-theme='dark'] & {
@@ -519,6 +521,7 @@
   font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 
   &:hover {

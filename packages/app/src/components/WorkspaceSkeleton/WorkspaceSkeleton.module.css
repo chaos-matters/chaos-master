@@ -10,6 +10,7 @@
   background: var(--color-bg, #04060c);
   color: var(--color-text, #f0f4f8);
   isolation: isolate;
+  -webkit-user-select: none;
   user-select: none;
 }
 

@@ -837,6 +837,7 @@
   display: block;
   /* The plate itself is the click target; neither layer should intercept. */
   pointer-events: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 

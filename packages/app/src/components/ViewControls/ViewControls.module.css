@@ -23,11 +23,13 @@
 
 .isDragging {
   cursor: grabbing !important;
+  -webkit-user-select: none !important;
   user-select: none !important;
 }
 
 .isDragging * {
   cursor: grabbing !important;
+  -webkit-user-select: none !important;
   user-select: none !important;
 }
 
@@ -88,6 +90,7 @@
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--neutral-500);
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -97,6 +100,7 @@
   color: var(--neutral-700);
   min-width: 3.5rem;
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 
   [data-theme='dark'] & {
@@ -160,6 +164,7 @@
   margin-left: auto; /* anchor to the right edge of the toolbar */
   padding: 0 0.25rem;
   min-width: 0;
+  -webkit-user-select: none;
   user-select: none;
 }
 

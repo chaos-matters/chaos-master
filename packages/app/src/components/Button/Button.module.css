@@ -70,6 +70,7 @@
   display: flex;
   align-items: stretch;
   border-radius: var(--space-1);
+  -webkit-user-select: none;
   user-select: none;
   box-shadow: 0 0 2.5px 1px var(--shadow-color);
 

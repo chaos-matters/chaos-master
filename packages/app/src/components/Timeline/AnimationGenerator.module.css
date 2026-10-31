@@ -117,6 +117,7 @@
   cursor: pointer;
   transition: all 0.12s;
   white-space: nowrap;
+  -webkit-user-select: none;
   user-select: none;
 
   [data-theme='dark'] & {
@@ -163,6 +164,7 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   transition: all 0.12s ease;
+  -webkit-user-select: none;
   user-select: none;
 
   [data-theme='dark'] & {

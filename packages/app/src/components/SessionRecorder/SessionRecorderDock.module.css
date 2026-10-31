@@ -63,6 +63,7 @@
 }
 
 .dragging {
+  -webkit-user-select: none;
   user-select: none;
   cursor: grabbing;
 }
