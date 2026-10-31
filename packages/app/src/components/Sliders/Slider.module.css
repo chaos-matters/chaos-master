@@ -20,6 +20,11 @@
   --track-color-filled: var(--slider-track-filled, var(--neutral-400));
   --track-color-empty: var(--slider-track-empty, var(--neutral-200));
   position: relative;
+  /* A drag on the track selects none of the row's text and raises no iOS
+     callout. .label is display: contents, so its children inherit these. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 
   [data-theme='dark'] & {
     --color: var(--slider-ink, var(--neutral-400));

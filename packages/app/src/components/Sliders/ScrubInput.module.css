@@ -5,6 +5,8 @@
   grid-column: 1 / -1;
   font-size: 0.7rem;
   color: var(--neutral-600);
+  /* The label is the scrub handle: iOS reads only the -webkit- spelling. */
+  -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   touch-action: none;
@@ -77,6 +79,9 @@
   color: var(--neutral-900);
   outline: none;
   text-align: right;
+  /* Typed into: selectable again inside the label that turns selection off. */
+  -webkit-user-select: text;
+  user-select: text;
 
   [data-theme='dark'] & {
     background: var(--neutral-800);

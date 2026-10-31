@@ -331,6 +331,11 @@
   overflow: hidden;
   min-width: 0;
   box-sizing: border-box;
+  /* Dragging the weight selects neither the name nor the value beside it,
+     and raises no iOS callout: iOS reads only the -webkit- spelling. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .varName {
@@ -523,6 +528,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* The same for the colour sliders and their label and value row. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .colourControlLabel {

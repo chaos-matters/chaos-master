@@ -4,7 +4,9 @@
   gap: 2px;
   width: 100%;
   padding: 2px 8px 4px 8px;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   box-sizing: border-box;
 }
 
