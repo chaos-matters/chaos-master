@@ -73,6 +73,9 @@ developer history lives in `dev.changelog.md`.
 - **On iPhone, iPad and Safari, the canvas shows the flame you pick from a
   dialog**, instead of the one before it.
 - **A 2D flame turns with its camera rotation** every time it appears.
+- **In 3D, affine handles follow the pointer.** A small drag used to send a
+  handle off the grid, and turning an axis spun it several times round, the
+  wrong way.
 - **The screen lock holds while an agent drives.** Keys, dialogs, history and
   the view stay locked, keys pressed while the app boots included, and the
   hover preview stays out of saves.
