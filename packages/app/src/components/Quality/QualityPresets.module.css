@@ -54,6 +54,7 @@
 
   text-align: center;
   text-transform: uppercase;
+  -webkit-user-select: none;
   user-select: none;
 
   background: linear-gradient(

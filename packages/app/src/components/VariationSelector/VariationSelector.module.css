@@ -171,6 +171,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  -webkit-user-select: none;
   user-select: none;
   margin: 0;
   padding: var(--space-1) 0;
@@ -239,6 +240,7 @@
   color: var(--item-text-color);
   touch-action: manipulation;
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
   min-height: 44px;
 
@@ -427,6 +429,7 @@
   color: var(--neutral-400);
   font-size: 0.65rem;
   font-weight: 500;
+  -webkit-user-select: none;
   user-select: none;
 
   [data-theme='dark'] & {
@@ -542,6 +545,7 @@
     color 0.13s,
     border-color 0.13s;
   white-space: nowrap;
+  -webkit-user-select: none;
   user-select: none;
 
   &:hover {

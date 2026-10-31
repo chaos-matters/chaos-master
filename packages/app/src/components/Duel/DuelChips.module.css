@@ -481,6 +481,7 @@
    the row moves as one surface rather than lighting up under the cursor. */
 .swatches[data-panning] {
   cursor: grabbing;
+  -webkit-user-select: none;
   user-select: none;
 }
 

@@ -197,6 +197,7 @@
     border-color 0.13s,
     box-shadow 0.13s,
     transform 0.1s;
+  -webkit-user-select: none;
   user-select: none;
 
   &:hover {
@@ -303,6 +304,7 @@
     transform 0.1s;
   touch-action: manipulation;
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
 
   &:hover {
@@ -420,6 +422,7 @@
     color 0.13s,
     border-color 0.13s;
   white-space: nowrap;
+  -webkit-user-select: none;
   user-select: none;
 
   &:hover {

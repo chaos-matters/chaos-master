@@ -94,6 +94,7 @@
   background: rgba(24, 24, 32, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  -webkit-user-select: none;
   user-select: none;
   transition:
     box-shadow 0.15s,
@@ -415,6 +416,7 @@
   margin-top: 2px;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   display: flex;
   align-items: center;

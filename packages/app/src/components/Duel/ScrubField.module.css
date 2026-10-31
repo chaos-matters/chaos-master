@@ -60,6 +60,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--scrub-value, rgba(255, 255, 255, 0.95));
   cursor: ew-resize;
+  -webkit-user-select: none;
   user-select: none;
   touch-action: none;
 }

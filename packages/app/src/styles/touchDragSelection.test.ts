@@ -15,15 +15,45 @@
  * its `none`. The preflight gives every field that takes typing `text` back,
  * at zero specificity, and ScrubInput's own field says so too.
  *
+ * TWO SPELLINGS EVERYWHERE. For the same reason a rule anywhere that writes
+ * `user-select` alone changes nothing on an iPhone: 66 rules did, among
+ * them the affine and colour editors' drag handles and the timeline header.
+ * So every user-select in any stylesheet has a -webkit-user-select of the
+ * same value in the same rule, and the other way round. The build keeps both
+ * (LightningCSS writes the -webkit- one first and drops neither, unlike
+ * backdrop-filter, glassBlurs.test.ts).
+ *
  * Chromium cannot show the iOS behaviour; the touch-polish browser check
  * reads the computed styles and the shipped CSS on an iPhone 13 Pro
  * descriptor instead.
  */
 import { describe, expect, it } from 'vitest'
-import { blocksOf, declarationsFor, readCss } from '@/test/cssModule'
+import { blocksOf, declarationsFor, readCss, readStylesheets, } from '@/test/cssModule'
 
 const STANDARD = 'user-select'
 const PREFIXED = '-webkit-user-select'
+
+/** Each user-select in a stylesheet whose other spelling is missing from its rule. */
+function twinOffenders(css: string, file: string): string[] {
+  const offenders: string[] = []
+  for (const block of blocksOf(css)) {
+    const values = (property: string) =>
+      block.declarations.filter((d) => d.property === property)
+    for (const [property, other] of [
+      [STANDARD, PREFIXED],
+      [PREFIXED, STANDARD],
+    ] as const) {
+      for (const d of values(property)) {
+        if (!values(other).some((twin) => twin.value === d.value)) {
+          offenders.push(
+            `${file}:${d.line} ${block.selector} { ${property}: ${d.value} } has no ${other}: ${d.value}`,
+          )
+        }
+      }
+    }
+  }
+  return offenders
+}
 
 /** The boxes a slider or scrub drag starts in, by stylesheet. */
 const DRAG_STARTS: readonly (readonly [file: string, selector: string])[] = [
@@ -43,6 +73,13 @@ const DRAG_STARTS: readonly (readonly [file: string, selector: string])[] = [
 ]
 
 describe('drag selection on touch', () => {
+  it('writes every user-select in both spellings', () => {
+    const offenders = readStylesheets().flatMap(({ file, css }) =>
+      twinOffenders(css, file),
+    )
+    expect(offenders).toEqual([])
+  })
+
   it.each(DRAG_STARTS)(
     'turns off selection and the callout where a drag starts: %s %s',
     (file, selector) => {
