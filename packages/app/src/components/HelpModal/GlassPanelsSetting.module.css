@@ -3,6 +3,7 @@
 
 .text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -18,9 +19,26 @@
 }
 
 /* The row is the checkbox's label, so the whole row toggles it: on a coarse
-   pointer it is the target, at full height, rather than the 19px box. */
-.row {
+   pointer it is the target, at full height, rather than the 19px box.
+
+   It never wraps. Under 500px HelpModal lets every settings row wrap, so a
+   wide segmented control drops below its label; here the long part is the
+   hint, which wraps inside .text, and wrapping the row put the box on a line
+   of its own at the left. With the coarse min-block-size standing in for the
+   automatic minimum, the modal's column also shrank the row to 44px, so that
+   line fell outside it and onto the Default mode label (measured at 390px:
+   the box at y 384, the row ending at 356). The box keeps the row's end, the
+   edge the segmented controls below end on, and the row keeps its height.
+   `label.row` outranks `.picker-mode-row`, whichever stylesheet loads last. */
+label.row {
+  flex-wrap: nowrap;
+  align-items: center;
+  flex-shrink: 0;
   cursor: pointer;
+}
+
+.row > input {
+  flex: none;
 }
 
 @media (pointer: coarse) {

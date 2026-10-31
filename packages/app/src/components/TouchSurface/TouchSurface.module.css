@@ -539,11 +539,14 @@
   cursor: pointer;
 }
 
-/* Vary panel: the rail's fourth chip. The deck keeps its footer instead. */
+/* Vary panel: the rail's fourth chip. The deck keeps its footer instead.
+   Block padding only: .panelContent already insets every tab by --la-s-3, and
+   the inline --la-s-4 on top put Mutate and Randomize 16px inside the edge
+   the transform pills, the variation rows and the colour sliders share. */
 .varyPanel {
   display: grid;
   gap: var(--la-s-3);
-  padding: var(--la-s-4);
+  padding: var(--la-s-4) 0;
 }
 
 .varyButton {
