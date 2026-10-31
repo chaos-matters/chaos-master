@@ -22,6 +22,11 @@
   /* Room for the mid-scrub bar to sit flush with the bottom edge. */
   position: relative;
   overflow: hidden;
+  /* A scrub selects neither the label above the value nor the value, and
+     raises no iOS callout: iOS reads only the -webkit- spelling. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   transition:
     background-color 140ms ease,
     border-color 140ms ease;

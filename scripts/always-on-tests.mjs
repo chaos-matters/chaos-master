@@ -218,6 +218,11 @@ export const ALWAYS_ON = [
     genre: 'filesystem',
   },
   {
+    file: 'src/styles/touchDragSelection.test.ts',
+    why: 'reads the preflight and the slider and scrub stylesheets where a touch drag starts',
+    genre: 'filesystem',
+  },
+  {
     file: 'src/pages/Benchmarks/BenchmarksPage.module.test.ts',
     why: 'reads BenchmarksPage.module.css',
     genre: 'filesystem',

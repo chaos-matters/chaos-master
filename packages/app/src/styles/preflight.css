@@ -326,6 +326,44 @@ input:where([type='button'], [type='reset'], [type='submit']),
 }
 
 /*
+  A range input is dragged, never read: the drag selects no text on a touch
+  screen and raises no iOS callout. iOS reads only the -webkit- spelling.
+*/
+
+input[type='range'] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/*
+  A field that takes typing keeps its caret and its selection. WebKit inherits
+  -webkit-user-select, so a field inside a box that turns selection off (a
+  scrub control's typed edit) lost both on iOS. :where() keeps this at zero
+  specificity, so a rule written for a field itself still wins.
+*/
+
+:where(
+  input:not(
+    [type='range'],
+    [type='checkbox'],
+    [type='radio'],
+    [type='button'],
+    [type='reset'],
+    [type='submit'],
+    [type='color'],
+    [type='file'],
+    [type='image'],
+    [type='hidden']
+  ),
+  textarea,
+  [contenteditable]:not([contenteditable='false'])
+) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
   Correct the cursor style of increment and decrement buttons in Safari.
 */
 
