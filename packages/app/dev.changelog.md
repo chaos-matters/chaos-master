@@ -188,6 +188,8 @@ user-facing summary is in `CHANGELOG.md`.
     lands on the recorded flame
   - **ui:** the Documentation dialog fits a phone screen, and its chip row
     scrolls
+  - **affine:** a 3D handle moves and turns with the pointer; each move added
+    the whole drag again, and the turn ran backwards (0.9.11 too)
 
 ### Security
 
