@@ -76,6 +76,16 @@ developer history lives in `dev.changelog.md`.
 - **In 3D, affine handles follow the pointer.** A small drag used to send a
   handle off the grid, and turning an axis spun it several times round, the
   wrong way.
+- **Settings fit a phone.** The Glass panels checkbox fell out of its row
+  and onto the next setting's label. It now sits at the row's end, on the
+  edge the controls below it share, and the Vary sheet's buttons line up
+  with the other sheets.
+- **Dragging a slider on an iPhone selects nothing.** A slider or scrub drag
+  used to select its label and could raise the iOS callout. Drags now select
+  no text anywhere in the app, and fields you type into stay selectable.
+- **The timeline stops at the glass sidebar.** With Glass panels on, the
+  timeline ran 6 px under the sidebar and its lines showed through the
+  glass. It now ends at the sidebar's edge.
 - **The screen lock holds while an agent drives.** Keys, dialogs, history and
   the view stay locked, keys pressed while the app boots included, and the
   hover preview stays out of saves.

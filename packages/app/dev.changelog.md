@@ -190,6 +190,12 @@ user-facing summary is in `CHANGELOG.md`.
     scrolls
   - **affine:** a 3D handle moves and turns with the pointer; each move added
     the whole drag again, and the turn ran backwards (0.9.11 too)
+  - **touch:** the Glass panels checkbox stays in its row on a phone, and the
+    Vary sheet's buttons share the other sheets' edge
+  - **ios:** a slider or scrub drag selects no label text and raises no
+    callout; every user-select also has the -webkit- spelling iOS reads
+  - **glass:** the timeline stops at the glass sidebar's edge instead of
+    running 0.4rem under it
 
 ### Security
 
