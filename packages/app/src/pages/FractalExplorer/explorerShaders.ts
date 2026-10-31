@@ -17,7 +17,7 @@
  */
 import { EXPONENT_FLOOR } from '@chaos-master/core'
 import { tgpu } from 'typegpu'
-import { arrayOf, atomic, builtin, f32, i32, struct, u32, vec2f, vec2u, vec4f, } from 'typegpu/data'
+import { align, arrayOf, atomic, builtin, f32, i32, struct, u32, vec2f, vec2u, vec4f, } from 'typegpu/data'
 
 export const WORKGROUP = 8
 
@@ -81,8 +81,11 @@ export const IterateUniforms = struct({
   maxIterations: u32,
   stepBudget: u32,
   flags: u32,
-  orbit0: OrbitInfo,
-  orbit1: OrbitInfo,
+  // A struct inside a uniform buffer must start on a 16-byte boundary.
+  // Chrome 144 relaxed that (uniform_buffer_standard_layout); WebKit's
+  // compiler still enforces it and refuses the whole shader.
+  orbit0: align(16, OrbitInfo),
+  orbit1: align(16, OrbitInfo),
 })
 
 /**
