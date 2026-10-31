@@ -9,7 +9,7 @@ import { TrackChangesDiamond } from '@/components/Timeline/TrackChangesDiamond'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { ensure3DAffine, project3D as projectIso } from '@/flame/affine3DView'
+import { project3D as projectIso } from '@/flame/affine3DView'
 import { randomizeAffineCoef } from '@/flame/randomize'
 import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle, } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -26,10 +26,12 @@ import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { createSelectedLastEntries } from '@/utils/selectedLastEntries'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
+import { grab3DAffine, LOCAL_AXIS_COEFS, pointerTurn, scaledRotated3D, translated3D, } from './affineDrag3D'
 import ui from './AffineEditor.module.css'
 import { AffineListEditor } from './AffineListEditor'
 import listUi from './AffineListEditor.module.css'
 import type { v2f } from 'typegpu/data'
+import type { LocalAxis } from './affineDrag3D'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { ReplayAffineMode, ReplayAffineTab, } from '@/recorder/focusPreparation'
@@ -435,17 +437,13 @@ function AffineHandle(props: {
 
   const startDragging3D = createDragHandler((initEvent) => {
     changeHistory.startPreview('Affine 3D Translation')
-    const initialTransform = ensure3DAffine(props.transform)
+    const initialTransform = grab3DAffine(props.transform)
     const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
     return {
       onPointerMove(ev) {
         const evPosition = clipToWorld(eventToClip(ev, canvas))
         const diff = sub(evPosition, grabPosition)
-        props.setTransform({
-          ...initialTransform,
-          d: (initialTransform.d ?? 0) + diff.x,
-          h: (initialTransform.h ?? 0) + diff.y,
-        })
+        props.setTransform(translated3D(initialTransform, diff.x, diff.y))
         keyframeDraggedCoefs(['d', 'h'])
       },
       onDone() {
@@ -455,10 +453,10 @@ function AffineHandle(props: {
     }
   })
 
-  const startScalingRotating3D = (axis: 'X' | 'Y' | 'Z', factor: number) =>
+  const startScalingRotating3D = (axis: LocalAxis, factor: number) =>
     createDragHandler((initEvent) => {
       changeHistory.startPreview(`Rotate/Scale Local ${axis}`)
-      const initialTransform = ensure3DAffine(props.transform)
+      const initialTransform = grab3DAffine(props.transform)
       const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
       const center = project3D(
         initialTransform.d ?? 0,
@@ -468,52 +466,22 @@ function AffineHandle(props: {
 
       function onPointerMove(ev: PointerEvent) {
         const evPosition = clipToWorld(eventToClip(ev, canvas))
-        const grabDiff = sub(grabPosition, center)
-        const evDiff = sub(evPosition, center)
-        const ratio = length(evDiff) / (length(grabDiff) || 0.001)
-        const grabNorm = vec2Normalize(grabDiff)
-        const evNorm = vec2Normalize(evDiff)
-        const cos = ev.ctrlKey || ev.metaKey ? 1 : dot(evNorm, grabNorm)
-        const sin = ev.ctrlKey || ev.metaKey ? 0 : cross2d(evNorm, grabNorm)
-
-        if (axis === 'X') {
-          const a = initialTransform.a ?? 1
-          const e = initialTransform.e ?? 0
-          const i = initialTransform.i ?? 0
-          props.setTransform({
-            ...initialTransform,
-            a: (a * cos - e * sin) * ratio * factor,
-            e: (a * sin + e * cos) * ratio * factor,
-            i: i * ratio * factor,
-          })
-        } else if (axis === 'Y') {
-          const b = initialTransform.b ?? 0
-          const f = initialTransform.f ?? 1
-          const j = initialTransform.j ?? 0
-          props.setTransform({
-            ...initialTransform,
-            b: (b * cos - f * sin) * ratio * factor,
-            f: (b * sin + f * cos) * ratio * factor,
-            j: j * ratio * factor,
-          })
-        } else if (axis === 'Z') {
-          const c = initialTransform.c ?? 0
-          const g = initialTransform.g ?? 0
-          const k = initialTransform.k ?? 1
-          props.setTransform({
-            ...initialTransform,
-            c: (c * cos - g * sin) * ratio * factor,
-            g: (c * sin + g * cos) * ratio * factor,
-            k: k * ratio * factor,
-          })
-        }
-        keyframeDraggedCoefs(
-          axis === 'X'
-            ? ['a', 'e', 'i']
-            : axis === 'Y'
-              ? ['b', 'f', 'j']
-              : ['c', 'g', 'k'],
+        const turn = pointerTurn(
+          sub(grabPosition, center),
+          sub(evPosition, center),
         )
+        // Ctrl / Cmd scales without turning.
+        const scaleOnly = ev.ctrlKey || ev.metaKey
+        props.setTransform(
+          scaledRotated3D(
+            initialTransform,
+            axis,
+            scaleOnly ? 1 : turn.cos,
+            scaleOnly ? 0 : turn.sin,
+            turn.ratio * factor,
+          ),
+        )
+        keyframeDraggedCoefs(LOCAL_AXIS_COEFS[axis].map(([coef]) => coef))
       }
 
       onPointerMove(initEvent)
