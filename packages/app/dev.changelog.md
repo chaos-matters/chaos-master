@@ -196,6 +196,9 @@ user-facing summary is in `CHANGELOG.md`.
     callout; every user-select also has the -webkit- spelling iOS reads
   - **glass:** the timeline stops at the glass sidebar's edge instead of
     running 0.4rem under it
+  - **explorer:** the iterate uniforms' orbit structs start on a 16-byte
+    boundary, which WebKit enforces (Chrome 144 relaxed it), so Safari can
+    build the shaders; a stopped picture names its reason under the HUD
 
 ### Security
 

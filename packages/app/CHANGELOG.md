@@ -86,6 +86,11 @@ developer history lives in `dev.changelog.md`.
 - **The timeline stops at the glass sidebar.** With Glass panels on, the
   timeline ran 6 px under the sidebar and its lines showed through the
   glass. It now ends at the sidebar's edge.
+- **Deep zoom on an iPhone.** Safari refused to build the explorer's shaders,
+  because two values in one of its buffers sat off the 16-byte boundary
+  Safari requires and Chrome no longer does, so the picture stayed black.
+  They now sit on it. If the picture ever stops, a line under the readouts
+  says why.
 - **The screen lock holds while an agent drives.** Keys, dialogs, history and
   the view stay locked, keys pressed while the app boots included, and the
   hover preview stays out of saves.
