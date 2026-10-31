@@ -50,8 +50,10 @@
    decides, and marks the canvas box .underSidebar while it does): the box
    spans the sidebar's column as well and drops the 0.4rem tuck, and the
    sidebar keeps its cell and sits over the canvas in it. The bottom bar,
-   which paints above the sidebar, starts where the sidebar's cover ends
-   (--leading-cover, CanvasViewport.tsx), where it sits with the setting off.
+   which paints above the sidebar, starts at the sidebar's trailing edge: the
+   cover (--leading-cover, CanvasViewport.tsx) plus the tuck the cover leaves
+   out. At the cover alone it ran 0.4rem onto the glass, and its top rule,
+   the timeline's resize edge and the dope sheet's ruler lines with it.
    Hidden, the sidebar covers nothing and the box is the full-screen one. The
    camera frames the flame in the part the sidebar leaves visible
    (lib/canvasFraming.ts). Not at the mobile widths, where the sidebar is a
@@ -65,7 +67,7 @@
   }
 
   .underSidebar > .bottom-bar {
-    left: var(--leading-cover, 0px);
+    left: calc(var(--leading-cover, 0px) + 0.4rem);
   }
 
   /* An export that sizes the canvas itself (Render in background off)

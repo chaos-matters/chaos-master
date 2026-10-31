@@ -7,7 +7,8 @@
  *     the cover the sidebar writes leaves out;
  *   - while the sidebar floats (.underSidebar on the canvas box), the box
  *     spans the sidebar's column without the tuck, at the desktop widths
- *     only, and the bottom bar starts where the cover ends;
+ *     only, and the bottom bar starts at the sidebar's trailing edge, the
+ *     cover plus the tuck, so none of its rules runs onto the glass;
  *   - the surface is glass by one composes line, the gate's optionalPanel
  *     beside onGlass, which gives the cards and the shared controls their
  *     glass look (glassHooks.test.ts), and App.module.css writes no copy of
@@ -53,7 +54,13 @@ describe('the canvas box beside the glass sidebar', () => {
     const bar = ownDeclarations(
       blockOf(desktop, /\.underSidebar > \.bottom-bar\s*\{/),
     )
-    expect(bar.get('left')).toBe('var(--leading-cover, 0px)')
+    // The cover counts from the setting-off canvas's edge, CANVAS_TUCK_REM
+    // inside the sidebar. A bar at the cover alone ran that far onto the
+    // glass, and its top rule, the timeline's resize edge and the dope
+    // sheet's ruler lines with it (6.4px at 1440 x 900).
+    expect(bar.get('left')).toBe(
+      `calc(var(--leading-cover, 0px) + ${CANVAS_TUCK_REM}rem)`,
+    )
     // Nowhere else: a span outside the media query would reach the mobile
     // grid, which has no sidebar column.
     expect(app.match(/\.underSidebar/g)).toHaveLength(3)
