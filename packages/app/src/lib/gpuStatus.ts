@@ -57,6 +57,19 @@ export function isGpuTerminallyDown() {
   return TERMINAL_STATES.has(gpuStatus())
 }
 
+const [gpuError, setGpuErrorInternal] = createSignal<string | undefined>()
+
+/**
+ * Why WebGPU went down, in the words of whatever failed, for a page that
+ * shows it (the deep-zoom explorer does, where a phone has no console).
+ * The first reason is kept: what fails after it is only the fallout.
+ */
+export { gpuError }
+
+export function setGpuError(message: string) {
+  if (gpuError() === undefined) setGpuErrorInternal(message)
+}
+
 // Dev-only console hook to exercise the degraded shell + preview posters without
 // a real device crash. In devtools run:  __chaosForceGpuUnavailable()
 // Flips the session to the terminal 'unavailable' state: every live preview

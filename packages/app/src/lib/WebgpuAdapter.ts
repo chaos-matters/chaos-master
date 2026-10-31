@@ -1,5 +1,5 @@
 import { TRACK_PERFORMANCE } from '@/defaults'
-import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
+import { gpuStatus, setGpuError, setGpuStatus } from '@/lib/gpuStatus'
 
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
@@ -182,6 +182,11 @@ export async function initializeWebgpuDevice(
       }
 
       setGpuStatus('unavailable')
+      setGpuError(
+        info.message
+          ? `the GPU device was lost: ${info.message}`
+          : 'the GPU device was lost',
+      )
       console.error('WebGPU device lost. Reload the page to recover.')
     })
     .catch(console.error)

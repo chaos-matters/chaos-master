@@ -21,6 +21,7 @@ import type { ExplorerRendererProps, ExplorerStatus } from './ExplorerRenderer'
 import type * as JuliaMarkerModule from './JuliaMarker'
 import type { JuliaMarkerProps } from './JuliaMarker'
 import type { Palette } from '@/flame/colorMap'
+import type * as GpuStatusModule from '@/lib/gpuStatus'
 
 const stubs = vi.hoisted(() => ({
   renderers: [] as ExplorerRendererProps[],
@@ -30,6 +31,13 @@ const stubs = vi.hoisted(() => ({
   /** The palette picker's choice, as the settings panel wires it. */
   selectPalette: undefined as ((palette: Palette) => void) | undefined,
   showToast: vi.fn(),
+  /** Why WebGPU went down, as `gpuStatus` would say, read at render. */
+  gpuError: undefined as string | undefined,
+}))
+
+vi.mock('@/lib/gpuStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof GpuStatusModule>()),
+  gpuError: () => stubs.gpuError,
 }))
 
 vi.mock('./ExplorerRenderer', () => ({
@@ -99,6 +107,7 @@ beforeEach(() => {
   stubs.markers.length = 0
   stubs.paletteUploads = 0
   stubs.showToast.mockClear()
+  stubs.gpuError = undefined
   vi.mocked(resolvePalette).mockClear()
 })
 
@@ -377,6 +386,43 @@ describe('FractalExplorerPage readouts', () => {
     expect(done()).toBe('Reference')
     report({ error: 'the orbit worker failed to start' })
     expect(done()).toBe('Error')
+  })
+
+  // On a phone there is no console to read: the reason has to be on screen.
+  it('says in words why the picture stopped, and drops it once it runs again', () => {
+    open(DEFAULT_LOCATION)
+    expect(screen.queryByRole('alert')).toBeNull()
+    stubs.renderers[0]!.onStatus({
+      ...STATUS,
+      error:
+        "the browser could not build the explorer's shaders: 1 error generated while compiling the shader:\n12:3: offset of struct member IterateUniforms::orbit0 must be a multiple of 16 bytes, but its offset is 36 bytes",
+    })
+    expect(screen.getByRole('alert').textContent).toBe(
+      "Deep zoom stopped: the browser could not build the explorer's shaders: 1 error generated while compiling the shader:\n12:3: offset of struct member IterateUniforms::orbit0 must be a multiple of 16 bytes, but its offset is 36 bytes",
+    )
+    stubs.renderers[0]!.onStatus(STATUS)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it("names the Julia pane's failure when the Mandelbrot pane has none", () => {
+    open(withMode(DEFAULT_LOCATION, 'split'))
+    stubs.renderers[0]!.onStatus(STATUS)
+    stubs.renderers[1]!.onStatus({
+      ...STATUS,
+      error: 'the GPU refused the orbits: out of memory',
+    })
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Deep zoom stopped: the GPU refused the orbits: out of memory',
+    )
+  })
+
+  it('names what stopped WebGPU before any picture could start', () => {
+    stubs.gpuError =
+      'Failed to get GPUAdapter, make sure to use a browser with WebGPU support.'
+    open(DEFAULT_LOCATION)
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Deep zoom stopped: Failed to get GPUAdapter, make sure to use a browser with WebGPU support.',
+    )
   })
 })
 

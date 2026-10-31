@@ -5,7 +5,7 @@
  * refused upload leaves behind.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { bindingEntries, createOrbitBuffers, deviceErrors, fittedCapacity, grownCapacity, } from './explorerOrbitBuffers'
+import { bindingEntries, createOrbitBuffers, deviceComplaint, deviceErrors, fittedCapacity, grownCapacity, } from './explorerOrbitBuffers'
 import type { TgpuRoot } from 'typegpu'
 import type { GpuOrbit } from './orbitProtocol'
 
@@ -90,6 +90,31 @@ describe('deviceErrors', () => {
       }),
     ).toThrow('no current texture')
     expect(open()).toBe(0)
+  })
+})
+
+describe('deviceComplaint', () => {
+  it('resolves to the first complaint, with both scopes popped', async () => {
+    const { device, open } = scopedDevice(['offset of struct member'])
+    const result = deviceComplaint(device, () => undefined)
+    expect(open()).toBe(0)
+    await expect(result).resolves.toBe('offset of struct member')
+  })
+
+  it('resolves to what the work threw, with both scopes popped', async () => {
+    const { device, open } = scopedDevice()
+    const result = deviceComplaint(device, () => {
+      throw new Error('Resolution of explorerIterate failed')
+    })
+    expect(open()).toBe(0)
+    await expect(result).resolves.toBe('Resolution of explorerIterate failed')
+  })
+
+  it('resolves to undefined when the device had nothing to say', async () => {
+    const { device } = scopedDevice()
+    await expect(deviceComplaint(device, () => undefined)).resolves.toBe(
+      undefined,
+    )
   })
 })
 

@@ -1,6 +1,6 @@
 import { createResource, onCleanup, Show } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { gpuReady } from '@/lib/gpuStatus'
+import { gpuReady, setGpuError } from '@/lib/gpuStatus'
 import { registerPagehideTeardown } from '@/lib/pagehideCleanup'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { vramLog } from '@/utils/vramLog'
@@ -48,6 +48,7 @@ export function Root(props: ParentProps<RootProps>) {
         // preview renders a poster — never a full-screen takeover. The status
         // signal (set in WebgpuAdapter) drives gpuReady() and the UI.
         console.error('[Root] WebGPU initialization failed:', err)
+        setGpuError(err instanceof Error ? err.message : String(err))
         return { adapter: null, device: null, root: null }
       }
     },

@@ -289,6 +289,54 @@
   }
 }
 
+/* Why the picture stopped, in the browser's own words, under the HUD. The
+   pill only says Error, and a phone has no console to read. pre-line keeps
+   the line breaks in a compiler message; the text stays selectable so it can
+   be copied into a bug report. */
+.alert {
+  composes: chrome from '@/styles/designSystem/glass.module.css';
+  position: absolute;
+  top: calc(var(--la-safe-top) + 2 * var(--la-s-3) + var(--la-tap));
+  left: calc(var(--la-safe-left) + var(--la-s-3));
+  max-width: min(
+    560px,
+    calc(100% - var(--la-safe-left) - var(--la-safe-right) - 2 * var(--la-s-3))
+  );
+  max-height: 30dvh;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--la-s-2) var(--la-s-3);
+  border-color: var(--la-error);
+  border-radius: var(--la-r-md);
+  color: var(--la-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Left of the open side panel, not under it. */
+@media (min-width: 680px) {
+  .page[data-panel] .alert {
+    max-width: min(
+      560px,
+      calc(
+        100% - var(--la-safe-left) - var(--la-safe-right) - 3 * var(--la-s-3) -
+          min(340px, calc(100vw - 2 * var(--la-s-3)))
+      )
+    );
+  }
+}
+
+/* The phone HUD is two rows tall. */
+@media not all and (min-width: 680px) {
+  .alert {
+    top: calc(
+      var(--la-safe-top) + 2 * var(--la-s-3) + 2 * var(--la-tap) + var(--la-s-1)
+    );
+    right: calc(var(--la-safe-right) + var(--la-s-3));
+    max-width: none;
+  }
+}
+
 .controls {
   display: flex;
   flex-direction: column;

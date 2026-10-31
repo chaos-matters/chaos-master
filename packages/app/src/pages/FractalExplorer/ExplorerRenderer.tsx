@@ -17,6 +17,7 @@ import { backdropMapping, pixelSpacing, referenceOffset, referenceServes, refere
 import { createEffect, onCleanup } from 'solid-js'
 import { useCanvas } from '@/lib/CanvasContext'
 import { useLiveRootContext } from '@/lib/RootContext'
+import { createExplorerFailure } from './explorerFailure'
 import { createExplorerGpu, PALETTE_SIZE } from './explorerGpu'
 import { attachExplorerInput } from './explorerInput'
 import { paletteLut } from './explorerPalette'
@@ -100,6 +101,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
   const { canvas, context, canvasFormat, canvasSize } = useCanvas()
   const { performance } = globalThis
   const gpu = createExplorerGpu(root, canvasFormat)
+  const failure = createExplorerFailure(gpu.pipelineCheck)
   onCleanup(() => {
     gpu.destroy()
   })
@@ -135,7 +137,6 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
   let inFlight = false
   let needsPresent = true
   let orbitMs: number | undefined
-  let error: string | undefined
   let lastStatus = 0
   /** When the current picture started iterating, and when it finished. */
   let startedAt = 0
@@ -225,7 +226,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
     if (!referenceServes({ ...spec, complete: false }, t)) {
       // A fresh reference that cannot serve its own view would be asked for
       // again every frame; say so instead.
-      error = 'this view is outside what the explorer can render'
+      failure.fail('this view is outside what the explorer can render')
       return
     }
     requested = spec
@@ -247,7 +248,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
           reference = undefined
           iterating = false
           const message = cause instanceof Error ? cause.message : cause
-          error = `the GPU refused the orbits: ${String(message)}`
+          failure.fail(`the GPU refused the orbits: ${String(message)}`)
         }
         gpu.uploadOrbits(result.set).then((message) => {
           if (message !== undefined) refuse(message)
@@ -256,14 +257,14 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
         requested = undefined
         refused = undefined
         orbitMs = result.ms
-        error = undefined
+        failure.clear()
         lastKey = ''
         setTimeout(tick, 0)
       })
       .catch((cause: unknown) => {
         // A newer request supersedes this one's failure too.
         if (requested !== spec) return
-        error = cause instanceof Error ? cause.message : String(cause)
+        failure.fail(cause)
         requested = undefined
       })
   }
@@ -335,7 +336,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
         if (active * 2 >= grid.width * grid.height) loadedBudget = budget
       })
       .catch((cause: unknown) => {
-        error = cause instanceof Error ? cause.message : String(cause)
+        failure.fail(cause)
         iterating = false
       })
       .finally(() => {
@@ -363,7 +364,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
       samples,
       sampleTarget: sampleTarget(),
       iterationCap: cap < props.scene().maxIterations ? cap : undefined,
-      error,
+      error: failure.message(),
     })
   }
 
@@ -372,7 +373,7 @@ export function ExplorerRenderer(props: ExplorerRendererProps) {
   }
 
   function tick() {
-    if (disposed) return
+    if (disposed || failure.stopped()) return
     // Resizing a canvas clears it, and a grid capped by the pixel budget
     // often stays the same size, so nothing else would draw it again.
     const size = canvasSize()

@@ -11,7 +11,8 @@
  * buffer that was refused.
  *
  * `deviceErrors` wraps GPU work in the out-of-memory and validation scopes,
- * for the uploads here and for `explorerGpu`'s steps.
+ * for the uploads here and for `explorerGpu`'s steps, and `deviceComplaint`
+ * for its pipeline check.
  */
 import { BLA_ENTRY_BYTES, ORBIT_ENTRY_BYTES } from '@chaos-master/core'
 import { arrayOf, vec2u } from 'typegpu/data'
@@ -87,6 +88,24 @@ export function deviceErrors(
     throw cause
   }
   return popBoth(device)
+}
+
+/**
+ * `deviceErrors` for work that can throw before the device sees it, as
+ * TypeGPU can while it writes a shader: the throw resolves as the
+ * complaint, so whoever shows complaints shows that one too.
+ */
+export function deviceComplaint(
+  device: GPUDevice,
+  work: () => void,
+): Promise<string | undefined> {
+  try {
+    return deviceErrors(device, work)
+  } catch (cause) {
+    return Promise.resolve(
+      cause instanceof Error ? cause.message : String(cause),
+    )
+  }
 }
 
 function emptyInfo(): OrbitUpload['info'] {

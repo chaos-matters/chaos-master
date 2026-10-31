@@ -18,6 +18,7 @@ import { Dropzone } from '@/components/Dropzone/Dropzone'
 import { useToast } from '@/contexts/ToastContext'
 import { ChevronLeft, Redo, Settings, SplitView, Undo } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
+import { gpuError, gpuReady } from '@/lib/gpuStatus'
 import { downloadBlob } from '@/utils/blob'
 import { addExplorerLocationToPng, extractExplorerFromPng, } from '@/utils/flameInPng'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
@@ -249,6 +250,15 @@ export function FractalExplorerPage() {
   }
 
   const progress = () => status()?.progress ?? 0
+  /**
+   * Why the picture stopped, in the words of what stopped it: a renderer,
+   * or WebGPU itself before there was one. A phone has no console, so this
+   * line under the readouts is the only place to read it.
+   */
+  const stoppedBecause = () =>
+    status()?.error ??
+    (split() ? juliaStatus()?.error : undefined) ??
+    (gpuReady() ? undefined : gpuError())
   /** The heads-up Done readout: why the picture stopped, or how far it got. */
   const done = () => {
     if (status()?.error) return 'Error'
@@ -405,6 +415,14 @@ export function FractalExplorerPage() {
             <Settings />
           </button>
         </header>
+
+        <Show when={stoppedBecause()}>
+          {(reason) => (
+            <p class={ui.alert} role="alert">
+              Deep zoom stopped: {reason()}
+            </p>
+          )}
+        </Show>
 
         <Show when={panelOpen()}>
           <aside class={ui.panel} aria-label="Explorer settings">

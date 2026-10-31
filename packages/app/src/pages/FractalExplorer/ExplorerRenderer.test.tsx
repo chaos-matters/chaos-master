@@ -46,10 +46,16 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject }
 }
 
-/** A GPU whose steps finish only when the test says so. */
-function fakeGpu() {
+/**
+ * A GPU whose steps finish only when the test says so, and whose pipelines
+ * built unless `pipelineCheck` says otherwise.
+ */
+function fakeGpu(
+  pipelineCheck = Promise.resolve<string | undefined>(undefined),
+) {
   const steps: Deferred<StepResult | undefined>[] = []
   const gpu = {
+    pipelineCheck,
     maxPixels: () => 1 << 24,
     maxOrbitEntries: () => 1 << 24,
     uploadOrbits: vi.fn(() => Promise.resolve<string | undefined>(undefined)),
@@ -139,8 +145,11 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function mount(initial: ExplorerScene = SCENE) {
-  const { gpu, steps } = fakeGpu()
+function mount(
+  initial: ExplorerScene = SCENE,
+  pipelineCheck?: Promise<string | undefined>,
+) {
+  const { gpu, steps } = fakeGpu(pipelineCheck)
   const orbits = fakeOrbits()
   vi.mocked(createExplorerGpu).mockReturnValue(gpu as unknown as ExplorerGpu)
   vi.mocked(createOrbitClient).mockReturnValue(orbits.client)
@@ -411,5 +420,33 @@ describe('ExplorerRenderer steps', () => {
       error: 'validation: binding too large',
       progress: 0,
     })
+  })
+
+  it('names the compiler error, in the console too, and tries nothing more when the shaders do not build', async () => {
+    const logged = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined)
+    // What Safari's WGSL compiler said about the uniform layout fixed here.
+    const compiler =
+      '1 error generated while compiling the shader:\n12:3: offset of struct member IterateUniforms::orbit0 must be a multiple of 16 bytes, but its offset is 36 bytes'
+    const check = deferred<string | undefined>()
+    const r = mount(SCENE, check.promise)
+    await r.adopt()
+    expect(r.gpu.step).toHaveBeenCalledOnce()
+    check.resolve(compiler)
+    r.steps[0]!.reject(new Error('Invalid ComputePipeline'))
+    await vi.advanceTimersByTimeAsync(100)
+    r.frame(1200)
+    const message = `the browser could not build the explorer's shaders: ${compiler}`
+    expect(r.statuses.at(-1)).toMatchObject({ error: message, progress: 0 })
+    expect(logged).toHaveBeenCalledWith(`[explorer] ${message}`)
+    // A pan would restart the picture; with no shaders it starts nothing.
+    const restarts = r.gpu.restart.mock.calls.length
+    r.move(panView(SCENE.view, 10, 0, 600))
+    r.frame(1300)
+    await r.settle()
+    expect(r.gpu.restart).toHaveBeenCalledTimes(restarts)
+    expect(r.gpu.step).toHaveBeenCalledOnce()
+    logged.mockRestore()
   })
 })
