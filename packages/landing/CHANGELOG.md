@@ -6,7 +6,7 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
-## Unreleased
+## [0.3.0] — 2026-10-31
 
 ### Product Hunt
 
@@ -15,6 +15,12 @@ This file is internal (not surfaced anywhere on the site).
   id (1252539); `theme=dark` is the variant drawn on `#221D21`, so it sits on
   the black hero instead of punching a white card through it. Nothing to add to
   a CSP — this package ships no `_headers`.
+
+### Lumen Arcade
+
+- Beats, Director and Arena join Teach, Cinema and Duel as live modes, each
+  with a paragraph on what the agent does in it. The "On the horizon" row
+  shows only while a mode is still to come, so it is gone for now.
 
 ### Privacy and support
 
