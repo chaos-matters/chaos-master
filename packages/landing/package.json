@@ -21,8 +21,8 @@
     "@typegpu/color": "0.12.0",
     "@typegpu/noise": "0.12.0",
     "@typegpu/sdf": "0.12.0",
-    "astro": "^7.2.8",
-    "solid-js": "1.9.11",
+    "astro": "^7.3.3",
+    "solid-js": "1.9.18",
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.4.0",
     "typegpu": "0.12.0",
@@ -36,6 +36,6 @@
     "typescript": "^5.9.3",
     "unplugin-typegpu": "^0.12.1",
     "vite-plugin-qrcode": "^0.4.1",
-    "wrangler": "^4.103.0"
+    "wrangler": "^4.157.0"
   }
 }

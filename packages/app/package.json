@@ -39,13 +39,13 @@
     "@vercel/analytics": "1.6.1",
     "acorn": "^8.16.0",
     "dexie": "^4.4.2",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.17",
     "fflate": "^0.8.3",
     "marked": "^18.0.4",
     "mathjax": "^4.1.2",
     "mp4-muxer": "^5.2.2",
     "solid-devtools": "^0.34.5",
-    "solid-js": "1.9.11",
+    "solid-js": "1.9.18",
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.4.0",
     "typegpu": "0.12.0",
@@ -59,12 +59,12 @@
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/dom": "^10.4.1",
     "@types/node": "^25.6.0",
-    "@vitest/coverage-v8": "5.0.1",
+    "@vitest/coverage-v8": "5.1.0",
     "esbuild": "^0.28.1",
     "eslint": "^9.39.4",
     "eslint-plugin-solid": "^0.14.5",
     "fake-indexeddb": "^6.2.5",
     "vite-plugin-qrcode": "^0.4.1",
-    "wrangler": "^4.103.0"
+    "wrangler": "^4.157.0"
   }
 }
