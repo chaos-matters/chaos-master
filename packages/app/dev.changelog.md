@@ -31,7 +31,7 @@ one pull request (#181). No application code changes.
 - **deps:** wrangler 4.103.0 -> 4.157.0 in app and landing; its miniflare moves
   sharp 0.34.5 -> 0.35.5 (GHSA-wq5f-xc86-pv6w, GHSA-rgj7-g3m4-5g8c,
   GHSA-f88m-g3jw-g9cj)
-- **deps:** Capacitor cli, core, android and ios 8.5.1 -> 8.6.0; the cli's
+- **deps:** Capacitor cli, core, android and ios 8.5.2 -> 8.6.0; the cli's
   xcode 4 no longer depends on uuid 7.0.3 (GHSA-w5hq-g745-h8pq)
 - **deps:** astro 7.3.2 -> 7.4.5 (GHSA-mpr7-6m5w-76rw), which carries devalue
   5.8.1 -> 6.0.3 (eight advisories), smol-toml 1.9.1, svgo 4.1.0 and zod 4.6.7
@@ -41,10 +41,13 @@ one pull request (#181). No application code changes.
 - **deps:** within range: browserslist 4.29.5, baseline-browser-mapping
   2.11.35, brace-expansion 1.1.21 and 5.0.12, fast-uri 3.1.9, js-yaml 4.3.2,
   postcss-selector-parser 7.1.7, source-map-js 1.2.2, svgo 3.3.5
-- Stays open: minimatch 3.1.5 under eslint 9 (GHSA-g3hv-75wg-m249, medium,
-  lint only). The first fixed release is 11.0.1; eslint 9 asks for ^3.1.5 and
-  eslint 10 for ^10.2.6, and 11 removed the `makeRe()` eslint calls, so no
-  override is safe. It waits for an eslint release on minimatch 11.
+- Stays open: minimatch below 11.0.1 (GHSA-g3hv-75wg-m249, medium, alert
+  #198), in dev tooling only: 3.1.5 under eslint 9 and its config packages,
+  10.2.5 under typescript-eslint, eslint-plugin-import-x and Stryker. Their
+  latest releases still ask for minimatch 10 or older, and an override would
+  break lint: 11 removed `makeRe()`, which eslint and import-x call, and the
+  3.x callers expect the CommonJS export to be a function. The alert closes
+  once all four move to minimatch 11.
 
 ## [0.9.13] - 2026-10-31
 
