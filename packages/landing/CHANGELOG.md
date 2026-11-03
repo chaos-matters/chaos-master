@@ -6,7 +6,7 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
-## [Unreleased]
+## [0.3.1] — 2026-11-03
 
 ### Security
 
