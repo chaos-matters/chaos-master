@@ -1,6 +1,6 @@
 {
   "name": "@chaos-master/landing",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Marketing landing page for Lumen Apeiron",
   "type": "module",
   "private": true,
