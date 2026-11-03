@@ -7,6 +7,45 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.14] - 2026-11-03
+
+A dependency-only patch: the open Dependabot advisories on upstream, closed in
+one pull request (#181). No application code changes.
+
+### Security
+
+- **deps:** dompurify 3.4.13 -> 3.4.17 (GHSA-cg2g-xh64-v4q7 critical,
+  GHSA-mrv2-3pqr-j5jr, GHSA-p98j-92pf-mc4p, GHSA-6688-9rhm-gjv2,
+  GHSA-c6gr-qvv4-5v3f)
+- **deps:** solid-js 1.9.11 -> 1.9.18 in app and landing; it carries seroval
+  1.5.4 -> 1.6.12 (GHSA-p6vx-979v-rg4c critical, GHSA-7rv5-mrxv-xcr9,
+  GHSA-97r2-qh9m-474h)
+- **deps:** vite 8.3.0 -> 8.3.5 (GHSA-rq7h-c2jc-7f22, GHSA-vfpm-58rq-9qcg,
+  GHSA-9jrq-w75r-8gcw and the launch-editor advisories GHSA-587h-7wmj-h5pm,
+  GHSA-r825-w8mm-5pxw, GHSA-698v-4r3x-3vcv)
+- **deps:** vitest 5.0.1 -> 5.1.0, with @vitest/coverage-v8 pinned to match in
+  app and core (@vitest/mocker GHSA-qxg6-89mg-rqv8, GHSA-xp26-3454-mjgp)
+- **deps:** happy-dom 20.10.2 -> 21.0.4 (GHSA-834v-8h66-3h79 host code
+  execution, GHSA-c8p4-j97h-3vg8 SSRF, GHSA-5fpq-26gf-qwcr). 21 stops loading
+  CSS files and iframes by default; the tests never did.
+- **deps:** wrangler 4.103.0 -> 4.157.0 in app and landing; its miniflare moves
+  sharp 0.34.5 -> 0.35.5 (GHSA-wq5f-xc86-pv6w, GHSA-rgj7-g3m4-5g8c,
+  GHSA-f88m-g3jw-g9cj)
+- **deps:** Capacitor cli, core, android and ios 8.5.1 -> 8.6.0; the cli's
+  xcode 4 no longer depends on uuid 7.0.3 (GHSA-w5hq-g745-h8pq)
+- **deps:** astro 7.3.2 -> 7.4.5 (GHSA-mpr7-6m5w-76rw), which carries devalue
+  5.8.1 -> 6.0.3 (eight advisories), smol-toml 1.9.1, svgo 4.1.0 and zod 4.6.7
+- **deps:** overrides: undici ^7.30.1 (sixteen advisories), rimraf>glob
+  ^14.0.2 (GHSA-3g3m-2fjr-6pw4) and typed-rest-client>qs ^6.16.1 (four
+  advisories); the parents pin older releases
+- **deps:** within range: browserslist 4.29.5, baseline-browser-mapping
+  2.11.35, brace-expansion 1.1.21 and 5.0.12, fast-uri 3.1.9, js-yaml 4.3.2,
+  postcss-selector-parser 7.1.7, source-map-js 1.2.2, svgo 3.3.5
+- Stays open: minimatch 3.1.5 under eslint 9 (GHSA-g3hv-75wg-m249, medium,
+  lint only). The first fixed release is 11.0.1; eslint 9 asks for ^3.1.5 and
+  eslint 10 for ^10.2.6, and 11 removed the `makeRe()` eslint calls, so no
+  override is safe. It waits for an eslint release on minimatch 11.
+
 ## [0.9.13] - 2026-10-31
 
 The fork's work since 0.9.11, Komediruzecki/chaos-master-fp #73 to #159, landed
