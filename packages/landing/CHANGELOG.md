@@ -13,6 +13,11 @@ This file is internal (not surfaced anywhere on the site).
 - Dependency updates shared with app 0.9.14 (#181): astro 7.3.2 -> 7.4.5,
   solid-js 1.9.11 -> 1.9.18, wrangler 4.103.0 -> 4.157.0.
 
+### Changed
+
+- The deploy workflows build on Node 24, as the app's workflows do. Astro
+  7.4.5 refuses to run on a Node 22 release older than 22.23.4.
+
 ## [0.3.0] — 2026-10-31
 
 ### Product Hunt

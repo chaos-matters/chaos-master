@@ -7,10 +7,10 @@ developer history lives in `dev.changelog.md`.
 
 ### Security
 
-- **Updated libraries.** The libraries the app is built with, and the tools
-  that build and test it, move to the releases that fix the security
-  advisories GitHub reported against them: DOMPurify, Solid, Vite, Vitest,
-  happy-dom, Wrangler, Capacitor and Astro among them. No feature changes.
+- **Updated libraries.** DOMPurify, Vite and happy-dom move to releases
+  that fix security advisories GitHub reported against them. Solid, Vitest,
+  Wrangler and Capacitor move to releases that bring in fixed versions of
+  the libraries they depend on. No feature changes.
 
 ## [0.9.13] - 2026-10-31
 
