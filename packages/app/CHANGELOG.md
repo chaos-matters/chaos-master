@@ -3,6 +3,15 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.14] - 2026-11-03
+
+### Security
+
+- **Updated libraries.** The libraries the app is built with, and the tools
+  that build and test it, move to the releases that fix the security
+  advisories GitHub reported against them: DOMPurify, Solid, Vite, Vitest,
+  happy-dom, Wrangler, Capacitor and Astro among them. No feature changes.
+
 ## [0.9.13] - 2026-10-31
 
 ### Added

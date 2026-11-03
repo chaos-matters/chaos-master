@@ -6,6 +6,13 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## [Unreleased]
+
+### Security
+
+- Dependency updates shared with app 0.9.14 (#181): astro 7.3.2 -> 7.4.5,
+  solid-js 1.9.11 -> 1.9.18, wrangler 4.103.0 -> 4.157.0.
+
 ## [0.3.0] — 2026-10-31
 
 ### Product Hunt
